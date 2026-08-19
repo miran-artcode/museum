@@ -1,0 +1,27 @@
+{
+  "name": "museum",
+  "version": "1.0.0",
+  "description": "고등학교 1학년 미술 8차시 단원 「실재한 적 없는 유물 이미지로 구성한 허구의 아카이브 전시」의 수업 자료와 학생 기록지, 교사 대시보드를 담은 웹 애플리케이션입니다.",
+  "main": "src-fb.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miran-artcode/museum.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/miran-artcode/museum/issues"
+  },
+  "homepage": "https://github.com/miran-artcode/museum#readme",
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "firebase": "^12.17.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}

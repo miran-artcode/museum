@@ -1318,35 +1318,39 @@ function SessionDot({ ratio }) {
 }
 
 
-function LessonPanel({ L }) {
+function LessonPanel({ L, teacher }) {
   const total = L.flow.reduce((a, r) => a + r[1], 0);
   return (
     <div className="lesson">
       <div className="lesson-head">
-        <span className="lesson-n">{L.n}차시 강의 노트</span>
+        <span className="lesson-n">{L.n}차시 {teacher ? "수업 안내" : "강의 노트"}</span>
         <span className="lesson-title">{L.title}</span>
-        <span className="lesson-min">{total}MIN</span>
+        {teacher && <span className="lesson-min">{total}MIN</span>}
       </div>
       <div className="lesson-body">
         <ul className="goal-list">
           {L.goals.map((g, i) => <li key={i}>{g}</li>)}
         </ul>
-        <div className="std-chips">
-          {L.stds.map((s, i) => <span className="std-chip" key={i}>{s}</span>)}
-        </div>
-        <details className="reading">
-          <summary>120분 수업 흐름</summary>
-          <div className="reading-in">
-            <table className="flow-tbl">
-              <thead><tr><th>단계</th><th>시간</th><th>활동</th></tr></thead>
-              <tbody>
-                {L.flow.map((r, i) => (
-                  <tr key={i}><td>{r[0]}</td><td className="fm">{r[1]}분</td><td>{r[2]}</td></tr>
-                ))}
-              </tbody>
-            </table>
+        {teacher && (
+          <div className="std-chips">
+            {L.stds.map((s, i) => <span className="std-chip" key={i}>{s}</span>)}
           </div>
-        </details>
+        )}
+        {teacher && (
+          <details className="reading" open>
+            <summary><span className="stage-tag ped">교사용</span>120분 수업 흐름</summary>
+            <div className="reading-in">
+              <table className="flow-tbl">
+                <thead><tr><th>단계</th><th>시간</th><th>활동</th></tr></thead>
+                <tbody>
+                  {L.flow.map((r, i) => (
+                    <tr key={i}><td>{r[0]}</td><td className="fm">{r[1]}분</td><td>{r[2]}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        )}
         {L.readings.map((rd, i) => (
           <details className="reading" key={i}>
             <summary><span className="stage-tag">{rd.stage}</span>{rd.h}</summary>
@@ -1366,7 +1370,7 @@ function LessonPanel({ L }) {
             </div>
           </details>
         ))}
-        {L.pedagogy && (
+        {teacher && L.pedagogy && (
           <details className="reading pedagogy">
             <summary><span className="stage-tag ped">교사용</span>{L.pedagogy.title}</summary>
             <div className="reading-in">
@@ -1375,7 +1379,7 @@ function LessonPanel({ L }) {
           </details>
         )}
       </div>
-      <div className="lesson-guide">읽기 자료는 수업 흐름의 단계 순서로 놓여 있습니다. 읽은 뒤 「배움 확인 {L.n}」과 「탐구 질문 {L.n}」에 자기 말로 답합니다. 답은 자동 저장됩니다.</div>
+      {!teacher && <div className="lesson-guide">읽기 자료는 수업 흐름의 단계 순서로 놓여 있습니다. 읽은 뒤 「배움 확인 {L.n}」과 「탐구 질문 {L.n}」에 자기 말로 답합니다. 답은 자동 저장됩니다.</div>}
     </div>
   );
 }
@@ -2344,6 +2348,27 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, onBack }) {
 
 /* ---------- 교사: 대시보드 ---------- */
 
+/* ---------- 교사: 수업 안내 (교사용 안내서) ---------- */
+
+function TeacherGuide() {
+  const [sess, setSess] = useState(SESSIONS[0]);
+  return (
+    <div>
+      <div className="card">
+        <div className="card-body" style={{ fontSize: 13, color: "var(--sub)" }}>
+          차시별 교사용 안내서입니다. 120분 수업 흐름, 성취기준, 설계 근거(교육학적 참고)와 학생에게 보이는 읽기 자료를 함께 볼 수 있습니다. 학생 화면에는 학습 목표와 읽기 자료만 보입니다.
+        </div>
+      </div>
+      <div className="t-tabs">
+        {SESSIONS.map((s) => (
+          <button key={s} className={"btn small " + (sess === s ? "" : "ghost")} onClick={() => setSess(s)}>{s}</button>
+        ))}
+      </div>
+      {LESSONS.filter((L) => L.session === sess).map((L) => <LessonPanel key={L.n} L={L} teacher />)}
+    </div>
+  );
+}
+
 function TeacherApp({ onExit, onGallery }) {
   const [tab, setTab] = useState("현황");
   const [roster, setRoster] = useState({});
@@ -2463,7 +2488,7 @@ function TeacherApp({ onExit, onGallery }) {
         ) : (
           <div>
             <div className="t-tabs">
-              {["현황", "차시 공개", "분석", "사고 변화", "설정"].map((t) => (
+              {["현황", "차시 공개", "수업 안내", "분석", "사고 변화", "설정"].map((t) => (
                 <button key={t} className={"btn small " + (tab === t ? "" : "ghost")} onClick={() => setTab(t)}>{t}</button>
               ))}
             </div>
@@ -2546,6 +2571,8 @@ function TeacherApp({ onExit, onGallery }) {
                   </div>
                 </div>
               </div>
+            ) : tab === "수업 안내" ? (
+              <TeacherGuide />
             ) : tab === "분석" ? (
               <div>
                 <div className="card">
