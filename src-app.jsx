@@ -15,6 +15,14 @@ const store = {
   set: (k, v) => fbStore.set(k, v),
 };
 
+/* 미디어(사진·음성·스케치·영상) 저장 계층 — Firestore media 컬렉션.
+   문서 이름은 {소유자}_{필드키} 형식이어야 보안 규칙이 앞부분으로 소유자를 판별한다. */
+const mediaStore = {
+  get: (owner, ref) => fbStore.get("media:" + owner + "_" + ref),
+  put: (owner, ref, data) => fbStore.set("media:" + owner + "_" + ref, data),
+  remove: (owner, ref) => fbStore.remove("media:" + owner + "_" + ref),
+};
+
 const now = () => new Date().toISOString();
 const fmtTime = (iso) => {
   if (!iso) return "-";
@@ -125,6 +133,7 @@ const SCHEMA = [
       { k: "contact", t: "text", label: "이 문제와 내가 만나는 자리" },
       { k: "why", t: "area", label: "왜 하필 이 문제인지" },
       { k: "photos", t: "images", opt: true, label: "관찰 사진 (최대 3장) — 문제를 만난 자리에서 찍은 장면. 사람의 얼굴이 담기지 않게 찍습니다.", mm: true },
+      { k: "sound", t: "audio", max: 30, opt: true, label: "현장 소리 (최대 30초) — 문제의 자리에서 들리는 소리를 담습니다. 사람의 목소리가 담기지 않게 합니다.", mm: true },
     ],
   },
   {
@@ -186,6 +195,7 @@ const SCHEMA = [
     fields: [
       { k: "eskis", t: "area", label: "서로 다른 시점의 에스키스 세 점에 대한 메모 (구조·시점·스케일·배경·빛)" },
       { k: "eskisImg", t: "images", opt: true, label: "에스키스 사진 (최대 3장) — 손으로 그린 세 점을 찍어 올립니다.", mm: true },
+      { k: "sketchpad", t: "sketch", opt: true, label: "디지털 에스키스 — 화면에 직접 그려 저장합니다. 종이 스케치 사진과 함께 남겨도 됩니다.", mm: true },
       { k: "pairRead", t: "text", label: "짝이 읽어 준 내용" },
       { k: "final", t: "area", label: "최종 선택한 장면과 선택 이유" },
       { k: "checks", t: "checks", opts: ["구조·재질", "시점·스케일", "빛·배경", "마모·파손·수리 흔적의 위치"], label: "화면 설계 확인" },
@@ -216,6 +226,7 @@ const SCHEMA = [
       { k: "aiRole", t: "area", label: "AI에게 맡길 것 / 내가 정할 것" },
       { k: "tool", t: "text", label: "고른 도구" },
       { k: "toolWhy", t: "area", label: "고른 도구가 표현 의도의 어느 요소에 맞는지 한 문장으로 쓰기" },
+      { k: "genLinks", t: "links", opt: true, label: "생성 결과 공유 링크 (최대 3개) — 도구가 만들어 준 공유 주소를 붙여 두면 원본 화질로 다시 볼 수 있습니다." },
     ],
   },
   { id: "s5b", session: "5차시", code: "I", title: "생성 회차 기록", note: "1인 5회 이내로 생성합니다. 회차마다 결과 화면을 함께 올리면 판단이 어떻게 바뀌었는지 남습니다.", fields: [{ k: "rounds", t: "rounds" }] },
@@ -302,6 +313,7 @@ const SCHEMA = [
       { k: "whyArt", t: "area", label: "“이 이미지가 미술로 작동하는 이유”를 한 문장으로 쓰기" },
       { k: "note", t: "area", label: "작가 노트 — 이 문제를 고른 이유, 사람을 그리지 않고 사물로 옮긴 이유, 흔적의 위치를 그 자리로 정한 근거", rows: 6 },
       { k: "installImg", t: "image", opt: true, label: "전시 설치 사진 — 벽면에 걸린 상태", mm: true },
+      { k: "installClip", t: "video", max: 10, opt: true, label: "전시 영상 (최대 10초) — 관람자의 걸음으로 작품에 다가가는 화면을 담습니다. 사람의 얼굴이 담기지 않게 찍습니다.", mm: true },
     ],
   },
   {
@@ -996,7 +1008,7 @@ function mediaFields() {
   const out = [];
   for (const sec of SCHEMA) {
     for (const f of sec.fields) {
-      if (f.t === "image" || f.t === "images" || f.t === "audio") out.push({ sec, f, key: sec.id + "." + f.k });
+      if (f.t === "image" || f.t === "images" || f.t === "audio" || f.t === "sketch" || f.t === "video") out.push({ sec, f, key: sec.id + "." + f.k });
     }
   }
   return out;
@@ -1212,6 +1224,14 @@ body{background:var(--bg)}
 .mm-del{border:none;background:none;font-family:var(--sans);font-size:11px;color:var(--seal);cursor:pointer;padding:0;text-decoration:underline}
 .mm-load{font-family:var(--mono);font-size:11px;color:var(--sub)}
 .mm-rec{font-family:var(--mono);font-size:12px;color:var(--seal)}
+.sketch-box{border:1px dashed var(--line);background:#fff;padding:10px}
+.sketch-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.sk-color{width:24px;height:24px;border:2px solid #fff;outline:1px solid var(--line);cursor:pointer;padding:0}
+.sk-color.on{outline:2px solid var(--seal)}
+.sketch-cv{width:100%;max-width:720px;border:1px solid var(--line2);background:#fff;touch-action:none;cursor:crosshair;display:block}
+.sketch-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.link-row{display:grid;grid-template-columns:2fr 1fr;gap:6px;margin-bottom:6px}
+@media(max-width:640px){.link-row{grid-template-columns:1fr}}
 
 /* 사고 변화 */
 .pair{border:1px solid var(--line);background:var(--card);margin-bottom:14px}
@@ -1437,6 +1457,19 @@ function MediaAudio({ owner, refId }) {
   return <audio controls src={src} style={{ width: "100%", maxWidth: 320 }} />;
 }
 
+function MediaVideo({ owner, refId }) {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    let live = true;
+    if (!refId) { setSrc(null); return; }
+    mediaStore.get(owner, refId).then((v) => { if (live) setSrc(v || null); });
+    return () => { live = false; };
+  }, [owner, refId]);
+  if (!refId) return null;
+  if (!src) return <span className="mm-load">불러오는 중…</span>;
+  return <video controls playsInline src={src} style={{ width: "100%", maxWidth: 320, border: "1px solid var(--line)", background: "#000" }} />;
+}
+
 
 function FieldEditor({ sec, f, ws, setField }) {
   const key = sec.id + "." + f.k;
@@ -1534,6 +1567,35 @@ function FieldEditor({ sec, f, ws, setField }) {
   }
   if (f.t === "audio") {
     return <AudioField f={f} fieldKey={key} v={v} setField={setField} />;
+  }
+  if (f.t === "sketch") {
+    return <SketchField f={f} fieldKey={key} v={v} setField={setField} />;
+  }
+  if (f.t === "video") {
+    return <VideoField f={f} fieldKey={key} v={v} setField={setField} />;
+  }
+  if (f.t === "links") {
+    const list = Array.isArray(v) ? v : [];
+    const rows = [...list];
+    while (rows.length < 3) rows.push({ url: "", memo: "" });
+    const up = (i, k2, val) => {
+      const next = rows.map((r, j) => (j === i ? { ...r, [k2]: val } : r)).filter((r, j) => j < 3);
+      setField(key, next.filter((r) => (r.url || "").trim() || (r.memo || "").trim()));
+    };
+    return (
+      <div className="field span2">
+        <label>{f.label}</label>
+        {rows.map((r, i) => (
+          <div className="link-row" key={i}>
+            <input value={r.url || ""} placeholder="https:// 로 시작하는 주소" maxLength={500}
+              onChange={(e) => up(i, "url", e.target.value)} />
+            <input value={r.memo || ""} placeholder="어떤 화면인지 한마디" maxLength={60}
+              onChange={(e) => up(i, "memo", e.target.value)} />
+          </div>
+        ))}
+        <span className="hint">주소는 https:// 로 시작해야 저장 후 열립니다. 링크만 남고 파일은 저장되지 않습니다.</span>
+      </div>
+    );
   }
   if (f.t === "image") {
     const pick = async (e) => {
@@ -1776,6 +1838,38 @@ function FieldReader({ sec, f, ws, owner }) {
       </div>
     );
   }
+  if (f.t === "sketch") {
+    const cur = typeof v === "string" ? null : v;
+    return (
+      <div className="read-block">
+        <div className="rl">{f.label}</div>
+        {cur ? <MediaThumb owner={owner || OWNER} refId={cur.ref} alt={f.label} size={200} /> : <div className="rv empty">스케치 없음</div>}
+      </div>
+    );
+  }
+  if (f.t === "video") {
+    const cur = typeof v === "string" ? null : v;
+    return (
+      <div className="read-block">
+        <div className="rl">{f.label}</div>
+        {cur ? <div><MediaVideo owner={owner || OWNER} refId={cur.ref} /><span className="hint">길이 약 {cur.sec || "?"}초</span></div> : <div className="rv empty">영상 없음</div>}
+      </div>
+    );
+  }
+  if (f.t === "links") {
+    const list = (Array.isArray(v) ? v : []).filter((r) => /^https?:\/\//.test((r.url || "").trim()));
+    return (
+      <div className="read-block">
+        <div className="rl">{f.label}</div>
+        {list.length ? list.map((r, i) => (
+          <div className="rv" key={i}>
+            <a href={r.url.trim()} target="_blank" rel="noopener noreferrer">{r.url.trim().slice(0, 80)}</a>
+            {filled(r.memo) && <span className="hint" style={{ marginLeft: 8 }}>{r.memo}</span>}
+          </div>
+        )) : <div className="rv empty">링크 없음</div>}
+      </div>
+    );
+  }
   if (f.t === "checks") {
     const m = v || {};
     const on = f.opts.filter((o) => m[o]);
@@ -1839,6 +1933,7 @@ function FieldReader({ sec, f, ws, owner }) {
 /* 음성 녹음 (최대 90초) */
 
 function AudioField({ f, fieldKey, v, setField }) {
+  const MAX = f.max || 90;
   const [rec, setRec] = useState(null);
   const [sec, setSec] = useState(0);
   const [err, setErr] = useState("");
@@ -1871,7 +1966,7 @@ function AudioField({ f, fieldKey, v, setField }) {
       setRec(mr);
       setSec(0);
       timerRef.current = setInterval(() => setSec((s) => {
-        if (s >= 89) { try { mr.stop(); } catch (e) {} return 90; }
+        if (s >= MAX - 1) { try { mr.stop(); } catch (e) {} return MAX; }
         return s + 1;
       }), 1000);
     } catch (e) {
@@ -1896,12 +1991,198 @@ function AudioField({ f, fieldKey, v, setField }) {
         )}
         {rec ? (
           <>
-            <span className="mm-rec">● 녹음 중 {sec}초 / 90초</span>
+            <span className="mm-rec">● 녹음 중 {sec}초 / {MAX}초</span>
             <button className="btn small" onClick={stop}>녹음 멈추기</button>
           </>
         ) : (
           <button className="btn small ghost" onClick={start}>{cur ? "다시 녹음하기" : "녹음 시작"}</button>
         )}
+        {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
+      </div>
+    </div>
+  );
+}
+
+/* 스케치 캔버스 (디지털 에스키스) — 그린 뒤 저장하면 JPEG로 줄여 media 컬렉션에 남긴다 */
+
+const SKETCH_COLORS = ["#26241E", "#8A3B2E", "#4A5A6A"];
+
+function SketchField({ f, fieldKey, v, setField }) {
+  const cvRef = useRef(null);
+  const strokesRef = useRef([]);
+  const liveRef = useRef(null);
+  const [color, setColor] = useState(SKETCH_COLORS[0]);
+  const [wide, setWide] = useState(false);
+  const [eraser, setEraser] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const cur = typeof v === "string" ? null : v;
+
+  const redraw = () => {
+    const cv = cvRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (const st of strokesRef.current) {
+      ctx.strokeStyle = st.c;
+      ctx.lineWidth = st.w;
+      ctx.beginPath();
+      st.pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+      ctx.stroke();
+    }
+  };
+  useEffect(() => { redraw(); }, []);
+
+  const posOf = (e) => {
+    const cv = cvRef.current;
+    const r = cv.getBoundingClientRect();
+    return [((e.clientX - r.left) / r.width) * cv.width, ((e.clientY - r.top) / r.height) * cv.height];
+  };
+  const down = (e) => {
+    e.preventDefault();
+    cvRef.current.setPointerCapture(e.pointerId);
+    liveRef.current = { c: eraser ? "#FFFFFF" : color, w: eraser ? 22 : wide ? 6 : 2.5, pts: [posOf(e)] };
+    strokesRef.current.push(liveRef.current);
+    setDirty(true);
+  };
+  const move = (e) => {
+    if (!liveRef.current) return;
+    liveRef.current.pts.push(posOf(e));
+    redraw();
+  };
+  const up = () => { liveRef.current = null; };
+  const undo = () => { strokesRef.current.pop(); redraw(); };
+  const clearAll = () => { strokesRef.current = []; redraw(); };
+
+  const save = async () => {
+    setErr(""); setBusy(true);
+    try {
+      const data = cvRef.current.toDataURL("image/jpeg", 0.85);
+      if (data.length > 400000) { setBusy(false); return setErr("스케치가 너무 큽니다. 지우개로 정리한 뒤 다시 저장하세요."); }
+      if (cur) await mediaStore.remove(OWNER, cur.ref);
+      const ref = fieldKey + "." + Date.now();
+      const ok = await mediaStore.put(OWNER, ref, data);
+      if (ok) { setField(fieldKey, { ref, at: now() }); setDirty(false); }
+      else setErr("스케치 저장에 실패했습니다.");
+    } catch (e) { setErr("스케치를 저장하지 못했습니다."); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="field span2">
+      <label>{f.label}</label>
+      <div className="sketch-box">
+        <div className="sketch-tools">
+          {SKETCH_COLORS.map((c) => (
+            <button key={c} className={"sk-color" + (!eraser && color === c ? " on" : "")} style={{ background: c }}
+              onClick={() => { setColor(c); setEraser(false); }} aria-label={"펜 색 " + c} />
+          ))}
+          <button className={"btn small " + (wide ? "" : "ghost")} onClick={() => setWide(!wide)}>굵게</button>
+          <button className={"btn small " + (eraser ? "" : "ghost")} onClick={() => setEraser(!eraser)}>지우개</button>
+          <button className="btn small ghost" onClick={undo}>되돌리기</button>
+          <button className="btn small ghost" onClick={clearAll}>모두 지우기</button>
+        </div>
+        <canvas ref={cvRef} width={720} height={480} className="sketch-cv"
+          onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />
+        <div className="sketch-foot">
+          <button className="btn small" disabled={busy || !dirty} onClick={save}>{busy ? "저장 중…" : "스케치 저장"}</button>
+          {cur && (
+            <>
+              <span className="hint">저장된 스케치 {fmtTime(cur.at)}</span>
+              <MediaThumb owner={OWNER} refId={cur.ref} alt="저장된 스케치" size={64} />
+              <button className="mm-del" onClick={async () => { await mediaStore.remove(OWNER, cur.ref); setField(fieldKey, ""); }}>지우기</button>
+            </>
+          )}
+          {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* 짧은 영상 (카메라 녹화, 저해상도) — 문서 크기 한도 안에서 10초 안팎을 담는다 */
+
+function VideoField({ f, fieldKey, v, setField }) {
+  const MAX = f.max || 10;
+  const [rec, setRec] = useState(null);
+  const [sec, setSec] = useState(0);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timerRef = useRef(null);
+  const previewRef = useRef(null);
+  const cur = typeof v === "string" ? null : v;
+
+  const start = async () => {
+    setErr("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: "environment" },
+        audio: false,
+      });
+      if (previewRef.current) { previewRef.current.srcObject = stream; previewRef.current.play().catch(() => {}); }
+      const mr = new MediaRecorder(stream, { videoBitsPerSecond: 350000 });
+      const chunks = [];
+      mr.ondataavailable = (e) => chunks.push(e.data);
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (previewRef.current) previewRef.current.srcObject = null;
+        clearInterval(timerRef.current);
+        setBusy(true);
+        const blob = new Blob(chunks, { type: mr.mimeType || "video/webm" });
+        if (blob.size > 650000) {
+          setErr("영상이 문서 한도를 넘었습니다. 더 짧게 다시 찍어 보세요.");
+          setRec(null); setSec(0); setBusy(false); return;
+        }
+        const fr = new FileReader();
+        fr.onload = async () => {
+          if (cur) await mediaStore.remove(OWNER, cur.ref);
+          const ref = fieldKey + "." + Date.now();
+          const ok = await mediaStore.put(OWNER, ref, fr.result);
+          if (ok) setField(fieldKey, { ref, at: now(), sec: Math.round(sec) });
+          else setErr("영상 저장에 실패했습니다.");
+          setRec(null); setSec(0); setBusy(false);
+        };
+        fr.readAsDataURL(blob);
+      };
+      mr.start();
+      setRec(mr);
+      setSec(0);
+      timerRef.current = setInterval(() => setSec((s) => {
+        if (s >= MAX - 1) { try { mr.stop(); } catch (e) {} return MAX; }
+        return s + 1;
+      }), 1000);
+    } catch (e) {
+      setErr("카메라를 쓸 수 없습니다. 브라우저 권한을 확인하거나 설치 사진으로 대신 남겨 주세요.");
+    }
+  };
+  const stop = () => { try { rec && rec.stop(); } catch (e) {} };
+  useEffect(() => () => clearInterval(timerRef.current), []);
+
+  return (
+    <div className="field span2">
+      <label>{f.label}</label>
+      <div className="mm-box" style={{ alignItems: "flex-start" }}>
+        {cur && !rec && (
+          <div style={{ width: "100%", marginBottom: 8 }}>
+            <MediaVideo owner={OWNER} refId={cur.ref} />
+            <button className="btn small ghost" style={{ marginTop: 6 }}
+              onClick={async () => { await mediaStore.remove(OWNER, cur.ref); setField(fieldKey, ""); }}>영상 지우기</button>
+          </div>
+        )}
+        <video ref={previewRef} muted playsInline style={{ width: 200, border: "1px solid var(--line)", background: "#000", display: rec ? "block" : "none" }} />
+        {rec ? (
+          <>
+            <span className="mm-rec">● 녹화 중 {sec}초 / {MAX}초</span>
+            <button className="btn small" onClick={stop}>녹화 멈추기</button>
+          </>
+        ) : (
+          <button className="btn small ghost" disabled={busy} onClick={start}>{busy ? "저장 중…" : cur ? "다시 찍기" : "녹화 시작"}</button>
+        )}
+        <span className="hint">화질을 낮춰 {MAX}초 안팎만 저장됩니다. 소리는 담기지 않습니다.</span>
         {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
       </div>
     </div>
@@ -2178,7 +2459,7 @@ function StudentApp({ me, onExit, onGallery }) {
         <div className="prog-strip">
           <ProgressBar pct={pct} />
           <span className="prog-num">{pct}%</span>
-          <span className="prog-num">사진·음성 {mediaCount(ws)}건</span>
+          <span className="prog-num">미디어 {mediaCount(ws)}건</span>
         </div>
         <div className="sess-tabs" role="tablist">
           {SESSIONS.map((s) => {
@@ -2441,7 +2722,7 @@ function TeacherApp({ onExit, onGallery }) {
 
   const exportCSV = () => {
     const head = ["학번", "별명", "진행률(%)", ...SESSIONS.map((s) => s + "(%)"),
-      "변화 쌍", "생성 회차", "고친 요소", "불성립 발견", "근거 있는 불성립", "제외 근거", "동료에게 준 문장", "반대 근거 쓴 논쟁", "③까지 채운 논쟁", "사진·음성", "고쳐 쓴 횟수",
+      "변화 쌍", "생성 회차", "고친 요소", "불성립 발견", "근거 있는 불성립", "제외 근거", "동료에게 준 문장", "반대 근거 쓴 논쟁", "③까지 채운 논쟁", "미디어(사진·음성·스케치·영상)", "고쳐 쓴 횟수",
       ...RUBRIC.map((r) => r.std), ...RUBRIC.map((r) => r.std + " 메모"),
       "관찰 확인 수", "관찰 메모", "피드백(조형)", "피드백(개념)", "최근 저장"];
     const rows = ids.map((id) => {
@@ -2685,7 +2966,7 @@ function TeacherApp({ onExit, onGallery }) {
                   <div className="card-head"><span className="card-code">학생</span><span className="card-title">전후 답이 모두 있는 자리</span></div>
                   <div className="card-body">
                     <table className="roster">
-                      <thead><tr><th>학생</th><th>변화 쌍</th><th>불성립 발견</th><th>사진·음성</th><th>고쳐 쓴 횟수</th><th></th></tr></thead>
+                      <thead><tr><th>학생</th><th>변화 쌍</th><th>불성립 발견</th><th>미디어</th><th>고쳐 쓴 횟수</th><th></th></tr></thead>
                       <tbody>
                         {ids.map((id) => {
                           const w = wsMap[id] || {};
@@ -2822,7 +3103,7 @@ function ChangeMap({ ws, owner }) {
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">자료</span><span className="card-title">사진·음성으로 남은 과정</span></div>
+        <div className="card-head"><span className="card-code">자료</span><span className="card-title">사진·음성·스케치·영상으로 남은 과정</span></div>
         <div className="card-body">
           {mediaFields().map((m) => {
             const v = (d[m.key]);
@@ -2831,6 +3112,7 @@ function ChangeMap({ ws, owner }) {
               <div className="read-block" key={m.key}>
                 <div className="rl">{m.sec.session} · {String(m.f.label).split(" —")[0]}</div>
                 {m.f.t === "audio" ? <MediaAudio owner={owner} refId={v.ref} />
+                  : m.f.t === "video" ? <MediaVideo owner={owner} refId={v.ref} />
                   : Array.isArray(v) ? <div className="mm-strip">{v.map((it) => <MediaThumb key={it.ref} owner={owner} refId={it.ref} alt={m.f.label} size={120} />)}</div>
                   : <MediaThumb owner={owner} refId={v.ref} alt={m.f.label} size={160} />}
               </div>
