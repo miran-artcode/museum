@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// 허구의 아카이브 학급 기록실 접근 규칙
+// 계정 체계: 학생 = {학번}@museum.class / 교사 = teacher@museum.class
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    // 로그인한 계정의 아이디 (학번 또는 teacher)
+    function uid() {
+      return request.auth.token.email.split('@')[0];
+    }
+    function isTeacher() {
+      return signedIn() && uid() == 'teacher';
+    }
+    function isOwner(id) {
+      return signedIn() && uid() == id;
+    }
+    function sizeOk() {
+      return request.resource.size() < 1000000;
+    }
+
+    // 차시 공개 설정: 로그인한 사람은 읽고, 교사만 쓴다
+    match /meta/{docId} {
+      allow read: if signedIn();
+      allow write: if isTeacher();
+    }
+
+    // 학생 명부(학번과 별명만): 로그인한 사람은 읽고, 본인과 교사만 쓴다
+    match /students/{sid} {
+      allow read: if signedIn();
+      allow create, update: if isOwner(sid) || isTeacher();
+      allow delete: if isTeacher();
+    }
+
+    // 창작 기록지: 본인과 교사만 읽고, 본인만 쓴다
+    match /worksheets/{sid} {
+      allow read: if isOwner(sid) || isTeacher();
+      allow create, update: if isOwner(sid) && sizeOk();
+      allow delete: if isTeacher();
+    }
+
+    // 채점 기록: 본인은 읽기만, 쓰기는 교사만
+    match /grades/{sid} {
+      allow read: if isOwner(sid) || isTeacher();
+      allow write: if isTeacher();
+    }
+
+    // 사진·음성: 문서 이름이 {소유자}_{필드}_{시각} 형식이므로 앞부분으로 소유자를 판별한다
+    match /media/{mediaId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && mediaId.split('_')[0] == uid() && sizeOk();
+      allow delete: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher());
+    }
+
+    match /misc/{docId} {
+      allow read: if signedIn();
+      allow write: if isTeacher();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
