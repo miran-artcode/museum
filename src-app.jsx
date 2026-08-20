@@ -24,6 +24,11 @@ const mediaStore = {
 };
 
 const now = () => new Date().toISOString();
+const fmtDur = (sec) => {
+  const s = Math.max(0, Math.round(sec || 0));
+  const m = Math.floor(s / 60);
+  return m ? m + "분 " + (s % 60 ? s % 60 + "초" : "") : s + "초";
+};
 const fmtTime = (iso) => {
   if (!iso) return "-";
   const d = new Date(iso);
@@ -68,17 +73,52 @@ const SCHEMA = [
     id: "l1", session: "1차시", code: "1", kind: "learn", title: "레디메이드와 개념미술",
     note: "1차시 강의 노트를 읽고 작성합니다.",
     fields: [
-      { k: "q1", t: "area", label: "뒤샹이 「샘」(1917)에서 직접 만든 것과 직접 고른 것을 구분해 쓰고, 무엇이 이 사물을 작품으로 만들었는지 한 문장으로 정리하기" },
-      { k: "q2", t: "area", label: "코수스의 「하나 그리고 세 개의 의자」(1965)에서 실물·사진·사전 정의 가운데 무엇이 ‘의자’를 만든다고 생각하는지 이유와 함께 쓰기" },
-      { k: "q3", t: "area", label: "극사실주의 화면에서 정밀한 표면이 관람자의 믿음을 만드는 조건을 한 가지 찾아 쓰기" },
+      {
+        k: "q1", t: "area", label: "뒤샹이 「샘」(1917)에서 직접 만든 것과 직접 고른 것을 구분하고, 무엇이 이 사물을 작품으로 만들었는지 정리하기",
+        steps: [
+          "큰 그림 — 「샘」 사건을 순서대로 떠올리기: 가게에서 구입 → 서명과 제목 붙임 → 출품 → 거부 → 소실",
+          "나누기 — 이 가운데 뒤샹이 손으로 한 일과 머리로 정한 일을 나누어 보기",
+          "정리 — 그렇다면 이 소변기를 작품으로 만든 것은 무엇이었는지 내 말로 쓰기",
+        ],
+      },
+      {
+        k: "q2", t: "area", label: "코수스의 「하나 그리고 세 개의 의자」(1965)에서 실물·사진·사전 정의 가운데 무엇이 ‘의자’를 만든다고 생각하는지 이유와 함께 쓰기",
+        steps: [
+          "큰 그림 — 나란히 놓인 세 가지(실물 의자 · 사진 · 사전 정의)가 각각 무엇을 보여 주는지 떠올리기",
+          "비교 — 전시 장소가 바뀔 때 교체되는 것(실물·사진)과 바뀌지 않는 것(정의)을 나누기",
+          "정리 — 셋 가운데 무엇이 ‘의자’를 만든다고 생각하는지, 그 이유와 함께 쓰기",
+        ],
+      },
+      {
+        k: "q3", t: "area", label: "극사실주의 화면에서 정밀한 표면이 관람자의 믿음을 만드는 조건을 한 가지 찾아 쓰기",
+        steps: [
+          "떠올리기 — 클로스의 초상을 멀리서 볼 때와 가까이서 볼 때 각각 무엇이 보였는지",
+          "찾기 — ‘사진 같다’는 느낌을 만든 화면의 조건 한 가지 고르기 (예: 세부 묘사, 초점, 반사광)",
+          "정리 — 그 조건이 왜 관람자의 믿음으로 이어지는지 쓰기",
+        ],
+      },
     ],
   },
   {
     id: "q1", session: "1차시", code: "1", kind: "inquiry", title: "탐구 질문",
     note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
     fields: [
-      { k: "concept", t: "area", qtype: "개념", label: "작가가 만들지 않은 사물이 작품이 되려면 그 앞에 무슨 일이 있어야 하는가. 오늘 본 작품 두 점 이상에서 근거를 찾아 쓰기" },
-      { k: "design", t: "area", qtype: "설계", pair: true, label: "오늘 본 작품 중 하나를 내가 골라 우리 교실에 놓는다면 어디에 어떻게 놓겠는가. 자리와 방식을 정한 이유를 함께 쓰기" },
+      {
+        k: "concept", t: "area", qtype: "개념", label: "작가가 만들지 않은 사물이 작품이 되려면 그 앞에 무슨 일이 있어야 하는가",
+        steps: [
+          "고르기 — 오늘 본 작품 가운데 ‘작가가 만들지 않은 사물’이 등장한 작품 두 점 고르기",
+          "찾기 — 각 작품에서 사물이 작품이 되기 전에 일어난 일(선택 · 명명 · 전시 등)을 하나씩 짚기",
+          "정리 — 두 작품의 공통점을 묶어 ‘그 앞에 있어야 하는 일’을 내 말로 쓰기",
+        ],
+      },
+      {
+        k: "design", t: "area", qtype: "설계", pair: true, label: "오늘 본 작품 중 하나를 내가 골라 우리 교실에 놓는다면 어디에 어떻게 놓겠는가",
+        steps: [
+          "고르기 — 오늘 본 작품 중 우리 교실에 놓아 보고 싶은 한 점 정하기",
+          "정하기 — 교실 어디에(자리), 어떻게(높이 · 방향 · 관람 거리) 놓을지 구체적으로 정하기",
+          "정리 — 그 자리와 방식이 작품의 읽기를 어떻게 바꾸는지 이유 쓰기",
+        ],
+      },
       { k: "debate", t: "debate", qtype: "논쟁", label: "미술인지 아닌지를 정하는 권한은 작가·미술계·관람자에게 각각 얼마씩 있는가" },
     ],
   },
@@ -86,17 +126,51 @@ const SCHEMA = [
     id: "l2", session: "2차시", code: "2", kind: "learn", title: "제도비평·아카이브·파라픽션",
     note: "2차시 강의 노트를 읽고 작성합니다.",
     fields: [
-      { k: "q1", t: "area", label: "브로타에스가 「현대미술관, 독수리 부서」(1968)에서 전시 자료마다 ‘이것은 미술 작품이 아니다’ 명패를 붙인 이유를 추론해 쓰기" },
-      { k: "q2", t: "area", label: "마크 디온의 작업과 폰트쿠베르타·아틀라스 그룹의 작업을 아카이브 미술의 두 갈래로 나누어 각각 한 문장으로 설명하기" },
-      { k: "q3", t: "area", label: "파라픽션(parafiction)과 위조의 차이를 ‘허구 고지’라는 말을 넣어 설명하기" },
+      {
+        k: "q1", t: "area", label: "브로타에스가 「현대미술관, 독수리 부서」(1968)에서 전시 자료마다 ‘이것은 미술 작품이 아니다’ 명패를 붙인 이유를 추론해 쓰기",
+        steps: [
+          "떠올리기 — 이 ‘미술관’에 실제로 놓여 있던 것들(독수리가 그려진 온갖 자료)",
+          "뒤집기 — 명패가 관람자에게 시키는 일이 무엇일지 생각하기 (미술이 아니라면, 왜 미술관처럼 놓았을까)",
+          "정리 — 작가가 이 가짜 미술관으로 무엇을 보여 주려 했는지 내 말로 쓰기",
+        ],
+      },
+      {
+        k: "q2", t: "area", label: "마크 디온의 작업과 폰트쿠베르타·아틀라스 그룹의 작업을 아카이브 미술의 두 갈래로 나누어 설명하기",
+        steps: [
+          "나누기 — 디온(실제 사물을 모아 박물관처럼 정리)과 폰트쿠베르타·아틀라스 그룹(허구를 기록의 형식에 담음)의 차이 떠올리기",
+          "정리 — 두 갈래를 각각 한 문장으로 쓰고, 무엇을 기준으로 갈리는지 덧붙이기",
+        ],
+      },
+      {
+        k: "q3", t: "area", label: "파라픽션(parafiction)과 위조의 차이를 ‘허구 고지’라는 말을 넣어 설명하기",
+        steps: [
+          "뜻 확인 — 파라픽션과 위조가 각각 허구를 어떻게 다루는지 떠올리기",
+          "가르기 — 둘을 가르는 자리에 ‘허구 고지’(허구임을 밝히는 표시)를 놓고 설명하기",
+          "덧붙이기 — 고지가 없으면 무엇이 달라지는지 한 줄 더 쓰기",
+        ],
+      },
     ],
   },
   {
     id: "q2", session: "2차시", code: "2", kind: "inquiry", title: "탐구 질문",
     note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
     fields: [
-      { k: "concept", t: "area", qtype: "개념", label: "명제표의 어떤 정보가 이미지의 읽기를 가장 크게 바꾸는가. 명제표 두 장 비교 자료에서 근거를 찾아 쓰기" },
-      { k: "design", t: "area", qtype: "설계", pair: true, label: "내가 만들 유물의 명제표에서 관람자가 첫 줄로 읽었으면 하는 정보는 무엇인가. 그 이유를 쓰기" },
+      {
+        k: "concept", t: "area", qtype: "개념", label: "명제표의 어떤 정보가 이미지의 읽기를 가장 크게 바꾸는가",
+        steps: [
+          "보기 — 명제표 두 장 비교 자료에서 두 읽기가 갈라진 지점 찾기",
+          "좁히기 — 명제표의 정보(제목 · 연대 · 재질 · 용도 · 출처) 가운데 읽기를 가장 크게 바꾼 한 가지 고르기",
+          "정리 — 그 정보가 왜 힘이 센지 근거와 함께 쓰기",
+        ],
+      },
+      {
+        k: "design", t: "area", qtype: "설계", pair: true, label: "내가 만들 유물의 명제표에서 관람자가 첫 줄로 읽었으면 하는 정보는 무엇인가",
+        steps: [
+          "떠올리기 — 내 유물 이미지를 처음 보는 관람자가 무엇부터 궁금해할지 상상하기",
+          "정하기 — 명제표 첫 줄에 놓을 정보 한 가지 정하기",
+          "정리 — 그 정보를 첫 줄에 놓는 이유 쓰기",
+        ],
+      },
       { k: "debate", t: "debate", qtype: "논쟁", label: "허구임을 미리 밝히면 파라픽션의 효과는 커지는가, 줄어드는가" },
     ],
   },
@@ -111,27 +185,69 @@ const SCHEMA = [
     id: "l3", session: "3차시", code: "3", kind: "learn", title: "사회참여 미술과 보이지 않는 것",
     note: "강의 노트 3차시를 읽고 작성합니다.",
     fields: [
-      { k: "q1", t: "area", label: "랑시에르의 ‘감각적인 것의 분배’를 내 주변의 예를 하나 들어 자기 말로 한 문장으로 옮기기" },
-      { k: "q2", t: "area", label: "알프레도 자가 「르완다 프로젝트」에서 참상 사진 대신 생존자의 눈만을 촬영한 이유를 쓰기" },
-      { k: "q3", t: "area", label: "얼굴을 모르는 사람을 상상해서 그릴 때 생기는 대리 재현의 문제와, 사물의 흔적으로 말할 때 그 문제가 줄어드는 이유를 쓰기" },
+      {
+        k: "q1", t: "area", label: "랑시에르의 ‘감각적인 것의 분배’를 내 주변의 예를 하나 들어 자기 말로 옮기기",
+        steps: [
+          "뜻 확인 — ‘감각적인 것의 분배’: 무엇이 잘 보이고 누구의 이야기가 말해지는지가 미리 정해져 있다는 생각",
+          "찾기 — 내 주변에서 ‘잘 보이는 것’과 ‘잘 안 보이는 것’의 예를 하나씩 찾기",
+          "정리 — 그 예를 들어 이 개념을 내 말로 옮기기",
+        ],
+      },
+      {
+        k: "q2", t: "area", label: "알프레도 자가 「르완다 프로젝트」에서 참상 사진 대신 생존자의 눈만을 촬영한 이유를 쓰기",
+        steps: [
+          "떠올리기 — 참상을 그대로 찍은 사진이 관람자에게 일으키는 반응과 그 반응의 한계",
+          "비교 — 생존자의 눈만 보여 줄 때 관람자가 대신 하게 되는 일이 무엇인지 생각하기",
+          "정리 — 작가가 그 방식을 고른 이유를 내 말로 쓰기",
+        ],
+      },
+      {
+        k: "q3", t: "area", label: "얼굴을 모르는 사람을 상상해서 그릴 때 생기는 대리 재현의 문제와, 사물의 흔적으로 말할 때 그 문제가 줄어드는 이유를 쓰기",
+        steps: [
+          "문제 확인 — 본 적 없는 사람을 상상해 그리면 화면에 남는 것은 그 사람인가, 내 짐작인가",
+          "옮기기 — 사물의 흔적으로 말하면 무엇이 남고 무엇이 사라지는지 나누기",
+          "정리 — 대리 재현의 문제가 왜 줄어드는지 쓰기",
+        ],
+      },
     ],
   },
   {
     id: "q3", session: "3차시", code: "3", kind: "inquiry", title: "탐구 질문",
     note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
     fields: [
-      { k: "concept", t: "area", qtype: "개념", label: "사물의 흔적이 사람에 대해 말할 수 있는 것과 말할 수 없는 것은 무엇인가. 오늘 본 작품에서 예를 하나씩 들기" },
-      { k: "design", t: "area", qtype: "설계", pair: true, label: "내가 고른 문제에서 사진으로 찍을 수 있는 것과 찍을 수 없는 것을 나누면 어떻게 되는가" },
+      {
+        k: "concept", t: "area", qtype: "개념", label: "사물의 흔적이 사람에 대해 말할 수 있는 것과 말할 수 없는 것은 무엇인가",
+        steps: [
+          "고르기 — 오늘 본 작품에서 사물이나 흔적이 사람 대신 말한 예 찾기",
+          "나누기 — 그 흔적이 말해 준 것과 끝내 말하지 못한 것을 하나씩 쓰기",
+          "정리 — 흔적의 힘과 한계를 한 줄씩 정리하기",
+        ],
+      },
+      {
+        k: "design", t: "area", qtype: "설계", pair: true, label: "내가 고른 문제에서 사진으로 찍을 수 있는 것과 찍을 수 없는 것을 나누면 어떻게 되는가",
+        steps: [
+          "펼치기 — 내가 고른 문제의 장면들을 떠올리기",
+          "나누기 — 카메라에 담을 수 있는 것과 담을 수 없는 것(마음 · 반복된 시간 · 사라진 것)을 나누어 쓰기",
+          "좁히기 — 담을 수 없는 것 가운데 내 유물이 대신 말해 줄 것 하나 고르기",
+        ],
+      },
       { k: "debate", t: "debate", qtype: "논쟁", label: "당사자가 아닌 사람이 그 문제를 작품으로 다루는 일은 어디까지 정당한가" },
     ],
   },
   {
     id: "s3a", session: "3차시", code: "B", title: "동시대 문제와 나의 접점",
     fields: [
-      { k: "scenes", t: "area", label: "일주일 관찰에서 마음에 남은 장면 세 가지" },
+      { k: "scenes", t: "area", label: "일주일 동안 오가며 마음에 남은 장면 세 가지 — 언제 · 어디서 · 무엇을 보았는지 각각 한 줄씩" },
       { k: "problem", t: "text", label: "고른 사회문제" },
-      { k: "contact", t: "text", label: "이 문제와 내가 만나는 자리" },
-      { k: "why", t: "area", label: "왜 하필 이 문제인지" },
+      { k: "contact", t: "text", label: "이 문제를 내가 직접 보거나 겪는 때와 곳 (예: 밤 11시 아파트 분리수거장, 등굣길 무인 편의점 앞)" },
+      {
+        k: "why", t: "area", label: "왜 다른 문제가 아니라 이 문제인지",
+        steps: [
+          "견주기 — 후보로 떠올렸다가 접은 다른 문제 하나와 나란히 놓아 보기",
+          "좁히기 — 이 문제만이 가진, 나와 이어진 지점 찾기",
+          "정리 — ‘나는 ~을 직접 보았기 때문에 / ~이 마음에 걸렸기 때문에’로 이유 쓰기",
+        ],
+      },
       { k: "photos", t: "images", opt: true, label: "관찰 사진 (최대 3장) — 문제를 만난 자리에서 찍은 장면. 사람의 얼굴이 담기지 않게 찍습니다.", mm: true },
       { k: "sound", t: "audio", max: 30, opt: true, label: "현장 소리 (최대 30초) — 문제의 자리에서 들리는 소리를 담습니다. 사람의 목소리가 담기지 않게 합니다.", mm: true },
     ],
@@ -139,8 +255,8 @@ const SCHEMA = [
   {
     id: "s3b", session: "3차시", code: "C", title: "번역 표", note: "셋째 칸은 눈으로 확인할 수 있는 말로만 씁니다.",
     fields: [
-      { k: "invisible", t: "text", label: "이 문제에서 보이지 않는 것" },
-      { k: "object", t: "text", label: "문제를 겪는 자리의 사물" },
+      { k: "invisible", t: "text", label: "이 문제에서 겉으로 드러나지 않는 것 (예: 반복된 노동의 시간, 사라진 가게의 기억)" },
+      { k: "object", t: "text", label: "그 문제의 자리에 실제로 놓여 있는 물건 (예: 손수레 손잡이, 가게 셔터, 방한 장갑)" },
       { k: "trace", t: "area", label: "관찰 가능한 흔적의 위치와 모양" },
     ],
   },
@@ -157,17 +273,51 @@ const SCHEMA = [
     id: "l4", session: "4차시", code: "4", kind: "learn", title: "박물관 장치와 발굴 기록 사진의 형식",
     note: "강의 노트 4차시를 읽고 작성합니다.",
     fields: [
-      { k: "q1", t: "area", label: "박물관화(musealization)의 뜻을 쓰고, 명제표가 사물의 읽기에서 하는 일을 한 문장으로 정리하기" },
-      { k: "q2", t: "area", label: "발굴 기록 사진의 형식 요소를 세 가지 이상 쓰기 (예: 스케일 바, 중립 배경, 균일한 확산광, 눈높이 정면)" },
-      { k: "q3", t: "area", label: "명명 관례(재질 + 특징 + 기물 종류)로 내 유물이 아닌 다른 가상 유물의 이름을 하나 지어 보기" },
+      {
+        k: "q1", t: "area", label: "박물관화(musealization)의 뜻을 쓰고, 명제표가 사물의 읽기에서 하는 일을 정리하기",
+        steps: [
+          "뜻 확인 — 박물관화: 쓰던 물건이 박물관에 들어가며 겪는 지위의 변화",
+          "연결 — 그 변화에서 명제표가 맡는 일(이름 붙이기 · 설명하기 · 믿게 하기) 생각하기",
+          "정리 — 두 가지를 이어 내 말로 정리하기",
+        ],
+      },
+      {
+        k: "q2", t: "area", label: "발굴 기록 사진의 형식 요소를 세 가지 이상 쓰기",
+        steps: [
+          "떠올리기 — 강의 노트의 발굴 기록 사진들을 다시 열어 보기",
+          "고르기 — 화면을 ‘기록처럼’ 보이게 만드는 형식 요소 세 가지 이상 쓰기 (예: 스케일 바, 중립 배경, 균일한 확산광, 눈높이 정면)",
+        ],
+      },
+      {
+        k: "q3", t: "area", label: "명명 관례(재질 + 특징 + 기물 종류)로 내 유물이 아닌 다른 가상 유물의 이름을 하나 지어 보기",
+        steps: [
+          "규칙 확인 — 재질 + 특징 + 기물 종류의 순서 (예: 청동 녹슨 거울)",
+          "지어 보기 — 내 것이 아닌 가상 유물의 이름 하나 짓기",
+          "점검 — 이름만 읽어도 물건의 모습이 그려지는지 확인하고, 안 그려지면 어느 자리가 모자란지 쓰기",
+        ],
+      },
     ],
   },
   {
     id: "q4", session: "4차시", code: "4", kind: "inquiry", title: "탐구 질문",
     note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
     fields: [
-      { k: "concept", t: "area", qtype: "개념", label: "흔적이 그 자리에 생기려면 어떤 사용이 얼마나 반복되어야 하는가. 내 유물의 흔적 하나로 따져 보기" },
-      { k: "design", t: "area", qtype: "설계", pair: true, label: "내 유물에서 관람자가 가장 먼저 볼 곳은 어디이며, 그렇게 만들려면 화면을 어떻게 짜야 하는가" },
+      {
+        k: "concept", t: "area", qtype: "개념", label: "흔적이 그 자리에 생기려면 어떤 사용이 얼마나 반복되어야 하는가",
+        steps: [
+          "고르기 — 내 유물의 흔적 하나 정하기 (예: 손잡이 한쪽만 닳음)",
+          "따지기 — 그 흔적이 생기려면 어떤 동작이 하루 몇 번, 몇 년쯤 반복되어야 할지 어림잡기",
+          "정리 — 어림의 근거(누가 · 어떤 일로 · 어떤 자세로 썼는지)를 함께 쓰기",
+        ],
+      },
+      {
+        k: "design", t: "area", qtype: "설계", pair: true, label: "내 유물에서 관람자가 가장 먼저 볼 곳은 어디이며, 그렇게 만들려면 화면을 어떻게 짜야 하는가",
+        steps: [
+          "정하기 — 관람자의 시선이 처음 닿았으면 하는 곳 한 군데",
+          "짜기 — 그곳으로 시선을 모으는 방법(빛 · 초점 · 여백 · 구도) 가운데 무엇을 쓸지 정하기",
+          "정리 — 그렇게 짜는 이유를 표현 의도와 이어 쓰기",
+        ],
+      },
       { k: "debate", t: "debate", qtype: "논쟁", label: "유물이 말하는 것은 만든 사람의 뜻인가, 쓴 사람의 습관인가, 발굴한 사람의 해석인가" },
     ],
   },
@@ -179,7 +329,7 @@ const SCHEMA = [
       { k: "struct", t: "text", label: "구조" }, { k: "wear", t: "text", label: "마모" },
       { k: "break", t: "text", label: "파손" }, { k: "repair", t: "text", label: "수리" },
       { k: "stain", t: "text", label: "오염" }, { k: "discard", t: "text", label: "폐기 이유" },
-      { k: "context", t: "area", label: "2300년 출토 맥락" },
+      { k: "context", t: "area", label: "2300년 출토 맥락 — 어디서, 무엇과 함께, 어떤 상태로 발견되었다는 설정인지" },
     ],
   },
   {
@@ -205,8 +355,22 @@ const SCHEMA = [
     id: "l5", session: "5차시", code: "5", kind: "learn", title: "사진의 지표성과 생성 이미지",
     note: "강의 노트 5차시를 읽고 작성합니다.",
     fields: [
-      { k: "q1", t: "area", label: "바르트가 말한 지표성(index)을 설명하고, 생성형 AI 이미지에 없는 것이 무엇인지 쓰기" },
-      { k: "q2", t: "area", label: "‘왜 우리는 어떤 이미지를 증거처럼 믿는가’에 대한 지금 시점의 내 답을 쓰기 (8차시에 다시 씁니다)" },
+      {
+        k: "q1", t: "area", label: "바르트가 말한 지표성(index)을 설명하고, 생성형 AI 이미지에 없는 것이 무엇인지 쓰기",
+        steps: [
+          "뜻 확인 — 지표성: 사진은 빛이 실제 사물에 닿았다가 돌아와 남은 흔적이라는 성질",
+          "비교 — 생성형 AI 이미지가 만들어지는 과정에는 그중 무엇이 없는지 찾기",
+          "정리 — 두 가지를 이어 내 말로 정리하기",
+        ],
+      },
+      {
+        k: "q2", t: "area", label: "‘왜 우리는 어떤 이미지를 증거처럼 믿는가’에 대한 지금 시점의 내 답을 쓰기 (8차시에 다시 씁니다)",
+        steps: [
+          "떠올리기 — 내가 이미지를 그대로 믿었던 최근 경험 하나",
+          "따지기 — 무엇이 그 믿음을 만들었는지 (화질? 올린 사람? 사진이라는 형식? 여러 번 봐서?)",
+          "정리 — 지금 시점의 내 답 쓰기",
+        ],
+      },
       { k: "q3", t: "area", label: "프롬프트 네 요소(무엇인가 / 어떤 상태인가 / 어떻게 놓였는가 / 어떤 사진인가)를 내 유물로 각각 한 구절씩 채우기" },
     ],
   },
@@ -214,8 +378,22 @@ const SCHEMA = [
     id: "q5", session: "5차시", code: "5", kind: "inquiry", title: "탐구 질문",
     note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
     fields: [
-      { k: "concept", t: "area", qtype: "개념", label: "사진처럼 보이게 만드는 요소 가운데 우리 눈이 가장 먼저 믿는 것은 무엇인가. 오늘 생성한 화면에서 근거를 찾기" },
-      { k: "design", t: "area", qtype: "설계", pair: true, label: "내가 고른 한 점과 버린 네 점의 차이를 조형 용어로 설명하면 무엇이 남는가" },
+      {
+        k: "concept", t: "area", qtype: "개념", label: "사진처럼 보이게 만드는 요소 가운데 우리 눈이 가장 먼저 믿는 것은 무엇인가",
+        steps: [
+          "보기 — 오늘 생성한 화면 한 장을 골라 구석구석 다시 보기",
+          "고르기 — ‘사진 같다’고 느끼게 한 요소 하나 고르기 (빛 · 초점 · 질감 · 구도 · 얕은 심도 등)",
+          "정리 — 눈이 그 요소를 왜 먼저 믿는지 근거와 함께 쓰기",
+        ],
+      },
+      {
+        k: "design", t: "area", qtype: "설계", pair: true, label: "내가 고른 한 점과 버린 네 점의 차이를 조형 용어로 설명하면 무엇이 남는가",
+        steps: [
+          "나란히 놓기 — 고른 한 점과 버린 넉 점을 다시 나란히 보기",
+          "견주기 — 차이를 조형 용어(구조 · 시점 · 빛 · 질감 · 흔적의 위치)로 하나씩 짚기",
+          "정리 — 견주고 나서 남는 결정적 차이 한 가지 쓰기",
+        ],
+      },
       { k: "debate", t: "debate", qtype: "논쟁", label: "도구가 만든 우연한 결과를 내 의도로 받아들이는 것은 발견인가, 자기합리화인가" },
       { k: "reflect", t: "reflect", qtype: "성찰", label: "왜 우리는 어떤 이미지를 증거처럼 믿는가. 지금 시점의 내 답을 쓰기 (8차시에 이 답을 다시 봅니다)" },
     ],
@@ -223,7 +401,7 @@ const SCHEMA = [
   {
     id: "s5a", session: "5차시", code: "H", title: "AI 역할과 도구 선택",
     fields: [
-      { k: "aiRole", t: "area", label: "AI에게 맡길 것 / 내가 정할 것" },
+      { k: "aiRole", t: "area", label: "AI에게 맡길 일 / 내가 정할 일 (예: 맡길 일 — 재질의 질감 표현 / 내가 정할 일 — 흔적의 위치와 방향)" },
       { k: "tool", t: "text", label: "고른 도구" },
       { k: "toolWhy", t: "area", label: "고른 도구가 표현 의도의 어느 요소에 맞는지 한 문장으로 쓰기" },
       { k: "genLinks", t: "links", opt: true, label: "생성 결과 공유 링크 (최대 3개) — 도구가 만들어 준 공유 주소를 붙여 두면 원본 화질로 다시 볼 수 있습니다." },
@@ -251,16 +429,41 @@ const SCHEMA = [
     id: "l6", session: "6차시", code: "6", kind: "learn", title: "핍진성과 다듬기의 세 방법",
     note: "강의 노트 6차시를 읽고 작성합니다.",
     fields: [
-      { k: "q1", t: "area", label: "핍진성(verisimilitude)의 뜻을 쓰고, 내 유물에서 핍진성을 만드는 요소 두 가지를 지목하기" },
-      { k: "q2", t: "area", label: "재생성·부분 수정·화면 편집이 각각 화면의 무엇을 바꾸는지 구분해 쓰기" },
+      {
+        k: "q1", t: "area", label: "핍진성(verisimilitude)의 뜻을 쓰고, 내 유물에서 핍진성을 만드는 요소 두 가지를 지목하기",
+        steps: [
+          "뜻 확인 — 핍진성: 진짜 같아 보이게 만드는 그럴듯함",
+          "찾기 — 내 유물 화면에서 그럴듯함을 만들고 있는 요소 두 가지 짚기 (어느 부분의 무엇인지 위치까지)",
+        ],
+      },
+      {
+        k: "q2", t: "area", label: "재생성·부분 수정·화면 편집이 각각 화면의 무엇을 바꾸는지 구분해 쓰기",
+        steps: [
+          "나누기 — 재생성(화면 전체를 새로), 부분 수정(한 부위만), 화면 편집(자르기 · 밝기 · 톤)",
+          "정리 — 세 방법이 각각 화면의 무엇을 바꾸고 무엇을 남기는지 구분해 쓰기",
+        ],
+      },
     ],
   },
   {
     id: "q6", session: "6차시", code: "6", kind: "inquiry", title: "탐구 질문",
     note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
     fields: [
-      { k: "concept", t: "area", qtype: "개념", label: "낡음을 늘렸는데 오히려 의심이 커지는 화면에는 무엇이 빠져 있는가" },
-      { k: "design", t: "area", qtype: "설계", pair: true, label: "내 화면에서 고치지 않기로 한 부분은 무엇이며 왜 그대로 두는가" },
+      {
+        k: "concept", t: "area", qtype: "개념", label: "낡음을 늘렸는데 오히려 의심이 커지는 화면에는 무엇이 빠져 있는가",
+        steps: [
+          "떠올리기 — 긁힘과 때를 잔뜩 넣었는데도 가짜처럼 보이는 화면 상상하기",
+          "찾기 — 그 화면에 빠져 있는 것 찾기 (닳을 이유, 쓰임의 방향, 시간의 순서)",
+          "정리 — ‘낡음’과 ‘낡을 이유’의 차이로 정리하기",
+        ],
+      },
+      {
+        k: "design", t: "area", qtype: "설계", pair: true, label: "내 화면에서 고치지 않기로 한 부분은 무엇이며 왜 그대로 두는가",
+        steps: [
+          "고르기 — 내 화면에서 손대지 않기로 한 부분 하나",
+          "정리 — 그대로 두는 이유를 표현 의도와 이어 쓰기 (고치면 무엇이 사라지는지)",
+        ],
+      },
       { k: "debate", t: "debate", qtype: "논쟁", label: "결함을 남기는 작업과 지우는 작업 가운데 어느 쪽이 더 정직한가" },
     ],
   },
@@ -291,16 +494,43 @@ const SCHEMA = [
     id: "l7", session: "7차시", code: "7", kind: "learn", title: "전시라는 장치와 조판",
     note: "강의 노트 7차시를 읽고 작성합니다.",
     fields: [
-      { k: "q1", t: "area", label: "진열 방식(단독·계열·파편·오분류·복원 표시) 가운데 두 가지를 골라 관람자의 읽기가 어떻게 달라지는지 비교하기" },
-      { k: "q2", t: "area", label: "허구 고지의 위치·크기·서체가 작품의 어조를 바꾸는 방식을 예를 들어 쓰기" },
+      {
+        k: "q1", t: "area", label: "진열 방식(단독·계열·파편·오분류·복원 표시) 가운데 두 가지를 골라 관람자의 읽기가 어떻게 달라지는지 비교하기",
+        steps: [
+          "고르기 — 진열 방식 두 가지 고르기",
+          "상상하기 — 같은 유물을 두 방식으로 놓았을 때 관람자가 각각 무엇부터 보고 무슨 생각을 할지 그려 보기",
+          "정리 — 두 읽기의 차이를 비교해 쓰기",
+        ],
+      },
+      {
+        k: "q2", t: "area", label: "허구 고지의 위치·크기·서체가 작품의 어조를 바꾸는 방식을 예를 들어 쓰기",
+        steps: [
+          "상상하기 — 고지를 크게 맨 위에 놓은 경우와, 작게 명제표 맨 아래에 놓은 경우",
+          "견주기 — 두 경우 작품의 말투(고백 같은가, 안내문 같은가, 농담 같은가)가 어떻게 달라지는지",
+          "정리 — 예를 들어 쓰기",
+        ],
+      },
     ],
   },
   {
     id: "q7", session: "7차시", code: "7", kind: "inquiry", title: "탐구 질문",
     note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
     fields: [
-      { k: "concept", t: "area", qtype: "개념", label: "같은 작품을 교실 벽과 미술관 벽에 걸었을 때 무엇이 달라지는가" },
-      { k: "design", t: "area", qtype: "설계", pair: true, label: "내 작품 옆에 놓일 다른 작품 한 점을 내가 고른다면 무엇이며 왜인가" },
+      {
+        k: "concept", t: "area", qtype: "개념", label: "같은 작품을 교실 벽과 미술관 벽에 걸었을 때 무엇이 달라지는가",
+        steps: [
+          "상상하기 — 같은 작품이 교실 벽에 걸린 장면과 미술관 벽에 걸린 장면을 나란히 그려 보기",
+          "견주기 — 관람자의 기대, 머무는 시간, 말투가 각각 어떻게 달라질지 짚기",
+          "정리 — 달라지게 만드는 것의 정체를 내 말로 쓰기",
+        ],
+      },
+      {
+        k: "design", t: "area", qtype: "설계", pair: true, label: "내 작품 옆에 놓일 다른 작품 한 점을 내가 고른다면 무엇이며 왜인가",
+        steps: [
+          "고르기 — 내 작품 옆에 놓고 싶은 한 점 (우리 반 작품이든 수업에서 본 작품이든)",
+          "정리 — 나란히 놓였을 때 두 작품의 읽기가 서로 어떻게 달라지는지 이유 쓰기",
+        ],
+      },
       { k: "debate", t: "debate", qtype: "논쟁", label: "배치를 정한 사람도 그 작품의 작가에 포함되는가" },
     ],
   },
@@ -328,17 +558,52 @@ const SCHEMA = [
     id: "l8", session: "8차시", code: "8", kind: "learn", title: "허구를 밝히는 사용과 이미지 윤리",
     note: "강의 노트 8차시를 읽고 작성합니다.",
     fields: [
-      { k: "q1", t: "area", label: "허구임을 밝히고 쓰는 생성 이미지와 허구를 숨기고 유통하는 이미지(딥페이크)의 차이를 사용자의 의도와 사용 방식으로 설명하기" },
-      { k: "q2", t: "area", label: "뒤샹의 「샘」과 내 작품의 공통점을 선택·명명·전시 가운데 하나로 쓰기" },
-      { k: "q3", t: "area", label: "이번 단원이 미술에 대한 내 생각에서 바꾼 부분을 한 문단으로 쓰기" },
+      {
+        k: "q1", t: "area", label: "허구임을 밝히고 쓰는 생성 이미지와 허구를 숨기고 유통하는 이미지(딥페이크)의 차이를 설명하기",
+        steps: [
+          "나누기 — 두 이미지가 허구를 다루는 방식의 차이(밝힘 / 숨김) 확인하기",
+          "따지기 — 만든 사람의 의도와 퍼뜨리는 방식이 각각 어떻게 다른지 짚기",
+          "정리 — 차이를 사용자의 의도와 사용 방식이라는 말로 정리하기",
+        ],
+      },
+      {
+        k: "q2", t: "area", label: "뒤샹의 「샘」과 내 작품의 공통점을 선택·명명·전시 가운데 하나로 쓰기",
+        steps: [
+          "떠올리기 — 「샘」에서 뒤샹이 한 일 (고르고, 이름 붙이고, 내놓음)",
+          "비추기 — 내 작품 제작에서 내가 같은 일을 한 순간 찾기",
+          "정리 — 가장 닮은 공통점 하나를 골라 쓰기",
+        ],
+      },
+      {
+        k: "q3", t: "area", label: "이번 단원이 미술에 대한 내 생각에서 바꾼 부분을 한 문단으로 쓰기",
+        steps: [
+          "돌아보기 — 1차시의 나는 미술을 무엇이라고 생각했는지",
+          "견주기 — 지금의 생각과 달라진 지점 찾기",
+          "정리 — 어떤 작품이나 활동이 그 변화를 만들었는지 함께 쓰기",
+        ],
+      },
     ],
   },
   {
     id: "q8", session: "8차시", code: "8", kind: "inquiry", title: "탐구 질문",
     note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
     fields: [
-      { k: "concept", t: "area", qtype: "개념", label: "이미지·명칭·명제표·진열 가운데 이 학급의 작품들이 의미를 만든 방법은 어느 쪽에 몰려 있는가. 관람에서 본 작품 두 점을 근거로 쓰기" },
-      { k: "design", t: "area", qtype: "설계", pair: true, label: "관람자가 내 의도와 다르게 읽었을 때 나는 무엇을 고치고 무엇을 그대로 두겠는가" },
+      {
+        k: "concept", t: "area", qtype: "개념", label: "이미지·명칭·명제표·진열 가운데 이 학급의 작품들이 의미를 만든 방법은 어느 쪽에 몰려 있는가",
+        steps: [
+          "고르기 — 관람에서 본 작품 두 점 고르기",
+          "살피기 — 각 작품에서 의미를 만든 힘이 이미지 · 명칭 · 명제표 · 진열 중 어디서 왔는지 짚기",
+          "정리 — 학급 전체의 경향을 두 작품을 근거로 쓰기",
+        ],
+      },
+      {
+        k: "design", t: "area", qtype: "설계", pair: true, label: "관람자가 내 의도와 다르게 읽었을 때 나는 무엇을 고치고 무엇을 그대로 두겠는가",
+        steps: [
+          "떠올리기 — 관람자가 내 의도와 다르게 읽은 지점",
+          "나누기 — 고칠 것(오해를 만든 원인)과 그대로 둘 것(다른 읽기도 성립하는 부분) 나누기",
+          "정리 — 나눈 기준을 쓰기",
+        ],
+      },
       { k: "debate", t: "debate", qtype: "논쟁", label: "허구를 밝힌 이미지와 밝히지 않은 이미지를 나누는 기준은 고지인가, 의도인가, 결과인가" },
       { k: "reflect", t: "reflect", qtype: "성찰", label: "5차시의 내 답과 지금의 답 사이에서 무엇이 달라졌으며, 무엇 때문에 달라졌는가", showPrev: "q5.reflect.pos" },
     ],
@@ -348,8 +613,22 @@ const SCHEMA = [
     fields: [
       { k: "q1", t: "area", label: "이 유물은 우리 시대의 무엇을 보여 주는가" },
       { k: "q2", t: "area", label: "이미지·기록·전시 맥락 가운데 작품의 실체는 어디에 있는가" },
-      { k: "q3", t: "area", label: "이것은 왜 미술인가" },
-      { k: "q4", t: "area", label: "허구를 밝힌 이 가짜가 어떤 진실을 말하는가" },
+      {
+        k: "q3", t: "area", label: "이것은 왜 미술인가",
+        steps: [
+          "돌아보기 — 2차시 정의문에서 내가 채운 빈칸 다시 읽기",
+          "맞대기 — 완성된 내 작품이 그 정의에 맞는지 따져 보기",
+          "정리 — 정의를 지킬지 고칠지 정하고, 그 이유로 답 쓰기",
+        ],
+      },
+      {
+        k: "q4", t: "area", label: "허구를 밝힌 이 가짜가 어떤 진실을 말하는가",
+        steps: [
+          "떠올리기 — 관람자들이 내 작품 앞에서 실제로 한 말과 쓴 문장",
+          "잇기 — 그 반응이 가리키는 우리 시대의 문제 찾기",
+          "정리 — 가짜 유물이 대신 말해 준 진실을 쓰기",
+        ],
+      },
       { k: "peerBack", t: "area", label: "상호평가에서 받은 문장의 반영 여부와 이유 (반영하지 않은 의견도 지우지 않고 이유와 함께)" },
       { k: "voice", t: "audio", opt: true, label: "구술 성찰 (최대 90초) — 작품 앞에서 말로 남기는 성찰. 글로 옮기기 어려운 판단의 근거를 말합니다.", mm: true },
     ],
@@ -1233,6 +1512,14 @@ body{background:var(--bg)}
 .link-row{display:grid;grid-template-columns:2fr 1fr;gap:6px;margin-bottom:6px}
 @media(max-width:640px){.link-row{grid-template-columns:1fr}}
 
+/* 생각 계단·생각 기록 */
+.think-steps{border-left:3px solid var(--patina);background:var(--card2);padding:8px 12px;margin-bottom:8px;font-size:12px}
+.think-steps .ts-t{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--patina);margin-bottom:6px}
+.think-steps ol{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.think-meter{display:block;margin-top:5px;font-size:11.5px}
+.think-meter.warn{color:var(--seal)}
+.think-meter.ok{color:var(--patina)}
+
 /* 사고 변화 */
 .pair{border:1px solid var(--line);background:var(--card);margin-bottom:14px}
 .pair-head{display:flex;gap:10px;align-items:baseline;padding:10px 14px;border-bottom:1px solid var(--line2);flex-wrap:wrap}
@@ -1338,7 +1625,7 @@ function SessionDot({ ratio }) {
 }
 
 
-function LessonPanel({ L, teacher }) {
+function LessonPanel({ L, teacher, onReading }) {
   const total = L.flow.reduce((a, r) => a + r[1], 0);
   return (
     <div className="lesson">
@@ -1372,7 +1659,7 @@ function LessonPanel({ L, teacher }) {
           </details>
         )}
         {L.readings.map((rd, i) => (
-          <details className="reading" key={i}>
+          <details className="reading" key={i} onToggle={(e) => onReading && onReading(e.target.open)}>
             <summary><span className="stage-tag">{rd.stage}</span>{rd.h}</summary>
             <div className="reading-in">
               {rd.p.map((para, j) => <p key={j}>{para}</p>)}
@@ -1471,11 +1758,35 @@ function MediaVideo({ owner, refId }) {
 }
 
 
+/* 생각 기록 도우미 — 문장 수를 세어 한 문장에서 멈추지 않게 이끈다 */
+function sentenceCount(t) {
+  return String(t || "").split(/[.!?…\n]/).map((s) => s.trim()).filter((s) => s.length >= 5).length;
+}
+
+function ThinkMeter({ text }) {
+  if (!filled(text)) return null;
+  const n = sentenceCount(text);
+  if (n <= 1) return <span className="think-meter warn">지금은 한 문장입니다. “왜냐하면 …”(그렇게 생각한 이유)과 “예를 들면 …”(수업에서 본 구체적 예)을 한 줄씩 이어 붙여 생각의 과정을 남겨 보세요.</span>;
+  return <span className="think-meter ok">문장 {n}개 — 생각의 과정이 남고 있습니다.</span>;
+}
+
+/* 생각 계단 — 큰 개념에서 작은 개념으로 내려오는 순서 안내 */
+function ThinkSteps({ steps }) {
+  if (!steps || !steps.length) return null;
+  return (
+    <div className="think-steps">
+      <div className="ts-t">생각 계단 — 위 계단부터 차례로 생각하고, 아래 칸에는 마지막 계단의 답을 중심으로 정리합니다.</div>
+      <ol>{steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+    </div>
+  );
+}
+
 function FieldEditor({ sec, f, ws, setField }) {
   const key = sec.id + "." + f.k;
   const v = ws[key];
 
   if (f.t === "text" || f.t === "area") {
+    const meter = f.t === "area" && (f.steps || sec.kind === "learn" || sec.kind === "inquiry");
     return (
       <div className={"field " + (f.t === "area" ? "span2" : "")}>
         {f.qtype ? (
@@ -1483,11 +1794,13 @@ function FieldEditor({ sec, f, ws, setField }) {
         ) : (
           <label>{f.label}</label>
         )}
+        <ThinkSteps steps={f.steps} />
         {f.t === "text" ? (
           <input value={v ?? ""} placeholder={f.def || ""} maxLength={300} onChange={(e) => setField(key, e.target.value)} />
         ) : (
-          <textarea rows={f.rows || 3} value={v ?? ""} maxLength={4000} onChange={(e) => setField(key, e.target.value)} />
+          <textarea rows={f.rows || 3} value={v ?? ""} maxLength={4000} placeholder={f.ph || ""} onChange={(e) => setField(key, e.target.value)} />
         )}
+        {meter && <ThinkMeter text={v} />}
       </div>
     );
   }
@@ -2350,6 +2663,68 @@ function StudentApp({ me, onExit, onGallery }) {
   const savingRef = useRef(false);
   wsRef.current = ws;
 
+  /* 살펴본 시간 기록 — 마우스·키보드·스크롤이 움직인 시간만 차시별로 센다 */
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+  const lastEventRef = useRef(Date.now());
+  const openReadingsRef = useRef(0);
+  const actAccRef = useRef({}); // { 차시: {sec, readSec, opens, visits} } — 저장 전까지 쌓아 두는 통
+
+  const accAct = (s, patch) => {
+    const a = actAccRef.current[s] || { sec: 0, readSec: 0, opens: 0, visits: 0 };
+    for (const k in patch) a[k] = (a[k] || 0) + patch[k];
+    actAccRef.current[s] = a;
+  };
+
+  /* 쌓인 활동 시간을 기록지에 합쳐 넣음 — 저장 직전에 호출 */
+  const drainAct = () => {
+    const acc = actAccRef.current;
+    if (!Object.keys(acc).length) return wsRef.current;
+    actAccRef.current = {};
+    const a = { ...(wsRef.current._act || {}) };
+    for (const s in acc) {
+      const cur = a[s] || {};
+      a[s] = {
+        sec: (cur.sec || 0) + (acc[s].sec || 0),
+        readSec: (cur.readSec || 0) + (acc[s].readSec || 0),
+        opens: (cur.opens || 0) + (acc[s].opens || 0),
+        visits: (cur.visits || 0) + (acc[s].visits || 0),
+        last: now(),
+      };
+    }
+    const merged = { ...wsRef.current, _act: a };
+    wsRef.current = merged;
+    setWs(merged);
+    return merged;
+  };
+
+  useEffect(() => {
+    const mark = () => { lastEventRef.current = Date.now(); };
+    const evs = ["pointermove", "pointerdown", "keydown", "scroll", "touchstart"];
+    evs.forEach((e) => window.addEventListener(e, mark, { passive: true }));
+    accAct(tabRef.current, { visits: 1 }); // 입장 직후 보고 있는 차시도 방문으로 셈
+    const tick = setInterval(() => {
+      // 화면이 보이는 상태에서 최근 45초 안에 움직임이 있었을 때만 10초를 더함
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastEventRef.current > 45000) return;
+      accAct(tabRef.current, { sec: 10, readSec: openReadingsRef.current > 0 ? 10 : 0 });
+    }, 10000);
+    // 활동 시간만 쌓였을 때도 2분 30초마다 조용히 저장
+    const persist = setInterval(() => {
+      if (Object.keys(actAccRef.current).length && !dirtyRef.current && !savingRef.current) doSave();
+    }, 150000);
+    return () => {
+      evs.forEach((e) => window.removeEventListener(e, mark));
+      clearInterval(tick);
+      clearInterval(persist);
+    };
+  }, []);
+
+  const onReading = (open) => {
+    openReadingsRef.current = Math.max(0, openReadingsRef.current + (open ? 1 : -1));
+    if (open) accAct(tabRef.current, { opens: 1 });
+  };
+
   useEffect(() => {
     setMediaOwner(me.sid);
     (async () => {
@@ -2374,7 +2749,7 @@ function StudentApp({ me, onExit, onGallery }) {
     savingRef.current = true;
     dirtyRef.current = false;
     setSaveState("saving");
-    const data = { ...wsRef.current, _updatedAt: now() };
+    const data = { ...drainAct(), _updatedAt: now() };
     const ok = await store.set(WSKEY, data);
     savingRef.current = false;
     if (ok) {
@@ -2434,7 +2809,7 @@ function StudentApp({ me, onExit, onGallery }) {
     };
   }, []);
 
-  const switchTab = (s) => { flush(); setTab(s); };
+  const switchTab = (s) => { flush(); accAct(s, { visits: 1 }); openReadingsRef.current = 0; setTab(s); };
 
   const pct = overallProgress(ws);
   const secs = SCHEMA.filter((s) => s.session === tab);
@@ -2491,7 +2866,7 @@ function StudentApp({ me, onExit, onGallery }) {
           const inquirySec = secs.find((s) => s.id === "q" + L.n);
           return (
             <React.Fragment key={L.n}>
-              <LessonPanel L={L} />
+              <LessonPanel L={L} onReading={onReading} />
               {confirmSec && <SectionCard sec={confirmSec} ws={ws} setField={setField} />}
               {inquirySec && <SectionCard sec={inquirySec} ws={ws} setField={setField} />}
             </React.Fragment>
@@ -2556,6 +2931,33 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, onBack }) {
           <button key={t} className={"btn small " + (subTab === t ? "" : "ghost")} onClick={() => setSubTab(t)}>{t}</button>
         ))}
       </div>
+
+      {ws._act && Object.keys(ws._act).length > 0 && (
+        <div className="card">
+          <div className="card-head"><span className="card-code">머문 시간</span><span className="card-title">차시별 살펴본 시간</span></div>
+          <div className="card-body">
+            <table className="tbl">
+              <thead><tr><th>차시</th><th>화면에 머문 시간</th><th>읽기 자료를 열어 둔 시간</th><th>자료 연 횟수</th><th>다녀간 횟수</th></tr></thead>
+              <tbody>
+                {SESSIONS.map((s) => {
+                  const a = ws._act[s];
+                  if (!a) return null;
+                  return (
+                    <tr key={s}>
+                      <td className="mono">{s}</td>
+                      <td className="mono">{fmtDur(a.sec)}</td>
+                      <td className="mono">{fmtDur(a.readSec)}</td>
+                      <td className="mono">{a.opens || 0}회</td>
+                      <td className="mono">{a.visits || 0}회</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="hint" style={{ marginTop: 8 }}>마우스·키보드·스크롤이 움직인 시간만 셉니다. 화면을 켜 두고 자리를 비운 시간은 들어가지 않습니다. 읽는 시간이 짧은데 답이 길면 다른 곳에서 옮겨 왔을 가능성도 함께 살핍니다.</p>
+          </div>
+        </div>
+      )}
 
       {subTab === "사고 변화" ? <ChangeMap ws={ws} owner={isPreview ? "preview" : sid} /> : null}
 
@@ -2722,7 +3124,7 @@ function TeacherApp({ onExit, onGallery }) {
 
   const exportCSV = () => {
     const head = ["학번", "별명", "진행률(%)", ...SESSIONS.map((s) => s + "(%)"),
-      "변화 쌍", "생성 회차", "고친 요소", "불성립 발견", "근거 있는 불성립", "제외 근거", "동료에게 준 문장", "반대 근거 쓴 논쟁", "③까지 채운 논쟁", "미디어(사진·음성·스케치·영상)", "고쳐 쓴 횟수",
+      "변화 쌍", "생성 회차", "고친 요소", "불성립 발견", "근거 있는 불성립", "제외 근거", "동료에게 준 문장", "반대 근거 쓴 논쟁", "③까지 채운 논쟁", "미디어(사진·음성·스케치·영상)", "고쳐 쓴 횟수", "머문 시간(분)", "읽기 자료 열람(분)",
       ...RUBRIC.map((r) => r.std), ...RUBRIC.map((r) => r.std + " 메모"),
       "관찰 확인 수", "관찰 메모", "피드백(조형)", "피드백(개념)", "최근 저장"];
     const rows = ids.map((id) => {
@@ -2732,6 +3134,8 @@ function TeacherApp({ onExit, onGallery }) {
       return [id, roster[id].nick || "", overallProgress(w),
         ...SESSIONS.map((s) => Math.round(sessionProgress(s, w) * 100)),
         cv("changed"), cv("rounds"), cv("revised"), cv("notPassed"), cv("ground"), cv("exclude"), cv("peerSent"), cv("counter"), cv("debate"), mediaCount(w), (w._log || []).length,
+        Math.round(Object.values(w._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60),
+        Math.round(Object.values(w._act || {}).reduce((a, x) => a + (x.readSec || 0), 0) / 60),
         ...[0, 1, 2, 3].map((i) => g["r" + i] || ""),
         ...[0, 1, 2, 3].map((i) => g["rm" + i] || ""),
         OBS_ITEMS.filter((_, i) => g["o" + i]).length,
@@ -2939,7 +3343,7 @@ function TeacherApp({ onExit, onGallery }) {
                 </div>
 
                 <div className="card">
-                  <div className="card-head"><span className="card-code">학급</span><span className="card-title">판단의 두께 지표</span></div>
+                  <div className="card-head"><span className="card-code">학급</span><span className="card-title">판단 근거의 양 — 학급 평균</span></div>
                   <div className="card-body">
                     {(() => {
                       const keys = ["revised", "notPassed", "ground", "exclude", "peerSent", "counter", "debate", "changed"];
