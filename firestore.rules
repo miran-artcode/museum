@@ -64,6 +64,13 @@ service cloud.firestore {
       allow delete: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher());
     }
 
+    // 연구 참여 동의 대장: 교사만 읽고 쓴다.
+    // 명부(students)에 두지 않는 이유 — 명부는 로그인한 학생 모두가 읽으므로
+    // 누가 연구에서 빠졌는지가 학생끼리 보이게 된다. 동의 여부는 학생 사이에 드러나서는 안 된다.
+    match /research/{docId} {
+      allow read, write: if isTeacher();
+    }
+
     // 그 밖의 학급 공용 문서. 「수업 편집」 탭이 고친 차시별 발문·이론·그림·링크가
     // lessonEdits 문서에 쌓인다. 학생은 읽기만 하고 교사만 고친다.
     match /misc/{docId} {

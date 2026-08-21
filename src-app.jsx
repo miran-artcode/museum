@@ -1149,7 +1149,7 @@ function fieldProgress(f, v) {
       return { total: 3, done: ["pos", "counter", "hold"].filter((k) => filled(m[k])).length };
     }
     case "reflect": return { total: 1, done: filled((v || {}).pos) ? 1 : 0 };
-    case "rounds": return { total: 1, done: rows.some((r) => r && (filled(r.tool) || filled(r.judge))) ? 1 : 0 };
+    case "rounds": return { total: 1, done: rows.some((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.prompt))) ? 1 : 0 };
     case "inspect": {
       const m = v || {};
       return { total: INSPECT_ITEMS.length, done: INSPECT_ITEMS.filter((it) => m[it.k] && m[it.k].status).length };
@@ -1857,7 +1857,7 @@ const strLen = (v) => (typeof v === "string" ? v.trim().length : 0);
 
 function creativityMetrics(ws) {
   const d = ws || {};
-  const rounds = (d["s5b.rounds"] || []).filter((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change)));
+  const rounds = (d["s5b.rounds"] || []).filter((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change) || filled(r.prompt)));
   const revised = rounds.filter((r) => filled(r.change)).length;
   const insp = d["s5c.inspect"] || {};
   const notPassed = INSPECT_ITEMS.filter((it) => (insp[it.k] || {}).status === "불성립");
@@ -1905,12 +1905,77 @@ const CREATIVITY_AXES = [
   { key: "multimodal", name: "채집의 폭", short: "채집", desc: "사진 · 소리 · 스케치 · 영상 · 링크를 고루 모았는가 (멀티모달)" },
 ];
 
-const tokSet = (s) => new Set(String(s || "").toLowerCase().trim().split(/\s+/).filter(Boolean));
+/* ---------- 텍스트 비교 ----------
+   한국어 어절은 조사·어미 때문에 같은 말이 다른 토큰이 된다 ("유물이 · 유물을 · 유물은").
+   공백으로만 쪼개면 같은 말을 쓴 두 학생의 유사도가 실제보다 낮게 나오므로 두 가지를 함께 쓴다.
+   ① 흔한 조사·어미를 잘라 낸 어절 토큰 — 학급 전체의 어휘 풀·희소도 계산에 쓴다.
+   ② 문자 3-gram — 띄어쓰기와 어미 차이에 둔감해 두 글의 직접 비교에 안정적이다. */
+
+const KO_TAIL = /(으로서|으로써|에게서|이라고|에서는|에게는|이라는|라는|이라|에서|에게|한테|께서|까지|부터|보다|처럼|마다|조차|이나|으로|와의|과의|의|이|가|은|는|을|를|에|와|과|도|만|로)$/;
+const stemKo = (w) => {
+  const m = w.match(KO_TAIL);
+  return m && w.length - m[0].length >= 2 ? w.slice(0, w.length - m[0].length) : w;
+};
+const normText = (s) => String(s || "").toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, " ").replace(/\s+/g, " ").trim();
+const tokSet = (s) => new Set(normText(s).split(" ").filter(Boolean).map(stemKo));
+
+/* 글이 길면 앞 GRAM_CAP자만 본다 — 140명이면 학급 안의 쌍이 만 개에 가까워 전체를 재면 화면이 멈춘다 */
+const GRAM_CAP = 1200;
+function gramSet(s, n) {
+  const N = n || 3;
+  const t = normText(s).replace(/ /g, "").slice(0, GRAM_CAP);
+  const out = new Set();
+  if (!t) return out;
+  if (t.length <= N) { out.add(t); return out; }
+  for (let i = 0; i + N <= t.length; i++) out.add(t.slice(i, i + N));
+  return out;
+}
+
 function jaccard(a, b) {
   if (!a.size || !b.size) return 0;
   let inter = 0;
   for (const w of a) if (b.has(w)) inter++;
   return inter / (a.size + b.size - inter);
+}
+
+/* 겹침 계수 — a가 b 안에 얼마나 남아 있는가. 자카드와 달리 길이 차이에 벌점을 주지 않아
+   "붙여넣은 문장이 최종문에 얼마나 살아남았는가"를 재는 데 맞다. */
+function overlapCoef(a, b) {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  for (const w of a) if (b.has(w)) inter++;
+  return inter / a.size;
+}
+
+const simText = (x, y) => jaccard(gramSet(x), gramSet(y));
+
+/* 글의 뼈대 — 어휘가 달라도 구조가 같은 경우를 잡는다.
+   학생은 AI 글을 그대로 내지 않고 고쳐서 낸다. 그러면 낱말은 바뀌지만
+   문장 수 · 나열 표지 · 연결어의 배치는 남는다. 내용 유사도는 이것을 놓친다. */
+const STRUCT_MARKS = ["첫째", "둘째", "셋째", "먼저", "또한", "그리고", "하지만", "그러나", "따라서",
+  "그래서", "마지막으로", "이러한", "때문에", "뿐만 아니라", "즉", "예를 들어", "결론적으로", "무엇보다"];
+
+function structSig(s, tag) {
+  const t = String(s || "").trim();
+  const out = new Set();
+  if (t.length < 20) return out;
+  const p = (x) => out.add((tag || "") + x);
+  const sents = t.split(/[.!?。\n]+/).map((x) => x.trim()).filter((x) => x.length > 1);
+  p("ns" + Math.min(8, sents.length));
+  p("ln" + Math.min(9, Math.round(t.length / 60)));
+  p("av" + Math.min(6, Math.round((sents.length ? t.length / sents.length : 0) / 25)));
+  STRUCT_MARKS.forEach((m) => { if (t.includes(m)) p("m" + m); });
+  if (/(^|\n)\s*([0-9]+[.)]|[①②③④⑤▪•·\-–])/.test(t)) p("list");
+  if (/(입니다|습니다)/.test(t)) p("politeA");
+  if (/(이다|한다|였다|것이다)\s*[.\n]?$/m.test(t)) p("politeB");
+  return out;
+}
+
+/* 학급 대조에 쓰는 서술형 칸 — 스키마의 긴 서술 칸(area)을 그대로 따른다 */
+function simFields() {
+  const out = [];
+  for (const sec of SCHEMA) for (const f of sec.fields) if (f.t === "area") out.push(sec.id + "." + f.k);
+  return out;
 }
 
 /* 어떤 매체 채널을 썼는가 */
@@ -1933,7 +1998,7 @@ function creativityAxesOne(ws, rare) {
   const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
   // 시도의 양: 생성 회차(5) + 명칭 후보(3) + 에스키스(4)
-  const rounds = (d["s5b.rounds"] || []).filter((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change)));
+  const rounds = (d["s5b.rounds"] || []).filter((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change) || filled(r.prompt)));
   const names = ["s4b.n1", "s4b.n2", "s4b.n3"].filter((k) => filled(d[k])).length;
   const sk = d["s4c.sketchpad"];
   const eskis = ((d["s4c.eskisImg"] || []).length || 0) + (sk && typeof sk === "object" && sk.ref ? 1 : 0);
@@ -2029,6 +2094,269 @@ const median = (arr) => {
   return a.length % 2 ? a[mid] : Math.round((a[mid - 1] + a[mid]) / 2);
 };
 
+/* ---------- 가져온 글과 전유 ----------
+   붙여넣기를 막는 대신 기록한다. 이 단원은 발산을 AI에, 수렴과 전유를 학생에 두는 구조이므로
+   가져오는 행위는 금지 대상이 아니라 관찰 대상이다. 문제는 가져왔는가가 아니라 가져온 뒤 무엇을 했는가다.
+   _paste 한 건 = { k 필드, at 시각, n 붙인 글자 수, head 앞 120자, base 붙이기 직전 그 칸의 길이,
+                    src 학생이 고른 출처, settle 붙인 뒤 마지막으로 손댈 때까지의 초 }
+   클립보드 전문은 저장하지 않는다. head 120자는 최종문에 얼마나 살아남았는지를 재기 위한 최소량이다. */
+
+const PASTE_SRC = ["AI", "내가 앞서 쓴 글", "자료", "친구"];
+const PASTE_MIN = 20; // 낱말 몇 개짜리 붙여넣기는 기록하지 않는다
+
+/* 기록지 안에 학생이 쓴 글을 모두 훑는다 — 서술 칸뿐 아니라 표·사다리·점검표 안의 칸까지.
+   표 안의 칸은 "필드키#속성행번호"로 가리킨다 (예: s5b.rounds#prompt2).
+   붙여넣기가 어디서든 일어날 수 있으므로 전유율의 분모도 전 과정의 글이어야 한다. */
+function writtenTextAll(ws) {
+  const d = ws || {};
+  const out = [];
+  const put = (k, v) => { if (typeof v === "string" && v.trim().length >= 10) out.push([k, v]); };
+  for (const k in d) {
+    if (k.charAt(0) === "_") continue;
+    const v = d[k];
+    if (typeof v === "string") put(k, v);
+    else if (Array.isArray(v)) {
+      v.forEach((row, i) => { if (row && typeof row === "object") for (const p in row) put(k + "#" + p + i, row[p]); });
+    } else if (v && typeof v === "object") {
+      for (const p in v) {
+        const x = v[p];
+        if (typeof x === "string") put(k + "#" + p, x);
+        else if (x && typeof x === "object") for (const q in x) put(k + "#" + p + "." + q, x[q]);
+      }
+    }
+  }
+  return out;
+}
+
+const writtenMap = (ws) => new Map(writtenTextAll(ws));
+
+/* 붙여넣기가 일어난 칸의 최종 글.
+   표·점검표처럼 칸 하나가 여러 입력을 품는 자리는 어느 줄에 붙였는지까지는 알 수 없으므로,
+   그 칸에 딸린 글을 모두 이어 붙여 대조한다. 그래야 표 안에 붙여넣은 문장도 잔존율이 잡힌다. */
+function pasteFinal(ws, k, wmap) {
+  const d = ws || {};
+  if (typeof d[k] === "string") return d[k];
+  const m = wmap || writtenMap(d);
+  const hit = m.get(k);
+  if (hit) return hit;
+  const pre = k + "#";
+  const parts = [];
+  m.forEach((v, key) => { if (key.indexOf(pre) === 0) parts.push(v); });
+  return parts.join("\n");
+}
+
+/* 한 건의 붙여넣기가 최종문에 얼마나 살아남았는가 (%) */
+function pasteSurvive(ws, e, wmap) {
+  const fin = pasteFinal(ws, e.k, wmap);
+  if (!e || !e.head || !fin) return null;
+  return Math.round(overlapCoef(gramSet(e.head), gramSet(fin)) * 100);
+}
+
+function pasteMetrics(ws) {
+  const d = ws || {};
+  const ps = (Array.isArray(d._paste) ? d._paste : []).filter((e) => e && e.k);
+  const wmap = writtenMap(d);
+  let writtenLen = 0;
+  wmap.forEach((v) => { writtenLen += v.trim().length; });
+  const chars = ps.reduce((a, e) => a + (e.n || 0), 0);
+
+  // 전유율 — 붙인 앞머리의 3-gram이 최종문에 얼마나 남았는가. 1 − 잔존율.
+  let apSum = 0, apN = 0;
+  ps.forEach((e) => {
+    const sv = pasteSurvive(d, e, wmap);
+    if (sv == null) return;
+    apSum += 100 - sv; apN++;
+  });
+
+  const settles = ps.map((e) => e.settle).filter((x) => typeof x === "number");
+  const srcOf = (s) => ps.filter((e) => e.src === s).length;
+
+  return {
+    pasteN: ps.length,
+    pasteChars: chars,
+    writtenLen,
+    srcRatio: writtenLen > 0 ? Math.round(Math.min(1, chars / writtenLen) * 100) : (chars > 0 ? 100 : 0),
+    approp: apN ? Math.round(apSum / apN) : null,
+    settleMed: settles.length ? median(settles) : null,
+    aiN: srcOf("AI"),
+    srcNamed: ps.filter((e) => filled(e.src)).length,
+    fieldsTouched: new Set(ps.map((e) => e.k)).size,
+    keptN: ps.filter((e) => { const s = pasteSurvive(d, e, wmap); return s != null && s >= 60; }).length,
+  };
+}
+
+/* 지우고 다시 쓴 흔적의 깊이 — 횟수만 세면 오타 수정과 논지 전환이 같은 1건이 된다.
+   남겨 둔 이전 문장이 최종문과 얼마나 멀어졌는지로 개작의 깊이를 잰다. */
+function revisionMetrics(ws) {
+  const d = ws || {};
+  const log = Array.isArray(d._log) ? d._log : [];
+  let sum = 0, n = 0, deep = 0;
+  log.forEach((e) => {
+    const fin = typeof d[e.k] === "string" ? d[e.k] : "";
+    if (!e || !e.prev || !fin) return;
+    const gap = 1 - jaccard(gramSet(e.prev), gramSet(fin));
+    sum += gap; n++;
+    if (gap >= 0.5) deep++;
+  });
+  return { editN: log.length, depth: n ? Math.round((sum / n) * 100) : null, deepN: deep };
+}
+
+/* 회차별 프롬프트의 궤적 — 발산이 어떻게 좁혀지는가.
+   stepSize 인접 회차의 평균 변화량 · stepEven 변화가 회차마다 고른 정도(한 번에 하나만 고치기)
+   planGap 5차시 강의 노트에 세운 프롬프트 계획과 첫 회차 실제 프롬프트의 거리 */
+function promptMetrics(ws) {
+  const d = ws || {};
+  const ps = ((d["s5b.rounds"] || []).map((r) => (r && typeof r.prompt === "string" ? r.prompt.trim() : "")));
+  const used = ps.filter((s) => s.length >= 10);
+  if (!used.length) return { promptN: 0, growth: null, stepSize: null, stepEven: null, planGap: null };
+
+  const steps = [];
+  for (let i = 1; i < ps.length; i++) {
+    if (ps[i].length < 10 || ps[i - 1].length < 10) continue;
+    steps.push(1 - simText(ps[i - 1], ps[i]));
+  }
+  const m = steps.length ? steps.reduce((a, b) => a + b, 0) / steps.length : null;
+  let even = null;
+  if (steps.length >= 2 && m > 0) {
+    const sd = Math.sqrt(steps.reduce((a, b) => a + (b - m) * (b - m), 0) / steps.length);
+    even = Math.round(Math.max(0, 1 - sd / m) * 100);
+  }
+  const plan = d["l5.q3"];
+  return {
+    promptN: used.length,
+    growth: tokSet(used[used.length - 1]).size - tokSet(used[0]).size,
+    stepSize: m != null ? Math.round(m * 100) : null,
+    stepEven: even,
+    planGap: filled(plan) ? Math.round((1 - simText(plan, used[0])) * 100) : null,
+  };
+}
+
+/* ---------- 학급 동질화 ----------
+   "이 학생의 답이 얼마나 비슷한가"는 그 학생만 봐서는 계산되지 않는다. 반드시 학급 전체가 규준이다.
+   학생 수준(peerSim·nnSim·structSim·hapax)과 학급 수준(lexPool·엔트로피)은 다른 질문이고
+   결론이 엇갈릴 수 있다 — 엇갈리는 것 자체가 결과다. */
+function similarityAll(wsMap) {
+  const ids = Object.keys(wsMap || {});
+  const N = ids.length;
+  const fields = simFields();
+  const grams = {}, toks = {}, sigs = {};
+
+  /* 공용 문구는 먼저 걷어 낸다.
+     기본값(허구 고지 문안 등)과 앞 칸에서 이어받은 문장은 여러 학생에게 글자 그대로 같이 들어가므로,
+     그대로 두면 아무도 베끼지 않았는데 유사도가 높게 나온다. 한 칸에서 같은 문장을 쓴 학생이
+     그 칸을 채운 학생의 40% 이상이면 그 문장은 학생의 말이 아니라 서식으로 보고 제외한다. */
+  const boiler = {};
+  fields.forEach((k) => {
+    const cnt = new Map();
+    let wrote = 0;
+    ids.forEach((id) => {
+      const t = normText((wsMap[id] || {})[k]);
+      if (!t) return;
+      wrote++;
+      cnt.set(t, (cnt.get(t) || 0) + 1);
+    });
+    if (wrote < 3) return;
+    const cut = Math.max(2, Math.ceil(wrote * 0.4));
+    const dropped = new Set();
+    cnt.forEach((v, t) => { if (v >= cut) dropped.add(t); });
+    if (dropped.size) boiler[k] = dropped;
+  });
+  const own = (id, k) => {
+    const raw = (wsMap[id] || {})[k];
+    if (typeof raw !== "string" || !raw.trim()) return "";
+    const b = boiler[k];
+    return b && b.has(normText(raw)) ? "" : raw;
+  };
+
+  ids.forEach((id) => {
+    const parts = fields.map((k) => own(id, k)).filter((x) => x.trim().length > 0);
+    const blob = parts.join("\n");
+    grams[id] = gramSet(blob);
+    toks[id] = tokSet(blob);
+    const sg = new Set();
+    fields.forEach((k, i) => { for (const x of structSig(own(id, k), "f" + i + ":")) sg.add(x); });
+    sigs[id] = sg;
+  });
+
+  const freq = new Map();
+  ids.forEach((id) => { for (const t of toks[id]) freq.set(t, (freq.get(t) || 0) + 1); });
+
+  const per = {};
+  ids.forEach((id) => {
+    const empty = grams[id].size === 0;
+    if (N < 2 || empty) { per[id] = { peerSim: null, nnSim: null, nnId: null, structSim: null, hapax: empty ? null : 0 }; return; }
+    let sum = 0, cnt = 0, mx = -1, mxId = null, ss = 0, sc = 0;
+    ids.forEach((o) => {
+      if (o === id || grams[o].size === 0) return;
+      const s = jaccard(grams[id], grams[o]);
+      sum += s; cnt++;
+      if (s > mx) { mx = s; mxId = o; }
+      if (sigs[id].size && sigs[o].size) { ss += jaccard(sigs[id], sigs[o]); sc++; }
+    });
+    let hap = 0;
+    for (const t of toks[id]) if (freq.get(t) === 1) hap++;
+    per[id] = {
+      peerSim: cnt ? Math.round((sum / cnt) * 100) : null,
+      nnSim: cnt ? Math.round(mx * 100) : null,
+      nnId: cnt ? mxId : null,
+      structSim: sc ? Math.round((ss / sc) * 100) : null,
+      hapax: hap,
+    };
+  });
+
+  // 학급이 몇 갈래로 쏠렸는가 — 분포의 섀넌 엔트로피를 최대값으로 나눠 0~100으로
+  const entropy = (counts) => {
+    const tot = counts.reduce((a, b) => a + b, 0);
+    if (!tot || counts.length < 2) return null;
+    let h = 0;
+    counts.forEach((v) => { if (v > 0) { const p = v / tot; h -= p * Math.log2(p); } });
+    const mxH = Math.log2(counts.length);
+    return mxH > 0 ? Math.round((h / mxH) * 100) : null;
+  };
+  const countsOf = (key) => {
+    const m = {};
+    ids.forEach((id) => { const v = (wsMap[id] || {})[key]; if (filled(v)) m[v] = (m[v] || 0) + 1; });
+    return Object.values(m);
+  };
+
+  const written = ids.filter((id) => grams[id].size > 0);
+  return {
+    per,
+    cls: {
+      n: N,
+      written: written.length,
+      lexPool: freq.size,
+      hapaxPool: [...freq.values()].filter((v) => v === 1).length,
+      peerSimMed: median(ids.map((i) => per[i].peerSim)),
+      nnSimMed: median(ids.map((i) => per[i].nnSim)),
+      structSimMed: median(ids.map((i) => per[i].structSim)),
+      attitudeEnt: entropy(countsOf("s3c.attitude")),
+      modeEnt: entropy(countsOf("s7.mode")),
+    },
+  };
+}
+
+/* 유형 — 붙여넣기가 없으면 전유율이 정의되지 않으므로 "직접 씀"으로 따로 둔다.
+   나머지는 학급 전유율 중앙값으로 가른다. 절대 기준이 아니라 학급 안의 상대 위치다. */
+const AI_TYPES = ["직접 씀", "전유", "대리 서술"];
+function aiTypesAll(wsMap) {
+  const ids = Object.keys(wsMap || {});
+  const pm = {};
+  ids.forEach((id) => { pm[id] = pasteMetrics(wsMap[id]); });
+  const aps = ids.map((id) => pm[id].approp).filter((x) => x != null);
+  const apMed = median(aps);
+  const srMed = median(ids.map((id) => pm[id].srcRatio).filter((x) => x != null));
+  const per = {};
+  ids.forEach((id) => {
+    const m = pm[id];
+    let type = null;
+    if (m.pasteN === 0) type = "직접 씀";
+    else if (m.approp != null && aps.length >= 3) type = m.approp >= apMed ? "전유" : "대리 서술";
+    per[id] = { ...m, type };
+  });
+  return { per, apMed, srMed, n: aps.length };
+}
+
 /* 멀티모달 자료 목록 — 기록지 안의 사진·음성 필드를 모아 둠 */
 
 function mediaFields() {
@@ -2086,12 +2414,86 @@ function editTimeline(ws) {
   }));
 }
 
-function labelOfKey(key) {
-  const [sid, fk] = String(key).split(".");
+/* 표·점검표 안의 칸 이름 — 붙여넣기 자료에서 "prompt2"가 아니라 "프롬프트 3회차"로 읽히도록 */
+const SUB_LABELS = {
+  prompt: "프롬프트", judge: "한 줄 판단", change: "고친 한 가지", tool: "사용 도구", no: "산출물 번호",
+  note: "근거", fix: "수정 방법", status: "성립 여부",
+  obj: "사물 후보", where: "있는 자리", whose: "닿는 몸", act: "동작", inv: "보이지 않는 것",
+  spot: "흔적의 자리", shape: "흔적의 모양", freq: "빈도", span: "기간",
+  memo: "메모", sent: "보낸 말", overall: "종합 비평", swap: "명제표 바꿔 달기",
+  counter: "반론", hold: "그럼에도 남는 것", stand: "내 입장", url: "링크",
+};
+function subLabel(sub) {
+  if (!sub) return "";
+  const one = (p) => {
+    const m = String(p).match(/^([a-zA-Z]+)(\d+)$/);
+    if (m) return (SUB_LABELS[m[1]] || m[1]) + " " + (Number(m[2]) + 1) + "행";
+    if (SUB_LABELS[p]) return SUB_LABELS[p];
+    const it = (typeof INSPECT_ITEMS !== "undefined" ? INSPECT_ITEMS : []).find((x) => x.k === p);
+    if (it) return it.label;
+    const pv = (typeof PEER_VIEWS !== "undefined" ? PEER_VIEWS : []).find((x) => x.k === p);
+    if (pv) return pv.label;
+    return String(p);
+  };
+  return String(sub).split(".").map(one).join(" · ");
+}
+
+/* 필드 키를 차시·구역·칸 이름으로 푼다. 표 안의 칸은 "필드키#속성행번호" 꼴이므로 "#" 앞만 본다. */
+function fieldMeta(key) {
+  const s0 = String(key);
+  const hash = s0.indexOf("#");
+  const base = hash >= 0 ? s0.slice(0, hash) : s0;
+  const sub = hash >= 0 ? s0.slice(hash + 1) : "";
+  const [sid, fk] = base.split(".");
   const sec = SCHEMA.find((s) => s.id === sid);
-  if (!sec) return key;
-  const f = sec.fields.find((x) => x.k === fk);
-  return (sec.kind === "learn" ? "배움 확인 " : "기록 ") + sec.code + " · " + (f ? String(f.label).slice(0, 28) : fk);
+  const f = sec ? sec.fields.find((x) => x.k === fk) : null;
+  const label = f && filled(f.label) ? String(f.label) : (sec ? sec.title : (fk || base));
+  return {
+    secId: sid || "", fieldKey: fk || "", sub, subName: subLabel(sub),
+    session: sec ? sec.session : "",
+    code: sec ? sec.code : "",
+    kind: sec ? (sec.kind === "learn" ? "배움 확인" : sec.kind === "inquiry" ? "탐구 질문" : "기록") : "",
+    secTitle: sec ? sec.title : "",
+    label,
+  };
+}
+
+function labelOfKey(key) {
+  const m = fieldMeta(key);
+  if (!m.secId || !m.code) return String(key);
+  return (m.kind ? m.kind + " " : "") + m.code + " · " + m.label.slice(0, 28) + (m.subName ? " · " + m.subName : "");
+}
+
+/* 붙여넣기 한 건 = 한 행. 붙여넣은 문구 자체와 그 문구가 겪은 일을 함께 담는다.
+   논문에서 이 표가 "가져온 글이 어떻게 되었는가"의 원자료가 된다. */
+function pasteRows(ws) {
+  const d = ws || {};
+  const ps = (Array.isArray(d._paste) ? d._paste : []).filter((e) => e && e.k);
+  const wmap = writtenMap(d);
+  return ps
+    .slice()
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)))
+    .map((e, i) => {
+      const m = fieldMeta(e.k);
+      const fin = pasteFinal(d, e.k, wmap);
+      const sv = pasteSurvive(d, e, wmap);
+      return {
+        no: i + 1,
+        at: e.at,
+        key: e.k,
+        session: m.session,
+        code: m.code,
+        where: (m.kind ? m.kind + " " + m.code + " · " : "") + m.label.slice(0, 40) + (m.subName ? " · " + m.subName : ""),
+        chars: e.n || 0,
+        base: e.base || 0,
+        src: e.src || "",
+        settle: typeof e.settle === "number" ? e.settle : null,
+        survive: sv,
+        approp: sv == null ? null : 100 - sv,
+        finalLen: strLen(fin),
+        head: e.head || "",
+      };
+    });
 }
 
 /* ============================================================
@@ -2176,7 +2578,7 @@ function fieldUnits(f, v) {
     case "debate": { const m = v || {}; push("① 내 입장", m.pos); push("② 반대 근거", m.counter); push("③ 유지·변경", m.hold); break; }
     case "reflect": push("", (v || {}).pos); break;
     case "checks": { const m = v || {}; push("", (f.opts || []).filter((o) => m[o]).join(" · ")); break; }
-    case "rounds": rows.forEach((r, i) => { if (!r) return; push("회차 " + (i + 1) + " 고친 것", r.change); push("회차 " + (i + 1) + " 판단", r.judge); }); break;
+    case "rounds": rows.forEach((r, i) => { if (!r) return; push("회차 " + (i + 1) + " 프롬프트", r.prompt); push("회차 " + (i + 1) + " 고친 것", r.change); push("회차 " + (i + 1) + " 판단", r.judge); }); break;
     case "inspect": { const m = v || {}; INSPECT_ITEMS.forEach((it) => { const r = m[it.k] || {}; if (filled(r.note)) push(it.label + "(" + (r.status || "-") + ")", r.note); }); break; }
     case "peer": rows.forEach((b, i) => {
       if (!b) return;
@@ -2546,6 +2948,16 @@ body{background:var(--bg)}
 .grade-row .g-name small{display:block;color:var(--sub);font-size:11px}
 .back-link{font-size:13px;color:var(--sub);cursor:pointer;background:none;border:none;font-family:var(--sans);padding:0;margin-bottom:12px;text-decoration:underline}
 .feedback-card{background:var(--patina-bg);border:1px solid var(--patina);padding:14px 16px;margin-bottom:18px}
+.paste-ask{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--card);border-top:2px solid var(--ink);box-shadow:0 -6px 24px rgba(0,0,0,.12)}
+.paste-ask-in{max-width:1060px;margin:0 auto;padding:12px 18px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.paste-ask .pa-q{font-weight:600;font-size:14px}
+.paste-ask .pa-opts{display:flex;flex-wrap:wrap;gap:6px}
+.paste-ask .pa-note{flex:1 1 100%;font-size:11.5px;color:var(--sub);line-height:1.6}
+.paste-mark{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:6px}
+.paste-mark .pm-n{font-size:11px;color:var(--sub);font-family:var(--mono)}
+.paste-mark .pm-chip{font-size:11px;padding:1px 7px;border:1px solid var(--line);border-radius:9px;background:var(--card2);color:var(--sub)}
+.paste-mark .pm-chip.kept{border-color:var(--seal);color:var(--seal);background:var(--seal-bg)}
+.paste-mark .pm-chip.own{border-color:var(--patina);color:var(--patina);background:var(--patina-bg)}
 .feedback-card h3{font-family:var(--serif);font-size:14px;color:var(--patina);margin-bottom:8px}
 .feedback-card p{font-size:13px;white-space:pre-wrap}
 
@@ -3532,7 +3944,7 @@ function FieldEditor({ sec, f, ws, setField }) {
   if (f.t === "text" || f.t === "area") {
     const meter = f.t === "area" && (f.steps || sec.kind === "learn" || sec.kind === "inquiry");
     return (
-      <div className={"field " + (f.t === "area" ? "span2" : "")}>
+      <div className={"field " + (f.t === "area" ? "span2" : "")} data-fk={key}>
         {f.qtype ? (
           <div className="q-head"><span className={"q-type " + (f.qtype === "설계" ? "design" : "concept")}>{f.qtype}</span><label style={{ margin: 0 }}>{f.label}</label></div>
         ) : (
@@ -3547,6 +3959,7 @@ function FieldEditor({ sec, f, ws, setField }) {
           <textarea rows={f.rows || 3} value={v ?? ""} maxLength={4000} placeholder={f.ph || ""} onChange={(e) => setField(key, e.target.value)} />
         )}
         {meter && <ThinkMeter text={v} />}
+        <PasteMark ws={ws} fieldKey={key} />
       </div>
     );
   }
@@ -3720,12 +4133,17 @@ function FieldEditor({ sec, f, ws, setField }) {
     return (
       <div className="tbl-scroll">
         <table className="tbl">
-          <thead><tr><th>회차</th><th>사용 도구</th><th>프롬프트에서 고친 한 가지</th><th>산출물 번호</th><th>한 줄 판단</th><th style={{ width: 118 }}>결과 화면</th></tr></thead>
+          <thead><tr><th>회차</th><th style={{ width: 92 }}>사용 도구</th><th style={{ minWidth: 240 }}>이번 회차에 넣은 프롬프트 전문</th><th>프롬프트에서 고친 한 가지</th><th style={{ width: 70 }}>산출물 번호</th><th>한 줄 판단</th><th style={{ width: 118 }}>결과 화면</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="rn">{i + 1}</td>
                 <td><input value={r.tool || ""} onChange={(e) => up(i, "tool", e.target.value)} /></td>
+                <td data-fk={key + "#prompt" + i}>
+                  <textarea rows={3} maxLength={1500} value={r.prompt || ""}
+                    placeholder={i === 0 ? "도구에 넣은 문장을 그대로 붙여 넣습니다. 네 요소(무엇인가 / 어떤 상태인가 / 어떻게 놓였는가 / 어떤 사진인가)" : ""}
+                    onChange={(e) => up(i, "prompt", e.target.value)} />
+                </td>
                 <td><input value={r.change || ""} onChange={(e) => up(i, "change", e.target.value)} /></td>
                 <td><input value={r.no || ""} onChange={(e) => up(i, "no", e.target.value)} /></td>
                 <td><input value={r.judge || ""} onChange={(e) => up(i, "judge", e.target.value)} /></td>
@@ -4077,15 +4495,29 @@ function FieldReader({ sec, f, ws, owner }) {
     );
   }
   if (f.t === "rounds") {
-    const rows = (v || []).filter((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change)));
+    const has = (r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change) || filled(r.prompt));
+    const rows = (v || []).filter(has);
     if (!rows.length) return Empty;
+    const steps = promptMetrics({ "s5b.rounds": v || [] });
     return (
-      <table className="tbl" style={{ marginBottom: 10 }}>
-        <thead><tr><th>회차</th><th>도구</th><th>고친 한 가지</th><th>산출물</th><th>한 줄 판단</th><th>결과 화면</th></tr></thead>
-        <tbody>{(v || []).map((r, i) => (r && (filled(r.tool) || filled(r.judge) || filled(r.change)) ?
-          <tr key={i}><td className="rn">{i + 1}</td><td>{r.tool}</td><td>{r.change}</td><td>{r.no}</td><td>{r.judge}</td><td>{r.img ? <MediaThumb owner={owner || OWNER} refId={r.img} alt={i + 1 + "회차"} size={56} /> : "-"}</td></tr> : null))}
-        </tbody>
-      </table>
+      <>
+        <table className="tbl" style={{ marginBottom: 6 }}>
+          <thead><tr><th>회차</th><th>도구</th><th style={{ minWidth: 200 }}>프롬프트 전문</th><th>고친 한 가지</th><th>산출물</th><th>한 줄 판단</th><th>결과 화면</th></tr></thead>
+          <tbody>{(v || []).map((r, i) => (has(r) ?
+            <tr key={i}><td className="rn">{i + 1}</td><td>{r.tool}</td>
+              <td style={{ whiteSpace: "pre-wrap", fontSize: 12 }}>{r.prompt || "-"}</td>
+              <td>{r.change}</td><td>{r.no}</td><td>{r.judge}</td><td>{r.img ? <MediaThumb owner={owner || OWNER} refId={r.img} alt={i + 1 + "회차"} size={56} /> : "-"}</td></tr> : null))}
+          </tbody>
+        </table>
+        {steps.promptN >= 2 && (
+          <p className="hint" style={{ marginBottom: 10 }}>
+            프롬프트 {steps.promptN}회 · 인접 회차 평균 변화량 {steps.stepSize}%
+            {steps.stepEven != null ? " · 변화가 고른 정도 " + steps.stepEven + "%" : ""}
+            {steps.planGap != null ? " · 5차시 계획과의 거리 " + steps.planGap + "%" : ""}
+            {steps.growth != null ? " · 어휘 " + (steps.growth >= 0 ? "+" : "") + steps.growth + "개" : ""}
+          </p>
+        )}
+      </>
     );
   }
   if (f.t === "inspect") {
@@ -4666,7 +5098,14 @@ function SectionCard({ sec, ws, setField }) {
       <div className="card-body">
         {sec.ladder && <LadderRail sec={sec} ws={ws} />}
         <div className="f-grid">
-          {sec.fields.map((f) => <FieldEditor key={f.k} sec={sec} f={f} ws={ws} setField={setField} />)}
+          {/* 감싸는 칸마다 필드 키를 달아 둔다 — 표·사다리·점검표처럼 자체 입력칸을 가진
+              자리에 붙여넣어도 어느 칸인지 알 수 있어야 전 과정의 붙여넣기가 빠짐없이 남는다.
+              display:contents라 격자 배치에는 영향을 주지 않는다. */}
+          {sec.fields.map((f) => (
+            <div key={f.k} data-fk={sec.id + "." + f.k} style={{ display: "contents" }}>
+              <FieldEditor sec={sec} f={f} ws={ws} setField={setField} />
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -4818,14 +5257,30 @@ function StudentApp({ me, onExit, onGallery }) {
     if (!loaded) return;
     setWs((p) => {
       const next = { ...p, [k]: v };
-      // 사고 변화를 볼 자리는 고쳐 쓰기 전의 문장을 남겨 둠
+      // 사고 변화를 볼 자리는 고쳐 쓰기 전의 문장을 남겨 둠.
+      // 길이 차만 보면 길이는 그대로인 채 내용만 갈아엎은 개작을 놓치므로 어휘 겹침도 함께 본다.
       if (TRACKED.includes(k) && typeof p[k] === "string" && typeof v === "string") {
         const prev = p[k].trim();
+        const cur = v.trim();
         const log = p._log || [];
         const last = log.filter((e) => e.k === k).slice(-1)[0];
         const gapOk = !last || Date.now() - new Date(last.at).getTime() > 120000;
-        if (prev.length > 15 && gapOk && Math.abs(v.trim().length - prev.length) > 8) {
-          next._log = [...log, { k, at: now(), prev: prev.slice(0, 400) }].slice(-120);
+        const grew = Math.abs(cur.length - prev.length) > 8;
+        const reworded = cur.length > 15 && jaccard(gramSet(prev), gramSet(cur)) < 0.6;
+        if (prev.length > 15 && gapOk && (grew || reworded)) {
+          next._log = [...log, { k, at: now(), prev: prev.slice(0, 400) }].slice(-300);
+        }
+      }
+      // 붙여넣은 뒤 그 칸을 마지막으로 손댈 때까지의 초 — 붙이고 바로 넘어갔는지 붙잡고 고쳤는지
+      if (typeof v === "string" && Array.isArray(p._paste) && p._paste.length) {
+        const ps = p._paste;
+        for (let i = ps.length - 1; i >= 0; i--) {
+          if (ps[i].k !== k) continue;
+          const sec = Math.round((Date.now() - new Date(ps[i].at).getTime()) / 1000);
+          if (sec >= 0 && sec < 3600 && Math.abs(sec - (ps[i].settle || 0)) >= 2) {
+            next._paste = ps.map((e, j) => (j === i ? { ...e, settle: sec } : e));
+          }
+          break;
         }
       }
       const t = { ...(p._t || {}) };
@@ -4838,6 +5293,42 @@ function StudentApp({ me, onExit, onGallery }) {
     setSaveState("dirty");
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(doSave, 600); // 입력이 멈추면 0.6초 안에 저장
+  };
+
+  /* 붙여넣기 기록 — 막지 않고 남긴다.
+     어느 칸에 몇 자를 붙였는지와 앞 120자만 저장한다. 클립보드 전문은 저장하지 않는다.
+     붙인 직후 출처를 학생이 직접 고르게 하는 것은 자료의 타당도를 지키는 장치이면서,
+     "이 문장은 어디서 왔는가"를 스스로 짚게 하는 수업 활동이기도 하다. */
+  const [pasteAsk, setPasteAsk] = useState(null);
+  useEffect(() => {
+    const onPaste = (e) => {
+      if (!loaded) return;
+      const el = e.target && e.target.closest ? e.target.closest("[data-fk]") : null;
+      if (!el) return;
+      const k = el.getAttribute("data-fk");
+      const txt = ((e.clipboardData || window.clipboardData || {}).getData ? (e.clipboardData || window.clipboardData).getData("text") : "") || "";
+      const body = txt.trim();
+      if (!k || body.length < PASTE_MIN) return;
+      const at = now();
+      const entry = { k, at, n: body.length, head: body.slice(0, 120), base: strLen(wsRef.current[k]), src: "" };
+      setWs((p) => ({ ...p, _paste: [...(Array.isArray(p._paste) ? p._paste : []), entry].slice(-200) }));
+      dirtyRef.current = true;
+      setSaveState("dirty");
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(doSave, 800);
+      setPasteAsk({ k, at });
+    };
+    document.addEventListener("paste", onPaste, true);
+    return () => document.removeEventListener("paste", onPaste, true);
+  }, [loaded]);
+
+  const setPasteSrc = (at, src) => {
+    setWs((p) => ({ ...p, _paste: (Array.isArray(p._paste) ? p._paste : []).map((e) => (e.at === at ? { ...e, src } : e)) }));
+    dirtyRef.current = true;
+    setSaveState("dirty");
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(doSave, 400);
+    setPasteAsk(null);
   };
 
   useEffect(() => {
@@ -4969,6 +5460,100 @@ function StudentApp({ me, onExit, onGallery }) {
         {isOpen(openMap, tab) && secs.filter((s) => s.kind !== "learn" && s.kind !== "inquiry").map((sec) => (
           <SectionCard key={sec.id} sec={sec} ws={ws} setField={setField} />
         ))}
+        {/* 차시마다 그 차시에서 가져온 문장을, 8차시에는 전 과정을 모아 보여 준다 */}
+        {isOpen(openMap, tab) && tab !== "8차시" && <PasteBackCard ws={ws} session={tab} />}
+        {isOpen(openMap, tab) && tab === "8차시" && <PasteBackCard ws={ws} />}
+      </div>
+
+      {pasteAsk && (
+        <div className="paste-ask" role="dialog" aria-label="붙여넣은 문장의 출처">
+          <div className="paste-ask-in">
+            <span className="pa-q">방금 붙여넣은 문장은 어디에서 왔나요?</span>
+            <div className="pa-opts">
+              {PASTE_SRC.map((s) => (
+                <button key={s} className="btn small" onClick={() => setPasteSrc(pasteAsk.at, s)}>{s}</button>
+              ))}
+              <button className="btn small ghost" onClick={() => setPasteAsk(null)}>닫기</button>
+            </div>
+            <span className="pa-note">붙여넣기는 막지 않습니다. 어디서 왔는지 스스로 짚어 두면 나중에 무엇을 내 말로 바꿨는지 볼 수 있습니다.</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* 붙여넣은 칸에 붙는 표지 — 어느 칸에 무엇을 가져왔고 그것이 지금 얼마나 남아 있는지
+   그 자리에서 바로 보이게 한다. 숨겨 두고 재기만 하면 감시가 되고, 보여 주면 되돌림이 된다. */
+function PasteMark({ ws, fieldKey }) {
+  const d = ws || {};
+  const ps = (Array.isArray(d._paste) ? d._paste : []).filter((e) => e && e.k === fieldKey);
+  if (!ps.length) return null;
+  const wmap = writtenMap(d);
+  return (
+    <div className="paste-mark">
+      <span className="pm-n">가져온 문장 {ps.length}건</span>
+      {ps.map((e, i) => {
+        const sv = pasteSurvive(d, e, wmap);
+        const kept = sv != null && sv >= 60;
+        return (
+          <span key={i} className={"pm-chip " + (kept ? "kept" : "own")} title={e.head}>
+            {e.src || "출처 미표시"}{sv != null ? " · 그대로 " + sv + "%" : ""}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/* 학생에게 돌려주는 화면 — 붙여넣은 문장 가운데 무엇이 그대로 남았는지 본인만 본다.
+   감시가 아니라 되돌림이 되게 하는 장치. 점수로 쓰지 않는다.
+   session을 주면 그 차시 것만, 주지 않으면 전 과정을 모아 보여 준다. */
+function PasteBackCard({ ws, session }) {
+  const all = pasteRows(ws).filter((r) => r.head);
+  const rows = session ? all.filter((r) => r.session === session) : all;
+  if (!rows.length) return null;
+  const kept = rows.filter((r) => r.survive != null && r.survive >= 60).length;
+  const named = rows.filter((r) => r.src).length;
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span className="card-code">되돌아보기</span>
+        <span className="card-title">{session ? "이 차시에서 가져온 문장" : "전 과정에서 내가 가져온 문장"}</span>
+        {!session && <span className="card-sess">전체</span>}
+      </div>
+      <div className="card-body">
+        <p className="hint" style={{ marginBottom: 10 }}>
+          {session ? "이 차시에서" : "이 단원 전체에서"} 다른 곳에서 가져온 문장이 {rows.length}개 있고, 그중 {kept}개가 거의 그대로 남아 있습니다.
+          {named < rows.length ? " 출처를 표시하지 않은 것이 " + (rows.length - named) + "개 있습니다." : ""}
+          {" "}가져온 것이 잘못이 아닙니다. 가져온 뒤 내 말로 바꾼 자리가 이 수업에서 내가 한 일입니다.
+        </p>
+        <div className="tbl-scroll">
+          <table className="tbl">
+            <thead><tr>
+              {!session && <th style={{ width: 62 }}>차시</th>}
+              <th style={{ width: 150 }}>어느 칸</th><th>가져온 문장의 앞머리</th>
+              <th style={{ width: 88 }}>출처</th><th style={{ width: 76 }}>글자 수</th><th style={{ width: 88 }}>그대로 남음</th>
+            </tr></thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  {!session && <td style={{ fontSize: 12 }}>{r.session}</td>}
+                  <td style={{ fontSize: 12 }}>{r.where}</td>
+                  <td style={{ fontSize: 12, color: "var(--sub)" }}>{r.head.slice(0, 70)}{r.head.length > 70 ? "…" : ""}</td>
+                  <td style={{ fontSize: 12 }}>{r.src || "—"}</td>
+                  <td className="mono">{r.chars}</td>
+                  <td className="mono" style={{ color: r.survive == null ? "var(--sub)" : r.survive >= 60 ? "var(--seal)" : "var(--patina)" }}>
+                    {r.survive == null ? "—" : r.survive + "%"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="hint" style={{ marginTop: 8 }}>
+          이 표는 선생님의 채점에 쓰지 않습니다. 가져온 문장의 앞 120자만 남기며, 붙여넣은 글 전체를 저장하지는 않습니다.
+        </p>
       </div>
     </div>
   );
@@ -5230,6 +5815,47 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
         </div>
       )}
 
+      {(() => {
+        const prs = pasteRows(ws);
+        if (!prs.length) return null;
+        const pm = pasteMetrics(ws);
+        return (
+          <div className="card">
+            <div className="card-body">
+              <details>
+                <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>
+                  가져온 문장 {prs.length}건 — 전체 서술의 {pm.srcRatio}% · 그대로 남은 것 {pm.keptN}건
+                  {pm.approp != null ? " · 전유율 " + pm.approp + "%" : ""}
+                </summary>
+                <table className="tbl" style={{ marginTop: 10 }}>
+                  <thead><tr><th style={{ width: 58 }}>차시</th><th style={{ width: 150 }}>어느 칸</th><th>가져온 문장의 앞머리</th><th style={{ width: 88 }}>출처</th><th style={{ width: 62 }}>글자</th><th style={{ width: 76 }}>손댄 시간</th><th style={{ width: 76 }}>그대로</th></tr></thead>
+                  <tbody>
+                    {prs.map((r, i) => (
+                      <tr key={i}>
+                        <td>{r.session}</td>
+                        <td style={{ fontSize: 12 }}>{r.where}</td>
+                        <td style={{ fontSize: 12, color: "var(--sub)" }}>{r.head.slice(0, 80)}{r.head.length > 80 ? "…" : ""}</td>
+                        <td style={{ fontSize: 12 }}>{r.src || "미표시"}</td>
+                        <td className="mono">{r.chars}</td>
+                        <td className="mono">{r.settle == null ? "—" : r.settle + "초"}</td>
+                        <td className="mono" style={{ color: r.survive == null ? "var(--sub)" : r.survive >= 60 ? "var(--seal)" : "var(--patina)" }}>
+                          {r.survive == null ? "—" : r.survive + "%"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="hint" style={{ marginTop: 8 }}>
+                  가져온 문장의 앞 120자만 남긴 것이며 붙여넣은 글 전체는 저장하지 않습니다.
+                  출처는 학생이 붙여넣은 직후 스스로 고른 값이라 미표시가 섞입니다 — <b>출처가 비어 있는 건을 AI로 간주하지 마십시오.</b>
+                  붙여넣기 자체는 잘못이 아니며, 이 표는 채점이 아니라 함께 읽을 자리를 고르는 데 씁니다.
+                </p>
+              </details>
+            </div>
+          </div>
+        );
+      })()}
+
       {ws._act && Object.keys(ws._act).length > 0 && (
         <div className="card">
           <div className="card-body">
@@ -5367,6 +5993,47 @@ const sidJitter = (id) => {
   return (h % 11) - 5;
 };
 
+/* 가져온 양 × 전유율 — 네 칸이 아니라 두 축으로 본다.
+   가로가 높다고 문제가 아니다. 세로(전유율)가 낮은 오른쪽 아래가 함께 볼 자리다. */
+function ApproprScatter({ rows, apMed, srMed, hoverId, setHoverId, onSel }) {
+  const W = 560, H = 240, PAD = 30;
+  const pts = rows.filter((r) => r.pm && r.pm.pasteN > 0 && r.pm.approp != null);
+  const none = rows.length - pts.length;
+  const x = (v) => PAD + (Math.max(0, Math.min(100, v)) / 100) * (W - PAD * 2);
+  const y = (v) => H - PAD - (Math.max(0, Math.min(100, v)) / 100) * (H - PAD * 2);
+  return (
+    <div>
+      <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: "auto" }} role="img" aria-label="가져온 양과 전유율의 학급 분포">
+        <title>가로: AI 소스 비중(%) · 세로: 전유율(%). 점 하나가 학생 한 명. 붙여넣기 기록이 있는 {pts.length}명만 나타납니다.</title>
+        <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="var(--line)" strokeWidth={1} />
+        <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} stroke="var(--line)" strokeWidth={1} />
+        {apMed != null && pts.length >= 3 && (
+          <line x1={PAD} y1={y(apMed)} x2={W - PAD} y2={y(apMed)} stroke="var(--ink)" strokeWidth={1} strokeDasharray="4 3" opacity={0.45} />
+        )}
+        {srMed != null && pts.length >= 3 && (
+          <line x1={x(srMed)} y1={PAD} x2={x(srMed)} y2={H - PAD} stroke="var(--ink)" strokeWidth={1} strokeDasharray="4 3" opacity={0.45} />
+        )}
+        <text x={W - PAD} y={H - 8} fontSize={10} fill="var(--sub)" fontFamily="var(--mono)" textAnchor="end">가져온 양 →</text>
+        <text x={4} y={PAD - 10} fontSize={10} fill="var(--sub)" fontFamily="var(--mono)">↑ 전유율</text>
+        <text x={W - PAD - 4} y={PAD + 2} fontSize={10} fill="var(--patina)" textAnchor="end">가져와서 바꿈</text>
+        <text x={W - PAD - 4} y={H - PAD - 6} fontSize={10} fill="var(--seal)" textAnchor="end">가져온 대로 둠</text>
+        {pts.map((r) => (
+          <circle key={r.id} cx={x(r.pm.srcRatio)} cy={y(r.pm.approp)} r={r.id === hoverId ? 6 : 4.5}
+            fill={r.id === hoverId ? "var(--seal)" : "var(--patina)"} fillOpacity={r.id === hoverId ? 1 : 0.55}
+            stroke="var(--card)" strokeWidth={1.5} style={{ cursor: "pointer" }}
+            onMouseEnter={() => setHoverId(r.id)} onMouseLeave={() => setHoverId(null)} onClick={() => onSel(r.id)}>
+            <title>{r.nick} · 가져온 양 {r.pm.srcRatio}% · 전유율 {r.pm.approp}% · {r.pm.type || "미분류"}</title>
+          </circle>
+        ))}
+      </svg>
+      <p className="hint">
+        붙여넣기 기록이 있는 {pts.length}명만 나타납니다{none > 0 ? " (직접 쓴 학생 " + none + "명은 이 그림에 없습니다)" : ""}.
+        {pts.length < 3 ? " 중앙값 선은 3명부터 그립니다." : ""}
+      </p>
+    </div>
+  );
+}
+
 function AxisStripRow({ axis, rows, first, hoverId, setHoverId, onSel }) {
   const W = 560, H = first ? 42 : 30, Y = 15;
   const pts = rows.filter((r) => r.v != null);
@@ -5467,7 +6134,22 @@ function TimeScatter({ rows, hoverId, setHoverId, onSel }) {
 function CreativityPanel({ ids, roster, wsMap, onSel }) {
   const [hoverId, setHoverId] = useState(null);
   const [sortKey, setSortKey] = useState("id");
-  const axesAll = useMemo(() => creativityAxesAll(Object.fromEntries(ids.map((id) => [id, wsMap[id] || {}]))), [ids, wsMap]);
+  const wsOnly = useMemo(() => Object.fromEntries(ids.map((id) => [id, wsMap[id] || {}])), [ids, wsMap]);
+  const axesAll = useMemo(() => creativityAxesAll(wsOnly), [wsOnly]);
+  const aiAll = useMemo(() => aiTypesAll(wsOnly), [wsOnly]);
+
+  /* 동질화는 학급 전체를 규준으로 쌍마다 비교하므로 140명이면 만 쌍에 가깝고 0.3초쯤 걸린다.
+     학생이 저장할 때마다 기록이 새로 내려오므로, 그때마다 다시 계산하면 화면이 끊긴다.
+     15초에 한 번씩만 다시 잰다 — 동질화는 초 단위로 움직이는 값이 아니다. */
+  const wsSnapRef = useRef(wsOnly);
+  wsSnapRef.current = wsOnly;
+  const [simTick, setSimTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSimTick((x) => x + 1), 15000);
+    return () => clearInterval(t);
+  }, []);
+  const simSnap = useMemo(() => wsSnapRef.current, [simTick, ids.length]);
+  const simAll = useMemo(() => similarityAll(simSnap), [simSnap]);
   const rows = ids.map((id) => ({ id, nick: (roster[id] || {}).nick || id, ax: axesAll[id] || {} }));
 
   const meanMed = median(rows.map((r) => r.ax.mean));
@@ -5621,11 +6303,64 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
       </div>
 
       <div className="card">
+        <div className="card-head"><span className="card-code">AI 1</span><span className="card-title">가져온 양 × 전유율 — 어떻게 쓰고 있는가</span></div>
+        <div className="card-body">
+          <ApproprScatter rows={rows.map((r) => ({ id: r.id, nick: r.nick, pm: aiAll.per[r.id] || {} }))}
+            apMed={aiAll.apMed} srMed={aiAll.srMed} hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
+          <div className="hbar" style={{ marginTop: 10 }}>
+            {AI_TYPES.map((t) => {
+              const n = ids.filter((id) => (aiAll.per[id] || {}).type === t).length;
+              return <span key={t} className="v" style={{ marginRight: 16 }}>{t} {n}명</span>;
+            })}
+          </div>
+          <p className="hint" style={{ marginTop: 8 }}>
+            가로는 붙여넣은 글자가 최종 서술에서 차지하는 비중, 세로는 붙인 문장이 최종문에서 사라진 정도입니다.
+            오른쪽 아래(많이 가져오고 덜 고침)가 함께 볼 학생이고, 오른쪽 위는 가져와서 자기 말로 바꾼 경우입니다.
+            <b> 붙여넣기 자체는 잘못이 아닙니다.</b> 이 단원은 발산을 AI에, 수렴과 전유를 학생에 두는 구조이므로 판단은 오른쪽 위·아래를 가르는 세로축에서 합니다.
+          </p>
+          <p className="hint" style={{ marginTop: 6, color: "var(--sub)" }}>
+            점선은 학급 중앙값입니다. 절대 기준이 아니라 이 학급 안의 상대 위치이며, 학급이 바뀌면 선도 움직입니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">AI 2</span><span className="card-title">학급이 서로 비슷해지고 있는가</span></div>
+        <div className="card-body">
+          <div className="kpis" style={{ marginBottom: 12 }}>
+            <div className="kpi"><div className="n">{simAll.cls.peerSimMed != null ? simAll.cls.peerSimMed + "%" : "—"}</div><div className="l">서술 유사도 중앙값</div></div>
+            <div className="kpi"><div className="n">{simAll.cls.structSimMed != null ? simAll.cls.structSimMed + "%" : "—"}</div><div className="l">구조 유사도 중앙값</div></div>
+            <div className="kpi"><div className="n">{simAll.cls.lexPool || "—"}</div><div className="l">학급 어휘 풀</div></div>
+            <div className="kpi"><div className="n">{simAll.cls.attitudeEnt != null ? simAll.cls.attitudeEnt + "%" : "—"}</div><div className="l">태도 선택의 고름</div></div>
+          </div>
+          <AxisStripRow axis={{ key: "peerSim", name: "학급 평균 유사도", desc: "내 서술이 나머지 학생 서술과 얼마나 겹치는가 (높을수록 무난함)" }}
+            rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).peerSim }))}
+            hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
+          <AxisStripRow axis={{ key: "structSim", name: "구조 유사도", desc: "낱말이 달라도 문장 수·나열 표지·연결어의 뼈대가 같은 정도" }}
+            rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).structSim }))}
+            hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
+          <AxisStripRow axis={{ key: "hapax", name: "나만 쓴 낱말", desc: "학급 전체에서 이 학생만 사용한 어휘의 수 (0~40개를 눈금으로)" }} first
+            rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).hapax == null ? null : Math.min(100, Math.round(((simAll.per[r.id] || {}).hapax / 40) * 100)) }))}
+            hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
+          <p className="hint" style={{ marginTop: 8 }}>
+            <b>구조 유사도를 함께 보는 이유</b> — 학생은 가져온 글을 그대로 내지 않고 고쳐서 냅니다. 그러면 낱말은 바뀌지만 뼈대는 남습니다.
+            서술 유사도는 낮은데 구조 유사도만 높은 학생이 있다면 그 자리를 먼저 읽어 보십시오.
+          </p>
+          <p className="hint" style={{ marginTop: 6, color: "var(--seal)" }}>
+            이 표는 <b>표절 탐지가 아닙니다.</b> 유사도가 높다는 것은 베꼈다는 뜻이 아니라 같은 말을 썼다는 뜻이며,
+            개인이나 짝을 지목하는 근거로 쓰지 않습니다. 학급 전체가 한 방향으로 좁아지고 있는지를 보는 자리입니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="card">
         <div className="card-head"><span className="card-code">읽는 법</span><span className="card-title">이 지표가 재는 것과 재지 못하는 것</span></div>
         <div className="card-body" style={{ fontSize: 13 }}>
           <p>이 화면의 숫자는 기록의 <b>양과 폭</b>을 셉니다. 답이 좋은지는 재지 못하므로, 점수는 어느 학생의 기록부터 읽을지 고르는 입구로만 쓰고 판단은 본문을 읽고 내립니다.</p>
           <p style={{ marginTop: 6 }}>남다름은 학급 안 낱말 비교라 같은 문제를 다른 말로 쓴 학생이 높게 나올 수 있고, 학급이 바뀌면 점수도 바뀝니다. 채집의 폭은 기기·촬영 환경의 영향을 받으므로 성적에 직접 반영하지 않고 격려와 관찰에 씁니다.</p>
           <p style={{ marginTop: 6 }}>축마다 성격과 만점 기준이 달라 여섯 축을 하나의 점수로 합치지 않습니다. 「축 평균」은 정렬과 산점도를 위한 참고값입니다.</p>
+          <p style={{ marginTop: 6 }}><b>붙여넣기 지표</b>는 외부 글이 들어온 시점과 분량을 알려 줄 뿐 <b>출처를 알려 주지 않습니다.</b> 학생이 고른 출처 표시가 없으면 AI인지 검색 결과인지 자기가 앞서 쓴 글인지 구분되지 않습니다. 전유율은 붙인 앞 120자가 최종문에 남았는지로 어림한 값이라 긴 글에서는 거칠게 나옵니다.</p>
+          <p style={{ marginTop: 6 }}><b>유사도 지표</b>는 학급을 규준으로 한 상대값입니다. 학급이 바뀌면 값도 바뀌고, 같은 과제를 성실히 수행한 학생끼리 높게 나오는 것이 정상입니다. 표절 판정이나 징계의 근거로 쓸 수 없습니다.</p>
         </div>
       </div>
 
@@ -6543,6 +7278,33 @@ const RESEARCH_VARS = [
   } },
   { k: "survey_pre", name: "창의성 인식 사전", unit: "1–5", def: "사전 설문 전체 척도 평균", get: (c) => (c.svPre ? Math.round(c.svPre.total * 100) / 100 : null) },
   { k: "survey_post", name: "창의성 인식 사후", unit: "1–5", def: "사후 설문 전체 척도 평균", get: (c) => (c.svPost ? Math.round(c.svPost.total * 100) / 100 : null) },
+
+  /* 가져온 글과 전유 — 붙여넣기를 막는 대신 기록해 얻는 변수들 */
+  { k: "paste_n", name: "붙여넣기 건수", unit: "건", def: "서술 칸에 20자 이상을 붙여넣은 횟수", get: (c) => c.pm.pasteN },
+  { k: "paste_chars", name: "붙여넣은 글자 수", unit: "자", def: "붙여넣기로 들어온 글자의 합", get: (c) => c.pm.pasteChars },
+  { k: "src_ratio", name: "AI 소스 비중", unit: "%", def: "붙여넣은 글자 수 ÷ 서술 칸 최종 글자 수", get: (c) => c.pm.srcRatio },
+  { k: "approp", name: "전유율", unit: "%", def: "붙인 앞머리가 최종문에서 사라진 정도 (1 − 잔존율)", get: (c) => (c.pm.approp == null ? null : c.pm.approp) },
+  { k: "paste_settle", name: "붙인 뒤 손댄 시간", unit: "초", def: "붙여넣기부터 그 칸을 마지막으로 고칠 때까지의 중앙값", get: (c) => c.pm.settleMed },
+  { k: "paste_src_ai", name: "출처를 AI로 표시", unit: "건", def: "학생이 스스로 AI라고 고른 붙여넣기 건수", get: (c) => c.pm.aiN },
+  { k: "paste_src_named", name: "출처를 표시한 건수", unit: "건", def: "출처를 고른 붙여넣기 건수 (자기보고 응답률)", get: (c) => c.pm.srcNamed },
+  { k: "ai_type", name: "유형", unit: "명목", def: "붙여넣기 없음이면 직접 씀, 있으면 학급 전유율 중앙값으로 전유·대리 서술", get: (c) => c.pm.type || "", text: true },
+
+  /* 지우고 다시 쓴 흔적 */
+  { k: "rewrite_depth", name: "개작의 깊이", unit: "%", def: "남겨 둔 이전 문장이 최종문과 얼마나 멀어졌는가의 평균", get: (c) => c.rv.depth },
+  { k: "rewrite_deep_n", name: "깊은 개작 건수", unit: "건", def: "이전 문장과 절반 이상 달라진 개작의 수", get: (c) => c.rv.deepN },
+
+  /* 프롬프트 궤적 */
+  { k: "prompt_n", name: "프롬프트 기록 회차", unit: "회", def: "전문을 남긴 생성 회차의 수", get: (c) => c.pr.promptN },
+  { k: "prompt_growth", name: "프롬프트 어휘 변화", unit: "개", def: "마지막 회차 − 첫 회차의 어휘 수", get: (c) => c.pr.growth },
+  { k: "prompt_step", name: "회차 간 변화량", unit: "%", def: "인접 회차 프롬프트의 평균 거리", get: (c) => c.pr.stepSize },
+  { k: "prompt_even", name: "변화의 고른 정도", unit: "%", def: "회차마다 한 가지만 고치기 규칙의 준수도", get: (c) => c.pr.stepEven },
+  { k: "plan_gap", name: "계획과의 거리", unit: "%", def: "5차시 프롬프트 계획과 첫 회차 실제 프롬프트의 거리", get: (c) => c.pr.planGap },
+
+  /* 학급 동질화 — 학급 전체를 규준으로 계산한다 */
+  { k: "peer_sim", name: "학급 평균 유사도", unit: "%", def: "내 서술과 나머지 학생 서술의 3-gram 유사도 평균", get: (c) => c.sim.peerSim },
+  { k: "nn_sim", name: "최근접 유사도", unit: "%", def: "가장 비슷한 한 명과의 유사도", get: (c) => c.sim.nnSim },
+  { k: "struct_sim", name: "구조 유사도", unit: "%", def: "문장 수·나열 표지·연결어의 뼈대가 학급과 얼마나 겹치는가", get: (c) => c.sim.structSim },
+  { k: "hapax", name: "나만 쓴 낱말", unit: "개", def: "학급 전체에서 이 학생만 사용한 어휘의 수", get: (c) => c.sim.hapax },
 ];
 
 /* 사전·사후 대응 자료 */
@@ -6553,18 +7315,27 @@ const RESEARCH_PAIRS = [
 ];
 
 /* 참여자 한 명의 계산 묶음 */
-function researchCases(ids, roster, wsMap, gradeMap, surveyMap) {
+function researchCases(ids, roster, wsMap, gradeMap, surveyMap, consentMap) {
   const wsOnly = {};
   ids.forEach((id) => { wsOnly[id] = wsMap[id] || {}; });
   const axAll = creativityAxesAll(wsOnly);
+  const simAll = similarityAll(wsOnly);   // 학급을 규준으로 한 동질화 — 개인만 봐서는 계산되지 않는다
+  const typeAll = aiTypesAll(wsOnly);     // 붙여넣기 의존도와 전유율, 그리고 학급 중앙값 기준 유형
   return ids.map((id, i) => {
     const sv = (surveyMap || {})[id] || {};
+    const w = wsMap[id] || {};
     return {
       id, pid: "P" + String(i + 1).padStart(2, "0"),
       nick: (roster[id] || {}).nick || "",
-      ws: wsMap[id] || {},
-      tm: translationMetrics(wsMap[id] || {}),
+      consent: (consentMap || {})[id] || "",
+      ws: w,
+      tm: translationMetrics(w),
       ax: axAll[id] || {},
+      pm: typeAll.per[id] || {},
+      rv: revisionMetrics(w),
+      pr: promptMetrics(w),
+      sim: simAll.per[id] || {},
+      cls: simAll.cls,
       g: (gradeMap || {})[id] || {},
       svPre: svDone(sv.pre) ? surveyScores(sv.pre.ans) : null,
       svPost: svDone(sv.post) ? surveyScores(sv.post.ans) : null,
@@ -6597,13 +7368,39 @@ const mdRow = (cells) => "| " + cells.join(" | ") + " |";
 const mdHead = (cells) => mdRow(cells) + "\n" + mdRow(cells.map(() => "---"));
 
 function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, openMap }) {
-  const cases = researchCases(ids, roster, wsMap, gradeMap, surveyMap);
+  /* 연구 참여 대장 — 수업은 모두가 하고 분석에서만 뺀다.
+     명부가 아니라 교사만 읽는 research 문서에 둔다. 명부는 학생끼리도 읽을 수 있어
+     누가 연구에서 빠졌는지가 학생 사이에 드러나면 안 되기 때문이다. */
+  const [consentMap, setConsentMap] = useState({});
+  const [consentBusy, setConsentBusy] = useState(false);
+  useEffect(() => {
+    if (sampleMode) return;
+    let alive = true;
+    store.get("research:consent").then((v) => { if (alive && v && typeof v === "object") setConsentMap(v); });
+    return () => { alive = false; };
+  }, [sampleMode]);
+  const setConsent = async (sid, val) => {
+    if (sampleMode) return;
+    const next = { ...consentMap };
+    if (val) next[sid] = val; else delete next[sid];
+    setConsentMap(next);
+    setConsentBusy(true);
+    const ok = await store.set("research:consent", next);
+    setConsentBusy(false);
+    if (!ok) { setConsentMap(consentMap); alert("동의 표시를 저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요."); }
+  };
+  const [dropExcluded, setDropExcluded] = useState(true);
+
+  const allCases = researchCases(ids, roster, wsMap, gradeMap, surveyMap, consentMap);
+  const excluded = allCases.filter((c) => c.consent === "제외").length;
+  const cases = dropExcluded ? allCases.filter((c) => c.consent !== "제외") : allCases;
   const N = cases.length;
   const numVars = RESEARCH_VARS.filter((v) => !v.text);
   const desc = numVars.map((v) => describe(cases, v)).filter((d) => d.n > 0);
   const pairStats = RESEARCH_PAIRS.map((p) => ({
     p, st: prePostStats(cases.map((c) => varVal(c, p.pre)), cases.map((c) => varVal(c, p.post))),
   }));
+  const pasteTotal = cases.reduce((a, c) => a + c.pm.pasteN, 0);
   const stamp = fileStamp();
   const tag = sampleMode ? "_표본" : "";
   const sampleWarn = sampleMode
@@ -6615,6 +7412,25 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     const head = ["pid", ...RESEARCH_VARS.map((v) => v.k)];
     const rows = cases.map((c) => [c.pid, ...RESEARCH_VARS.map((v) => { const x = varVal(c, v.k); return x == null ? "" : x; })]);
     download("연구자료_참여자단위" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
+  };
+
+  /* ---------- 1-2. 붙여넣기 단위 (long) ----------
+     가져온 문장 한 건이 1행. 문구 자체와 그 문구가 겪은 일(얼마나 남았는가, 얼마나 붙잡고 고쳤는가)을
+     함께 담아, 논문에서 "가져온 글이 어떻게 되었는가"의 원자료가 되게 한다.
+     앞 120자만 나가며 붙여넣은 글 전체는 애초에 저장하지 않는다. */
+  const exportPaste = () => {
+    const head = ["pid", "paste_no", "at", "session", "sec_code", "field_key", "where",
+      "chars", "field_len_before", "field_len_final", "src_selfreport", "settle_sec",
+      "survive_pct", "approp_pct", "head_text"];
+    const rows = [];
+    cases.forEach((c) => {
+      pasteRows(c.ws).forEach((r) => {
+        rows.push([c.pid, r.no, r.at, r.session, r.code, r.key, r.where,
+          r.chars, r.base, r.finalLen, r.src, r.settle == null ? "" : r.settle,
+          r.survive == null ? "" : r.survive, r.approp == null ? "" : r.approp, r.head]);
+      });
+    });
+    download("연구자료_붙여넣기단위" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
   };
 
   /* ---------- 2. 계단 단위 (long) ---------- */
@@ -6797,6 +7613,31 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push(mdHead(["코드", "변수명", "단위", "조작적 정의"]));
     RESEARCH_VARS.forEach((v) => L.push(mdRow([v.k, v.name, v.unit, v.def])));
     L.push("");
+    L.push("## 붙여넣기 단위 자료의 열 구성");
+    L.push("");
+    L.push("연구자료_붙여넣기단위.csv는 가져온 문장 한 건이 한 행입니다. 참여자 단위 자료의 paste_* 변수는 이 표를 참여자별로 집계한 값이므로, 두 파일은 같은 원자료에서 나옵니다.");
+    L.push("");
+    L.push(mdHead(["열", "내용"]));
+    [
+      ["pid", "익명 번호"],
+      ["paste_no", "그 학생의 붙여넣기 순번 (시각순)"],
+      ["at", "붙여넣은 시각 (ISO 8601)"],
+      ["session", "차시"],
+      ["sec_code", "기록 구역 코드"],
+      ["field_key", "기록 칸의 내부 키. 표 안의 칸은 «필드키#속성행번호» 꼴"],
+      ["where", "사람이 읽는 칸 이름"],
+      ["chars", "붙여넣은 글자 수 (전체 길이. 저장한 것은 앞 120자뿐)"],
+      ["field_len_before", "붙이기 직전 그 칸에 있던 글자 수"],
+      ["field_len_final", "그 칸의 최종 글자 수"],
+      ["src_selfreport", "학생이 붙인 직후 고른 출처. 빈칸은 미응답이며 AI로 간주하지 않는다"],
+      ["settle_sec", "붙여넣기부터 그 칸을 마지막으로 고칠 때까지의 초"],
+      ["survive_pct", "붙인 앞머리의 문자 3-gram이 최종문에 남은 비율"],
+      ["approp_pct", "100 − survive_pct. 전유율"],
+      ["head_text", "가져온 문장의 앞 120자"],
+    ].forEach((r) => L.push(mdRow(r)));
+    L.push("");
+    L.push("수집 범위는 기록지의 모든 입력 칸입니다. 서술 칸뿐 아니라 표·사다리·점검표 안의 칸에 붙여넣은 것도 같은 방식으로 남습니다. 20자 미만의 붙여넣기는 기록하지 않습니다.");
+    L.push("");
     L.push("## 구체성 지수의 산출식");
     L.push("");
     L.push("구체성 = round( 0.6 × 비율항 + 0.4 × 밀도항 ) × 100");
@@ -6893,11 +7734,15 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("- 기록지의 모든 서술문과 표 입력값 (계단·차시·항목 단위로 구분됨)");
     L.push("- 번역 진술의 확정 버전 이력 (학생이 문장을 다시 세울 때마다 그 시점의 문장이 따로 저장됨)");
-    L.push("- 고쳐 쓰기 이력 (일정 시간 간격을 두고 문장이 크게 바뀌면 이전 문장을 보관)");
+    L.push("- 고쳐 쓰기 이력 (앞선 기록에서 2분 이상 지난 뒤 길이가 8자를 넘게 달라지거나 어휘 겹침이 0.6 미만으로 떨어지면 이전 문장을 보관. 길이는 그대로인 채 내용만 바뀐 개작을 놓치지 않기 위해 두 조건을 함께 둔다)");
+    L.push("- 붙여넣기 기록 (서술 칸에 20자 이상이 붙여넣어진 시각·분량·앞 120자, 그리고 학생이 직접 고른 출처. 클립보드 전문은 저장하지 않는다)");
+    L.push("- 생성 회차마다 실제로 사용한 프롬프트 전문");
     L.push("- 항목별 최초·최종 입력 시각과 편집 횟수");
     L.push("- 차시별 머문 시간과 강의 노트 열람 시간 (조작이 있는 동안만 누적)");
     L.push("- 관찰 사진·현장 소리·스케치·전시 영상 등 멀티모달 자료의 건수");
     L.push("- 창의성 인식 설문(사전·사후, 5점 리커트)과 루브릭 등급");
+    L.push("");
+    L.push("붙여넣기는 차단하지 않고 기록했다. 이 단원이 발산을 생성형 도구에, 수렴과 전유를 학생에 두는 구조이므로 외부 텍스트를 가져오는 행위는 금지 대상이 아니라 관찰 대상이며, 기술적으로도 우클릭 차단은 붙여넣기를 막지 못한 채 보조기기 사용만 제한한다. 수집 사실과 그 범위는 사전에 고지하였다. 「연구자 서술 — 동의 절차와 고지 문안」");
     L.push("");
     L.push("### 2.4 측정 도구");
     L.push("");
@@ -6907,14 +7752,59 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     ["stage_depth", "obs_method", "obs_blind", "engage_mode", "engage_risk", "engage_form", "invis_n", "invis_type_n", "cand_n", "causal_n", "revisit_n", "stmt_versions", "conc_pre", "conc_post", "conc_gain", "lex_overlap"]
       .forEach((k) => { const v = RESEARCH_VARS.find((x) => x.k === k); if (v) L.push(mdRow([v.name + " (" + v.k + ")", v.unit, v.def])); });
     L.push("");
+    L.push("생성형 도구의 사용 방식은 사용량과 전유 정도를 나누어 재었다. 전유율은 붙여넣은 문장의 앞 120자를 문자 3-gram으로 바꾼 뒤 그 학생의 최종 서술문에 남아 있는 비율을 구해 1에서 뺀 값이다. 한국어 어절은 조사·어미 때문에 같은 말이 다른 토큰이 되므로, 학급 대조에는 흔한 조사·어미를 잘라 낸 어절 토큰을, 두 글의 직접 비교에는 문자 3-gram을 사용하였다. 「연구자 서술 — 형태소 분석기를 쓰지 않은 이유와 그 한계」");
+    L.push("");
+    L.push(mdHead(["변수", "단위", "조작적 정의"]));
+    ["paste_n", "src_ratio", "approp", "paste_settle", "paste_src_ai", "ai_type", "rewrite_depth", "rewrite_deep_n", "prompt_n", "prompt_growth", "prompt_step", "prompt_even", "plan_gap", "peer_sim", "nn_sim", "struct_sim", "hapax"]
+      .forEach((k) => { const v = RESEARCH_VARS.find((x) => x.k === k); if (v) L.push(mdRow([v.name + " (" + v.k + ")", v.unit, v.def])); });
+    L.push("");
+    L.push("구조 유사도를 내용 유사도와 따로 둔 까닭은, 학생이 가져온 글을 그대로 제출하지 않고 고쳐 쓰는 경우 어휘는 달라지지만 문장 수·나열 표지·연결어의 배치는 남기 때문이다. 내용 유사도만 보면 이 경우를 놓친다.");
+    L.push("");
     L.push("구체성 지수는 위치어·재질어·변형어와 수량 표현의 출현을 추상어와 견주어 0–100으로 환산한 값이다. 형태소 분석이 아닌 어간 일치 방식의 간이 지표이므로, 결과 해석에는 코딩 시트를 통한 사람의 교차 검토를 함께 두어야 한다. 「연구자 서술 — 코더 간 신뢰도 산출 결과」");
     L.push("");
     L.push("### 2.5 분석 방법");
     L.push("");
-    L.push("참여자 단위(wide), 계단 단위(long), 문장 단위(코딩 시트)의 세 가지 구조로 자료를 펼쳤다. 양적 자료는 기술통계로 요약하고 사전·사후 대응 비교를 함께 보았다. 단일 학급 자료이므로 통계적 일반화 대신 기술통계와 사례 서술을 중심에 두었다. 질적 자료는 문장 단위 코딩 시트에 1차 자동 표지(계단·항목·구체어 적중 수)를 붙인 뒤 「연구자 서술 — 코딩 절차와 범주 생성 방식」");
+    L.push("참여자 단위(wide), 계단 단위(long), 붙여넣기 단위(long), 문장 단위(코딩 시트)의 네 가지 구조로 자료를 펼쳤다. 붙여넣기 단위 자료는 가져온 문장 한 건을 한 행으로 삼아 그 문장이 놓인 칸·분량·학생의 출처 자기보고·붙인 뒤 손댄 시간·최종문에서의 잔존율을 함께 담으며, 참여자 단위의 집계값은 이 표에서 산출한 것이다. 양적 자료는 기술통계로 요약하고 사전·사후 대응 비교를 함께 보았다. 사전·사후 비교에서는 차이점수 대신 사후 점수를 종속변수로, 사전 점수를 공변량으로 투입한 공분산분석을 사용해 평균 회귀의 영향을 줄였다. 여러 척도와 축을 동시에 대조하므로 다중비교에는 위양성 발견율(FDR) 보정을 적용하였다. 「연구자 서술 — 적용한 보정 절차와 유의수준」");
+    L.push("");
+    L.push("동질화 지표는 분석 단위가 둘로 나뉜다. 학생 한 명이 학급의 나머지와 얼마나 겹치는가(개인 수준)와 학급 전체의 어휘 풀·선택 분포가 얼마나 좁아졌는가(학급 수준)는 서로 다른 질문이며, 두 수준의 결론이 엇갈릴 수 있다. 두 수준을 함께 보고한다.");
+    L.push("");
+    L.push("학급 간 차이는 학급을 더미변수로 투입한 고정효과 모형으로 통제하였다. 학급 수가 다수준 분석에서 권장되는 하한에 미치지 못해 집단 수준 분산을 안정적으로 추정할 수 없다고 판단하였기 때문이다. 「연구자 서술 — 학급 수와 모형 선택의 근거」");
+    L.push("");
+    L.push("학업 수준과 사전 성향에 따른 차이는 조절효과에 해당하나, 상호작용 검정은 주효과보다 훨씬 큰 표본을 요구하므로 본 연구의 표본으로는 검정력이 충분하지 않다. 따라서 이 부분은 유의성 검정 대신 집단별 기술통계와 효과크기를 제시하고 질적 자료로 뒷받침하는 탐색적 분석으로 한정하였다.");
+    L.push("");
+    L.push("설계상 단일집단이고 무작위 배정이 없으므로 생성형 도구의 사용과 창의성 지표 사이의 관계는 인과로 해석하지 않는다. 창의적 자기효능감이 낮은 학생이 애초에 도구에 더 기댔을 가능성(역방향의 설명)을 배제할 수 없어, 사전 자기효능감을 공변량으로 통제한 뒤에도 남는 관계만을 보고한다.");
+    L.push("");
+    L.push("단일 학급 자료이므로 통계적 일반화 대신 기술통계와 사례 서술을 중심에 두었다. 질적 자료는 문장 단위 코딩 시트에 1차 자동 표지(계단·항목·구체어 적중 수)를 붙인 뒤 「연구자 서술 — 코딩 절차와 범주 생성 방식」");
     L.push("");
     L.push("## 3. 결과");
     L.push("");
+    L.push("### 3.0 가져온 글과 전유");
+    L.push("");
+    {
+      const withP = cases.filter((c) => c.pm.pasteN > 0);
+      const named = cases.reduce((a, c) => a + c.pm.srcNamed, 0);
+      const aiN = cases.reduce((a, c) => a + c.pm.aiN, 0);
+      const kept = cases.reduce((a, c) => a + (c.pm.keptN || 0), 0);
+      const tCount = (t) => cases.filter((c) => c.pm.type === t).length;
+      L.push("전 과정에서 기록된 붙여넣기는 " + pasteTotal + "건이며, 한 건이라도 붙여넣은 학생은 " + withP.length + "명(" +
+        (N ? Math.round((withP.length / N) * 100) : 0) + "%)이었다. 이 가운데 학생이 출처를 표시한 것은 " + named + "건이고 그중 생성형 도구라고 답한 것은 " + aiN + "건이다. " +
+        "출처가 비어 있는 건은 미응답이며 생성형 도구에서 온 것으로 간주하지 않았다.");
+      L.push("");
+      L.push("가져온 문장이 최종 서술문에 거의 그대로(잔존율 60% 이상) 남은 것은 " + kept + "건이었다. 유형별 분포는 " +
+        AI_TYPES.map((t) => t + " " + tCount(t) + "명").join(" · ") + "이며, 유형은 학급 전유율 중앙값을 기준으로 가른 상대 구분이다.");
+      L.push("");
+      L.push(mdHead(["지표", "평균", "표준편차", "중앙값", "최소", "최대", "n"]));
+      ["paste_n", "src_ratio", "approp", "paste_settle", "rewrite_depth", "peer_sim", "nn_sim", "struct_sim", "hapax"].forEach((k) => {
+        const v = RESEARCH_VARS.find((x) => x.k === k);
+        if (!v) return;
+        const d0 = describe(cases, v);
+        if (!d0.n) return;
+        L.push(mdRow([v.name, d0.m, d0.sd, d0.md, d0.mn, d0.mx, d0.n]));
+      });
+      L.push("");
+      L.push("「연구자 서술 — 사용량과 전유율의 관계, 그리고 유형별 사례 대조」");
+      L.push("");
+    }
     L.push("### 3.1 계단의 도달");
     L.push("");
     L.push("참여자 " + N + "명의 연속 도달 계단은 평균 " + say("stage_depth") + "이었고, 아홉 계단을 모두 채운 학생은 " + fullCount + "명(" + (N ? Math.round((fullCount / N) * 100) : 0) + "%)이었다. 계단별 완료 비율은 다음과 같다.");
@@ -7021,10 +7911,17 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 계단의 완료 판정은 항목이 채워졌는지만 보고 내용의 질을 보지 않는다.");
     L.push("- 관찰 절차와 드러내는 방법의 선택 분포는 교사가 제시한 다섯·여덟 갈래 안에서만 나온 것이므로, 갈래를 달리 짜면 분포도 달라진다.");
     L.push("- 사전·사후 비교의 t 값과 효과크기는 참고 계산이며 유의확률을 산출하지 않았다.");
+    L.push("- 붙여넣기 기록은 외부 텍스트가 들어온 시점과 분량을 알려 줄 뿐 출처를 알려 주지 않는다. 학생의 출처 자기보고가 없는 건은 생성형 도구에서 온 것인지 검색 결과인지 본인이 앞서 쓴 글인지 구분되지 않는다.");
+    L.push("- 전유율은 붙여넣은 문장의 앞 120자만을 근거로 어림한 값이므로 긴 글에서는 정밀도가 떨어진다. 클립보드 전문을 저장하지 않기로 한 수집 원칙에 따른 제한이다.");
+    L.push("- 유사도 지표는 모두 학급을 규준으로 한 상대값이다. 학급 구성이 바뀌면 값도 바뀌며, 같은 과제를 충실히 수행한 학생들 사이에서 값이 높아지는 것이 정상이다. 표절이나 부정행위의 판정 근거로 사용하지 않았다.");
+    L.push("- 머문 시간과 짧은 접속 기록은 몰입이나 이탈 의도를 재지 못한다. 수업 종료, 기기 반납, 통신 끊김이 로그상으로 구분되지 않으므로 차시 시각표와 대조해 해석하였다.");
+    L.push("- 1인 1기기가 보장되지 않은 환경에서는 기기 공유와 로그아웃 누락으로 로그가 섞일 수 있다. 「연구자 서술 — 정제 과정에서 제외한 사례와 그 기준」");
+    L.push("- 수집 사실을 사전에 고지하였으므로 학생의 행동이 관찰에 반응해 달라졌을 가능성을 배제할 수 없다. 고지 없는 수집은 연구윤리상 선택지가 아니었다.");
     L.push("");
     L.push("## 부록 A. 자료 파일");
     L.push("");
     L.push("- 연구자료_참여자단위.csv — 참여자 1명이 1행. 변수 " + RESEARCH_VARS.length + "개.");
+    L.push("- 연구자료_붙여넣기단위.csv — 가져온 문장 1건이 1행 (" + pasteTotal + "건). 칸·시각·분량·출처 자기보고·손댄 시간·잔존율과 문구 앞 120자.");
     L.push("- 연구자료_계단단위.csv — 참여자 × 계단이 1행. 계단별 도달·글자 수·구체성·편집 시각.");
     L.push("- 연구자료_코딩시트.csv — 참여자 × 항목 × 문장이 1행. code_1·code_2·memo 열은 연구자가 채우는 빈칸.");
     L.push("- 연구자료_사전사후쌍.csv — 같은 물음에 두 번 답한 자리의 텍스트 쌍과 지표 차이.");
@@ -7047,6 +7944,8 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
   const FILES = [
     { k: "wide", h: "참여자 단위 자료", fn: "연구자료_참여자단위" + tag + "_" + stamp + ".csv",
       p: "참여자 1명이 1행. 사고 과정·창의성·활동 시간·루브릭·설문을 합쳐 변수 " + RESEARCH_VARS.length + "개를 담습니다. 통계 프로그램에 그대로 올릴 수 있습니다.", go: exportWide },
+    { k: "paste", h: "붙여넣기 단위 자료", fn: "연구자료_붙여넣기단위" + tag + "_" + stamp + ".csv",
+      p: "가져온 문장 1건이 1행. 전 과정 어느 칸에 언제 몇 자를 붙였는지, 학생이 고른 출처, 붙인 뒤 그 칸을 손댄 시간, 그리고 그 문장이 최종문에 얼마나 남았는지를 문구 앞 120자와 함께 담습니다. 지금 " + pasteTotal + "건.", go: exportPaste },
     { k: "long", h: "계단 단위 자료", fn: "연구자료_계단단위" + tag + "_" + stamp + ".csv",
       p: "참여자 × 아홉 계단이 1행. 계단별 도달률·글자 수·문장 수·구체성·편집 시각을 담아 사고의 진행을 시간 축으로 볼 수 있습니다.", go: exportLong },
     { k: "coding", h: "질적 코딩 시트", fn: "연구자료_코딩시트" + tag + "_" + stamp + ".csv",
@@ -7076,19 +7975,36 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
             학번을 정렬해 P01부터 익명 번호를 붙입니다. 내려받는 파일에는 학번·별명·계정 정보가 들어가지 않습니다.
             아래 대응표는 이 화면에서만 보이며 파일로 나가지 않으므로, 필요하면 교사가 따로 안전한 곳에 보관하세요.
           </p>
-          <div className="tbl-scroll" style={{ maxHeight: 200, overflow: "auto" }}>
+          <div className="tbl-scroll" style={{ maxHeight: 240, overflow: "auto" }}>
             <table className="stat-tbl">
-              <thead><tr><th>익명 번호</th><th>학번</th><th>별명</th><th>기록률</th><th>도달 계단</th></tr></thead>
+              <thead><tr><th>익명 번호</th><th>학번</th><th>별명</th><th>기록률</th><th>도달 계단</th><th style={{ width: 140 }}>연구 참여</th></tr></thead>
               <tbody>
-                {cases.map((c) => (
-                  <tr key={c.id}>
+                {allCases.map((c) => (
+                  <tr key={c.id} style={c.consent === "제외" ? { opacity: 0.5 } : {}}>
                     <td className="mono">{c.pid}</td><td className="mono">{c.id}</td><td style={{ textAlign: "left" }}>{c.nick}</td>
                     <td className="mono">{overallProgress(c.ws)}%</td><td className="mono">{c.tm.depth}/9</td>
+                    <td>
+                      <div className="seg">
+                        <button className={c.consent === "동의" ? "on-ok" : ""} disabled={sampleMode || consentBusy}
+                          onClick={() => setConsent(c.id, c.consent === "동의" ? "" : "동의")}>동의</button>
+                        <button className={c.consent === "제외" ? "on-no" : ""} disabled={sampleMode || consentBusy}
+                          onClick={() => setConsent(c.id, c.consent === "제외" ? "" : "제외")}>제외</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <p className="hint" style={{ marginTop: 8 }}>
+            <b>제외로 표시한 학생도 수업은 그대로 합니다.</b> 이 앱은 수업 도구이므로 연구 참여를 거부한 것이 수업에서 빠지는 것이 되어서는 안 됩니다.
+            표시는 내려받는 자료에서만 걸러집니다. 표시가 비어 있는 학생은 아직 확인하지 않은 것으로 보고 함께 포함됩니다.
+          </p>
+          <label className="hint" style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
+            <input type="checkbox" checked={dropExcluded} onChange={(e) => setDropExcluded(e.target.checked)} />
+            제외로 표시한 학생을 내려받기·기술통계에서 뺍니다
+            {excluded > 0 && <b style={{ color: "var(--seal)" }}>— 지금 {excluded}명, 분석 대상 {N}명</b>}
+          </label>
         </div>
       </div>
 
@@ -7687,6 +8603,40 @@ function ChangeMap({ ws, owner }) {
 }
 /* ---------- 표본 학급 자료 (화면을 살펴보기 위한 가상 자료) ---------- */
 
+/* 표본 학급의 말투 네 갈래 — 두 번째 갈래는 나열 표지가 많은 뼈대라
+   낱말이 달라도 구조 유사도가 높게 잡히는 경우를 화면에서 확인할 수 있다. */
+const SAMPLE_STYLES = [
+  [
+    "{R}에는 {P}의 시간이 자국으로 남아 있다. 나는 그 자국이 어느 자리에 생기는지부터 찾았다.",
+    "이 흔적은 하루에도 여러 번 같은 자리에 힘이 실릴 때 생긴다. 한 번의 사건이 아니라 반복이 만든 모양이다.",
+    "관람자가 화면에서 가장 먼저 그 자리를 보게 만들고 싶었다. 그래서 다른 부분은 일부러 어둡게 두었다.",
+  ],
+  [
+    "첫째, {R}은 오래 사용된 물건이다. 둘째, 특정 부위에만 마모가 집중되어 있다. 따라서 사용자의 동작을 추정할 수 있다.",
+    "첫째, 배경은 중립적이어야 한다. 둘째, 빛은 균일해야 한다. 마지막으로 시점은 눈높이여야 한다. 따라서 발굴 기록 사진의 형식을 그대로 따랐다.",
+    "결론적으로 이 유물은 {P}을 증언한다. 이러한 증언은 물리적 흔적에 근거하기 때문에 설득력을 가진다.",
+  ],
+  [
+    "{P}을 겪는 사람의 손이 {R}에 닿는 자리를 먼저 찾았다. 몸이 닿지 않으면 흔적도 생기지 않는다.",
+    "덧감은 자국이 수리의 시간을 말해 준다. 버리지 않고 고쳐 쓴 사람이 있었다는 뜻이다.",
+    "관람자가 이 유물을 진짜라고 믿었다가 고지문을 읽고 한 번 멈추기를 바랐다. 그 멈춤이 이 작업의 목적이다.",
+  ],
+  [
+    "{R}을 고른 이유는 아무도 눈여겨보지 않는 물건이기 때문이다. 눈에 띄지 않는 것에 오래된 시간이 붙는다.",
+    "{P}은 크게 말해지지만 그 자국은 아주 작은 자리에 남는다. 나는 그 작은 자리를 크게 찍기로 했다.",
+    "이름을 먼저 읽은 사람과 화면을 먼저 본 사람이 다른 것을 찾는다는 점이 흥미로웠다.",
+  ],
+];
+
+/* 회차가 갈수록 네 요소가 채워지는 프롬프트 — 표본 학급의 시연용 */
+const SAMPLE_PROMPTS = [
+  "오래 쓴 손잡이 파편 사진",
+  "오래 쓴 손잡이 파편, 중립 회색 배경의 발굴 기록 사진",
+  "오른쪽 그립만 고무가 벗겨져 금속이 드러난 손잡이 파편, 중립 회색 배경의 발굴 기록 사진",
+  "오른쪽 그립만 고무가 벗겨져 금속이 드러나고 직물 테이프를 세 겹 감은 손잡이 파편, 중립 회색 배경, 스케일 바와 함께, 균일한 확산광",
+  "오른쪽 그립만 고무가 벗겨져 금속이 드러나고 직물 테이프를 세 겹 감은 강철 손잡이 파편, 중립 회색 배경, 스케일 바와 함께, 균일한 확산광, 눈높이 정면의 발굴 기록 사진",
+];
+
 const SAMPLE_SEEDS = [
   { id: "10102", nick: "물때", upto: 60, ldr: 22, obs: "fixed", mode: "parafiction", ivt: ["gone", "time", "gone"], back: "T6 사물 찾기", gap: "다르게 읽음",
     st1: "물이 여기까지 찼다는 사실은 교실 사물함에 자국으로 남는다.",
@@ -7758,6 +8708,44 @@ function buildSampleClass() {
         visits: 1 + ((i + j) % 3),
       };
     });
+    // 서술을 학생마다 다른 말로 바꿔 둠 — 원본을 그대로 두면 여덟 명의 글이 같아
+    // 「AI 2」의 동질화 지표가 시연되지 않는다. 같은 말투를 쓰는 학생이 둘씩 생기도록 배열했다.
+    {
+      const style = SAMPLE_STYLES[i % SAMPLE_STYLES.length];
+      const areas0 = simFields().filter((k) => filled(w[k]));
+      areas0.slice(0, style.length).forEach((k, j) => {
+        w[k] = style[j]
+          .replace(/\{R\}/g, s.relic || s.nick)
+          .replace(/\{P\}/g, s.problem || "이 문제")
+          .replace(/\{N\}/g, s.nick);
+      });
+    }
+
+    // 표본에도 붙여넣기와 프롬프트를 심어 「AI 1·2」 카드와 되돌아보기 화면이 시연되게 함 (결정적 값)
+    if (s.upto >= 20) {
+      const areas = simFields().filter((k) => filled(w[k]));
+      const cnt = Math.min(1 + (i % 3), areas.length);
+      const ps = [];
+      for (let j = 0; j < cnt; j++) {
+        const k = areas[(i * 2 + j * 3) % areas.length];
+        const kept = (i + j) % 3 !== 0; // 그대로 둔 학생과 고쳐 쓴 학생이 섞이도록
+        ps.push({
+          k,
+          at: new Date(Date.now() - (i + 1) * 3600000 * 6 - j * 600000).toISOString(),
+          n: 90 + ((i * 13 + j * 7) % 130),
+          head: kept ? String(w[k]).slice(0, 110)
+            : "이 유물은 오랫동안 사용된 흔적을 지니고 있으며, 그 흔적은 사용자의 반복된 동작과 생활의 조건을 보여 준다.",
+          base: 0,
+          src: ["AI", "AI", "자료", "내가 앞서 쓴 글", ""][(i + j) % 5],
+          settle: kept ? 6 + ((i + j) % 5) * 3 : 70 + ((i + j) % 7) * 25,
+        });
+      }
+      if (ps.length) w._paste = ps;
+    }
+    if (Array.isArray(w["s5b.rounds"])) {
+      w["s5b.rounds"] = w["s5b.rounds"].map((r, j) => (r && (filled(r.tool) || filled(r.judge) || filled(r.change))
+        ? { ...r, prompt: SAMPLE_PROMPTS[Math.min(j, SAMPLE_PROMPTS.length - 1)] } : r));
+    }
     w._sample = true;
     roster[s.id] = { nick: s.nick, sample: true };
     ws[s.id] = w;
