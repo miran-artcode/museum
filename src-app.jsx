@@ -1281,6 +1281,143 @@ function creativityMetrics(ws) {
   ];
 }
 
+/* ---------- 창의성 축 — 기록 데이터로 계산하는 6축 프로파일 ----------
+   축마다 성격·정규화가 달라 단일 점수로 합산하지 않는다. 대시보드의 '축 평균'은
+   산점도·정렬을 위한 참고값일 뿐 성적 근거가 아니다. */
+
+const CREATIVITY_AXES = [
+  { key: "fluency", name: "시도의 양", short: "시도", desc: "생성 회차 · 명칭 후보 · 에스키스를 몇 갈래 내놓았는가 (Torrance 유창성)" },
+  { key: "flexibility", name: "방법 바꾸기", short: "방법", desc: "다듬기 세 방법 · 수정 방법 · 도구를 옮겨 다닌 폭 (융통성)" },
+  { key: "originality", name: "남다름", short: "남다름", desc: "고른 문제 · 유물명 · 태도 · 진열이 학급 안에서 얼마나 드문 선택인가 (학급 상대)" },
+  { key: "elaboration", name: "설정의 촘촘함", short: "촘촘함", desc: "흔적 · 물건의 일대기 · 출토 맥락 · 명제표의 세부 밀도 (정교성)" },
+  { key: "process", name: "다시 보기", short: "다시보기", desc: "불성립 선언 · 제외 근거 · 반론 쓰기 · 고쳐 쓰기 (과정 창의성)" },
+  { key: "multimodal", name: "채집의 폭", short: "채집", desc: "사진 · 소리 · 스케치 · 영상 · 링크를 고루 모았는가 (멀티모달)" },
+];
+
+const tokSet = (s) => new Set(String(s || "").toLowerCase().trim().split(/\s+/).filter(Boolean));
+function jaccard(a, b) {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  for (const w of a) if (b.has(w)) inter++;
+  return inter / (a.size + b.size - inter);
+}
+
+/* 어떤 매체 채널을 썼는가 */
+function mediaChannels(ws) {
+  const d = ws || {};
+  const has = (v) => (Array.isArray(v) ? v.length > 0 : !!(v && typeof v === "object" ? v.ref : filled(v)));
+  return {
+    "사진": has(d["s3a.photos"]) || has(d["s4c.eskisImg"]) || has(d["s6a.beforeImg"]) || has(d["s6a.afterImg"]) ||
+      has(d["s7.installImg"]) || has(d["s7x.img"]) || (d["s5b.rounds"] || []).some((r) => r && r.img),
+    "음성": has(d["s3a.sound"]) || has(d["s8a.voice"]),
+    "스케치": has(d["s4c.sketchpad"]),
+    "영상": has(d["s7.installClip"]),
+    "링크": (Array.isArray(d["s5a.genLinks"]) ? d["s5a.genLinks"] : []).some((r) => /^https?:\/\//.test(((r || {}).url || "").trim())),
+  };
+}
+
+/* 한 학생의 축 점수. rare(학급 희소도)는 creativityAxesAll이 계산해 넘긴다 */
+function creativityAxesOne(ws, rare) {
+  const d = ws || {};
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+
+  // 시도의 양: 생성 회차(5) + 명칭 후보(3) + 에스키스(4)
+  const rounds = (d["s5b.rounds"] || []).filter((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change)));
+  const names = ["s4b.n1", "s4b.n2", "s4b.n3"].filter((k) => filled(d[k])).length;
+  const sk = d["s4c.sketchpad"];
+  const eskis = ((d["s4c.eskisImg"] || []).length || 0) + (sk && typeof sk === "object" && sk.ref ? 1 : 0);
+  const fluency = Math.round(clamp01((Math.min(rounds.length, 5) + names + Math.min(eskis, 4)) / 12) * 100);
+
+  // 방법 바꾸기: 다듬기 3방법 + 점검표 수정 방법 종류(4) + 도구 종류(3)
+  const insp = d["s5c.inspect"] || {};
+  const M = ["s6a.regen", "s6a.partial", "s6a.edit"].filter((k) => filled(d[k])).length;
+  const fixes = new Set(INSPECT_ITEMS.map((it) => (insp[it.k] || {}).fix).filter((x) => FIX_OPTS.includes(x)));
+  const tools = new Set(rounds.map((r) => String(r.tool || "").trim().toLowerCase()).filter(Boolean));
+  const flexibility = Math.round(clamp01((M + fixes.size + Math.min(tools.size, 3)) / 10) * 100);
+
+  // 남다름: 학급 희소도의 가중합 (기록 없는 항은 가중치에서 제외)
+  let originality = null;
+  if (rare) {
+    const parts = [];
+    if (rare.problem != null) parts.push([0.4, rare.problem]);
+    if (rare.relic != null) parts.push([0.3, rare.relic]);
+    if (rare.attitude != null) parts.push([0.15, rare.attitude]);
+    if (rare.mode != null) parts.push([0.15, rare.mode]);
+    const wsum = parts.reduce((a, p) => a + p[0], 0);
+    if (wsum > 0) originality = Math.round(clamp01(parts.reduce((a, p) => a + p[0] * p[1], 0) / wsum) * 100);
+  }
+
+  // 설정의 촘촘함: 흔적 서술 + 일대기 5칸 + 출토 맥락 + 명제표 구체성 + 점검 근거
+  const b1 = clamp01(strLen(d["s3b.trace"]) / 120);
+  const b2 = ["s4a.wear", "s4a.break", "s4a.repair", "s4a.stain", "s4a.discard"].filter((k) => strLen(d[k]) >= 10).length / 5;
+  const b3 = clamp01(strLen(d["s4a.context"]) / 150);
+  const b4 = ((filled(d["s6b.era"]) ? 1 : 0) + (/\d/.test(d["s6b.size"] || "") ? 1 : 0) + (strLen(d["s6b.context"]) >= 40 ? 1 : 0)) / 3;
+  const b5 = INSPECT_ITEMS.filter((it) => filled((insp[it.k] || {}).note)).length / 8;
+  const elaboration = Math.round(((b1 + b2 + b3 + b4 + b5) / 5) * 100);
+
+  // 다시 보기: 회차 수정 + 불성립 선언·근거 + 제외 근거 + 논쟁 ②③ + 고쳐 쓰기
+  const notPassed = INSPECT_ITEMS.filter((it) => (insp[it.k] || {}).status === "불성립");
+  const debateKeys = SCHEMA.filter((s) => s.kind === "inquiry").map((s) => s.id + ".debate");
+  const p1 = rounds.filter((r) => filled(r.change)).length / 5;
+  const p2 = notPassed.length / 8;
+  const p3 = notPassed.filter((it) => filled((insp[it.k] || {}).note)).length / 8;
+  const p4 = filled(d["s5d.excWhy"]) ? 1 : 0;
+  const p5 = (debateKeys.filter((k) => filled((d[k] || {}).counter)).length + debateKeys.filter((k) => filled((d[k] || {}).hold)).length) / (debateKeys.length * 2);
+  const p6 = clamp01((d._log || []).length / 10);
+  const process = Math.round(((p1 + p2 + p3 + p4 + p5 + p6) / 6) * 100);
+
+  // 채집의 폭: 채널 종류 50% + 필드 커버리지 30% + 총량 20%
+  const ch = mediaChannels(d);
+  const K = Object.values(ch).filter(Boolean).length;
+  const mf = mediaFields();
+  const covered = mf.filter((m) => { const v = d[m.key]; return v && (!Array.isArray(v) || v.length); }).length;
+  const multimodal = Math.round((0.5 * K / 5 + 0.3 * covered / Math.max(1, mf.length) + 0.2 * clamp01(mediaCount(d) / 12)) * 100);
+
+  const axes = { fluency, flexibility, originality, elaboration, process, multimodal };
+  const nums = Object.values(axes).filter((x) => x != null);
+  const mean = nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null;
+  return { ...axes, mean };
+}
+
+/* 학급 전체의 축 점수 — 남다름의 희소도는 학급을 규준 삼아 여기서 계산한다 */
+function creativityAxesAll(wsMap) {
+  const ids = Object.keys(wsMap || {});
+  const N = ids.length;
+  const probTok = {}, relicTok = {}, attFreq = {}, modeFreq = {};
+  ids.forEach((id) => {
+    const d = wsMap[id] || {};
+    probTok[id] = tokSet(d["s3a.problem"]);
+    relicTok[id] = tokSet(d["s6b.relic"]);
+    const a = d["s3c.attitude"]; if (filled(a)) attFreq[a] = (attFreq[a] || 0) + 1;
+    const m = d["s7.mode"]; if (filled(m)) modeFreq[m] = (modeFreq[m] || 0) + 1;
+  });
+  const rarTok = (tokMap, id) => {
+    const mine = tokMap[id];
+    if (!mine.size || N < 2) return null;
+    const dup = ids.filter((o) => o !== id && jaccard(mine, tokMap[o]) >= 0.5).length;
+    return 1 - dup / (N - 1);
+  };
+  const rarOpt = (freq, v) => (filled(v) && N >= 2 ? 1 - (freq[v] || 1) / N : null);
+  const out = {};
+  ids.forEach((id) => {
+    const d = wsMap[id] || {};
+    out[id] = creativityAxesOne(d, {
+      problem: rarTok(probTok, id),
+      relic: rarTok(relicTok, id),
+      attitude: rarOpt(attFreq, d["s3c.attitude"]),
+      mode: rarOpt(modeFreq, d["s7.mode"]),
+    });
+  });
+  return out;
+}
+
+const median = (arr) => {
+  const a = arr.filter((x) => x != null).sort((x, y) => x - y);
+  if (!a.length) return null;
+  const mid = Math.floor(a.length / 2);
+  return a.length % 2 ? a[mid] : Math.round((a[mid - 1] + a[mid]) / 2);
+};
+
 /* 멀티모달 자료 목록 — 기록지 안의 사진·음성 필드를 모아 둠 */
 
 function mediaFields() {
@@ -1437,8 +1574,12 @@ body{background:var(--bg)}
 
 /* 저장 상태 */
 .save-pill{font-family:var(--mono);font-size:11px;padding:3px 9px;border:1px solid var(--line);background:var(--card2);color:var(--sub)}
-.save-pill.dirty{border-color:var(--amber);color:var(--amber)}
+.save-pill.dirty{border-color:var(--amber);color:#6F5527}
 .save-pill.err{border-color:var(--seal);color:var(--seal)}
+.dot-check{font-size:11px;color:var(--patina);font-weight:700;line-height:1}
+.tbl-scroll{overflow-x:auto}
+.tbl-scroll .tbl{min-width:640px}
+.sample-banner{border:1px solid var(--amber);background:#F5EFE2;color:#6F5527;padding:10px 14px;font-size:13px;margin-top:18px}
 
 /* 교사 대시보드 */
 .t-tabs{display:flex;gap:6px;margin:18px 0;flex-wrap:wrap}
@@ -1620,8 +1761,11 @@ function ProgressBar({ pct }) {
 }
 
 function SessionDot({ ratio }) {
+  const state = ratio >= 0.999 ? "완료" : ratio > 0 ? "진행 중" : "시작 전";
   const cls = ratio >= 0.999 ? "dot full" : ratio > 0 ? "dot part" : "dot";
-  return <span className={cls} />;
+  // 완료는 색만이 아니라 ✓ 글자로도 구분한다 (색약·보조기기 대응)
+  if (ratio >= 0.999) return <span className="dot-check" role="img" aria-label={state} title={state}>✓</span>;
+  return <span className={cls} role="img" aria-label={state} title={state} />;
 }
 
 
@@ -1697,6 +1841,9 @@ function LessonPanel({ L, teacher, onReading }) {
 
 let OWNER = "preview";
 function setMediaOwner(o) { OWNER = o; }
+
+/* 사진·녹음·스케치·영상은 다시 만들 수 없는 기록이라 지우기 전에 한 번 묻는다 */
+const confirmDel = () => window.confirm("이 기록을 지울까요? 지우면 되돌릴 수 없습니다.");
 
 function compress(file, maxPx, maxBytes) {
   return new Promise((res, rej) => {
@@ -1832,13 +1979,30 @@ function FieldEditor({ sec, f, ws, setField }) {
     const m = v || {};
     return <ReflectField f={f} fieldKey={key} m={m} ws={ws} setField={setField} />;
   }
-  if (f.t === "toggle") {
+  if (f.t === "toggle" || f.t === "select") {
     return (
       <div className="field">
         <label>{f.label}</label>
         <div className="toggle-row">
           {f.opts.map((o) => (
-            <button key={o} className={v === o ? "on" : ""} onClick={() => setField(key, o)}>{o}</button>
+            <button key={o} className={v === o ? "on" : ""} aria-pressed={v === o} onClick={() => setField(key, o)}>{o}</button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (f.t === "checks") {
+    const m = v || {};
+    return (
+      <div className="field span2">
+        <label>{f.label}</label>
+        <div className="checkline">
+          {f.opts.map((o) => (
+            <span key={o} className={"chk " + (m[o] ? "on" : "")} role="checkbox" aria-checked={!!m[o]} tabIndex={0}
+              onClick={() => setField(key, { ...m, [o]: !m[o] })}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setField(key, { ...m, [o]: !m[o] }); } }}>
+              {m[o] ? "☑" : "☐"} {o}
+            </span>
           ))}
         </div>
       </div>
@@ -1868,7 +2032,7 @@ function FieldEditor({ sec, f, ws, setField }) {
             {list.map((it, i) => (
               <div className="mm-item" key={it.ref}>
                 <MediaThumb owner={OWNER} refId={it.ref} alt={f.label + " " + (i + 1)} />
-                <button className="mm-del" onClick={async () => { await mediaStore.remove(OWNER, it.ref); setField(key, list.filter((x) => x.ref !== it.ref)); }}>지우기</button>
+                <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, it.ref); setField(key, list.filter((x) => x.ref !== it.ref)); }}>지우기</button>
               </div>
             ))}
           </div>
@@ -1932,7 +2096,7 @@ function FieldEditor({ sec, f, ws, setField }) {
           {cur ? (
             <div className="mm-item">
               <MediaThumb owner={OWNER} refId={cur.ref} alt={f.label} size={110} />
-              <button className="mm-del" onClick={async () => { await mediaStore.remove(OWNER, cur.ref); setField(key, ""); }}>지우기</button>
+              <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, cur.ref); setField(key, ""); }}>지우기</button>
             </div>
           ) : <span className="hint">사진 한 장을 올립니다.</span>}
           <input type="file" accept="image/*" onChange={pick} style={{ fontSize: 12 }} />
@@ -1947,7 +2111,7 @@ function FieldEditor({ sec, f, ws, setField }) {
       setField(key, next);
     };
     return (
-      <div style={{ overflowX: "auto" }}>
+      <div className="tbl-scroll">
         <table className="tbl">
           <thead><tr><th>회차</th><th>사용 도구</th><th>프롬프트에서 고친 한 가지</th><th>산출물 번호</th><th>한 줄 판단</th><th style={{ width: 118 }}>결과 화면</th></tr></thead>
           <tbody>
@@ -1962,7 +2126,7 @@ function FieldEditor({ sec, f, ws, setField }) {
                   {r.img ? (
                     <div className="mm-item">
                       <MediaThumb owner={OWNER} refId={r.img} alt={i + 1 + "회차 결과"} size={64} />
-                      <button className="mm-del" onClick={async () => { await mediaStore.remove(OWNER, r.img); up(i, "img", ""); }}>지우기</button>
+                      <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, r.img); up(i, "img", ""); }}>지우기</button>
                     </div>
                   ) : (
                     <input type="file" accept="image/*" style={{ fontSize: 11 }} onChange={async (e) => {
@@ -1988,7 +2152,7 @@ function FieldEditor({ sec, f, ws, setField }) {
     const m = v || {};
     const up = (ik, k2, val) => setField(key, { ...m, [ik]: { ...(m[ik] || {}), [k2]: val } });
     return (
-      <div style={{ overflowX: "auto" }}>
+      <div className="tbl-scroll">
         <table className="tbl">
           <thead><tr><th style={{ width: 130 }}>점검 항목</th><th style={{ width: 130 }}>성립 여부</th><th style={{ width: 120 }}>수정 방법</th><th>확인한 내용 / 불성립의 물리적 근거</th></tr></thead>
           <tbody>
@@ -2033,7 +2197,7 @@ function FieldEditor({ sec, f, ws, setField }) {
                 <input style={{ width: 140, padding: "5px 8px", border: "1px solid var(--line)", fontFamily: "var(--sans)", fontSize: 13 }}
                   placeholder="작품 번호" value={b.no || ""} onChange={(e) => upB(i, { no: e.target.value })} />
               </div>
-              <div style={{ overflowX: "auto" }}>
+              <div className="tbl-scroll">
                 <table className="tbl">
                   <thead><tr><th style={{ width: 160 }}>평가 관점</th><th style={{ width: 110 }}>확인</th><th>메모</th><th>작가에게 줄 한 문장</th></tr></thead>
                   <tbody>
@@ -2251,13 +2415,15 @@ function AudioField({ f, fieldKey, v, setField }) {
   const [sec, setSec] = useState(0);
   const [err, setErr] = useState("");
   const timerRef = useRef(null);
+  const secRef = useRef(0);
   const cur = typeof v === "string" ? null : v;
 
   const start = async () => {
     setErr("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      // 48kbps면 90초가 약 540KB로 문서 한도(1MB) 안에 안전하게 들어간다
+      const mr = new MediaRecorder(stream, { audioBitsPerSecond: 48000 });
       const chunks = [];
       mr.ondataavailable = (e) => chunks.push(e.data);
       mr.onstop = async () => {
@@ -2269,7 +2435,7 @@ function AudioField({ f, fieldKey, v, setField }) {
         fr.onload = async () => {
           const ref = fieldKey + "." + Date.now();
           const ok = await mediaStore.put(OWNER, ref, fr.result);
-          if (ok) setField(fieldKey, { ref, at: now(), sec: Math.round(sec) });
+          if (ok) setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) });
           else setErr("녹음 저장에 실패했습니다.");
           setRec(null); setSec(0);
         };
@@ -2278,7 +2444,9 @@ function AudioField({ f, fieldKey, v, setField }) {
       mr.start();
       setRec(mr);
       setSec(0);
+      secRef.current = 0;
       timerRef.current = setInterval(() => setSec((s) => {
+        secRef.current = s + 1;
         if (s >= MAX - 1) { try { mr.stop(); } catch (e) {} return MAX; }
         return s + 1;
       }), 1000);
@@ -2299,7 +2467,7 @@ function AudioField({ f, fieldKey, v, setField }) {
           <div style={{ width: "100%", marginBottom: 8 }}>
             <MediaAudio owner={OWNER} refId={cur.ref} />
             <button className="btn small ghost" style={{ marginTop: 6 }}
-              onClick={async () => { await mediaStore.remove(OWNER, cur.ref); setField(fieldKey, ""); }}>녹음 지우기</button>
+              onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, cur.ref); setField(fieldKey, ""); }}>녹음 지우기</button>
           </div>
         )}
         {rec ? (
@@ -2403,11 +2571,12 @@ function SketchField({ f, fieldKey, v, setField }) {
           onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />
         <div className="sketch-foot">
           <button className="btn small" disabled={busy || !dirty} onClick={save}>{busy ? "저장 중…" : "스케치 저장"}</button>
+          {dirty && !busy && <span className="hint" style={{ color: "var(--seal)" }}>아직 저장되지 않은 획이 있습니다 — 「스케치 저장」을 눌러야 남습니다.</span>}
           {cur && (
             <>
               <span className="hint">저장된 스케치 {fmtTime(cur.at)}</span>
               <MediaThumb owner={OWNER} refId={cur.ref} alt="저장된 스케치" size={64} />
-              <button className="mm-del" onClick={async () => { await mediaStore.remove(OWNER, cur.ref); setField(fieldKey, ""); }}>지우기</button>
+              <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, cur.ref); setField(fieldKey, ""); }}>지우기</button>
             </>
           )}
           {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
@@ -2426,6 +2595,7 @@ function VideoField({ f, fieldKey, v, setField }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const timerRef = useRef(null);
+  const secRef = useRef(0);
   const previewRef = useRef(null);
   const cur = typeof v === "string" ? null : v;
 
@@ -2455,7 +2625,7 @@ function VideoField({ f, fieldKey, v, setField }) {
           if (cur) await mediaStore.remove(OWNER, cur.ref);
           const ref = fieldKey + "." + Date.now();
           const ok = await mediaStore.put(OWNER, ref, fr.result);
-          if (ok) setField(fieldKey, { ref, at: now(), sec: Math.round(sec) });
+          if (ok) setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) });
           else setErr("영상 저장에 실패했습니다.");
           setRec(null); setSec(0); setBusy(false);
         };
@@ -2464,7 +2634,9 @@ function VideoField({ f, fieldKey, v, setField }) {
       mr.start();
       setRec(mr);
       setSec(0);
+      secRef.current = 0;
       timerRef.current = setInterval(() => setSec((s) => {
+        secRef.current = s + 1;
         if (s >= MAX - 1) { try { mr.stop(); } catch (e) {} return MAX; }
         return s + 1;
       }), 1000);
@@ -2483,7 +2655,7 @@ function VideoField({ f, fieldKey, v, setField }) {
           <div style={{ width: "100%", marginBottom: 8 }}>
             <MediaVideo owner={OWNER} refId={cur.ref} />
             <button className="btn small ghost" style={{ marginTop: 6 }}
-              onClick={async () => { await mediaStore.remove(OWNER, cur.ref); setField(fieldKey, ""); }}>영상 지우기</button>
+              onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, cur.ref); setField(fieldKey, ""); }}>영상 지우기</button>
           </div>
         )}
         <video ref={previewRef} muted playsInline style={{ width: 200, border: "1px solid var(--line)", background: "#000", display: rec ? "block" : "none" }} />
@@ -2702,7 +2874,6 @@ function StudentApp({ me, onExit, onGallery }) {
     const mark = () => { lastEventRef.current = Date.now(); };
     const evs = ["pointermove", "pointerdown", "keydown", "scroll", "touchstart"];
     evs.forEach((e) => window.addEventListener(e, mark, { passive: true }));
-    accAct(tabRef.current, { visits: 1 }); // 입장 직후 보고 있는 차시도 방문으로 셈
     const tick = setInterval(() => {
       // 화면이 보이는 상태에서 최근 45초 안에 움직임이 있었을 때만 10초를 더함
       if (document.visibilityState !== "visible") return;
@@ -2732,7 +2903,14 @@ function StudentApp({ me, onExit, onGallery }) {
       if (saved) { setWs(saved); setSavedAt(saved._updatedAt || null); }
       setGrade(await store.get("grade:" + me.sid));
       const cfg = await store.get("config");
-      setOpenMap((cfg && cfg.open) || DEFAULT_OPEN);
+      const om = (cfg && cfg.open) || DEFAULT_OPEN;
+      setOpenMap(om);
+      // 지난번에 보던 차시로 이어서 연다. 없으면 열린 차시 중 가장 뒤의 것
+      let t0 = SESSIONS[0];
+      if (saved && saved._lastTab && isOpen(om, saved._lastTab)) t0 = saved._lastTab;
+      else { const lastOpen = [...SESSIONS].reverse().find((s) => isOpen(om, s)); if (lastOpen) t0 = lastOpen; }
+      setTab(t0);
+      accAct(t0, { visits: 1 }); // 입장 방문은 실제로 열린 차시에 귀속
       setLoaded(true);
     })();
   }, []);
@@ -2809,7 +2987,17 @@ function StudentApp({ me, onExit, onGallery }) {
     };
   }, []);
 
-  const switchTab = (s) => { flush(); accAct(s, { visits: 1 }); openReadingsRef.current = 0; setTab(s); };
+  const switchTab = (s) => {
+    if (s === tab) return;
+    wsRef.current = { ...wsRef.current, _lastTab: s }; // 다음 입장 때 이 차시로 이어서 연다
+    setWs(wsRef.current);
+    dirtyRef.current = true; // flush가 _lastTab까지 함께 저장하도록
+    flush();
+    accAct(s, { visits: 1 });
+    openReadingsRef.current = 0;
+    setTab(s);
+    window.scrollTo({ top: 0 });
+  };
 
   const pct = overallProgress(ws);
   const secs = SCHEMA.filter((s) => s.session === tab);
@@ -2832,15 +3020,20 @@ function StudentApp({ me, onExit, onGallery }) {
       </div>
       <div className="wrap">
         <div className="prog-strip">
-          <ProgressBar pct={pct} />
-          <span className="prog-num">{pct}%</span>
+          <ProgressBar pct={Math.round(sessionProgress(tab, ws) * 100)} />
+          <span className="prog-num">{(() => {
+            let t = 0, d = 0;
+            for (const s of secs) { const p = sectionProgress(s, ws); t += p.total; d += p.done; }
+            return "이번 차시 " + d + "/" + t;
+          })()}</span>
+          <span className="prog-num">전체 {pct}%</span>
           <span className="prog-num">미디어 {mediaCount(ws)}건</span>
         </div>
         <div className="sess-tabs" role="tablist">
           {SESSIONS.map((s) => {
             const open = isOpen(openMap, s);
             return (
-              <button key={s} className={"sess-tab " + (tab === s ? "on" : "") + (open ? "" : " locked")}
+              <button key={s} role="tab" aria-selected={tab === s} className={"sess-tab " + (tab === s ? "on" : "") + (open ? "" : " locked")}
                 onClick={() => open && switchTab(s)} disabled={!open} title={open ? s : s + " 잠김"}>
                 {open ? <SessionDot ratio={sessionProgress(s, ws)} /> : <span className="lock">잠김</span>}{s}
               </button>
@@ -2882,90 +3075,131 @@ function StudentApp({ me, onExit, onGallery }) {
 
 /* ---------- 교사: 학생 상세(열람 + 채점) ---------- */
 
-function TeacherStudentView({ sid, roster, wsData, gradeData, onBack }) {
+function TeacherStudentView({ sid, roster, wsData, gradeData, onBack, ids, onSel }) {
   const [ws, setWs] = useState(null);
   const [grade, setGrade] = useState({});
+  const [gradeDirty, setGradeDirty] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [subTab, setSubTab] = useState("기록 열람");
+  const [sessFilter, setSessFilter] = useState("전체");
+  const upGrade = (g) => { setGrade(g); setGradeDirty(true); };
+  const guarded = (fn) => () => {
+    if (gradeDirty && !window.confirm("저장하지 않은 채점이 있습니다. 이동하면 사라집니다. 이동할까요?")) return;
+    fn();
+  };
 
   const isPreview = sid === "미리보기";
   const isSample = !!(roster[sid] && roster[sid].sample);
 
+  const gradeRef = useRef(grade);
+  gradeRef.current = grade;
+
+  // key={sid}로 학생마다 리마운트되지만, 늦게 도착한 응답이 상태를 덮지 않게 이중으로 막는다
   useEffect(() => {
+    let alive = true;
     (async () => {
       if (isSample) {
         setWs(wsData || {});
         setGrade(gradeData || {});
       } else {
         const k = isPreview ? "preview" : sid;
-        setWs((await store.get("ws:" + k)) || wsData || {});
-        setGrade((await store.get("grade:" + k)) || {});
+        const w = (await store.get("ws:" + k)) || wsData || {};
+        const g = (await store.get("grade:" + k)) || {};
+        if (!alive) return;
+        setWs(w);
+        setGrade(g);
       }
     })();
+    return () => { alive = false; };
   }, [sid]);
 
   const saveGrade = async () => {
     if (isSample) return setSaveMsg("표본 학급 자료라 채점을 저장하지 않습니다.");
     setSaveMsg("저장 중…");
-    const ok = await store.set("grade:" + (isPreview ? "preview" : sid), { ...grade, _updatedAt: now() });
+    const snap = grade;
+    const ok = await store.set("grade:" + (isPreview ? "preview" : sid), { ...snap, _updatedAt: now() });
+    // 저장하는 사이에 또 고쳤다면 dirty를 풀지 않는다
+    if (ok && gradeRef.current === snap) setGradeDirty(false);
     setSaveMsg(ok ? "저장됨 " + fmtTime(now()) : "저장 실패 — 다시 시도하세요");
   };
 
   if (!ws) return <div style={{ padding: 30, color: "var(--sub)" }}>불러오는 중…</div>;
   const rec = roster[sid] || {};
   const pct = overallProgress(ws);
+  const order = ids || [];
+  const pos = order.indexOf(sid);
+  const goto = (id) => { if (id && onSel) { onSel(id); window.scrollTo({ top: 0 }); } };
 
   return (
     <div>
-      <button className="back-link" onClick={onBack}>← 학생 목록으로</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <button className="back-link" onClick={guarded(onBack)}>← 학생 목록으로</button>
+        {pos >= 0 && order.length > 1 && (
+          <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button className="btn small ghost" disabled={pos <= 0} onClick={guarded(() => goto(order[pos - 1]))}>← 이전 학생</button>
+            <span className="mono" style={{ fontSize: 11, color: "var(--sub)" }}>{pos + 1} / {order.length}</span>
+            <button className="btn small ghost" disabled={pos >= order.length - 1} onClick={guarded(() => goto(order[pos + 1]))}>다음 학생 →</button>
+          </span>
+        )}
+      </div>
       <div className="card">
         <div className="card-head">
-          <span className="card-code">학생 기록</span>
+          <span className="card-code">학생 기록{isSample ? " · 표본" : ""}</span>
           <span className="card-title">{sid} · {rec.nick || "-"}</span>
           <span className="card-sess">진행 {pct}% · 최근 저장 {fmtTime(ws._updatedAt)}</span>
         </div>
       </div>
 
       <div className="t-tabs">
-        {["기록 열람", "사고 변화"].map((t) => (
-          <button key={t} className={"btn small " + (subTab === t ? "" : "ghost")} onClick={() => setSubTab(t)}>{t}</button>
+        {["기록 열람", "사고 변화", "채점"].map((t) => (
+          <button key={t} className={"btn small " + (subTab === t ? "" : "ghost")} onClick={() => setSubTab(t)}>{t}{t === "채점" && gradeDirty ? " ●" : ""}</button>
         ))}
       </div>
 
       {ws._act && Object.keys(ws._act).length > 0 && (
         <div className="card">
-          <div className="card-head"><span className="card-code">머문 시간</span><span className="card-title">차시별 살펴본 시간</span></div>
           <div className="card-body">
-            <table className="tbl">
-              <thead><tr><th>차시</th><th>화면에 머문 시간</th><th>읽기 자료를 열어 둔 시간</th><th>자료 연 횟수</th><th>다녀간 횟수</th></tr></thead>
-              <tbody>
-                {SESSIONS.map((s) => {
-                  const a = ws._act[s];
-                  if (!a) return null;
-                  return (
-                    <tr key={s}>
-                      <td className="mono">{s}</td>
-                      <td className="mono">{fmtDur(a.sec)}</td>
-                      <td className="mono">{fmtDur(a.readSec)}</td>
-                      <td className="mono">{a.opens || 0}회</td>
-                      <td className="mono">{a.visits || 0}회</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <p className="hint" style={{ marginTop: 8 }}>마우스·키보드·스크롤이 움직인 시간만 셉니다. 화면을 켜 두고 자리를 비운 시간은 들어가지 않습니다. 읽는 시간이 짧은데 답이 길면 다른 곳에서 옮겨 왔을 가능성도 함께 살핍니다.</p>
+            <details>
+              <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>
+                차시별 살펴본 시간 — 총 {fmtDur(Object.values(ws._act).reduce((a, x) => a + (x.sec || 0), 0))} (읽기 자료 {fmtDur(Object.values(ws._act).reduce((a, x) => a + (x.readSec || 0), 0))})
+              </summary>
+              <table className="tbl" style={{ marginTop: 10 }}>
+                <thead><tr><th>차시</th><th>화면에 머문 시간</th><th>읽기 자료를 열어 둔 시간</th><th>자료 연 횟수</th><th>다녀간 횟수</th></tr></thead>
+                <tbody>
+                  {SESSIONS.map((s) => {
+                    const a = ws._act[s];
+                    if (!a) return null;
+                    return (
+                      <tr key={s}>
+                        <td className="mono">{s}</td>
+                        <td className="mono">{fmtDur(a.sec)}</td>
+                        <td className="mono">{fmtDur(a.readSec)}</td>
+                        <td className="mono">{a.opens || 0}회</td>
+                        <td className="mono">{a.visits || 0}회</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <p className="hint" style={{ marginTop: 8 }}>마우스·키보드·스크롤이 움직인 시간만 셉니다. 화면을 켜 두고 자리를 비운 시간은 들어가지 않습니다. 읽는 시간이 짧은데 답이 길면 다른 곳에서 옮겨 왔을 가능성도 함께 살핍니다.</p>
+            </details>
           </div>
         </div>
       )}
 
       {subTab === "사고 변화" ? <ChangeMap ws={ws} owner={isPreview ? "preview" : sid} /> : null}
 
+      {subTab === "채점" && (
       <div className="grade-panel">
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
           <strong className="serif" style={{ fontSize: 15 }}>수행평가 채점 (루브릭)</strong>
           <span className="hint">평가요소 1개당 하나의 성취기준만 평가합니다. 결과물의 정교함보다 판단과 수정의 근거를 우선 봅니다.</span>
         </div>
+        {isSample && (
+          <p className="hint" style={{ color: "var(--seal)", marginBottom: 12 }}>
+            표본 학급 자료입니다 — 채점 연습은 가능하지만 저장되지 않습니다.
+          </p>
+        )}
         {RUBRIC.map((r, i) => (
           <div className="grade-row" key={i}>
             <span className="g-std mono">{r.std}</span>
@@ -2974,11 +3208,11 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, onBack }) {
               {["상", "중", "하"].map((lv) => (
                 <button key={lv}
                   className={grade["r" + i] === lv ? (lv === "상" ? "on-ok" : lv === "중" ? "on-mid" : "on-no") : ""}
-                  onClick={() => setGrade({ ...grade, ["r" + i]: grade["r" + i] === lv ? "" : lv })}>{lv}</button>
+                  onClick={() => upGrade({ ...grade, ["r" + i]: grade["r" + i] === lv ? "" : lv })}>{lv}</button>
               ))}
             </div>
             <input style={{ flex: "1 1 100%", padding: "6px 8px", border: "1px solid var(--line)", fontFamily: "var(--sans)", fontSize: 13 }}
-              placeholder="근거 메모" value={grade["rm" + i] || ""} onChange={(e) => setGrade({ ...grade, ["rm" + i]: e.target.value })} />
+              placeholder="근거 메모" value={grade["rm" + i] || ""} onChange={(e) => upGrade({ ...grade, ["rm" + i]: e.target.value })} />
           </div>
         ))}
         <div style={{ margin: "16px 0 8px" }}>
@@ -2987,26 +3221,37 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, onBack }) {
         <div className="checkline" style={{ marginBottom: 12 }}>
           {OBS_ITEMS.map((o, i) => (
             <span key={i} className={"chk " + (grade["o" + i] ? "on" : "")}
-              onClick={() => setGrade({ ...grade, ["o" + i]: !grade["o" + i] })}>
+              onClick={() => upGrade({ ...grade, ["o" + i]: !grade["o" + i] })}>
               {grade["o" + i] ? "☑" : "☐"} {o}
             </span>
           ))}
         </div>
         <div className="field"><label>관찰 메모</label>
-          <textarea rows={2} value={grade.obsMemo || ""} onChange={(e) => setGrade({ ...grade, obsMemo: e.target.value })} /></div>
+          <textarea rows={2} value={grade.obsMemo || ""} onChange={(e) => upGrade({ ...grade, obsMemo: e.target.value })} /></div>
         <div className="f-grid">
           <div className="field"><label>서면 피드백 ① 조형 기준 질문 (형태·빛·질감·스케일 중)</label>
-            <input value={grade.fbForm || ""} onChange={(e) => setGrade({ ...grade, fbForm: e.target.value })} /></div>
+            <input value={grade.fbForm || ""} onChange={(e) => upGrade({ ...grade, fbForm: e.target.value })} /></div>
           <div className="field"><label>서면 피드백 ② 작품 개념 질문 (사회문제·유물의 기능·미술 맥락 중)</label>
-            <input value={grade.fbConcept || ""} onChange={(e) => setGrade({ ...grade, fbConcept: e.target.value })} /></div>
+            <input value={grade.fbConcept || ""} onChange={(e) => upGrade({ ...grade, fbConcept: e.target.value })} /></div>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button className="btn" onClick={saveGrade}>채점 저장</button>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button className="btn" disabled={isSample} onClick={saveGrade}>채점 저장</button>
+          {pos >= 0 && pos < order.length - 1 && (
+            <button className="btn ghost" onClick={() => { if (gradeDirty) return window.alert("저장하지 않은 채점이 있습니다. 먼저 「채점 저장」을 누르세요."); goto(order[pos + 1]); }}>다음 학생 →</button>
+          )}
           <span className="hint">{saveMsg}</span>
         </div>
       </div>
+      )}
 
-      {subTab === "기록 열람" && SESSIONS.map((sess) => (
+      {subTab === "기록 열람" && (
+        <div className="t-tabs" style={{ margin: "0 0 12px" }}>
+          {["전체", ...SESSIONS].map((s) => (
+            <button key={s} className={"btn small " + (sessFilter === s ? "" : "ghost")} onClick={() => setSessFilter(s)}>{s}</button>
+          ))}
+        </div>
+      )}
+      {subTab === "기록 열람" && SESSIONS.filter((s) => sessFilter === "전체" || s === sessFilter).map((sess) => (
         <div key={sess}>
           {SCHEMA.filter((s) => s.session === sess).map((sec) => {
             const sp = sectionProgress(sec, ws);
@@ -3031,6 +3276,310 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, onBack }) {
 
 /* ---------- 교사: 대시보드 ---------- */
 
+/* ---------- 교사: 창의성 대시보드 ----------
+   색약 대응: 이 앱의 3색은 색만으로 구분이 어려워(검증 결과), 모든 차트에서
+   식별은 위치·직접 라벨·숫자가 맡고 색은 강조(선택=적갈)만 담당한다. */
+
+const sidJitter = (id) => {
+  let h = 0; const s = String(id);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 997;
+  return (h % 11) - 5;
+};
+
+function AxisStripRow({ axis, rows, first, hoverId, setHoverId, onSel }) {
+  const W = 560, H = first ? 42 : 30, Y = 15;
+  const pts = rows.filter((r) => r.v != null);
+  const med = median(pts.map((r) => r.v));
+  const missing = rows.length - pts.length;
+  const hr = hoverId ? pts.find((r) => r.id === hoverId) : null;
+  return (
+    <div className="hbar" style={{ alignItems: "center" }}>
+      <span className="lb" title={axis.desc}>{axis.name}</span>
+      <svg viewBox={"0 0 " + W + " " + H} style={{ flex: "1 1 280px", height: H }} role="img" aria-label={axis.name + " 학급 분포"}>
+        <title>{axis.name} — 기록 {pts.length}명{med != null ? " · 중앙값 " + med + "점" : ""}. {axis.desc}</title>
+        <line x1={0} y1={Y} x2={W} y2={Y} stroke="var(--line)" strokeWidth={1} />
+        {[0, W / 2, W].map((x, i) => <line key={i} x1={x} y1={Y - 3} x2={x} y2={Y + 3} stroke="var(--line2)" strokeWidth={1} />)}
+        {first && [["0", 0, "start"], ["50", W / 2, "middle"], ["100", W, "end"]].map(([t, x, an]) => (
+          <text key={t} x={x} y={H - 2} fontSize={10} fill="var(--sub)" fontFamily="var(--mono)" textAnchor={an}>{t}</text>
+        ))}
+        {med != null && pts.length >= 2 && (
+          <line x1={(med / 100) * W} y1={Y - 9} x2={(med / 100) * W} y2={Y + 9} stroke="var(--ink)" strokeWidth={2} />
+        )}
+        {pts.map((r) => (
+          <circle key={r.id} cx={(r.v / 100) * W} cy={Y + sidJitter(r.id)} r={r.id === hoverId ? 5 : 4}
+            fill={r.id === hoverId ? "var(--seal)" : "var(--patina)"} fillOpacity={r.id === hoverId ? 1 : 0.5}
+            stroke="var(--card)" strokeWidth={1.5} style={{ cursor: "pointer" }}
+            onMouseEnter={() => setHoverId(r.id)} onMouseLeave={() => setHoverId(null)} onClick={() => onSel(r.id)}>
+            <title>{r.nick} · {axis.name} {r.v}점</title>
+          </circle>
+        ))}
+        {hr && <text x={Math.min(Math.max((hr.v / 100) * W, 24), W - 24)} y={Y - 11} fontSize={10} fontFamily="var(--mono)" fill="var(--ink)" textAnchor="middle">{hr.nick} {hr.v}</text>}
+      </svg>
+      <span className="v" style={{ minWidth: 96, textAlign: "right" }}>
+        {axis.key === "originality" && rows.length < 2 ? "비교는 2명부터" : (
+          <>
+            {med != null ? "중앙값 " + med : "기록 없음"}
+            {missing > 0 && <span style={{ color: "var(--seal)" }}> · 미기록 {missing}</span>}
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function TimeScatter({ rows, hoverId, setHoverId, onSel }) {
+  const W = 720, H = 300, L = 48, R = 16, T = 18, B = 30;
+  const data = rows.filter((r) => r.min != null && r.min > 0 && r.score != null);
+  const noTime = rows.length - data.length;
+  if (!data.length) return <p className="hint">활동 시간이 기록된 학생이 아직 없습니다. 학생이 화면에서 작업하면 점이 나타납니다.</p>;
+  const maxX = Math.max(30, ...data.map((r) => r.min));
+  const px = (v) => L + (v / maxX) * (W - L - R);
+  const py = (v) => T + (1 - v / 100) * (H - T - B);
+  const mx = median(data.map((r) => r.min)), my = median(data.map((r) => r.score));
+  const xticks = [0, Math.round(maxX / 2), Math.round(maxX)];
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", minWidth: 480 }} role="img" aria-label="머문 시간 대비 기록 산출 산점도">
+        <title>가로: 총 활동 시간(분) · 세로: 창의성 축 평균(0~100). 점 하나가 학생 한 명.</title>
+        {[0, 50, 100].map((v) => (
+          <g key={v}>
+            <line x1={L} y1={py(v)} x2={W - R} y2={py(v)} stroke="var(--line2)" strokeWidth={1} />
+            <text x={L - 6} y={py(v) + 3} fontSize={10} fill="var(--sub)" fontFamily="var(--mono)" textAnchor="end">{v}</text>
+          </g>
+        ))}
+        {xticks.map((v) => (
+          <text key={v} x={px(v)} y={H - 8} fontSize={10} fill="var(--sub)" fontFamily="var(--mono)" textAnchor="middle">{v}분</text>
+        ))}
+        <line x1={L} y1={py(0)} x2={W - R} y2={py(0)} stroke="var(--line)" strokeWidth={1} />
+        <line x1={L} y1={T} x2={L} y2={py(0)} stroke="var(--line)" strokeWidth={1} />
+        {data.length >= 2 && mx != null && (
+          <g>
+            <line x1={px(mx)} y1={T} x2={px(mx)} y2={py(0)} stroke="var(--sub)" strokeWidth={1} strokeDasharray="4 3" opacity={0.5} />
+            <line x1={L} y1={py(my)} x2={W - R} y2={py(my)} stroke="var(--sub)" strokeWidth={1} strokeDasharray="4 3" opacity={0.5} />
+            <text x={px(mx) + 4} y={T + 26} fontSize={9} fill="var(--sub)" fontFamily="var(--mono)">학급 중앙값</text>
+          </g>
+        )}
+        {data.length >= 5 && (
+          <g fontSize={10} fill="var(--sub)">
+            <text x={L + 4} y={T + 12}>시간 짧고 산출 높음 — 작성 경위 확인</text>
+            <text x={W - R - 4} y={py(0) - 8} textAnchor="end">시간 길고 산출 낮음 — 막힌 지점 지원</text>
+          </g>
+        )}
+        {data.map((r) => (
+          <circle key={r.id} cx={px(r.min)} cy={py(r.score)} r={r.id === hoverId ? 6 : 4.5}
+            fill={r.id === hoverId ? "var(--seal)" : "var(--patina)"} fillOpacity={r.id === hoverId ? 1 : 0.65}
+            stroke="var(--card)" strokeWidth={1.5} style={{ cursor: "pointer" }}
+            onMouseEnter={() => setHoverId(r.id)} onMouseLeave={() => setHoverId(null)} onClick={() => onSel(r.id)}>
+            <title>{r.nick} · {r.min}분 · 축 평균 {r.score}</title>
+          </circle>
+        ))}
+        {hoverId && (() => {
+          const hr = data.find((r) => r.id === hoverId);
+          return hr ? <text x={px(hr.min)} y={py(hr.score) - 9} fontSize={10} fontFamily="var(--mono)" fill="var(--ink)" textAnchor="middle">{hr.nick}</text> : null;
+        })()}
+      </svg>
+      {noTime > 0 && <p className="hint">시간 기록이 없는 학생 {noTime}명은 이 그림에서 빠져 있습니다.</p>}
+    </div>
+  );
+}
+
+function CreativityPanel({ ids, roster, wsMap, onSel }) {
+  const [hoverId, setHoverId] = useState(null);
+  const [sortKey, setSortKey] = useState("id");
+  const axesAll = useMemo(() => creativityAxesAll(Object.fromEntries(ids.map((id) => [id, wsMap[id] || {}]))), [ids, wsMap]);
+  const rows = ids.map((id) => ({ id, nick: (roster[id] || {}).nick || id, ax: axesAll[id] || {} }));
+
+  const meanMed = median(rows.map((r) => r.ax.mean));
+  const zeroMedia = rows.filter((r) => mediaCount(wsMap[r.id]) === 0);
+  const editSum = rows.reduce((a, r) => a + ((wsMap[r.id] || {})._log || []).length, 0);
+  const actMin = (id) => Math.round(Object.values((wsMap[id] || {})._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60);
+
+  const sorted = [...rows].sort((a, b) => {
+    if (sortKey === "id") return a.id.localeCompare(b.id);
+    const av = a.ax[sortKey], bv = b.ax[sortKey];
+    if (av == null && bv == null) return a.id.localeCompare(b.id);
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return bv - av;
+  });
+
+  // 판단 근거 지표의 고정 분모 — 행마다 같은 눈금이 되도록
+  const debateN = SCHEMA.filter((s) => s.kind === "inquiry").length;
+  const denoms = { rounds: 5, revised: 5, notPassed: 8, ground: 8, exclude: 1, peerSent: 2 * PEER_VIEWS.length, peerBack: 1, changed: CHANGE_PAIRS.length, counter: debateN, debate: debateN };
+
+  // 미디어 유형별 총량
+  const typeCounts = { "사진": 0, "음성": 0, "스케치": 0, "영상": 0, "링크": 0 };
+  ids.forEach((id) => {
+    const d = wsMap[id] || {};
+    for (const m of mediaFields()) {
+      const v = d[m.key];
+      if (!v || (Array.isArray(v) && !v.length)) continue;
+      const n = Array.isArray(v) ? v.length : 1;
+      typeCounts[m.f.t === "audio" ? "음성" : m.f.t === "sketch" ? "스케치" : m.f.t === "video" ? "영상" : "사진"] += n;
+    }
+    typeCounts["사진"] += (d["s5b.rounds"] || []).filter((r) => r && r.img).length;
+    typeCounts["링크"] += (Array.isArray(d["s5a.genLinks"]) ? d["s5a.genLinks"] : []).filter((r) => /^https?:\/\//.test(((r || {}).url || "").trim())).length;
+  });
+  const typeMax = Math.max(1, ...Object.values(typeCounts));
+
+  return (
+    <div>
+      <div className="kpis">
+        <div className="kpi"><div className="n">{rows.filter((r) => overallProgress(wsMap[r.id]) > 0).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {ids.length}</span></div><div className="l">기록을 시작한 학생</div></div>
+        <div className="kpi"><div className="n">{meanMed != null ? meanMed : "—"}</div><div className="l">축 평균의 학급 중앙값</div></div>
+        <div className="kpi"><div className="n" style={zeroMedia.length ? { color: "var(--seal)" } : {}}>{zeroMedia.length}</div><div className="l">미디어 0건 학생</div></div>
+        <div className="kpi"><div className="n">{editSum}</div><div className="l">고쳐 쓴 흔적 합계</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">창의성 1</span><span className="card-title">여섯 축의 학급 분포</span></div>
+        <div className="card-body">
+          {CREATIVITY_AXES.map((axis, i) => (
+            <AxisStripRow key={axis.key} axis={axis} first={i === CREATIVITY_AXES.length - 1}
+              rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: r.ax[axis.key] }))}
+              hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
+          ))}
+          <p className="hint" style={{ marginTop: 8 }}>
+            점 하나가 학생 한 명입니다 (0~100). 굵은 세로선은 학급 중앙값. 점을 누르면 그 학생의 기록으로 들어갑니다.
+            여섯 축을 거미줄 그림으로 겹치지 않은 이유: 25명의 다각형은 겹쳐 읽을 수 없어, 축마다 같은 자 위에 펼쳤습니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">창의성 2</span><span className="card-title">창의성 대장 — 학생 × 축</span></div>
+        <div className="card-body">
+          <div className="tbl-scroll">
+            <table className="roster">
+              <thead>
+                <tr>
+                  <th style={{ cursor: "pointer" }} onClick={() => setSortKey("id")}>학생{sortKey === "id" ? " ▾" : ""}</th>
+                  {CREATIVITY_AXES.map((a) => (
+                    <th key={a.key} style={{ cursor: "pointer" }} title={a.desc} onClick={() => setSortKey(a.key)}>{a.short}{sortKey === a.key ? " ▾" : ""}</th>
+                  ))}
+                  <th style={{ cursor: "pointer" }} onClick={() => setSortKey("mean")}>축 평균{sortKey === "mean" ? " ▾" : ""}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((r) => (
+                  <tr key={r.id}
+                    style={r.id === hoverId ? { outline: "1px solid var(--ink)" } : {}}
+                    onMouseEnter={() => setHoverId(r.id)} onMouseLeave={() => setHoverId(null)}>
+                    <td>{r.nick} <span className="mono" style={{ fontSize: 11, color: "var(--sub)" }}>{r.id}</span></td>
+                    {CREATIVITY_AXES.map((a) => {
+                      const v = r.ax[a.key];
+                      return (
+                        <td key={a.key} className="mono" style={{ position: "relative" }}
+                          title={v != null ? a.name + " " + v + "점" : a.key === "originality" && ids.length < 2 ? "남다름 — 학급 2명부터 계산합니다" : a.name + " — 계산할 기록이 아직 없음"}>
+                          {v != null && <span style={{ position: "absolute", inset: 0, background: "var(--patina)", opacity: (v / 100) * 0.4 }} />}
+                          <span style={{ position: "relative", color: v == null ? "var(--seal)" : "var(--ink)" }}>{v == null ? "—" : v}</span>
+                        </td>
+                      );
+                    })}
+                    <td className="mono" style={{ fontFamily: "var(--serif)", fontWeight: 700 }}>{r.ax.mean == null ? "—" : r.ax.mean}</td>
+                    <td><button className="btn small" onClick={() => onSel(r.id)}>기록 열람</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="hint" style={{ marginTop: 8 }}>축 이름을 누르면 그 축이 높은 순으로 정렬됩니다. — 표시는 0점이 아니라 계산할 기록이 아직 없다는 뜻입니다.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">창의성 3</span><span className="card-title">판단 근거의 양 — 학급 평균</span></div>
+        <div className="card-body">
+          {(() => {
+            const keys = ["revised", "notPassed", "ground", "exclude", "peerSent", "counter", "debate", "changed"];
+            return keys.map((k) => {
+              const vals = ids.map((id) => (creativityMetrics(wsMap[id]).find((m) => m.k === k) || {}).v || 0);
+              const label = (creativityMetrics(wsMap[ids[0]] || {}).find((m) => m.k === k) || {}).label || k;
+              const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+              const den = denoms[k] || Math.max(1, ...vals);
+              return (
+                <div className="hbar" key={k}>
+                  <span className="lb">{label}</span>
+                  <span className="tr"><i style={{ width: Math.min(100, (avg / den) * 100) + "%" }} /></span>
+                  <span className="v">{avg.toFixed(1)} / {den}</span>
+                </div>
+              );
+            });
+          })()}
+          <p className="hint" style={{ marginTop: 8 }}>막대는 지표별 만점(빗금 뒤 숫자) 기준이라 행끼리 눈으로 비교할 수 있습니다. 불성립 발견과 제외 근거가 낮으면 5차시 이중 점검 시범을 보강합니다.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">과정 1</span><span className="card-title">머문 시간 대비 기록 산출</span></div>
+        <div className="card-body">
+          <TimeScatter rows={rows.map((r) => ({ id: r.id, nick: r.nick, min: actMin(r.id), score: r.ax.mean }))}
+            hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
+          <p className="hint" style={{ marginTop: 8 }}>시간은 보조 지표입니다. 구석의 문구는 판정이 아니라 함께 살펴볼 학생을 고르는 안내이며, 평가 근거는 항상 기록 본문에서 확인합니다.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">과정 2</span><span className="card-title">멀티모달 수집 현황</span></div>
+        <div className="card-body">
+          {Object.entries(typeCounts).map(([t, n]) => (
+            <div className="hbar" key={t}>
+              <span className="lb">{t}</span>
+              <span className="tr"><i style={{ width: (n / typeMax) * 100 + "%" }} /></span>
+              <span className="v">{n}건</span>
+            </div>
+          ))}
+          <p className="hint" style={{ marginTop: 6 }}>생성 회차의 결과 화면은 사진에 합산됩니다.</p>
+          {zeroMedia.length > 0 && (
+            <p className="hint" style={{ marginTop: 6, color: "var(--seal)" }}>
+              아직 아무것도 올리지 않은 학생: {zeroMedia.map((r) => r.nick).join(", ")}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">읽는 법</span><span className="card-title">이 지표가 재는 것과 재지 못하는 것</span></div>
+        <div className="card-body" style={{ fontSize: 13 }}>
+          <p>이 화면의 숫자는 기록의 <b>양과 폭</b>을 셉니다. 답이 좋은지는 재지 못하므로, 점수는 어느 학생의 기록부터 읽을지 고르는 입구로만 쓰고 판단은 본문을 읽고 내립니다.</p>
+          <p style={{ marginTop: 6 }}>남다름은 학급 안 낱말 비교라 같은 문제를 다른 말로 쓴 학생이 높게 나올 수 있고, 학급이 바뀌면 점수도 바뀝니다. 채집의 폭은 기기·촬영 환경의 영향을 받으므로 성적에 직접 반영하지 않고 격려와 관찰에 씁니다.</p>
+          <p style={{ marginTop: 6 }}>축마다 성격과 만점 기준이 달라 여섯 축을 하나의 점수로 합치지 않습니다. 「축 평균」은 정렬과 산점도를 위한 참고값입니다.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">학생</span><span className="card-title">전후 답이 모두 있는 자리</span></div>
+        <div className="card-body">
+          <div className="tbl-scroll">
+            <table className="roster">
+              <thead><tr><th>학생</th><th>변화 쌍</th><th>불성립 발견</th><th>미디어</th><th>고쳐 쓴 횟수</th><th></th></tr></thead>
+              <tbody>
+                {ids.map((id) => {
+                  const w = wsMap[id] || {};
+                  const m = creativityMetrics(w);
+                  const g = (k) => (m.find((x) => x.k === k) || {}).v || 0;
+                  return (
+                    <tr key={id}>
+                      <td>{(roster[id] || {}).nick} <span className="mono" style={{ fontSize: 11, color: "var(--sub)" }}>{id}</span></td>
+                      <td className="mono">{g("changed")} / {CHANGE_PAIRS.length}</td>
+                      <td className="mono">{g("notPassed")}</td>
+                      <td className="mono">{mediaCount(w)}</td>
+                      <td className="mono">{(w._log || []).length}</td>
+                      <td><button className="btn small" onClick={() => onSel(id)}>변화 보기</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <p className="hint" style={{ marginTop: 10 }}>학생을 눌러 들어간 뒤 「사고 변화」에서 앞뒤 답을 나란히 봅니다. 채점은 이 화면의 근거를 먼저 읽고 매깁니다.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- 교사: 수업 안내 (교사용 안내서) ---------- */
 
 function TeacherGuide() {
@@ -3040,6 +3589,29 @@ function TeacherGuide() {
       <div className="card">
         <div className="card-body" style={{ fontSize: 13, color: "var(--sub)" }}>
           차시별 교사용 안내서입니다. 120분 수업 흐름, 성취기준, 설계 근거(교육학적 참고)와 학생에게 보이는 읽기 자료를 함께 볼 수 있습니다. 학생 화면에는 학습 목표와 읽기 자료만 보입니다.
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-body">
+          <details>
+            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>참고 — 학습지 항목과 「창의성」 탭 지표의 대응 표</summary>
+            <p style={{ fontSize: 13, margin: "10px 0" }}>
+              창의력의 증진은 완성 이미지 한 점으로 확인하기 어렵습니다. 같은 질문에 두 번 답한 자리, 자기 판단을 세웠다가 뒤집은 자리, 남의 읽기를 받아들이거나 물리친 자리에 생각의 이동이 남습니다. 학습지의 각 항목은 아래 규칙으로 지표와 짝을 이룹니다.
+            </p>
+            <table className="match-tbl">
+              <thead><tr><th style={{ width: 78 }}>차원</th><th>학습지 앞 자리</th><th>학습지 뒤 자리</th><th>대시보드에서 보는 것</th></tr></thead>
+              <tbody>
+                {CHANGE_PAIRS.map((p, i) => (
+                  <tr key={i}>
+                    <td>{p.dim}</td>
+                    <td>{p.before.where}</td>
+                    <td>{p.after.where}</td>
+                    <td>{p.look}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
         </div>
       </div>
       <div className="t-tabs">
@@ -3105,6 +3677,12 @@ function TeacherApp({ onExit, onGallery }) {
     if (ok) { setOpenMap(next); setMsg(val ? "모든 차시를 열었습니다." : "모든 차시를 닫았습니다."); }
   };
   useEffect(() => { loadAll(); }, []);
+  // 알림 문구는 6초 뒤 스스로 사라짐 — 다른 탭에 남은 옛 메시지가 현재 조작의 결과처럼 보이지 않게
+  useEffect(() => {
+    if (!msg) return;
+    const t = setTimeout(() => setMsg(""), 6000);
+    return () => clearTimeout(t);
+  }, [msg]);
   // 학생 명부와 기록지를 실시간으로 받음
   useEffect(() => {
     if (sel) return;
@@ -3123,19 +3701,23 @@ function TeacherApp({ onExit, onGallery }) {
   const gradedCount = ids.filter((id) => { const g = gradeMap[id]; return g && [0, 1, 2, 3].every((i) => g["r" + i]); }).length;
 
   const exportCSV = () => {
+    const axesAll = creativityAxesAll(Object.fromEntries(ids.map((id) => [id, wsMap[id] || {}])));
     const head = ["학번", "별명", "진행률(%)", ...SESSIONS.map((s) => s + "(%)"),
-      "변화 쌍", "생성 회차", "고친 요소", "불성립 발견", "근거 있는 불성립", "제외 근거", "동료에게 준 문장", "반대 근거 쓴 논쟁", "③까지 채운 논쟁", "미디어(사진·음성·스케치·영상)", "고쳐 쓴 횟수", "머문 시간(분)", "읽기 자료 열람(분)",
+      "변화 쌍", "생성 회차", "고친 요소", "불성립 발견", "근거 있는 불성립", "제외 근거", "동료에게 준 문장", "받은 의견 처리", "반대 근거 쓴 논쟁", "③까지 채운 논쟁", "미디어(사진·음성·스케치·영상)", "고쳐 쓴 횟수", "머문 시간(분)", "읽기 자료 열람(분)",
+      ...CREATIVITY_AXES.map((a) => "창의성:" + a.name),
       ...RUBRIC.map((r) => r.std), ...RUBRIC.map((r) => r.std + " 메모"),
       "관찰 확인 수", "관찰 메모", "피드백(조형)", "피드백(개념)", "최근 저장"];
     const rows = ids.map((id) => {
       const w = wsMap[id] || {}, g = gradeMap[id] || {};
       const cm = creativityMetrics(w);
       const cv = (k) => (cm.find((x) => x.k === k) || {}).v || 0;
+      const ax = axesAll[id] || {};
       return [id, roster[id].nick || "", overallProgress(w),
         ...SESSIONS.map((s) => Math.round(sessionProgress(s, w) * 100)),
-        cv("changed"), cv("rounds"), cv("revised"), cv("notPassed"), cv("ground"), cv("exclude"), cv("peerSent"), cv("counter"), cv("debate"), mediaCount(w), (w._log || []).length,
+        cv("changed"), cv("rounds"), cv("revised"), cv("notPassed"), cv("ground"), cv("exclude"), cv("peerSent"), cv("peerBack"), cv("counter"), cv("debate"), mediaCount(w), (w._log || []).length,
         Math.round(Object.values(w._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60),
         Math.round(Object.values(w._act || {}).reduce((a, x) => a + (x.readSec || 0), 0) / 60),
+        ...CREATIVITY_AXES.map((a) => (ax[a.key] == null ? "" : ax[a.key])),
         ...[0, 1, 2, 3].map((i) => g["r" + i] || ""),
         ...[0, 1, 2, 3].map((i) => g["rm" + i] || ""),
         OBS_ITEMS.filter((_, i) => g["o" + i]).length,
@@ -3149,7 +3731,8 @@ function TeacherApp({ onExit, onGallery }) {
     const csv = "\uFEFF" + [head, ...rows].map((r) => r.map(esc).join(",")).join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
-    a.href = url; a.download = "허구의아카이브_학급기록.csv"; a.click();
+    const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+    a.href = url; a.download = "허구의아카이브_학급기록" + (sampleMode ? "_표본" : "") + "_" + stamp + ".csv"; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -3168,12 +3751,18 @@ function TeacherApp({ onExit, onGallery }) {
       <div className="wrap wide">
         {sel ? (
           <div style={{ paddingTop: 18 }}>
-            <TeacherStudentView sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} onBack={() => { setSel(null); loadAll(); }} />
+            <TeacherStudentView key={sel} sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} ids={ids} onSel={setSel}
+              onBack={() => { setSel(null); loadAll(); }} />
           </div>
         ) : (
           <div>
+            {sampleMode && !loading && (
+              <div className="sample-banner">
+                지금 보이는 학급은 <b>표본 자료</b>입니다. 화면 구조를 살펴보기 위한 가상 학생 8명이며, 실제 학생이 입장하면 자동으로 실데이터로 바뀝니다.
+              </div>
+            )}
             <div className="t-tabs">
-              {["현황", "차시 공개", "수업 안내", "분석", "사고 변화", "설정"].map((t) => (
+              {["현황", "차시 공개", "수업 안내", "분석", "창의성", "설정"].map((t) => (
                 <button key={t} className={"btn small " + (tab === t ? "" : "ghost")} onClick={() => setTab(t)}>{t}</button>
               ))}
             </div>
@@ -3183,13 +3772,17 @@ function TeacherApp({ onExit, onGallery }) {
                   <div className="kpi"><div className="n">{ids.length}</div><div className="l">등록 학생</div></div>
                   <div className="kpi"><div className="n">{avg}%</div><div className="l">평균 진행률</div></div>
                   <div className="kpi"><div className="n">{gradedCount}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {ids.length}</span></div><div className="l">루브릭 채점 완료</div></div>
+                  <div className="kpi" style={{ cursor: "pointer" }} onClick={() => setTab("차시 공개")} title="차시 공개 탭으로 이동">
+                    <div className="n" style={{ fontSize: 17 }}>{SESSIONS.filter((s) => isOpen(openMap, s)).map((s) => s.replace("차시", "")).join(" · ") || "없음"}</div>
+                    <div className="l">열린 차시 (누르면 설정)</div>
+                  </div>
                 </div>
                 {ids.length === 0 ? (
                   <div className="card"><div className="card-body" style={{ color: "var(--sub)" }}>
                     아직 입장한 학생이 없습니다. 학생에게 이 화면의 주소를 알려 주고 학번·별명·비밀번호 4자리로 입장하게 하세요.
                   </div></div>
                 ) : (
-                  <div style={{ overflowX: "auto" }}>
+                  <div className="tbl-scroll">
                     <table className="roster">
                       <thead><tr><th>학번</th><th>별명</th><th>진행률</th><th>차시별 (1 ~ 8)</th><th>최근 저장</th><th>채점</th><th></th></tr></thead>
                       <tbody>
@@ -3216,7 +3809,7 @@ function TeacherApp({ onExit, onGallery }) {
                     </table>
                   </div>
                 )}
-                <p className="hint" style={{ marginTop: 10 }}>이 화면은 20초마다 자동으로 새로고침되어 학생들의 저장 내용을 실시간에 가깝게 보여 줍니다.</p>
+                <p className="hint" style={{ marginTop: 10 }}>학생이 저장하면 잠시 후 이 화면에 자동으로 반영됩니다.</p>
               </div>
             ) : tab === "차시 공개" ? (
               <div>
@@ -3279,19 +3872,24 @@ function TeacherApp({ onExit, onGallery }) {
                 <div className="card">
                   <div className="card-head"><span className="card-code">분석 2</span><span className="card-title">기록 구간별 미기록 학생</span></div>
                   <div className="card-body">
-                    {SCHEMA.map((sec) => {
+                    {SCHEMA.filter((sec) => isOpen(openMap, sec.session)).map((sec) => {
                       const missing = ids.filter((id) => sectionProgress(sec, wsMap[id]).done === 0);
                       if (!missing.length || !ids.length) return null;
                       return (
                         <div key={sec.id} style={{ marginBottom: 8, fontSize: 13 }}>
                           <span className="mono" style={{ color: "var(--seal)", fontSize: 11 }}>{sec.kind === "learn" ? "배움 확인" : sec.kind === "inquiry" ? "탐구 질문" : "기록"} {sec.code}</span>{" "}
                           <strong>{sec.title}</strong> <span className="hint">({sec.session})</span> —{" "}
-                          <span className="mono" style={{ fontSize: 12 }}>{missing.join(", ")}</span>
+                          <span className="mono" style={{ fontSize: 12 }}>{missing.length}명: {missing.join(", ")}</span>
                         </div>
                       );
                     })}
-                    {ids.length > 0 && SCHEMA.every((sec) => ids.every((id) => sectionProgress(sec, wsMap[id]).done > 0)) &&
-                      <p className="hint">모든 학생이 모든 구간에 한 항목 이상 기록했습니다.</p>}
+                    {(() => {
+                      const closed = SESSIONS.filter((s) => !isOpen(openMap, s)).length;
+                      return closed > 0 && <p className="hint" style={{ marginTop: 4 }}>닫힌 차시 {closed}개의 구간은 아직 수업 전이라 여기서 제외했습니다.</p>;
+                    })()}
+                    {ids.length > 0 && SESSIONS.some((s) => isOpen(openMap, s)) &&
+                      SCHEMA.filter((sec) => isOpen(openMap, sec.session)).every((sec) => ids.every((id) => sectionProgress(sec, wsMap[id]).done > 0)) &&
+                      <p className="hint">열린 차시의 모든 구간에 전원이 한 항목 이상 기록했습니다.</p>}
                     {ids.length === 0 && <p className="hint">학생 기록이 쌓이면 여기에 표시됩니다.</p>}
                   </div>
                 </div>
@@ -3318,81 +3916,8 @@ function TeacherApp({ onExit, onGallery }) {
                   </div>
                 </div>
               </div>
-            ) : tab === "사고 변화" ? (
-              <div>
-                <div className="card">
-                  <div className="card-head"><span className="card-code">매칭</span><span className="card-title">학습지 항목과 대시보드 지표의 대응</span></div>
-                  <div className="card-body">
-                    <p style={{ fontSize: 13, marginBottom: 10 }}>
-                      창의력의 증진은 완성 이미지 한 점으로 확인하기 어렵습니다. 같은 질문에 두 번 답한 자리, 자기 판단을 세웠다가 뒤집은 자리, 남의 읽기를 받아들이거나 물리친 자리에 생각의 이동이 남습니다. 학습지의 각 항목은 아래 규칙으로 지표와 짝을 이룹니다.
-                    </p>
-                    <table className="match-tbl">
-                      <thead><tr><th style={{ width: 78 }}>차원</th><th>학습지 앞 자리</th><th>학습지 뒤 자리</th><th>대시보드에서 보는 것</th></tr></thead>
-                      <tbody>
-                        {CHANGE_PAIRS.map((p, i) => (
-                          <tr key={i}>
-                            <td>{p.dim}</td>
-                            <td>{p.before.where}</td>
-                            <td>{p.after.where}</td>
-                            <td>{p.look}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <div className="card">
-                  <div className="card-head"><span className="card-code">학급</span><span className="card-title">판단 근거의 양 — 학급 평균</span></div>
-                  <div className="card-body">
-                    {(() => {
-                      const keys = ["revised", "notPassed", "ground", "exclude", "peerSent", "counter", "debate", "changed"];
-                      const rows = keys.map((k) => {
-                        const vals = ids.map((id) => (creativityMetrics(wsMap[id]).find((m) => m.k === k) || {}).v || 0);
-                        const label = (creativityMetrics(wsMap[ids[0]] || {}).find((m) => m.k === k) || {}).label || k;
-                        const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-                        const max = Math.max(1, ...vals);
-                        return { label, avg, max };
-                      });
-                      return rows.map((r, i) => (
-                        <div className="hbar" key={i}>
-                          <span className="lb">{r.label}</span>
-                          <span className="tr"><i style={{ width: (r.avg / r.max) * 100 + "%" }} /></span>
-                          <span className="v">{r.avg.toFixed(1)}</span>
-                        </div>
-                      ));
-                    })()}
-                    <p className="hint" style={{ marginTop: 8 }}>학급 평균입니다. 불성립 발견과 제외 근거가 낮은 학급은 5차시 이중 점검 시간을 늘리고, 물리적 근거를 적는 예시를 한 번 더 보여 줍니다.</p>
-                  </div>
-                </div>
-
-                <div className="card">
-                  <div className="card-head"><span className="card-code">학생</span><span className="card-title">전후 답이 모두 있는 자리</span></div>
-                  <div className="card-body">
-                    <table className="roster">
-                      <thead><tr><th>학생</th><th>변화 쌍</th><th>불성립 발견</th><th>미디어</th><th>고쳐 쓴 횟수</th><th></th></tr></thead>
-                      <tbody>
-                        {ids.map((id) => {
-                          const w = wsMap[id] || {};
-                          const m = creativityMetrics(w);
-                          const g = (k) => (m.find((x) => x.k === k) || {}).v || 0;
-                          return (
-                            <tr key={id}>
-                              <td>{roster[id].nick} <span className="mono" style={{ fontSize: 11, color: "var(--sub)" }}>{id}</span></td>
-                              <td className="mono">{g("changed")} / {CHANGE_PAIRS.length}</td>
-                              <td className="mono">{g("notPassed")}</td>
-                              <td className="mono">{mediaCount(w)}</td>
-                              <td className="mono">{((w._log || []).length)}</td>
-                              <td><button className="btn small" onClick={() => setSel(id)}>변화 보기</button></td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                    <p className="hint" style={{ marginTop: 10 }}>학생을 눌러 들어간 뒤 「사고 변화」 탭에서 앞뒤 답을 나란히 봅니다. 채점은 이 화면의 근거를 먼저 읽고 매깁니다.</p>
-                  </div>
-                </div>
-              </div>
+            ) : tab === "창의성" ? (
+              <CreativityPanel ids={ids} roster={roster} wsMap={wsMap} onSel={setSel} />
             ) : (
               <div>
                 {msg && <div className="ok-note">{msg}</div>}
@@ -3540,21 +4065,21 @@ function ChangeMap({ ws, owner }) {
 /* ---------- 표본 학급 자료 (화면을 살펴보기 위한 가상 자료) ---------- */
 
 const SAMPLE_SEEDS = [
-  { id: "10102", nick: "물때", upto: 22, problem: "기후 재난", title: "수위선 1.2m", relic: "도장 박리 교실 사물함 문짝", no: "B-02", show: true,
+  { id: "10102", nick: "물때", upto: 60, problem: "기후 재난", title: "수위선 1.2m", relic: "도장 박리 교실 사물함 문짝", no: "B-02", show: true,
     grade: { r0: "상", r1: "중", r2: "상", r3: "중", rm0: "관찰 기록에서 문제 선정까지 근거가 이어짐", o0: true, o1: true, o3: true,
       fbForm: "물때 선의 높이를 정한 근거를 화면 어디에서 확인할 수 있나요?", fbConcept: "이 유물이 경고하는 시점은 언제인가요?" } },
-  { id: "10107", nick: "열쇠", upto: 20, problem: "사라지는 동네", title: "37번 열쇠", relic: "고무줄 삭은 신발장 열쇠와 번호표", no: "C-05", show: true,
+  { id: "10107", nick: "열쇠", upto: 44, problem: "사라지는 동네", title: "37번 열쇠", relic: "고무줄 삭은 신발장 열쇠와 번호표", no: "C-05", show: true,
     grade: { r0: "중", r1: "상", r2: "중", r3: "상", o1: true, o2: true, fbForm: "숫자 획이 얕아진 부분을 접사로 더 볼 수 있을까요?" } },
-  { id: "10111", nick: "손수레", upto: 26, problem: "새벽 배송 노동", title: "오른손", relic: "합성고무 그립 마모 손수레 손잡이 파편", no: "A-01", show: true,
+  { id: "10111", nick: "손수레", upto: 999, problem: "새벽 배송 노동", title: "오른손", relic: "합성고무 그립 마모 손수레 손잡이 파편", no: "A-01", show: true,
     grade: { r0: "상", r1: "상", r2: "상", r3: "상", rm2: "불성립 세 항목을 물리적 근거와 함께 기록", o0: true, o1: true, o2: true, o3: true, o4: true, o5: true,
       obsMemo: "선별과 제외의 근거를 표현 의도와 연결해 말함", fbConcept: "이 이름이 관람자에게 무엇을 먼저 찾게 하나요?" } },
-  { id: "10114", nick: "야간등", upto: 16, problem: "고립된 노년", title: "", relic: "", no: "", show: false,
+  { id: "10114", nick: "야간등", upto: 30, problem: "고립된 노년", title: "", relic: "", no: "", show: false,
     grade: { r0: "중", r3: "중" } },
   { id: "10119", nick: "셔터", upto: 12, problem: "폐업한 상가", title: "", relic: "", no: "", show: false, grade: null },
-  { id: "10123", nick: "장갑", upto: 24, problem: "배달 노동", title: "왼쪽 검지", relic: "손끝 마모 방한 장갑", no: "D-03", show: true,
+  { id: "10123", nick: "장갑", upto: 70, problem: "배달 노동", title: "왼쪽 검지", relic: "손끝 마모 방한 장갑", no: "D-03", show: true,
     grade: { r0: "상", r1: "중", r2: "중", r3: "중", o0: true, o2: true } },
   { id: "10126", nick: "급식판", upto: 9, problem: "음식물 쓰레기", title: "", relic: "", no: "", show: false, grade: null },
-  { id: "10130", nick: "우산", upto: 18, problem: "폭우와 침수", title: "", relic: "", no: "", show: false, grade: { r0: "하", rm0: "문제 선정의 근거가 아직 한 줄" } },
+  { id: "10130", nick: "우산", upto: 24, problem: "폭우와 침수", title: "", relic: "", no: "", show: false, grade: { r0: "하", rm0: "문제 선정의 근거가 아직 한 줄" } },
 ];
 
 // DEMO_WS의 앞부분을 잘라 진행 정도가 다른 학생 기록을 만듦
@@ -3571,6 +4096,16 @@ function buildSampleClass() {
     w["s7x.show"] = s.show ? "공개" : "비공개";
     if (!s.title) { delete w["s6b.title"]; delete w["s7x.no"]; }
     w._updatedAt = new Date(Date.now() - (i + 1) * 3600000 * 5).toISOString();
+    // 표본에도 활동 시간을 심어 창의성 탭의 산점도·머문 시간 표가 시연되게 함 (결정적 값)
+    w._act = {};
+    SESSIONS.slice(0, Math.max(1, Math.min(8, Math.ceil(s.upto / 12)))).forEach((sess, j) => {
+      w._act[sess] = {
+        sec: 600 + ((i * 7 + j * 13) % 9) * 240,
+        readSec: 180 + ((i * 5 + j) % 6) * 120,
+        opens: 2 + ((i + j) % 4),
+        visits: 1 + ((i + j) % 3),
+      };
+    });
     w._sample = true;
     roster[s.id] = { nick: s.nick, sample: true };
     ws[s.id] = w;
