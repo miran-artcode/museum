@@ -35,10 +35,10 @@ service cloud.firestore {
       allow delete: if isTeacher();
     }
 
-    // 창작 기록지: 본인과 교사만 읽고, 본인만 쓴다
+    // 창작 기록지: 본인과 교사만 읽는다. 쓰기는 본인, 그리고 학생 관리(학번 이관·전시 내리기)를 위한 교사
     match /worksheets/{sid} {
       allow read: if isOwner(sid) || isTeacher();
-      allow create, update: if isOwner(sid) && sizeOk();
+      allow create, update: if (isOwner(sid) || isTeacher()) && sizeOk();
       allow delete: if isTeacher();
     }
 
@@ -48,10 +48,18 @@ service cloud.firestore {
       allow write: if isTeacher();
     }
 
+    // 사전·사후 창의성 설문: 본인과 교사만 읽고, 본인만 쓴다 (연구용 수집 데이터)
+    match /surveys/{sid} {
+      allow read: if isOwner(sid) || isTeacher();
+      allow create, update: if isOwner(sid) && sizeOk();
+      allow delete: if isTeacher();
+    }
+
     // 사진·음성: 문서 이름이 {소유자}_{필드}_{시각} 형식이므로 앞부분으로 소유자를 판별한다
+    // 교사 쓰기는 학번 이관 때 미디어를 새 소유자 이름으로 복사하기 위한 것
     match /media/{mediaId} {
       allow read: if signedIn();
-      allow create, update: if signedIn() && mediaId.split('_')[0] == uid() && sizeOk();
+      allow create, update: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher()) && sizeOk();
       allow delete: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher());
     }
 

@@ -94,6 +94,7 @@ function route(key) {
   if (key === "roster") return { kind: "roster" };
   if (key.startsWith("ws:")) return { kind: "doc", path: ["worksheets", safe(key.slice(3))] };
   if (key.startsWith("grade:")) return { kind: "doc", path: ["grades", safe(key.slice(6))] };
+  if (key.startsWith("survey:")) return { kind: "doc", path: ["surveys", safe(key.slice(7))] };
   if (key.startsWith("media:")) return { kind: "doc", path: ["media", safe(key.slice(6))] };
   return { kind: "doc", path: ["misc", safe(key)] };
 }
@@ -177,5 +178,35 @@ export const fbStore = {
       snap.forEach((d) => { const x = d.data(); out[d.id] = x && x.v !== undefined ? x.v : x; });
       return out;
     } catch (e) { return {}; }
+  },
+
+  async allSurveys() {
+    try {
+      const snap = await getDocs(collection(db, "surveys"));
+      const out = {};
+      snap.forEach((d) => { const x = d.data(); out[d.id] = x && x.v !== undefined ? x.v : x; });
+      return out;
+    } catch (e) { return {}; }
+  },
+
+  watchSurveys(cb) {
+    return onSnapshot(collection(db, "surveys"), (snap) => {
+      const out = {};
+      snap.forEach((d) => { const x = d.data(); out[d.id] = x && x.v !== undefined ? x.v : x; });
+      cb(out);
+    }, () => {});
+  },
+
+  /* 교사용 학생 관리 — 명부 문서를 학번 지정으로 쓰고 지운다 (규칙이 교사만 허용) */
+  async setStudent(sid, data) {
+    try {
+      await setDoc(doc(db, "students", safe(sid)), { ...data, updatedAt: Date.now() }, { merge: true });
+      return true;
+    } catch (e) { console.error("setStudent fail", sid, e); return false; }
+  },
+
+  async removeStudent(sid) {
+    try { await deleteDoc(doc(db, "students", safe(sid))); return true; }
+    catch (e) { console.error("removeStudent fail", sid, e); return false; }
   },
 };

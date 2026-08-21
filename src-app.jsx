@@ -61,6 +61,87 @@ const OBS_ITEMS = [
   "설계와 화면의 연결", "도구와 프롬프트의 근거", "선별과 제외의 근거",
   "점검의 물리적 근거", "명제표를 전제한 판단", "짝의 읽기 처리",
 ];
+/* ============================================================
+   관찰 → 사물: 보이지 않는 것을 드러내는 일곱 계단
+   ------------------------------------------------------------
+   사회문제를 관찰하고, 그 안에서 보이지 않는 대상을 골라, 실제로 그 자리에
+   놓여 있는 사물의 흔적으로 옮기기까지를 일곱 계단으로 나눈다.
+   계단마다 앞 계단의 답이 재료가 되고, 되돌아간 자리와 고쳐 쓴 문장이
+   그대로 사고의 발전·변화 자료가 된다.
+   ============================================================ */
+
+const SENSES = ["눈으로 본 것", "귀로 들은 것", "냄새로 맡은 것", "손에 닿은 것", "몸으로 겪은 것"];
+
+/* 왜 보이지 않는가 — 다섯 갈래.
+   갈래를 정하면 찾아야 할 사물의 종류와 흔적의 종류가 달라진다.
+   이 표가 관찰에서 사물로 건너가는 다리 노릇을 한다. */
+const INVIS_TYPES = [
+  { k: "time", label: "시간에 흩어져서", hint: "한 번에는 보이지 않고 여러 번 쌓여야 드러남",
+    find: "여러 번의 접촉이 겹쳐 남는 자리를 찾습니다 — 닳음 · 눌림 · 색바램 · 손자국 광택",
+    ex: "매일 반복되는 새벽 하역, 몇 년에 걸친 돌봄" },
+  { k: "place", label: "자리에 가려져서", hint: "벽 · 문 · 경계 뒤에 있어 바깥에서 볼 수 없음",
+    find: "평소 보이지 않는 면을 찾습니다 — 안쪽 면 · 바닥 면 · 이음매 · 뒷면 · 밑동",
+    ex: "셔터 내린 가게 안, 주방 뒤편, 기숙사 안" },
+  { k: "record", label: "기록이 없어서", hint: "세지도 적지도 않아 숫자와 문서로 남지 않음",
+    find: "누군가 임시로 남긴 표식을 찾습니다 — 손으로 쓴 번호 · 눈금 · 표시 테이프 · 스티커",
+    ex: "집계되지 않는 무급 노동, 신고되지 않은 사고" },
+  { k: "gone", label: "이미 사라져서", hint: "없어진 뒤라 지금은 자리만 남아 있음",
+    find: "없어진 것의 그림자를 찾습니다 — 떼어 낸 자국 · 빈 나사 구멍 · 색이 다른 사각형",
+    ex: "폐업한 가게의 간판 자리, 철거된 놀이터" },
+  { k: "norm", label: "너무 당연해서", hint: "늘 그렇게 있어서 아무도 문제로 세지 않음",
+    find: "누군가에게만 불편한 기준을 찾습니다 — 규격 · 높이 · 폭 · 안내문의 글자 크기",
+    ex: "휠체어가 넘지 못하는 문턱, 아이 키에 맞지 않는 손잡이" },
+];
+
+/* 되돌려 읽기 — 짝의 읽기와 내 의도 사이의 거리 */
+const GAP_OPTS = ["거의 같게 읽음", "일부만 읽음", "다르게 읽음"];
+
+/* 일곱 계단. keys는 그 계단에 속한 기록 칸을 가리키고,
+   대시보드와 연구 자료 내보내기가 이 대응표를 그대로 쓴다. */
+const TRANSLATE_STAGES = [
+  { key: "T1", n: 1, sec: "s3a", name: "채집", full: "장면을 모은다",
+    keys: ["s3a.scenes"],
+    ask: "일주일 동안 오가며 눈에 걸린 장면을 모읍니다. 아직 문제를 정하지 않습니다.",
+    out: "장면 세 가지 이상",
+    look: "감각이 여러 갈래인지, 장면이 자기 동선 안에 있는지" },
+  { key: "T2", n: 2, sec: "s3a", name: "좁히기", full: "문제로 좁힌다",
+    keys: ["s3a.problem", "s3a.contact", "s3a.why"],
+    ask: "모은 장면을 한 문제로 묶고, 그 문제와 내가 만나는 때와 곳을 정합니다.",
+    out: "문제 한 가지와 나의 접점",
+    look: "접은 후보와 견주어 골랐는지, 접점이 실제 동선에 있는지" },
+  { key: "T3", n: 3, sec: "s3t1", name: "가르기", full: "보이지 않는 것을 가른다",
+    keys: ["s3t1.list", "s3t1.pick", "s3t1.pickWhy"],
+    ask: "이 문제에서 겉으로 드러나지 않는 것을 늘어놓고, 왜 보이지 않는지를 다섯 갈래로 나눕니다.",
+    out: "보이지 않는 것 세 가지 이상과 그 갈래, 고른 하나",
+    look: "갈래가 여러 개로 갈리는지, 고른 이유에 접은 항목이 함께 나오는지" },
+  { key: "T4", n: 4, sec: "s3t2", name: "사물 찾기", full: "사물 후보를 찾는다",
+    keys: ["s3t2.cands", "s3t2.dropWhy"],
+    ask: "고른 갈래에 맞는 사물을 세 가지 이상 찾습니다. 상상한 물건이 아니라 그 자리에 실제로 놓여 있는 물건이어야 합니다.",
+    out: "사물 후보 세 가지, 고른 하나, 접은 후보의 이유",
+    look: "몸이 닿는 동작까지 적었는지, 버린 이유가 있는지" },
+  { key: "T5", n: 5, sec: "s3t3", name: "흔적 옮기기", full: "흔적으로 옮긴다",
+    keys: ["s3t3.traces", "s3t3.stmt1"],
+    ask: "보이지 않는 것을 사물의 어느 자리에 어떤 모양으로 남길지 정하고, 그 흔적이 생기려면 어떤 동작이 얼마나 반복되어야 하는지 어림합니다.",
+    out: "흔적 번역 표와 번역 진술 초안",
+    look: "위치·모양이 눈으로 확인할 수 있는 말인지, 인과의 어림에 횟수와 기간이 있는지" },
+  { key: "T6", n: 6, sec: "s3t4", name: "되돌려 읽기", full: "거꾸로 읽어 본다",
+    keys: ["s3t4.reverse"],
+    ask: "짝에게 사물과 흔적만 말해 주고 무엇으로 읽는지 확인합니다. 읽히지 않으면 어느 계단으로 돌아갈지 정합니다.",
+    out: "짝의 읽기, 의도와의 거리, 되돌아간 계단과 고친 것",
+    look: "읽히지 않았을 때 되돌아가 고쳤는지, 고친 자리를 적었는지" },
+  { key: "T7", n: 7, sec: "s3t4", name: "진술 확정", full: "진술을 확정한다",
+    keys: ["s3t4.stmt2", "s3t4.moved"],
+    ask: "되돌려 읽기를 거친 뒤 번역 진술을 다시 씁니다. 초안과 나란히 놓고 무엇이 달라졌는지 적습니다.",
+    out: "확정 진술과 초안 대비 변화 서술",
+    look: "추상어가 관찰 가능한 말로 바뀌었는지, 바꾼 이유를 댈 수 있는지" },
+];
+
+const STAGE_OF_KEY = (() => {
+  const m = {};
+  TRANSLATE_STAGES.forEach((st) => st.keys.forEach((k) => { m[k] = st.key; }));
+  return m;
+})();
+
 const RUBRIC = [
   { std: "[12미02-01]", name: "다양한 발상 방법을 활용하여 주제 탐색하기", data: "접점 기록·번역 표 (3차시)" },
   { std: "[12미02-03]", name: "표현 매체의 조합·응용·확장으로 표현 효과 탐색하기", data: "도구 선택·회차 기록·다듬기 (5~6차시)" },
@@ -235,13 +316,14 @@ const SCHEMA = [
     ],
   },
   {
-    id: "s3a", session: "3차시", code: "B", title: "동시대 문제와 나의 접점",
+    id: "s3a", session: "3차시", code: "B1", title: "번역 사다리 ① 장면 채집과 문제 좁히기", ladder: true,
+    note: "관찰에서 유물 설계까지 일곱 계단을 오릅니다. 계단마다 앞 계단의 답이 재료가 되므로 순서대로 채웁니다. 되돌아가 고쳐도 됩니다. 고친 자리는 그대로 기록에 남습니다.",
     fields: [
-      { k: "scenes", t: "area", label: "일주일 동안 오가며 마음에 남은 장면 세 가지 — 언제 · 어디서 · 무엇을 보았는지 각각 한 줄씩" },
-      { k: "problem", t: "text", label: "고른 사회문제" },
-      { k: "contact", t: "text", label: "이 문제를 내가 직접 보거나 겪는 때와 곳 (예: 밤 11시 아파트 분리수거장, 등굣길 무인 편의점 앞)" },
+      { k: "scenes", t: "scenes", label: "T1 · 일주일 동안 오가며 마음에 걸린 장면 — 언제 · 어디서 · 무엇을, 그리고 어느 감각으로 걸렸는지" },
+      { k: "problem", t: "text", label: "T2 · 고른 사회문제" },
+      { k: "contact", t: "text", label: "T2 · 이 문제를 내가 직접 보거나 겪는 때와 곳 (예: 밤 11시 아파트 분리수거장, 등굣길 무인 편의점 앞)" },
       {
-        k: "why", t: "area", label: "왜 다른 문제가 아니라 이 문제인지",
+        k: "why", t: "area", label: "T2 · 왜 다른 문제가 아니라 이 문제인지",
         steps: [
           "견주기 — 후보로 떠올렸다가 접은 다른 문제 하나와 나란히 놓아 보기",
           "좁히기 — 이 문제만이 가진, 나와 이어진 지점 찾기",
@@ -253,11 +335,67 @@ const SCHEMA = [
     ],
   },
   {
-    id: "s3b", session: "3차시", code: "C", title: "번역 표", note: "셋째 칸은 눈으로 확인할 수 있는 말로만 씁니다.",
+    id: "s3t1", session: "3차시", code: "B2", title: "번역 사다리 ② 보이지 않는 것 가르기", ladder: true,
+    note: "이 문제에서 겉으로 드러나지 않는 것을 먼저 늘어놓고, 왜 보이지 않는지를 다섯 갈래로 나눕니다. 갈래가 정해지면 다음 계단에서 찾을 사물과 흔적의 종류가 달라집니다.",
     fields: [
-      { k: "invisible", t: "text", label: "이 문제에서 겉으로 드러나지 않는 것 (예: 반복된 노동의 시간, 사라진 가게의 기억)" },
-      { k: "object", t: "text", label: "그 문제의 자리에 실제로 놓여 있는 물건 (예: 손수레 손잡이, 가게 셔터, 방한 장갑)" },
-      { k: "trace", t: "area", label: "관찰 가능한 흔적의 위치와 모양" },
+      { k: "list", t: "invis", label: "T3 · 보이지 않는 것 목록 — 세 가지 이상 늘어놓고, 각각 왜 보이지 않는지 갈래를 고릅니다" },
+      { k: "pick", t: "pickinv", label: "T3 · 이 가운데 내 유물이 대신 말해 줄 하나" },
+      {
+        k: "pickWhy", t: "area", label: "T3 · 그 하나를 고른 이유 — 접은 항목이 무엇이고 왜 접었는지도 함께",
+        steps: [
+          "견주기 — 목록에 늘어놓은 항목들을 나란히 놓고, 사물의 흔적으로 옮길 수 있는 정도를 견주기",
+          "접기 — 접은 항목 하나를 골라 왜 흔적으로 옮기기 어려운지 쓰기 (예: 마음은 사물에 자국을 남기지 않는다)",
+          "정리 — 고른 하나가 왜 남았는지, 어느 갈래여서 어떤 흔적을 기대할 수 있는지 쓰기",
+        ],
+      },
+    ],
+  },
+  {
+    id: "s3t2", session: "3차시", code: "B3", title: "번역 사다리 ③ 사물 후보 찾기와 고르기", ladder: true,
+    note: "앞 계단에서 고른 갈래에 맞는 사물을 세 가지 이상 찾습니다. 머릿속에서 지어낸 물건이 아니라 그 문제의 자리에 실제로 놓여 있는 물건이어야 합니다.",
+    fields: [
+      { k: "cands", t: "cands", label: "T4 · 사물 후보 — 어디에 실제로 있는가 · 누구의 몸이 닿는가 · 어떤 동작이 닿는가" },
+      {
+        k: "dropWhy", t: "area", label: "T4 · 고르지 않은 후보를 접은 이유 — 한 후보 이상에 대해 씁니다",
+        steps: [
+          "고르기 — 접은 후보 가운데 가장 아까웠던 하나 정하기",
+          "따지기 — 그 물건이 왜 이 문제를 대신 말하기 어려운지 짚기 (닿는 몸이 없다 · 흔적이 남지 않는다 · 다른 물건으로 읽힌다)",
+          "정리 — 접은 이유를 한 문장으로 쓰고, 고른 물건이 그 점에서 어떻게 나은지 덧붙이기",
+        ],
+      },
+    ],
+  },
+  {
+    id: "s3t3", session: "3차시", code: "B4", title: "번역 사다리 ④ 흔적으로 옮기기", ladder: true,
+    note: "보이지 않는 것을 사물의 어느 자리에 어떤 모양으로 남길지 정합니다. 위치와 모양은 눈으로 확인할 수 있는 말로만 씁니다. 마지막 칸에는 그 흔적이 생기려면 어떤 동작이 얼마나 반복되어야 하는지 어림합니다.",
+    fields: [
+      { k: "traces", t: "traces", label: "T5 · 흔적 번역 표 — 보이지 않는 것 하나가 사물의 어느 자리에 어떤 모양으로 남는가" },
+      { k: "stmt1", t: "stmt", stage: "T5", label: "T5 · 번역 진술 (초안) — 아래 문장 틀을 채워 한 문장으로 만듭니다" },
+    ],
+  },
+  {
+    id: "s3t4", session: "3차시", code: "B5", title: "번역 사다리 ⑤ 되돌려 읽기와 진술 확정", ladder: true,
+    note: "흔적만 보고 남이 그 문제를 읽어 낼 수 있는지 확인합니다. 읽히지 않으면 어느 계단으로 돌아갈지 정하고, 돌아가 고친 뒤 다시 내려와 진술을 확정합니다.",
+    fields: [
+      { k: "reverse", t: "reverse", label: "T6 · 되돌려 읽기 — 짝에게 사물과 흔적만 말해 주고 무엇으로 읽었는지 적습니다 (두 사람에게)" },
+      { k: "stmt2", t: "stmt", stage: "T7", prev: "s3t3.stmt1", label: "T7 · 번역 진술 (확정) — 되돌려 읽기를 거친 뒤 다시 씁니다" },
+      {
+        k: "moved", t: "area", label: "T7 · 초안과 확정 사이에서 무엇이 달라졌는가 — 바뀐 말과 그 말을 바꾼 이유",
+        steps: [
+          "맞대기 — 초안 진술과 확정 진술을 한 줄씩 나란히 놓기",
+          "짚기 — 사라진 말과 새로 들어온 말을 각각 하나씩 지목하기",
+          "정리 — 그 말을 바꾸게 한 것이 무엇이었는지 쓰기 (짝의 읽기 · 인과의 어림 · 사물의 교체)",
+        ],
+      },
+    ],
+  },
+  {
+    id: "s3b", session: "3차시", code: "C", title: "번역 표 (사다리 요약)",
+    note: "일곱 계단의 결론을 세 칸으로 줄여 둡니다. 4차시 유물 설계부터는 이 세 칸을 재료로 씁니다. 사다리를 채웠다면 아래 단추로 가져온 뒤 손봅니다.",
+    fields: [
+      { k: "invisible", t: "text", label: "이 문제에서 겉으로 드러나지 않는 것 (예: 반복된 노동의 시간, 사라진 가게의 기억)", carry: "invisible" },
+      { k: "object", t: "text", label: "그 문제의 자리에 실제로 놓여 있는 물건 (예: 손수레 손잡이, 가게 셔터, 방한 장갑)", carry: "object" },
+      { k: "trace", t: "area", label: "관찰 가능한 흔적의 위치와 모양", carry: "trace" },
     ],
   },
   {
@@ -416,6 +554,14 @@ const SCHEMA = [
       { k: "fileName", t: "text", label: "파일명 (학번_차시_도구_회차)" },
       { k: "selWhy", t: "area", label: "선별 근거 — 구조·시점·빛·흔적 가운데 무엇이 구상대로 나타났는지 조형적 증거를 들어 쓰기" },
       { k: "excWhy", t: "area", label: "제외 근거 — 제외한 산출물 한 점이 구상과 어긋난 점을 표현 의도와 연결해 쓰기" },
+      {
+        k: "serendip", t: "area", label: "빌려 온 우연 — 내 구상에 없었는데 도구가 만들어 낸 요소 하나를 짚고, 살려 쓸지 버릴지 판단과 이유 쓰기",
+        steps: [
+          "찾기 — 다섯 회차의 화면에서 내가 시키지 않았는데 나타난 요소 하나 고르기 (예: 예상 밖의 균열, 다른 재질감, 낯선 그림자)",
+          "판단 — 그 우연을 살려 쓸지(내 의도에 편입) 버릴지(의도와 어긋남) 정하기",
+          "정리 — 그 판단의 근거를 표현 의도와 이어 쓰기. 오늘 논쟁 질문(발견인가 자기합리화인가)에서 세운 내 입장과 견주어 보기",
+        ],
+      },
     ],
   },
   {
@@ -630,6 +776,14 @@ const SCHEMA = [
         ],
       },
       { k: "peerBack", t: "area", label: "상호평가에서 받은 문장의 반영 여부와 이유 (반영하지 않은 의견도 지우지 않고 이유와 함께)" },
+      {
+        k: "ownQ", t: "area", label: "다음 질문 만들기 — 이 단원을 지나며 내 안에 새로 생긴, 더 파고들고 싶은 질문 하나를 만들어 쓰기",
+        steps: [
+          "돌아보기 — 여덟 차시 동안 답이 끝나지 않은 채 남아 있는 궁금함 떠올리기",
+          "다듬기 — 그 궁금함을 ‘예·아니오로 끝나지 않는’ 질문 한 문장으로 다듬기",
+          "덧붙이기 — 이 질문에 답해 보려면 무엇을 보거나 만들어 봐야 할지 한 줄 쓰기",
+        ],
+      },
       { k: "voice", t: "audio", opt: true, label: "구술 성찰 (최대 90초) — 작품 앞에서 말로 남기는 성찰. 글로 옮기기 어려운 판단의 근거를 말합니다.", mm: true },
     ],
   },
@@ -645,45 +799,159 @@ function isOpen(openMap, s) {
   return m[s] === true;
 }
 
+/* ============================================================
+   사전·사후 창의성 설문 (little-c 자기보고 척도)
+   이론 근거 — Kaufman & Beghetto의 4C 모형에서 학교 수업이 기르는 창의성은
+   big-C(역사에 남는 창의성)가 아니라 mini-c(자기에게 새로운 해석)와
+   little-c(일상의 창의성)다. 아래 문항은 검증된 자기보고 척도를 고등학생
+   수준으로 번안·축약한 것으로, 같은 24문항을 단원 전(사전)과 후(사후)에
+   두 번 실시해 little-c 관련 자기 인식의 변화를 잰다.
+   - 창의적 자기효능감: Beghetto(2006), Karwowski(2011) SSCS-CSE
+   - 창의적 정체성: Karwowski(2011) SSCS-CPI
+   - 아이디어 행동: Runco·Plucker·Lim(2001) RIBS 축약
+   - 창의성 성장 신념: Karwowski(2014) 창의성 마인드셋
+   - 일상 창의 행동(평가·정교화): Beghetto & Kaufman(2007)의 little-c 논의 기반 자체 개발
+   - AI 협업 창의성 인식: 인간-AI 공동창작 연구 기반 자체 개발 문항
+   자기보고는 행동 지표(창의성 6축)·질적 기록(변화 쌍)과 삼각검증하며,
+   어느 하나만으로 창의성의 변화를 단정하지 않는다. 역문항(rev)은 채점 때 6-x로 뒤집는다.
+   ============================================================ */
+
+const SURVEY_VER = "v1";
+const LIKERT = ["전혀 그렇지 않다", "그렇지 않다", "보통이다", "그렇다", "매우 그렇다"];
+
+const SURVEY_SCALES = [
+  { k: "cse", name: "창의적 자기효능감", src: "Beghetto(2006) · Karwowski(2011) SSCS-CSE 번안" },
+  { k: "cpi", name: "창의적 정체성", src: "Karwowski(2011) SSCS-CPI 번안" },
+  { k: "rib", name: "아이디어 행동", src: "Runco 외(2001) RIBS 축약 번안" },
+  { k: "gmc", name: "창의성 성장 신념", src: "Karwowski(2014) 번안" },
+  { k: "evb", name: "일상 창의 행동", src: "little-c 문헌 기반 자체 개발" },
+  { k: "aic", name: "AI 협업 창의성 인식", src: "인간-AI 공동창작 연구 기반 자체 개발" },
+];
+
+const SURVEY_ITEMS = [
+  // 창의적 자기효능감 (cse)
+  { k: "a1", s: "cse", text: "나는 좋은 아이디어를 잘 떠올리는 편이다." },
+  { k: "a2", s: "cse", text: "어려운 문제라도 여러 방법을 시도하면 풀 수 있다고 믿는다." },
+  { k: "a3", s: "cse", text: "나는 남들이 생각하지 못한 방식으로 문제를 풀 수 있다." },
+  { k: "a4", s: "cse", text: "나는 상상력이 풍부한 편이라고 생각한다." },
+  // 창의적 정체성 (cpi)
+  { k: "a5", s: "cpi", text: "‘창의적인 사람’이라는 말은 나를 설명하는 중요한 특징이다." },
+  { k: "a6", s: "cpi", text: "나는 나의 창의성을 소중하게 여긴다." },
+  { k: "a7", s: "cpi", text: "새로운 것을 만들어 내는 일은 내 삶에서 중요한 부분이다." },
+  // 아이디어 행동 (rib)
+  { k: "a8", s: "rib", text: "나는 한 가지 문제에 대해 답을 여러 개 떠올리곤 한다." },
+  { k: "a9", s: "rib", text: "나는 사물을 남들과 다른 각도에서 바라보곤 한다." },
+  { k: "a10", s: "rib", text: "친구들이 생각하지 못한 아이디어를 내가 먼저 내놓을 때가 있다." },
+  { k: "a11", s: "rib", text: "쓸모가 있든 없든, 아이디어가 꼬리를 물고 떠오를 때가 있다." },
+  { k: "a12", s: "rib", rev: true, text: "나는 새로운 아이디어를 떠올리는 일이 거의 없다." },
+  // 창의성 성장 신념 (gmc)
+  { k: "a13", s: "gmc", text: "창의성은 타고나는 것이 아니라 연습으로 기를 수 있다." },
+  { k: "a14", s: "gmc", text: "누구나 노력하면 지금보다 더 창의적인 사람이 될 수 있다." },
+  { k: "a15", s: "gmc", rev: true, text: "창의적인 사람은 따로 정해져 있어서, 노력해도 크게 달라지지 않는다." },
+  // 일상 창의 행동 — 평가·정교화 (evb)
+  { k: "a16", s: "evb", text: "과제를 할 때 처음 떠오른 생각 말고도 다른 가능성을 더 찾아본다." },
+  { k: "a17", s: "evb", text: "내가 만든 결과물에서 아쉬운 점을 스스로 찾아 고치는 편이다." },
+  { k: "a18", s: "evb", text: "실패한 시도에서도 쓸 만한 부분을 찾아내려 한다." },
+  { k: "a19", s: "evb", text: "내 생각과 다른 의견을 들으면 내 아이디어를 다시 살펴본다." },
+  // AI 협업 창의성 인식 (aic)
+  { k: "a20", s: "aic", text: "인공지능 도구를 쓰면 내 아이디어를 더 여러 갈래로 펼쳐 볼 수 있다." },
+  { k: "a21", s: "aic", text: "인공지능이 만든 결과물 중에서 무엇이 좋은지 고르고 버리는 것도 창의적인 일이다." },
+  { k: "a22", s: "aic", text: "인공지능 도구를 쓸 때에도 작품의 방향을 정하는 것은 나여야 한다." },
+  { k: "a23", s: "aic", rev: true, text: "인공지능이 다 만들어 주기 때문에 내 창의성은 별로 중요하지 않다." },
+  { k: "a24", s: "aic", text: "인공지능이 내 예상과 다른 결과를 내놓아도, 그것을 내 의도에 맞게 살려 쓸 수 있다." },
+];
+
+/* 사후 전용 회고 문항 — 사전·사후 비교에는 넣지 않고 해석 자료로만 쓴다 */
+const SURVEY_POST_LIKERT = [
+  { k: "e1", text: "이번 단원을 지나며 나는 이전보다 아이디어를 더 여러 갈래로 떠올리게 되었다." },
+  { k: "e2", text: "생성형 AI를 직접 써 보니, 창의성에서 사람의 몫이 무엇인지 더 분명해졌다." },
+];
+const SURVEY_POST_OPEN = { k: "e3", text: "이 단원에서 내 생각이 가장 크게 바뀐 순간이 있었다면 언제, 무엇이 바꾸었는지 써 주세요. (선택)" };
+
+/* 응답 → 척도별 평균 (1~5, 역문항 반전). 응답 없는 척도는 null */
+function surveyScores(ans) {
+  const a = ans || {};
+  const out = {};
+  for (const sc of SURVEY_SCALES) {
+    const vals = SURVEY_ITEMS.filter((it) => it.s === sc.k)
+      .map((it) => { const v = a[it.k]; return v >= 1 && v <= 5 ? (it.rev ? 6 - v : v) : null; })
+      .filter((v) => v != null);
+    out[sc.k] = vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : null;
+  }
+  const nums = Object.values(out).filter((v) => v != null);
+  out.total = nums.length ? nums.reduce((x, y) => x + y, 0) / nums.length : null;
+  return out;
+}
+
+const svDone = (block) => !!(block && block.submittedAt);
+const round2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
+
+/* 짝지은 사전-사후 기술통계 — vals는 [pre, post] 쌍의 배열 */
+function pairedStats(pairs) {
+  const ok = pairs.filter((p) => p[0] != null && p[1] != null);
+  const n = ok.length;
+  if (!n) return null;
+  const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sd = (xs, m) => (xs.length > 1 ? Math.sqrt(xs.reduce((a, b) => a + (b - m) * (b - m), 0) / (xs.length - 1)) : 0);
+  const pre = ok.map((p) => p[0]), post = ok.map((p) => p[1]), diff = ok.map((p) => p[1] - p[0]);
+  const mPre = mean(pre), mPost = mean(post), mD = mean(diff);
+  const sdD = sd(diff, mD);
+  return {
+    n, mPre, sdPre: sd(pre, mPre), mPost, sdPost: sd(post, mPost),
+    mDiff: mD, dz: sdD > 0 ? mD / sdD : null, // Cohen's dz (짝지은 효과크기)
+  };
+}
+
+/* 설문 공개 설정 — config.survey = { pre, post } */
+const DEFAULT_SURVEY = { pre: true, post: false };
+const surveyOpen = (cfgSurvey, phase) => (cfgSurvey || DEFAULT_SURVEY)[phase] === true;
+
 /* ---------- 진행률 계산 ---------- */
 const filled = (v) => typeof v === "string" && v.trim().length > 0;
+
+/* 필드 하나의 채움 정도 — 진행률·단계 도달률·연구 자료가 모두 이 규칙을 함께 쓴다 */
+function fieldProgress(f, v) {
+  if (f.opt) return { total: 0, done: 0 };
+  const rows = Array.isArray(v) ? v : [];
+  const cnt = (n, pred) => Math.min(n, rows.filter((r) => r && pred(r)).length);
+  switch (f.t) {
+    case "toggle": return { total: 1, done: filled(v) ? 1 : 0 };
+    case "debate": {
+      const m = v || {};
+      return { total: 3, done: ["pos", "counter", "hold"].filter((k) => filled(m[k])).length };
+    }
+    case "reflect": return { total: 1, done: filled((v || {}).pos) ? 1 : 0 };
+    case "rounds": return { total: 1, done: rows.some((r) => r && (filled(r.tool) || filled(r.judge))) ? 1 : 0 };
+    case "inspect": {
+      const m = v || {};
+      return { total: INSPECT_ITEMS.length, done: INSPECT_ITEMS.filter((it) => m[it.k] && m[it.k].status).length };
+    }
+    case "checks": {
+      const m = v || {};
+      return { total: 1, done: f.opts.some((o) => m[o]) ? 1 : 0 };
+    }
+    case "peer": {
+      const p = (Array.isArray(v) ? v : [{}, {}]).slice(0, 2);
+      return { total: 2, done: p.filter((b) => b && (filled(b.no) || filled(b.overall))).length };
+    }
+    /* 번역 사다리 */
+    case "scenes": return { total: 3, done: cnt(3, (r) => filled(r.what)) };
+    case "invis": return { total: 3, done: cnt(3, (r) => filled(r.text) && filled(r.type)) };
+    case "pickinv": return { total: 1, done: filled(v) ? 1 : 0 };
+    case "cands": return { total: 3, done: cnt(3, (r) => filled(r.obj) && filled(r.act)) };
+    case "traces": return { total: 2, done: cnt(2, (r) => filled(r.spot) && filled(r.shape)) };
+    case "stmt": return { total: 1, done: filled(stmtNow(v)) ? 1 : 0 };
+    case "reverse": return { total: 2, done: cnt(2, (r) => filled(r.read)) };
+    default: return { total: 1, done: filled(v) ? 1 : 0 };
+  }
+}
 
 function sectionProgress(sec, ws) {
   const d = ws || {};
   let total = 0, done = 0;
   for (const f of sec.fields) {
-    if (f.opt) continue;
-    const v = d[sec.id + "." + f.k];
-    if (f.t === "toggle") {
-      total += 1;
-      if (filled(v)) done += 1;
-    } else if (f.t === "debate") {
-      total += 3;
-      const m = v || {};
-      ["pos", "counter", "hold"].forEach((k2) => { if (filled(m[k2])) done += 1; });
-    } else if (f.t === "reflect") {
-      total += 1;
-      if (filled((v || {}).pos)) done += 1;
-    } else if (f.t === "rounds") {
-      total += 1;
-      const rows = v || [];
-      if (rows.some((r) => r && (filled(r.tool) || filled(r.judge)))) done += 1;
-    } else if (f.t === "inspect") {
-      total += INSPECT_ITEMS.length;
-      const m = v || {};
-      done += INSPECT_ITEMS.filter((it) => m[it.k] && m[it.k].status).length;
-    } else if (f.t === "checks") {
-      total += 1;
-      const m = v || {};
-      if (f.opts.some((o) => m[o])) done += 1;
-    } else if (f.t === "peer") {
-      total += 2;
-      const p = v || [{}, {}];
-      p.slice(0, 2).forEach((b) => { if (b && (filled(b.no) || filled(b.overall))) done += 1; });
-    } else {
-      total += 1;
-      if (filled(v)) done += 1;
-    }
+    const p = fieldProgress(f, d[sec.id + "." + f.k]);
+    total += p.total; done += p.done;
   }
   return { total, done };
 }
@@ -1001,6 +1269,7 @@ const LESSONS = [
         "생성을 1인 5회로 제한하는 것은 기술적 제약이기 앞서 평가 설계입니다. 무제한 생성은 판단을 복권 긁기로 바꿉니다. 회차가 유한하면 매 회차가 가설 검증이 되고, 회차 기록표의 ‘고친 한 가지’ 칸이 가설의 문장이 됩니다. 과정중심평가의 관점에서 이 표는 결과물로 확인할 수 없는 사고 과정을 채점 가능한 기록으로 바꾸는 장치입니다.",
         "이중 점검표는 메타인지 훈련의 도구입니다. 자기 결과물을 의심하는 일은 저절로 일어나지 않으므로 의심의 항목과 판정의 언어(물리적 근거)를 표로 외재화합니다. 불성립 발견을 감점 대신 성취로 세는 지표 설계가 여기에 붙습니다. 오류를 많이 찾은 기록이 좋은 기록이라는 원칙을 학생이 믿게 되어야 점검이 형식적 체크를 넘어섭니다.",
         "이 차시는 KERIS 생성형 AI 활용 교수학습 모형의 자료 개발·수업 실행 단계에 해당하며, 도구는 표현 의도를 구현하는 매체로만 다룹니다. 도구 사용법 강의를 최소화하고 판단 기록에 시간을 쓰는 배분이 그 원칙의 적용입니다.",
+        "창의성 이론의 자리에서 보면 이 차시는 Guilford의 확산적 사고(다섯 회차로 화면의 가능성을 벌림)와 수렴적 사고(선별·제외로 좁힘)가 한 시간 안에서 순환하는 구조입니다. 인간-AI 공동창작 연구는 생성형 AI가 발산의 폭을 넓히는 대신 평가와 선택을 사람에게 남길 때에만 창의성 발달에 기여한다고 봅니다. 기록 K의 선별 근거·제외 근거·빌려 온 우연 세 칸이 그 수렴 판단을 기록으로 강제하는 장치이며, 특히 ‘빌려 온 우연’은 도구가 만든 뜻밖의 결과를 자기 의도에 편입할지 판단하는 전유(appropriation)의 자리로, Kaufman과 Beghetto가 말하는 little-c 창의성이 실제로 작동하는 순간입니다.",
       ],
     },
     readings: [
@@ -1161,6 +1430,7 @@ const LESSONS = [
         "1차 관람에서 명제표를 가리는 규칙은 펠드먼 4단계의 서술·분석 단계를 강제하는 장치입니다. 정보가 없으면 학생은 화면의 증거만으로 말해야 하고, 2차 관람에서 명제표가 열리면 해석 단계가 눈앞에서 일어납니다. 두 관람의 차이 자체가 이 단원의 핵심 명제(파라텍스트가 읽기를 정한다)의 체험적 증명이 됩니다. 상호평가 활동지가 관점마다 지목할 증거를 요구하는 것도 인상 비평을 근거 비평으로 옮기는 같은 설계입니다.",
         "성찰 문항이 5차시의 자기 답을 다시 보여 주는 것은 사고 변화를 학생 자신이 확인하게 하는 장치입니다. 변화의 유무보다 변화의 근거를 쓰게 하고, 바뀌지 않은 답에도 이유를 요구해 확신과 고집을 스스로 구별하게 합니다. 마지막에 1차시의 다섯 후보(기술·선택·명명·전시·관념)로 돌아가는 정리는 단원 전체를 하나의 긴 탐구로 닫는 수미상관이며, 여기서 나온 문장들이 수행평가 [12미03-04]의 채점 자료가 됩니다.",
         "생성 이미지의 윤리는 자기 경험의 대조로 다룹니다. 여덟 차시 동안 허구를 밝히며 쓰는 사용을 몸으로 익힌 학생에게 허구를 숨기는 사용(딥페이크)을 대조 사례로 제시하면, 둘을 나누는 기준이 의도와 방식이라는 판단이 훈계 없이 학생 쪽에서 나옵니다.",
+        "이 차시의 정리 단계에서 사후 창의성 설문을 실시합니다(차시 공개 탭에서 열기). 사전 설문과 같은 24문항으로 창의적 자기효능감·정체성·아이디어 행동·성장 신념·AI 협업 인식의 변화를 재고, 기록 P의 ‘다음 질문 만들기’는 Getzels와 Csikszentmihalyi가 창의성의 핵심으로 꼽은 문제 발견(problem finding)을 확인하는 자리입니다. 좋은 답보다 좋은 질문이 남았는지가 단원이 창의성에 남긴 것을 보여 줍니다. 설문 결과는 「설문」 탭에서 행동 지표·변화 쌍과 함께 삼각검증합니다.",
       ],
     },
     readings: [
@@ -1195,6 +1465,13 @@ const LESSONS = [
 
 const CHANGE_PAIRS = [
   {
+    dim: "보이지 않는 것의 번역",
+    label: "관찰한 문제를 사물의 흔적으로 옮긴 진술",
+    before: { k: "s3t3.stmt1", where: "3차시 T5 번역 진술 초안", kind: "stmt" },
+    after: { k: "s3t4.stmt2", where: "3차시 T7 번역 진술 확정", kind: "stmt" },
+    look: "되돌려 읽기를 거치며 큰 말(노동·시간·기억)이 위치·모양·동작의 말로 바뀌었는지, 흔적이 생기는 인과가 문장 안에 들어왔는지 확인함.",
+  },
+  {
     dim: "미술 개념",
     label: "미술의 정의",
     before: { k: "s12.def", where: "2차시 기록 A" },
@@ -1221,6 +1498,13 @@ const CHANGE_PAIRS = [
     before: { k: "s5d.selWhy", where: "5차시 기록 K" },
     after: { k: "s5d.excWhy", where: "5차시 기록 K" },
     look: "고른 이유만 있고 버린 이유가 비면 판단이 아니라 수용에 가깝다. 두 근거가 모두 표현 의도와 이어지는지 봄.",
+  },
+  {
+    dim: "우연의 전유",
+    label: "도구가 만든 우연에 대한 입장과 실제 판단",
+    before: { k: "q5.debate", where: "5차시 논쟁 질문 ①~③", kind: "debate" },
+    after: { k: "s5d.serendip", where: "5차시 기록 K 빌려 온 우연" },
+    look: "논쟁에서 세운 입장(발견인가, 자기합리화인가)이 실제 선별에서 우연을 다루는 판단과 일치하는지, 어긋났다면 무엇이 입장을 움직였는지 확인함. 생성형 AI 협업에서 학생의 저자성이 드러나는 자리.",
   },
   {
     dim: "수정의 논리",
@@ -1258,7 +1542,10 @@ function creativityMetrics(ws) {
   const withGround = notPassed.filter((it) => filled((insp[it.k] || {}).note)).length;
   const peer = d["s8b.peer"] || [];
   const peerSent = peer.reduce((a, b) => a + PEER_VIEWS.filter((v) => filled((((b || {}).views || {})[v.k] || {}).sent)).length, 0);
-  const val = (spec) => spec.kind === "reflect" ? (d[spec.k] || {}).pos : d[spec.k];
+  const val = (spec) => spec.kind === "reflect" ? (d[spec.k] || {}).pos
+    : spec.kind === "debate" ? ((d[spec.k] || {}).hold || (d[spec.k] || {}).pos)
+    : spec.kind === "stmt" ? stmtNow(d[spec.k])
+    : d[spec.k];
   const changed = CHANGE_PAIRS.filter((p) => {
     if (p.before.kind === "inspect") return notPassed.length > 0 && filled(d[p.after.k]);
     return filled(val(p.before)) && filled(val(p.after));
@@ -1273,6 +1560,8 @@ function creativityMetrics(ws) {
     { k: "notPassed", label: "불성립 발견", v: notPassed.length, unit: "항목", hint: "자기 결과를 의심한 횟수" },
     { k: "ground", label: "물리적 근거를 적은 불성립", v: withGround, unit: "항목", hint: "의심에 근거를 붙였는가" },
     { k: "exclude", label: "제외 근거", v: filled(d["s5d.excWhy"]) ? 1 : 0, unit: "건", hint: "버린 이유를 남겼는가" },
+    { k: "serendip", label: "빌려 온 우연 판단", v: filled(d["s5d.serendip"]) ? 1 : 0, unit: "건", hint: "도구의 우연을 전유했는가" },
+    { k: "ownQ", label: "스스로 만든 질문", v: filled(d["s8a.ownQ"]) ? 1 : 0, unit: "건", hint: "문제 발견 — 단원 뒤에 남긴 질문" },
     { k: "peerSent", label: "동료에게 준 문장", v: peerSent, unit: "문장", hint: "타인의 작품을 읽은 양" },
     { k: "peerBack", label: "받은 의견 처리 기록", v: strLen(d["s8a.peerBack"]) > 20 ? 1 : 0, unit: "건", hint: "반영·미반영의 이유" },
     { k: "changed", label: "전후 답이 모두 있는 쌍", v: changed, unit: "/ " + CHANGE_PAIRS.length, hint: "변화를 볼 수 있는 자리" },
@@ -1361,7 +1650,7 @@ function creativityAxesOne(ws, rare) {
   const p1 = rounds.filter((r) => filled(r.change)).length / 5;
   const p2 = notPassed.length / 8;
   const p3 = notPassed.filter((it) => filled((insp[it.k] || {}).note)).length / 8;
-  const p4 = filled(d["s5d.excWhy"]) ? 1 : 0;
+  const p4 = ((filled(d["s5d.excWhy"]) ? 1 : 0) + (filled(d["s5d.serendip"]) ? 1 : 0)) / 2;
   const p5 = (debateKeys.filter((k) => filled((d[k] || {}).counter)).length + debateKeys.filter((k) => filled((d[k] || {}).hold)).length) / (debateKeys.length * 2);
   const p6 = clamp01((d._log || []).length / 10);
   const process = Math.round(((p1 + p2 + p3 + p4 + p5 + p6) / 6) * 100);
@@ -1443,10 +1732,27 @@ function mediaCount(ws) {
   return n;
 }
 
+/* 기록지 안에 흩어진 미디어 참조를 전부 모음 — 학번 변경·기록 초기화 때 media 문서를 옮기고 지우는 데 씀 */
+function collectMediaRefs(ws) {
+  const refs = new Set();
+  const visit = (v) => {
+    if (!v) return;
+    if (Array.isArray(v)) return v.forEach(visit);
+    if (typeof v === "object") {
+      if (typeof v.ref === "string" && v.ref) refs.add(v.ref);
+      Object.values(v).forEach(visit);
+    }
+  };
+  Object.entries(ws || {}).forEach(([k, v]) => { if (!k.startsWith("_")) visit(v); });
+  ((ws || {})["s5b.rounds"] || []).forEach((r) => { if (r && typeof r.img === "string" && r.img) refs.add(r.img); });
+  return [...refs];
+}
+
 /* 편집 이력 — 자동 저장 때 남긴 수정 흔적을 시간순으로 정리 */
 
 const TRACKED = CHANGE_PAIRS.flatMap((p) => [p.before.k, p.after.k])
-  .concat(["s3b.trace", "s4a.context", "s5d.selWhy", "s6b.relic", "s7.whyArt"]);
+  .concat(["s3a.why", "s3t1.pickWhy", "s3t2.dropWhy", "s3t4.moved",
+    "s3b.trace", "s4a.context", "s5d.selWhy", "s6b.relic", "s7.whyArt"]);
 
 function editTimeline(ws) {
   const log = (ws && ws._log) || [];
@@ -1464,6 +1770,299 @@ function labelOfKey(key) {
   if (!sec) return key;
   const f = sec.fields.find((x) => x.k === fk);
   return (sec.kind === "learn" ? "배움 확인 " : "기록 ") + sec.code + " · " + (f ? String(f.label).slice(0, 28) : fk);
+}
+
+/* ============================================================
+   사고 과정 측정 — 관찰에서 사물로 옮겨 가는 동안 무엇이 달라졌는가
+   ------------------------------------------------------------
+   여기의 수치는 모두 학생이 남긴 기록에서 기계적으로 센 1차 지표다.
+   좋고 나쁨의 판정이 아니라 어디를 들여다볼지 가리키는 표지이며,
+   연구 자료로 쓸 때는 연구자의 질적 검토를 거치도록 안내 문구를 함께 내보낸다.
+   ============================================================ */
+
+/* 진술 필드 — { text, versions:[{at,text}] }. 옛 문자열 값도 받아 준다. */
+function stmtNow(v) {
+  if (typeof v === "string") return v;
+  const m = v || {};
+  if (filled(m.text)) return m.text;
+  const vs = m.versions || [];
+  return vs.length ? vs[vs.length - 1].text : "";
+}
+function stmtVersions(v) {
+  if (typeof v === "string") return filled(v) ? [{ at: null, text: v }] : [];
+  const m = v || {};
+  const vs = (m.versions || []).slice();
+  const cur = filled(m.text) ? m.text : "";
+  if (cur && (!vs.length || String(vs[vs.length - 1].text).trim() !== cur.trim())) vs.push({ at: m.at || null, text: cur, draft: true });
+  return vs;
+}
+function stmtFirst(v) {
+  const vs = stmtVersions(v);
+  return vs.length ? vs[0].text : "";
+}
+
+/* ---------- 구체성 — 눈으로 확인할 수 있는 말로 쓰였는가 ----------
+   위치어·재질어·변형어·수량 표현을 세고 추상어와 견준다.
+   형태소 분석 없이 어간 일치로 세는 간이 지표이므로 연구에 쓸 때는 교차 검토가 필요하다. */
+
+const CONC_LEX = [
+  "위쪽", "아래쪽", "안쪽", "바깥쪽", "모서리", "가장자리", "테두리", "손잡이", "바닥면", "밑면", "윗면", "뒷면", "앞면",
+  "이음매", "틈새", "구석", "가운데", "둘레", "밑동", "표면", "단면", "끄트머리", "귀퉁이", "접히는", "맞닿는", "눌리는",
+  "플라스틱", "금속", "쇠", "철판", "알루미늄", "스테인리스", "고무", "실리콘", "비닐", "천", "섬유", "가죽", "나무", "합판",
+  "종이", "유리", "도자", "유약", "페인트", "도색", "도장", "코팅", "니스", "시멘트", "콘크리트", "스티로폼", "아크릴",
+  "닳", "마모", "긁힌", "긁힘", "벗겨", "눌린", "눌림", "찌그러", "깨진", "깨짐", "갈라진", "금이", "녹슨", "녹슬",
+  "삭은", "삭아", "해어", "늘어난", "늘어진", "접힌", "눌어붙", "찍힌", "패인", "패임", "구부러", "휘어", "뜯긴",
+  "문질러", "쓸린", "베인", "그을", "얼룩", "먼지", "곰팡이", "물때", "이물질", "광택", "반들",
+  "테이프", "철사", "노끈", "케이블타이", "나사", "볼트", "리벳", "경첩", "용접", "땜질", "덧댄", "감은", "묶은",
+  "자국", "무늬", "구멍", "주름", "그을음", "빛바랜", "누렇게", "검게", "희미해", "벌어진", "헐거워",
+  "높이", "너비", "두께", "지름", "길이", "가로로", "세로로", "안쪽으로", "바깥으로",
+];
+const ABST_LEX = [
+  "문제점", "사회적", "사람들이", "우리는", "현실", "심각", "중요", "관심", "인식", "생각한다", "마음", "느낌", "감정",
+  "힘들", "어렵", "안타", "슬프", "불쌍", "필요하다", "해결", "개선", "노력", "가치", "의미", "영향", "상황", "실태",
+  "많이", "매우", "정말", "너무", "여러", "다양한", "무언가",
+];
+const NUM_RE = /\d+\s*(회|번|년|개월|달|주일|주|일|시간|분|초|cm|mm|kg|명|개|겹|칸|층|센티|밀리|미터)/g;
+
+function lexHits(t, lex) {
+  const s = String(t || "");
+  let n = 0;
+  for (const w of lex) if (s.includes(w)) n++;
+  return n;
+}
+function numHits(t) {
+  return (String(t || "").match(NUM_RE) || []).length;
+}
+
+/* 0~100. 글이 너무 짧으면 null (측정하지 않음) */
+function concreteness(t) {
+  const s = String(t || "").trim();
+  if (s.length < 8) return null;
+  const c = lexHits(s, CONC_LEX), a = lexHits(s, ABST_LEX), nm = numHits(s);
+  const ratio = (c + nm * 1.5) / (c + nm * 1.5 + a + 2);          // 구체어가 추상어보다 많은가
+  const dens = Math.min(1, (c + nm) / Math.max(2, Math.round(s.length / 45))); // 길이 대비 밀도
+  return Math.round((0.6 * ratio + 0.4 * dens) * 100);
+}
+
+/* ---------- 필드 값을 코딩 단위로 펼치기 ----------
+   질적 코딩 시트와 구체성 계산이 같은 함수를 쓴다. */
+function fieldUnits(f, v) {
+  const out = [];
+  const push = (sub, text) => { if (filled(text)) out.push({ sub, text: String(text).trim() }); };
+  const rows = Array.isArray(v) ? v : [];
+  switch (f.t) {
+    case "debate": { const m = v || {}; push("① 내 입장", m.pos); push("② 반대 근거", m.counter); push("③ 유지·변경", m.hold); break; }
+    case "reflect": push("", (v || {}).pos); break;
+    case "checks": { const m = v || {}; push("", (f.opts || []).filter((o) => m[o]).join(" · ")); break; }
+    case "rounds": rows.forEach((r, i) => { if (!r) return; push("회차 " + (i + 1) + " 고친 것", r.change); push("회차 " + (i + 1) + " 판단", r.judge); }); break;
+    case "inspect": { const m = v || {}; INSPECT_ITEMS.forEach((it) => { const r = m[it.k] || {}; if (filled(r.note)) push(it.label + "(" + (r.status || "-") + ")", r.note); }); break; }
+    case "peer": rows.forEach((b, i) => {
+      if (!b) return;
+      PEER_VIEWS.forEach((pv) => { const r = ((b.views || {})[pv.k]) || {}; push("작품" + (i + 1) + " " + pv.label + " 메모", r.memo); push("작품" + (i + 1) + " " + pv.label + " 한 문장", r.sent); });
+      push("작품" + (i + 1) + " 명제표 바꿔 달기", b.swap);
+      push("작품" + (i + 1) + " 종합 비평", b.overall);
+    }); break;
+    case "scenes": rows.forEach((r, i) => {
+      if (!r) return;
+      push("장면 " + (i + 1), [r.when, r.where, r.what].filter(filled).join(" · ") + (filled(r.sense) ? " [" + r.sense + "]" : ""));
+    }); break;
+    case "invis": rows.forEach((r, i) => {
+      if (!r) return;
+      const ty = (INVIS_TYPES.find((x) => x.k === r.type) || {}).label || "";
+      push("보이지 않는 것 " + (i + 1) + (ty ? " [" + ty + "]" : ""), [r.text, r.why].filter(filled).join(" — "));
+    }); break;
+    case "cands": rows.forEach((r, i) => {
+      if (!r) return;
+      push("후보 " + (i + 1) + (r.verdict ? " [" + r.verdict + "]" : ""), [r.obj, r.where, r.whose, r.act, r.why].filter(filled).join(" · "));
+    }); break;
+    case "traces": rows.forEach((r, i) => {
+      if (!r) return;
+      push("흔적 " + (i + 1), [r.inv && "보이지 않는 것: " + r.inv, r.spot && "자리: " + r.spot, r.shape && "모양: " + r.shape,
+        r.act && "동작: " + r.act, r.freq && "빈도: " + r.freq, r.span && "기간: " + r.span].filter(Boolean).join(" / "));
+    }); break;
+    case "stmt": stmtVersions(v).forEach((x, i, arr) => push(i === arr.length - 1 ? "진술 (최종)" : "진술 v" + (i + 1), x.text)); break;
+    case "reverse": rows.forEach((r, i) => {
+      if (!r) return;
+      push("되돌려 읽기 " + (i + 1), [r.shown && "보여 준 것: " + r.shown, r.read && "짝이 읽은 것: " + r.read, r.gap && "거리: " + r.gap,
+        r.backTo && "되돌아간 계단: " + r.backTo, r.fixed && "고친 것: " + r.fixed].filter(Boolean).join(" / "));
+    }); break;
+    case "image": case "images": case "audio": case "video": case "sketch": case "links": break;
+    default: push("", typeof v === "string" ? v : ""); break;
+  }
+  return out;
+}
+const fieldPlain = (f, v) => fieldUnits(f, v).map((u) => u.text).join(" ");
+
+/* 문장 단위로 다시 쪼갬 — 질적 코딩 시트의 한 행이 된다 */
+function splitSentences(t) {
+  return String(t || "").split(/[.!?…]\s+|[.!?…]$|\n+/).map((s) => s.trim()).filter((s) => s.length >= 5);
+}
+
+/* ---------- 사다리에서 값 끌어오기 ---------- */
+const rowsOf = (v) => (Array.isArray(v) ? v.filter(Boolean) : []);
+
+function ladderPick(ws) {
+  const d = ws || {};
+  if (filled(d["s3t1.pick"])) return d["s3t1.pick"];
+  const r = rowsOf(d["s3t1.list"]).find((x) => filled(x.text));
+  return r ? r.text : "";
+}
+function ladderObject(ws) {
+  const cs = rowsOf((ws || {})["s3t2.cands"]);
+  const chosen = cs.find((c) => c.verdict === "고름" && filled(c.obj)) || cs.find((c) => filled(c.obj));
+  return chosen ? chosen.obj || "" : "";
+}
+function ladderTrace(ws) {
+  const t = rowsOf((ws || {})["s3t3.traces"]).find((r) => filled(r.spot) || filled(r.shape));
+  if (!t) return "";
+  return [filled(t.spot) ? t.spot + "에" : "", t.shape].filter(filled).join(" ")
+    + (filled(t.act) ? " (" + t.act + (filled(t.freq) ? " " + t.freq : "") + ")" : "");
+}
+/* 문장 틀 — 학생이 손보기 전의 제안문 */
+function ladderSentence(ws) {
+  const d = ws || {};
+  const inv = ladderPick(d) || "「보이지 않는 것」";
+  const obj = ladderObject(d) || "「사물」";
+  const t = rowsOf(d["s3t3.traces"]).find((r) => filled(r.spot) || filled(r.shape)) || {};
+  const spot = t.spot || "「어느 자리」";
+  const shape = t.shape || "「어떤 모양」";
+  const act = t.act || "「어떤 동작」";
+  const freq = [t.freq, t.span].filter(filled).join(" ") || "「얼마나 반복」";
+  return inv + "은(는) " + obj + "의 " + spot + "에 " + shape + "(으)로 남는다. 이 흔적은 " + act + "을(를) " + freq + " 반복했을 때 생긴다.";
+}
+
+/* ---------- 계단별 도달과 사고의 두께 ---------- */
+function stageStat(st, ws) {
+  const d = ws || {};
+  let total = 0, done = 0, chars = 0, units = 0, edits = 0;
+  let first = null, last = null;
+  const texts = [];
+  st.keys.forEach((k) => {
+    const [sid, fk] = k.split(".");
+    const sec = SCHEMA.find((s) => s.id === sid);
+    const f = sec && sec.fields.find((x) => x.k === fk);
+    if (!f) return;
+    const v = d[k];
+    const p = fieldProgress(f, v);
+    total += p.total; done += p.done;
+    const us = fieldUnits(f, v);
+    units += us.length;
+    us.forEach((u) => { chars += u.text.length; texts.push(u.text); });
+    const t = (d._t || {})[sid];
+    if (t) {
+      edits = Math.max(edits, t.edits || 0);
+      if (t.first && (!first || t.first < first)) first = t.first;
+      if (t.last && (!last || t.last > last)) last = t.last;
+    }
+  });
+  const joined = texts.join(" ");
+  return {
+    key: st.key, n: st.n, name: st.name, total, done,
+    ratio: total ? done / total : 0,
+    chars, units, edits, first, last,
+    sentences: splitSentences(joined).length,
+    conc: concreteness(joined),
+  };
+}
+
+/* 한 학생의 번역 사고 프로파일 */
+function translationMetrics(ws) {
+  const d = ws || {};
+  const scenes = rowsOf(d["s3a.scenes"]).filter((r) => filled(r.what));
+  const senses = new Set(scenes.map((r) => r.sense).filter(filled));
+  const inv = rowsOf(d["s3t1.list"]).filter((r) => filled(r.text));
+  const invTypes = inv.map((r) => r.type).filter(filled);
+  const cands = rowsOf(d["s3t2.cands"]).filter((r) => filled(r.obj));
+  const dropped = cands.filter((r) => r.verdict === "접음");
+  const traces = rowsOf(d["s3t3.traces"]).filter((r) => filled(r.spot) || filled(r.shape));
+  const causal = traces.filter((r) => filled(r.act) && (filled(r.freq) || filled(r.span)));
+  const rev = rowsOf(d["s3t4.reverse"]).filter((r) => filled(r.read));
+  const revisits = rev.filter((r) => filled(r.backTo) && r.backTo !== "돌아가지 않음");
+
+  const s1 = stmtFirst(d["s3t3.stmt1"]);
+  const s2 = stmtNow(d["s3t4.stmt2"]);
+  const c1 = concreteness(s1), c2 = concreteness(s2);
+  const vers = stmtVersions(d["s3t3.stmt1"]).length + stmtVersions(d["s3t4.stmt2"]).length;
+
+  const stages = TRANSLATE_STAGES.map((st) => stageStat(st, d));
+  const reached = stages.filter((s) => s.ratio >= 0.999).length;
+  let depth = 0;
+  for (const s of stages) { if (s.ratio >= 0.999) depth = s.n; else break; }
+
+  const freq = {};
+  invTypes.forEach((t) => { freq[t] = (freq[t] || 0) + 1; });
+  const invTypeMain = Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0] || "";
+
+  return {
+    stages, reached, depth,
+    scenes: scenes.length, senses: senses.size,
+    invN: inv.length, invTypeN: new Set(invTypes).size, invTypeMain, invTypeFreq: freq,
+    candN: cands.length, dropN: dropped.length, dropWhy: filled(d["s3t2.dropWhy"]) ? 1 : 0,
+    traceN: traces.length, causalN: causal.length,
+    reverseN: rev.length, revisitN: revisits.length,
+    backStages: revisits.map((r) => r.backTo),
+    gapSame: rev.filter((r) => r.gap === GAP_OPTS[0]).length,
+    gapDiff: rev.filter((r) => r.gap === GAP_OPTS[2]).length,
+    stmtVers: vers, stmt1: s1, stmt2: s2,
+    conc1: c1, conc2: c2,
+    concGain: c1 == null || c2 == null ? null : c2 - c1,
+    overlap: filled(s1) && filled(s2) ? Math.round(jaccard(tokSet(s1), tokSet(s2)) * 100) : null,
+    len1: String(s1 || "").trim().length, len2: String(s2 || "").trim().length,
+  };
+}
+
+function translationAll(wsMap) {
+  const out = {};
+  Object.keys(wsMap || {}).forEach((id) => { out[id] = translationMetrics(wsMap[id]); });
+  return out;
+}
+
+/* ---------- 기술통계 도구 (연구 자료 내보내기용) ---------- */
+const numsOf = (arr) => arr.filter((x) => typeof x === "number" && isFinite(x));
+const mean = (arr) => { const a = numsOf(arr); return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; };
+const sdev = (arr) => {
+  const a = numsOf(arr);
+  if (a.length < 2) return null;
+  const m = mean(a);
+  return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1)); // 표본 표준편차
+};
+const minv = (arr) => { const a = numsOf(arr); return a.length ? Math.min.apply(null, a) : null; };
+const maxv = (arr) => { const a = numsOf(arr); return a.length ? Math.max.apply(null, a) : null; };
+const r2 = (x) => (x == null ? "" : String(Math.round(x * 100) / 100));
+
+function pearson(xs, ys) {
+  const p = [];
+  for (let i = 0; i < xs.length; i++) {
+    if (typeof xs[i] === "number" && typeof ys[i] === "number" && isFinite(xs[i]) && isFinite(ys[i])) p.push([xs[i], ys[i]]);
+  }
+  if (p.length < 3) return null;
+  const mx = mean(p.map((q) => q[0])), my = mean(p.map((q) => q[1]));
+  let sxy = 0, sxx = 0, syy = 0;
+  p.forEach((q) => { sxy += (q[0] - mx) * (q[1] - my); sxx += (q[0] - mx) * (q[0] - mx); syy += (q[1] - my) * (q[1] - my); });
+  if (sxx === 0 || syy === 0) return null;
+  return sxy / Math.sqrt(sxx * syy);
+}
+
+/* 대응표본 사전·사후 비교 — t 값과 효과크기(Cohen d_z)를 함께 낸다.
+   유의확률은 이 앱에서 계산하지 않는다. 표본이 한 학급이라 통계 검정을 그대로
+   일반화할 수 없으므로, 초안에도 기술통계 중심으로 서술하도록 안내한다. */
+function prePostStats(pre, post) {
+  const p = [];
+  for (let i = 0; i < pre.length; i++) {
+    if (typeof pre[i] === "number" && typeof post[i] === "number" && isFinite(pre[i]) && isFinite(post[i])) p.push([pre[i], post[i]]);
+  }
+  if (!p.length) return { n: 0 };
+  const diff = p.map((q) => q[1] - q[0]);
+  const md = mean(diff), sdd = sdev(diff);
+  return {
+    n: p.length,
+    preM: mean(p.map((q) => q[0])), preSD: sdev(p.map((q) => q[0])),
+    postM: mean(p.map((q) => q[1])), postSD: sdev(p.map((q) => q[1])),
+    diffM: md, diffSD: sdd,
+    t: sdd && sdd > 0 ? md / (sdd / Math.sqrt(p.length)) : null,
+    df: p.length - 1,
+    d: sdd && sdd > 0 ? md / sdd : null,
+  };
 }
 
 /* ---------- 공용 UI ---------- */
@@ -1750,6 +2349,107 @@ body{background:var(--bg)}
 .img-drop{border:1px dashed var(--line);background:#fff;padding:12px;font-size:12px;color:var(--sub);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .img-drop img{max-height:90px;border:1px solid var(--line2)}
 @media print{.topbar,.sess-tabs,.t-tabs,.btn{display:none!important}}
+
+/* 사전·사후 설문 */
+.sv-card{border-top:3px solid var(--seal)}
+.sv-legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:11px;color:var(--sub);background:var(--card2);border:1px solid var(--line2);padding:8px 12px;margin-bottom:14px}
+.sv-legend b{font-family:var(--mono);color:var(--ink);margin-right:3px}
+.sv-item{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:9px 0;border-bottom:1px dashed var(--line2)}
+.sv-item:last-of-type{border-bottom:none}
+.sv-q{font-size:13px;line-height:1.6;flex:1}
+.sv-n{font-family:var(--mono);font-size:11px;color:var(--seal);margin-right:8px}
+.likert{display:flex;gap:4px;flex:0 0 auto}
+.likert button{width:34px;height:34px;border:1px solid var(--line);background:#fff;font-family:var(--mono);font-size:13px;color:var(--sub);cursor:pointer}
+.likert button.on{background:var(--ink);border-color:var(--ink);color:var(--card)}
+@media(max-width:560px){.sv-item{flex-direction:column;gap:6px}.likert{align-self:flex-end}}
+.sv-foot{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.sv-block-t{font-family:var(--serif);font-size:14px;font-weight:700;margin:18px 0 4px;padding-top:12px;border-top:1px solid var(--line2)}
+.sv-tbl small{color:var(--sub)}
+.sv-delta-up{color:var(--patina);font-family:var(--mono)}
+.sv-delta-dn{color:var(--seal);font-family:var(--mono)}
+.sv-delta-0{color:var(--sub);font-family:var(--mono)}
+
+/* 번역 사다리 — 학생 화면 */
+.ladder{display:flex;gap:0;margin:0 0 14px;flex-wrap:wrap;border:1px solid var(--line);background:var(--card2)}
+.ld-step{flex:1 1 92px;min-width:92px;padding:8px 8px 9px;border-right:1px solid var(--line2);position:relative;text-align:center}
+.ld-step:last-child{border-right:0}
+.ld-step .k{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--sub)}
+.ld-step .nm{font-size:12px;font-weight:700;margin-top:2px;line-height:1.3}
+.ld-step .bar{height:3px;background:var(--line2);margin-top:6px;position:relative}
+.ld-step .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--patina)}
+.ld-step.now{background:var(--card);box-shadow:inset 0 3px 0 var(--seal)}
+.ld-step.now .nm{color:var(--seal)}
+.ld-step.done .k{color:var(--patina)}
+.ld-hint{font-size:12px;color:var(--sub);margin:-8px 0 14px;line-height:1.6}
+
+/* 앞 계단에서 이어받은 값 */
+.carry{border-left:3px solid var(--patina);background:var(--patina-bg);padding:8px 10px;margin:0 0 10px;font-size:12.5px;line-height:1.6}
+.carry b{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--patina);display:block;margin-bottom:3px}
+.carry .empty{color:var(--sub)}
+.carry-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+
+/* 사다리 표 공통 */
+.lt{width:100%;border-collapse:collapse;font-size:13px}
+.lt th{background:var(--card2);border:1px solid var(--line);padding:6px 7px;font-size:11px;font-weight:700;text-align:left;color:var(--sub);white-space:nowrap}
+.lt td{border:1px solid var(--line2);padding:4px 5px;vertical-align:top}
+.lt td input,.lt td textarea{width:100%;border:0;background:transparent;font-family:var(--sans);font-size:13px;padding:3px 2px;resize:vertical}
+.lt td input:focus,.lt td textarea:focus{outline:1px solid var(--seal);background:#fff}
+.lt .rn{width:26px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--sub);background:var(--card2)}
+.lt select{width:100%;border:0;background:transparent;font-family:var(--sans);font-size:12.5px;padding:3px 0}
+
+/* 보이지 않음 갈래 고르개 */
+.ivt{display:flex;flex-direction:column;gap:3px}
+.ivt button{border:1px solid var(--line);background:var(--card);font-family:var(--sans);font-size:11.5px;padding:3px 6px;text-align:left;cursor:pointer;line-height:1.35}
+.ivt button.on{background:var(--seal-bg);border-color:var(--seal);color:var(--seal);font-weight:700}
+.ivt-guide{margin-top:8px;border:1px dashed var(--line);background:var(--card2);padding:9px 11px;font-size:12.5px;line-height:1.65}
+.ivt-guide b{color:var(--seal)}
+.ivt-guide .ex{color:var(--sub);font-size:11.5px}
+
+/* 진술 문장 틀 */
+.stmt-box{border:1px solid var(--line);background:var(--card);padding:12px}
+.stmt-tpl{font-family:var(--serif);font-size:13px;line-height:1.8;background:var(--card2);border-left:3px solid var(--seal);padding:9px 11px;margin-bottom:10px;color:var(--ink)}
+.stmt-tpl small{display:block;font-family:var(--mono);font-size:10px;color:var(--sub);letter-spacing:.06em;margin-bottom:4px}
+.stmt-row{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;margin-top:8px}
+.stmt-vers{margin-top:10px;border-top:1px solid var(--line2);padding-top:8px}
+.stmt-vers .v{display:flex;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px dotted var(--line2);line-height:1.6}
+.stmt-vers .v .n{font-family:var(--mono);font-size:10px;color:var(--seal);white-space:nowrap;padding-top:2px}
+.stmt-vers .v .t{flex:1}
+.stmt-vers .v.cur .t{font-weight:700}
+.conc-chip{font-family:var(--mono);font-size:10px;border:1px solid var(--line);padding:2px 6px;color:var(--sub);white-space:nowrap}
+.conc-chip.hi{border-color:var(--patina);color:var(--patina);background:var(--patina-bg)}
+.conc-chip.lo{border-color:var(--amber);color:var(--amber)}
+
+/* 사고 발전 지도 (교사) */
+.funnel .fr{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px}
+.funnel .fr .lb{width:150px;flex:none;font-size:12px}
+.funnel .fr .lb small{font-family:var(--mono);color:var(--sub);font-size:10px;margin-right:5px}
+.funnel .fr .tr{flex:1;height:14px;background:var(--line2);position:relative}
+.funnel .fr .tr i{position:absolute;left:0;top:0;bottom:0;background:var(--patina)}
+.funnel .fr .tr i.part{background:var(--amber);opacity:.55}
+.funnel .fr .v{width:78px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--sub)}
+.slope{width:100%;height:250px;display:block}
+.slope text{font-family:var(--mono);font-size:9px;fill:var(--sub)}
+.slope .ln{stroke:var(--sub);stroke-width:1.2;opacity:.5}
+.slope .ln.up{stroke:var(--patina);opacity:.85}
+.slope .ln.dn{stroke:var(--seal);opacity:.85}
+.slope .dot{fill:var(--ink)}
+.slope .ax{stroke:var(--line);stroke-width:1}
+.tt-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--sub);margin-top:6px}
+.tt-legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:4px}
+
+/* 연구 자료 내보내기 */
+.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-bottom:14px}
+.res-card{border:1px solid var(--line);background:var(--card2);padding:11px 12px}
+.res-card h4{font-family:var(--serif);font-size:13.5px;margin-bottom:4px}
+.res-card p{font-size:12px;color:var(--sub);line-height:1.6;margin-bottom:9px;min-height:56px}
+.res-card .fn{font-family:var(--mono);font-size:10px;color:var(--seal);display:block;margin-bottom:7px;word-break:break-all}
+.warn-note{border:1px solid var(--seal);background:var(--seal-bg);padding:10px 12px;font-size:12.5px;line-height:1.65;margin-bottom:14px;color:var(--ink)}
+.mdbox{background:#22241E;color:#DCD8CC;font-family:var(--mono);font-size:11px;line-height:1.65;padding:12px;max-height:340px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.stat-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.stat-tbl th,.stat-tbl td{border:1px solid var(--line2);padding:5px 7px;text-align:right}
+.stat-tbl th{background:var(--card2);font-size:11px;color:var(--sub);font-weight:700}
+.stat-tbl td:first-child,.stat-tbl th:first-child{text-align:left}
+.stat-tbl td.mono{font-family:var(--mono)}
 `;
 
 function ProgressBar({ pct }) {
@@ -1928,6 +2628,415 @@ function ThinkSteps({ steps }) {
   );
 }
 
+/* ---------- 번역 사다리 — 학생 화면 도우미 ---------- */
+
+/* 일곱 계단 띠. 지금 있는 칸을 표시하고, 각 계단의 채움 정도를 함께 보여 준다. */
+function LadderRail({ sec, ws }) {
+  const stats = TRANSLATE_STAGES.map((st) => stageStat(st, ws));
+  const here = TRANSLATE_STAGES.filter((st) => st.sec === sec.id).map((st) => st.key);
+  const cur = TRANSLATE_STAGES.find((st) => here.includes(st.key));
+  return (
+    <div>
+      <div className="ladder">
+        {TRANSLATE_STAGES.map((st, i) => {
+          const s = stats[i];
+          const done = s.ratio >= 0.999;
+          return (
+            <div key={st.key} className={"ld-step " + (here.includes(st.key) ? "now " : "") + (done ? "done" : "")}
+              title={st.full + " — " + st.ask}>
+              <div className="k">{st.key}{done ? " ✓" : ""}</div>
+              <div className="nm">{st.name}</div>
+              <div className="bar"><i style={{ width: Math.round(s.ratio * 100) + "%" }} /></div>
+            </div>
+          );
+        })}
+      </div>
+      {cur && <div className="ld-hint"><b>{cur.key} {cur.full}</b> — {cur.ask} <span style={{ color: "var(--seal)" }}>내놓을 것: {cur.out}</span></div>}
+    </div>
+  );
+}
+
+/* 앞 계단의 답을 그 자리에 다시 보여 줌 — 계단이 끊기지 않고 이어지게 한다 */
+function Carry({ ws }) {
+  const d = ws || {};
+  const items = [
+    { l: "T2 고른 문제", v: d["s3a.problem"] },
+    { l: "T3 보이지 않는 것", v: ladderPick(d) },
+    { l: "T4 고른 사물", v: ladderObject(d) },
+    { l: "T5 흔적", v: ladderTrace(d) },
+  ].filter((x) => filled(x.v));
+  if (!items.length) return null;
+  return (
+    <div className="carry">
+      <b>앞 계단에서 가져온 것</b>
+      {items.map((x, i) => <div key={i}>{x.l} — {x.v}</div>)}
+    </div>
+  );
+}
+
+function ConcChip({ text, label }) {
+  const c = concreteness(text);
+  if (c == null) return null;
+  return <span className={"conc-chip " + (c >= 55 ? "hi" : c <= 30 ? "lo" : "")} title="위치·재질·변형·수량을 가리키는 말이 얼마나 들어 있는지 기계적으로 센 값입니다. 점수가 아니라 다시 볼 자리를 가리키는 표지입니다.">{label || "구체성"} {c}</span>;
+}
+
+/* 여러 줄 표의 행 개수를 늘 일정하게 유지 */
+function padRows(v, n, blank) {
+  const rows = Array.isArray(v) ? v.slice() : [];
+  while (rows.length < n) rows.push({ ...blank });
+  return rows;
+}
+
+/* ---------- 사다리 필드 렌더러 ---------- */
+
+function ScenesField({ f, fieldKey, v, setField }) {
+  const legacy = typeof v === "string" && v.trim() ? v : "";
+  const rows = padRows(legacy ? [] : v, 3, { when: "", where: "", what: "", sense: "" });
+  const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
+  return (
+    <div className="field span2">
+      <label>{f.label}</label>
+      <ThinkSteps steps={[
+        "펼치기 — 일주일 동안 오간 길을 순서대로 떠올리기 (집 · 등굣길 · 학교 · 하굣길 · 동네)",
+        "걸러 내기 — 그 길에서 한 번 더 눈이 간 장면만 남기기. 아직 문제로 묶지 않습니다",
+        "적기 — 언제 · 어디서 · 무엇을 보았는지 각각 한 줄로 적고, 어느 감각으로 걸렸는지 고르기",
+      ]} />
+      {legacy && (
+        <div className="carry" style={{ borderLeftColor: "var(--amber)", background: "var(--card2)" }}>
+          <b>이전에 줄글로 쓴 내용</b>
+          <div style={{ whiteSpace: "pre-wrap" }}>{legacy}</div>
+          <div className="carry-row">
+            <button className="btn small ghost" onClick={() => {
+              const parts = legacy.split(/\n+/).map((x) => x.replace(/^\s*\d+[.)]\s*/, "").trim()).filter(Boolean).slice(0, 3);
+              const next = padRows(parts.map((p) => ({ when: "", where: "", what: p, sense: "" })), 3, { when: "", where: "", what: "", sense: "" });
+              setField(fieldKey, next);
+            }}>줄글을 표로 옮기기</button>
+          </div>
+        </div>
+      )}
+      <div className="tbl-scroll">
+        <table className="lt">
+          <thead><tr><th></th><th style={{ width: 120 }}>언제</th><th style={{ width: 150 }}>어디서</th><th>무엇을 보았는가</th><th style={{ width: 120 }}>어느 감각으로</th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td className="rn">{i + 1}</td>
+                <td><input value={r.when || ""} maxLength={40} placeholder="밤 11시" onChange={(e) => up(i, "when", e.target.value)} /></td>
+                <td><input value={r.where || ""} maxLength={60} placeholder="아파트 분리수거장" onChange={(e) => up(i, "where", e.target.value)} /></td>
+                <td><input value={r.what || ""} maxLength={200} placeholder="쌓인 상자 옆에 세워 둔 손수레" onChange={(e) => up(i, "what", e.target.value)} /></td>
+                <td>
+                  <select value={r.sense || ""} onChange={(e) => up(i, "sense", e.target.value)}>
+                    <option value="">-</option>
+                    {SENSES.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <span className="hint">감각이 한 갈래로만 몰리면 눈에 보이는 것만 모은 것입니다. 소리·냄새·손에 닿은 것도 한 줄은 넣어 보세요.</span>
+    </div>
+  );
+}
+
+function InvisField({ f, fieldKey, v, setField, ws }) {
+  const rows = padRows(v, 3, { text: "", type: "", why: "" });
+  const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
+  const picked = Array.from(new Set(rows.map((r) => r.type).filter(Boolean)));
+  return (
+    <div className="field span2">
+      <label>{f.label}</label>
+      <Carry ws={ws} />
+      <ThinkSteps steps={[
+        "펼치기 — 고른 문제의 장면 안에서 ‘눈에 보이는 것’을 먼저 적어 보고, 그 옆에 ‘보이지 않는 것’을 짝지어 떠올리기",
+        "가르기 — 각 항목이 왜 보이지 않는지 오른쪽 다섯 갈래에서 고르기. 갈래에 따라 다음 계단에서 찾을 사물이 달라집니다",
+        "채우기 — 세 줄 이상 채우기. 서로 다른 갈래가 두 가지 이상 나오면 문제를 여러 각도에서 본 것입니다",
+      ]} />
+      <div className="tbl-scroll">
+        <table className="lt">
+          <thead><tr><th></th><th>이 문제에서 겉으로 드러나지 않는 것</th><th style={{ width: 176 }}>왜 보이지 않는가</th><th style={{ width: 210 }}>그렇게 고른 까닭 한 줄</th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td className="rn">{i + 1}</td>
+                <td><textarea rows={2} value={r.text || ""} maxLength={300} placeholder="상자를 놓고 가는 사람의 몸과 시간" onChange={(e) => up(i, "text", e.target.value)} /></td>
+                <td>
+                  <div className="ivt">
+                    {INVIS_TYPES.map((t) => (
+                      <button key={t.k} className={r.type === t.k ? "on" : ""} title={t.hint}
+                        onClick={() => up(i, "type", r.type === t.k ? "" : t.k)}>{t.label}</button>
+                    ))}
+                  </div>
+                </td>
+                <td><textarea rows={2} value={r.why || ""} maxLength={300} placeholder="새벽 시간대에만 오가서 마주친 적이 없다" onChange={(e) => up(i, "why", e.target.value)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {picked.length > 0 && (
+        <div className="ivt-guide">
+          <div style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--sub)", letterSpacing: ".06em", marginBottom: 6 }}>고른 갈래에 맞는 찾기 방법 — 다음 계단에서 이대로 찾습니다</div>
+          {picked.map((k) => {
+            const t = INVIS_TYPES.find((x) => x.k === k);
+            if (!t) return null;
+            return <div key={k} style={{ marginBottom: 6 }}><b>{t.label}</b> — {t.find}<div className="ex">이런 경우: {t.ex}</div></div>;
+          })}
+        </div>
+      )}
+      <span className="hint">갈래가 모두 같다면 한 각도에서만 본 것입니다. 다른 갈래를 하나 더 찾아보면 사물 후보가 넓어집니다.</span>
+    </div>
+  );
+}
+
+function PickInvField({ f, fieldKey, v, setField, ws }) {
+  const list = rowsOf((ws || {})["s3t1.list"]).filter((r) => filled(r.text));
+  return (
+    <div className="field span2">
+      <label>{f.label}</label>
+      {list.length === 0 ? (
+        <span className="hint">위 목록을 먼저 채우면 여기에서 고를 수 있습니다.</span>
+      ) : (
+        <div className="toggle-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
+          {list.map((r, i) => {
+            const t = INVIS_TYPES.find((x) => x.k === r.type);
+            return (
+              <button key={i} className={v === r.text ? "on" : ""} style={{ textAlign: "left", lineHeight: 1.5 }}
+                onClick={() => setField(fieldKey, v === r.text ? "" : r.text)}>
+                {r.text}{t ? <span style={{ color: "var(--sub)", fontSize: 11 }}> · {t.label}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <span className="hint">하나만 고릅니다. 고르지 않은 것은 지우지 말고 목록에 그대로 둡니다 — 무엇을 접었는지가 판단의 기록입니다.</span>
+    </div>
+  );
+}
+
+function CandsField({ f, fieldKey, v, setField, ws }) {
+  const rows = padRows(v, 3, { obj: "", where: "", whose: "", act: "", verdict: "", why: "" });
+  const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
+  /* 고름은 한 줄만. 다른 줄에 고름이 있으면 접음으로 내린다. */
+  const setVerdict = (i, val) => {
+    setField(fieldKey, rows.map((r, j) => {
+      if (j === i) return { ...r, verdict: r.verdict === val ? "" : val };
+      if (val === "고름" && r.verdict === "고름") return { ...r, verdict: "접음" };
+      return r;
+    }));
+  };
+  const d = ws || {};
+  const types = Array.from(new Set(rowsOf(d["s3t1.list"]).map((r) => r.type).filter(Boolean)));
+  return (
+    <div className="field span2">
+      <label>{f.label}</label>
+      <Carry ws={ws} />
+      {types.length > 0 && (
+        <div className="ivt-guide" style={{ marginTop: 0, marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--sub)", letterSpacing: ".06em", marginBottom: 6 }}>내가 고른 갈래의 찾기 방법</div>
+          {types.map((k) => {
+            const t = INVIS_TYPES.find((x) => x.k === k);
+            return t ? <div key={k}><b>{t.label}</b> — {t.find}</div> : null;
+          })}
+        </div>
+      )}
+      <ThinkSteps steps={[
+        "자리로 가기 — 문제의 자리(접점)를 떠올리고, 거기 실제로 놓여 있는 물건을 눈에 보이는 대로 적기",
+        "몸을 붙이기 — 그 물건에 누구의 몸이 어떤 동작으로 닿는지 적기. 닿는 몸이 없으면 흔적도 생기지 않습니다",
+        "고르고 접기 — 셋을 견주어 하나를 고르고 나머지는 접음으로 표시하기. 접은 이유는 아래 칸에 씁니다",
+      ]} />
+      <div className="tbl-scroll">
+        <table className="lt">
+          <thead><tr><th></th><th style={{ width: 150 }}>사물 후보</th><th style={{ width: 140 }}>어디에 실제로 있는가</th><th style={{ width: 120 }}>누구의 몸이 닿는가</th><th>어떤 동작으로 닿는가</th><th style={{ width: 92 }}>판정</th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td className="rn">{i + 1}</td>
+                <td><textarea rows={2} value={r.obj || ""} maxLength={120} placeholder="배송용 손수레 손잡이" onChange={(e) => up(i, "obj", e.target.value)} /></td>
+                <td><textarea rows={2} value={r.where || ""} maxLength={120} placeholder="분리수거장 옆에 세워 둠" onChange={(e) => up(i, "where", e.target.value)} /></td>
+                <td><input value={r.whose || ""} maxLength={60} placeholder="배송 노동자의 오른손" onChange={(e) => up(i, "whose", e.target.value)} /></td>
+                <td><textarea rows={2} value={r.act || ""} maxLength={200} placeholder="한 손으로 기울여 끌 때 손바닥이 그립을 비틀어 쥔다" onChange={(e) => up(i, "act", e.target.value)} /></td>
+                <td>
+                  <div className="seg" style={{ flexDirection: "column" }}>
+                    <button className={r.verdict === "고름" ? "on-ok" : ""} onClick={() => setVerdict(i, "고름")}>고름</button>
+                    <button className={r.verdict === "접음" ? "on-no" : ""} onClick={() => setVerdict(i, "접음")}>접음</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <span className="hint">머릿속에서 지어낸 물건이 아니라 그 자리에 실제로 놓여 있는 물건이어야 합니다. 셋 가운데 몸이 닿는 동작을 적을 수 없는 것이 있다면 그것부터 접습니다.</span>
+    </div>
+  );
+}
+
+function TracesField({ f, fieldKey, v, setField, ws }) {
+  const d = ws || {};
+  const rows = padRows(v, 2, { inv: "", spot: "", shape: "", act: "", freq: "", span: "" });
+  const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
+  const pick = ladderPick(d), obj = ladderObject(d);
+  return (
+    <div className="field span2">
+      <label>{f.label}</label>
+      <Carry ws={ws} />
+      <ThinkSteps steps={[
+        "자리 정하기 — 고른 사물에서 그 동작이 가장 자주 닿는 곳 한 군데를 정하기 (손잡이 오른쪽 · 바닥 모서리 · 안쪽 이음매)",
+        "모양 정하기 — 그 자리에 무엇이 남는지 눈으로 확인할 수 있는 말로 쓰기 (고무가 벗겨져 금속이 드러남 · 색이 옅어짐 · 테이프를 여러 겹 감음)",
+        "인과 어림하기 — 그 흔적이 생기려면 어떤 동작을 하루 몇 번, 몇 년쯤 반복해야 하는지 근거를 대며 어림하기",
+      ]} />
+      <div className="tbl-scroll">
+        <table className="lt">
+          <thead><tr><th></th><th style={{ width: 140 }}>보이지 않는 것</th><th style={{ width: 130 }}>사물의 어느 자리</th><th>어떤 모양으로 남는가</th><th style={{ width: 130 }}>어떤 동작이</th><th style={{ width: 92 }}>얼마나 자주</th><th style={{ width: 84 }}>얼마 동안</th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td className="rn">{i + 1}</td>
+                <td><textarea rows={2} value={r.inv || ""} maxLength={150} placeholder={i === 0 && pick ? pick : "반복된 노동의 시간"} onChange={(e) => up(i, "inv", e.target.value)} /></td>
+                <td><input value={r.spot || ""} maxLength={80} placeholder="오른쪽 그립 손바닥 자리" onChange={(e) => up(i, "spot", e.target.value)} /></td>
+                <td><textarea rows={2} value={r.shape || ""} maxLength={250} placeholder="고무가 벗겨져 금속이 드러나고 그 위에 직물 테이프를 세 겹 감음" onChange={(e) => up(i, "shape", e.target.value)} /></td>
+                <td><input value={r.act || ""} maxLength={80} placeholder="한 손으로 비틀어 쥐고 끌기" onChange={(e) => up(i, "act", e.target.value)} /></td>
+                <td><input value={r.freq || ""} maxLength={40} placeholder="하루 200회" onChange={(e) => up(i, "freq", e.target.value)} /></td>
+                <td><input value={r.span || ""} maxLength={40} placeholder="4년" onChange={(e) => up(i, "span", e.target.value)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <span className="hint">
+        셋째 칸부터는 마음·의미·상징 같은 말을 쓰지 않습니다. 사진에 찍히는 것만 씁니다.
+        {obj ? " 고른 사물: " + obj : ""}
+      </span>
+    </div>
+  );
+}
+
+function StmtField({ f, fieldKey, v, setField, ws }) {
+  const d = ws || {};
+  const cur = stmtNow(v);
+  const vers = stmtVersions(v);
+  const saved = (typeof v === "object" && v ? v.versions : null) || [];
+  const tpl = ladderSentence(d);
+  const prevText = f.prev ? stmtNow(d[f.prev]) : "";
+  const set = (text) => setField(fieldKey, { ...(typeof v === "object" && v ? v : {}), text, at: now() });
+  const fix = () => {
+    const t = String(cur || "").trim();
+    if (!t) return;
+    const last = saved.length ? String(saved[saved.length - 1].text).trim() : "";
+    if (t === last) return;
+    setField(fieldKey, { text: t, at: now(), versions: [...saved, { at: now(), text: t }].slice(-8) });
+  };
+  return (
+    <div className="field span2">
+      <label>{f.label}</label>
+      {filled(prevText) && (
+        <div className="carry" style={{ borderLeftColor: "var(--amber)" }}>
+          <b>T5에서 쓴 초안</b>
+          <div>{prevText}</div>
+          <div className="carry-row"><ConcChip text={prevText} label="초안 구체성" /></div>
+        </div>
+      )}
+      <div className="stmt-box">
+        <div className="stmt-tpl">
+          <small>문장 틀 — 사다리에서 자동으로 끌어온 제안문</small>
+          {tpl}
+        </div>
+        <div className="stmt-row" style={{ marginTop: 0, marginBottom: 8 }}>
+          <button className="btn small ghost" onClick={() => set(tpl.replace(/「[^」]*」/g, "____"))}>이 틀을 아래에 넣기</button>
+          <span className="hint" style={{ margin: 0 }}>틀을 넣은 뒤 「 」 자리를 자기 말로 바꾸고, 어색한 조사를 손봅니다.</span>
+        </div>
+        <textarea rows={4} maxLength={1200} value={cur} placeholder="보이지 않는 것 · 사물 · 자리 · 모양 · 동작 · 반복이 모두 한 문장 안에 들어가게 씁니다."
+          onChange={(e) => set(e.target.value)} />
+        <div className="stmt-row">
+          <ConcChip text={cur} />
+          <span className="conc-chip">{String(cur || "").trim().length}자</span>
+          <span className="conc-chip">확정 {saved.length}회</span>
+          <button className="btn small" onClick={fix} disabled={!filled(cur)}>이 문장으로 확정</button>
+          <span className="hint" style={{ margin: 0, flex: "1 1 180px" }}>확정할 때마다 그때의 문장이 따로 남습니다. 고쳐 쓴 과정이 그대로 기록이 됩니다.</span>
+        </div>
+        <ThinkMeter text={cur} />
+        {vers.length > 0 && (
+          <div className="stmt-vers">
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--sub)", letterSpacing: ".06em", marginBottom: 5 }}>확정한 문장의 자취</div>
+            {vers.map((x, i) => (
+              <div className={"v " + (i === vers.length - 1 ? "cur" : "")} key={i}>
+                <span className="n">{x.draft ? "지금" : "v" + (i + 1)}{x.at ? " " + fmtTime(x.at) : ""}</span>
+                <span className="t">{x.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReverseField({ f, fieldKey, v, setField, ws }) {
+  const rows = padRows(v, 2, { shown: "", read: "", gap: "", backTo: "", fixed: "" });
+  const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
+  const backOpts = ["돌아가지 않음", ...TRANSLATE_STAGES.filter((s) => s.n <= 5).map((s) => s.key + " " + s.name)];
+  return (
+    <div className="field span2">
+      <label>{f.label}</label>
+      <Carry ws={ws} />
+      <ThinkSteps steps={[
+        "가리고 말하기 — 짝에게 문제 이름은 말하지 않고 사물과 흔적만 말해 주기 (또는 흔적 메모만 보여 주기)",
+        "받아 적기 — 짝이 무엇으로 읽었는지 그 사람의 말 그대로 적기. 고쳐서 적지 않습니다",
+        "정하기 — 내 의도와의 거리를 고르고, 다르게 읽혔다면 어느 계단으로 돌아갈지 정해 실제로 돌아가 고치기",
+      ]} />
+      <div className="tbl-scroll">
+        <table className="lt">
+          <thead><tr><th></th><th style={{ width: 150 }}>짝에게 보여 준 것</th><th>짝이 읽은 것 (그 사람의 말 그대로)</th><th style={{ width: 120 }}>내 의도와의 거리</th><th style={{ width: 120 }}>되돌아간 계단</th><th style={{ width: 180 }}>돌아가서 고친 것</th></tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td className="rn">{i + 1}</td>
+                <td><textarea rows={2} value={r.shown || ""} maxLength={150} placeholder="손수레 손잡이와 흔적 메모" onChange={(e) => up(i, "shown", e.target.value)} /></td>
+                <td><textarea rows={2} value={r.read || ""} maxLength={300} placeholder="공사장에서 오래 쓴 공구 같다고 했다" onChange={(e) => up(i, "read", e.target.value)} /></td>
+                <td>
+                  <select value={r.gap || ""} onChange={(e) => up(i, "gap", e.target.value)}>
+                    <option value="">-</option>
+                    {GAP_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </td>
+                <td>
+                  <select value={r.backTo || ""} onChange={(e) => up(i, "backTo", e.target.value)}>
+                    <option value="">-</option>
+                    {backOpts.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </td>
+                <td><textarea rows={2} value={r.fixed || ""} maxLength={250} placeholder="흔적을 손바닥 자리로 좁히고 테이프 방향을 끄는 방향과 맞춤" onChange={(e) => up(i, "fixed", e.target.value)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <span className="hint">다르게 읽혔다고 해서 실패가 아닙니다. 어디로 돌아가 무엇을 고쳤는지가 이 단원에서 가장 중요한 기록입니다.</span>
+    </div>
+  );
+}
+
+/* 사다리 요약 표(기록 C)의 세 칸을 사다리에서 끌어와 채운다 */
+function CarryFill({ carry, ws, cur, onFill }) {
+  const src = carry === "invisible" ? ladderPick(ws) : carry === "object" ? ladderObject(ws) : ladderTrace(ws);
+  if (!filled(src)) return null;
+  const same = String(cur || "").trim() === String(src).trim();
+  return (
+    <div className="carry" style={{ marginBottom: 8 }}>
+      <b>사다리에서 가져올 값</b>
+      <div>{src}</div>
+      {!same && (
+        <div className="carry-row">
+          <button className="btn small ghost" onClick={() => onFill(src)}>{filled(cur) ? "이 값으로 바꾸기" : "이 값 가져오기"}</button>
+          <span className="hint" style={{ margin: 0 }}>가져온 뒤 문장을 손봐도 됩니다.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FieldEditor({ sec, f, ws, setField }) {
   const key = sec.id + "." + f.k;
   const v = ws[key];
@@ -1942,6 +3051,7 @@ function FieldEditor({ sec, f, ws, setField }) {
           <label>{f.label}</label>
         )}
         <ThinkSteps steps={f.steps} />
+        {f.carry && <CarryFill carry={f.carry} ws={ws} cur={v} onFill={(t) => setField(key, t)} />}
         {f.t === "text" ? (
           <input value={v ?? ""} placeholder={f.def || ""} maxLength={300} onChange={(e) => setField(key, e.target.value)} />
         ) : (
@@ -2104,6 +3214,13 @@ function FieldEditor({ sec, f, ws, setField }) {
       </div>
     );
   }
+  if (f.t === "scenes") return <ScenesField f={f} fieldKey={key} v={v} setField={setField} />;
+  if (f.t === "invis") return <InvisField f={f} fieldKey={key} v={v} setField={setField} ws={ws} />;
+  if (f.t === "pickinv") return <PickInvField f={f} fieldKey={key} v={v} setField={setField} ws={ws} />;
+  if (f.t === "cands") return <CandsField f={f} fieldKey={key} v={v} setField={setField} ws={ws} />;
+  if (f.t === "traces") return <TracesField f={f} fieldKey={key} v={v} setField={setField} ws={ws} />;
+  if (f.t === "stmt") return <StmtField f={f} fieldKey={key} v={v} setField={setField} ws={ws} />;
+  if (f.t === "reverse") return <ReverseField f={f} fieldKey={key} v={v} setField={setField} ws={ws} />;
   if (f.t === "rounds") {
     const rows = v || [{}, {}, {}, {}, {}];
     const up = (i, k2, val) => {
@@ -2354,6 +3471,109 @@ function FieldReader({ sec, f, ws, owner }) {
       <div className="read-block">
         <div className="rl">{f.label}</div>
         <div className="rv">{on.length ? on.map((o) => "☑ " + o).join("  ") : "체크 없음"}</div>
+      </div>
+    );
+  }
+  if (f.t === "scenes") {
+    const rows = rowsOf(v).filter((r) => filled(r.what));
+    if (typeof v === "string" && filled(v)) return <div className="read-block"><div className="rl">{f.label}</div><div className="rv" style={{ whiteSpace: "pre-wrap" }}>{v}</div></div>;
+    if (!rows.length) return <div className="read-block"><div className="rl">{f.label}</div>{Empty}</div>;
+    return (
+      <div className="read-block">
+        <div className="rl">{f.label}</div>
+        <table className="tbl">
+          <thead><tr><th style={{ width: 26 }}></th><th style={{ width: 110 }}>언제</th><th style={{ width: 140 }}>어디서</th><th>무엇을 보았는가</th><th style={{ width: 110 }}>감각</th></tr></thead>
+          <tbody>{rows.map((r, i) => (
+            <tr key={i}><td className="rn">{i + 1}</td><td>{r.when || "-"}</td><td>{r.where || "-"}</td><td>{r.what}</td><td>{r.sense || "-"}</td></tr>
+          ))}</tbody>
+        </table>
+      </div>
+    );
+  }
+  if (f.t === "invis") {
+    const rows = rowsOf(v).filter((r) => filled(r.text));
+    if (!rows.length) return <div className="read-block"><div className="rl">{f.label}</div>{Empty}</div>;
+    return (
+      <div className="read-block">
+        <div className="rl">{f.label}</div>
+        <table className="tbl">
+          <thead><tr><th style={{ width: 26 }}></th><th>보이지 않는 것</th><th style={{ width: 130 }}>왜 보이지 않는가</th><th style={{ width: 200 }}>고른 까닭</th></tr></thead>
+          <tbody>{rows.map((r, i) => {
+            const t = INVIS_TYPES.find((x) => x.k === r.type);
+            return <tr key={i}><td className="rn">{i + 1}</td><td>{r.text}</td>
+              <td style={{ color: t ? "var(--seal)" : "var(--sub)" }}>{t ? t.label : "미분류"}</td><td>{r.why || ""}</td></tr>;
+          })}</tbody>
+        </table>
+      </div>
+    );
+  }
+  if (f.t === "pickinv") {
+    return <div className="read-block"><div className="rl">{f.label}</div>{filled(v) ? <div className="rv">{v}</div> : Empty}</div>;
+  }
+  if (f.t === "cands") {
+    const rows = rowsOf(v).filter((r) => filled(r.obj));
+    if (!rows.length) return <div className="read-block"><div className="rl">{f.label}</div>{Empty}</div>;
+    return (
+      <div className="read-block">
+        <div className="rl">{f.label}</div>
+        <table className="tbl">
+          <thead><tr><th style={{ width: 26 }}></th><th style={{ width: 140 }}>사물 후보</th><th style={{ width: 130 }}>어디에 있는가</th><th style={{ width: 110 }}>누구의 몸</th><th>어떤 동작</th><th style={{ width: 56 }}>판정</th></tr></thead>
+          <tbody>{rows.map((r, i) => (
+            <tr key={i}><td className="rn">{i + 1}</td><td>{r.obj}</td><td>{r.where || "-"}</td><td>{r.whose || "-"}</td><td>{r.act || "-"}</td>
+              <td style={{ color: r.verdict === "고름" ? "var(--patina)" : r.verdict === "접음" ? "var(--seal)" : "var(--sub)" }}>{r.verdict || "-"}</td></tr>
+          ))}</tbody>
+        </table>
+      </div>
+    );
+  }
+  if (f.t === "traces") {
+    const rows = rowsOf(v).filter((r) => filled(r.spot) || filled(r.shape));
+    if (!rows.length) return <div className="read-block"><div className="rl">{f.label}</div>{Empty}</div>;
+    return (
+      <div className="read-block">
+        <div className="rl">{f.label}</div>
+        <table className="tbl">
+          <thead><tr><th style={{ width: 26 }}></th><th style={{ width: 130 }}>보이지 않는 것</th><th style={{ width: 120 }}>어느 자리</th><th>어떤 모양</th><th style={{ width: 120 }}>동작</th><th style={{ width: 80 }}>빈도</th><th style={{ width: 70 }}>기간</th></tr></thead>
+          <tbody>{rows.map((r, i) => (
+            <tr key={i}><td className="rn">{i + 1}</td><td>{r.inv || "-"}</td><td>{r.spot || "-"}</td><td>{r.shape || "-"}</td>
+              <td>{r.act || "-"}</td><td>{r.freq || "-"}</td><td>{r.span || "-"}</td></tr>
+          ))}</tbody>
+        </table>
+      </div>
+    );
+  }
+  if (f.t === "stmt") {
+    const vers = stmtVersions(v);
+    if (!vers.length) return <div className="read-block"><div className="rl">{f.label}</div>{Empty}</div>;
+    return (
+      <div className="read-block">
+        <div className="rl">{f.label}</div>
+        <div className="stmt-vers" style={{ marginTop: 0, borderTop: 0, paddingTop: 0 }}>
+          {vers.map((x, i) => (
+            <div className={"v " + (i === vers.length - 1 ? "cur" : "")} key={i}>
+              <span className="n">{x.draft ? "지금" : "v" + (i + 1)}{x.at ? " " + fmtTime(x.at) : ""}</span>
+              <span className="t">{x.text}</span>
+              <ConcChip text={x.text} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (f.t === "reverse") {
+    const rows = rowsOf(v).filter((r) => filled(r.read));
+    if (!rows.length) return <div className="read-block"><div className="rl">{f.label}</div>{Empty}</div>;
+    return (
+      <div className="read-block">
+        <div className="rl">{f.label}</div>
+        <table className="tbl">
+          <thead><tr><th style={{ width: 26 }}></th><th style={{ width: 130 }}>보여 준 것</th><th>짝이 읽은 것</th><th style={{ width: 105 }}>거리</th><th style={{ width: 110 }}>되돌아간 계단</th><th style={{ width: 170 }}>고친 것</th></tr></thead>
+          <tbody>{rows.map((r, i) => (
+            <tr key={i}><td className="rn">{i + 1}</td><td>{r.shown || "-"}</td><td>{r.read}</td>
+              <td style={{ color: r.gap === GAP_OPTS[2] ? "var(--seal)" : r.gap === GAP_OPTS[0] ? "var(--patina)" : "var(--sub)" }}>{r.gap || "-"}</td>
+              <td>{r.backTo || "-"}</td><td>{r.fixed || "-"}</td></tr>
+          ))}</tbody>
+        </table>
       </div>
     );
   }
@@ -2693,6 +3913,143 @@ function ReflectField({ f, fieldKey, m, ws, setField }) {
   );
 }
 
+/* ---------- 사전·사후 창의성 설문 (학생 작성 카드) ---------- */
+
+function SurveyCard({ phase, block, onChange, onSubmit, busy }) {
+  const sv = block || {};
+  const ans = sv.ans || {};
+  const extra = sv.extra || {};
+  const isPost = phase === "post";
+  const done = SURVEY_ITEMS.filter((it) => ans[it.k] >= 1).length;
+  const total = SURVEY_ITEMS.length;
+  const extraDone = !isPost || SURVEY_POST_LIKERT.every((it) => (extra[it.k] || 0) >= 1);
+
+  if (svDone(sv)) {
+    return (
+      <div className="ok-note">
+        {isPost ? "사후" : "사전"} 설문을 제출했습니다 · {fmtTime(sv.submittedAt)} — 솔직하게 답해 주어 고맙습니다.
+      </div>
+    );
+  }
+
+  const setAns = (k, n) => onChange({ ...sv, startedAt: sv.startedAt || now(), ans: { ...ans, [k]: n } });
+  const setExtra = (k, v2) => onChange({ ...sv, startedAt: sv.startedAt || now(), extra: { ...extra, [k]: v2 } });
+
+  return (
+    <div className="card sv-card">
+      <div className="card-head">
+        <span className="card-code">{isPost ? "사후 설문" : "사전 설문"}</span>
+        <span className="card-title">나의 창의성에 대한 생각</span>
+        <span className="card-sess">{done}/{total}</span>
+      </div>
+      <div className="card-note">
+        정답이 없고 성적과도 관계없는 설문입니다. 잘 보이려는 답이 아니라 지금의 나에게 가장 가까운 답을 고르세요.
+        {isPost ? " 단원을 모두 마친 지금의 생각으로 답합니다. 사전 설문과 같은 문항이지만, 그때의 답을 기억해 맞출 필요는 없습니다." : " 단원을 시작하기 전, 지금 생각 그대로 답합니다. 약 5분이 걸립니다."}
+      </div>
+      <div className="card-body">
+        <div className="sv-legend">{LIKERT.map((l, i) => <span key={i}><b>{i + 1}</b>{l}</span>)}</div>
+        {SURVEY_ITEMS.map((it, idx) => (
+          <div className="sv-item" key={it.k}>
+            <div className="sv-q"><span className="sv-n">{String(idx + 1).padStart(2, "0")}</span>{it.text}</div>
+            <div className="likert" role="radiogroup" aria-label={it.text}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button key={n} className={ans[it.k] === n ? "on" : ""} role="radio" aria-checked={ans[it.k] === n}
+                  title={LIKERT[n - 1]} onClick={() => setAns(it.k, n)}>{n}</button>
+              ))}
+            </div>
+          </div>
+        ))}
+        {isPost && (
+          <div>
+            <div className="sv-block-t">단원을 돌아보며</div>
+            {SURVEY_POST_LIKERT.map((it, idx) => (
+              <div className="sv-item" key={it.k}>
+                <div className="sv-q"><span className="sv-n">추{idx + 1}</span>{it.text}</div>
+                <div className="likert" role="radiogroup" aria-label={it.text}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} className={extra[it.k] === n ? "on" : ""} role="radio" aria-checked={extra[it.k] === n}
+                      title={LIKERT[n - 1]} onClick={() => setExtra(it.k, n)}>{n}</button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="field" style={{ marginTop: 12 }}>
+              <label>{SURVEY_POST_OPEN.text}</label>
+              <textarea rows={3} maxLength={1500} value={extra[SURVEY_POST_OPEN.k] || ""}
+                onChange={(e) => setExtra(SURVEY_POST_OPEN.k, e.target.value)} />
+            </div>
+          </div>
+        )}
+        <div className="sv-foot">
+          <button className="btn" disabled={done < total || !extraDone || busy} onClick={onSubmit}>
+            {busy ? "제출 중…" : done < total ? "남은 문항 " + (total - done) + "개" : !extraDone ? "돌아보기 문항이 남았습니다" : "제출하기"}
+          </button>
+          <span className="hint">모든 문항에 답하면 제출 단추가 켜집니다. 제출한 뒤에는 고칠 수 없습니다.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* 사전·사후 점수 변화 표시 (교사 화면 공용) */
+function DeltaCell({ d }) {
+  if (d == null) return <span className="sv-delta-0">-</span>;
+  const cls = d > 0.05 ? "sv-delta-up" : d < -0.05 ? "sv-delta-dn" : "sv-delta-0";
+  return <span className={cls}>{d > 0 ? "+" : ""}{round2(d)}</span>;
+}
+
+/* 학생 한 명의 설문 요약 — 교사 학생 상세의 사고 변화 탭에 붙는다 */
+function SurveyMini({ sv }) {
+  const pre = sv && sv.pre, post = sv && sv.post;
+  if (!svDone(pre) && !svDone(post)) return null;
+  const sPre = svDone(pre) ? surveyScores(pre.ans) : null;
+  const sPost = svDone(post) ? surveyScores(post.ans) : null;
+  return (
+    <div className="card">
+      <div className="card-head">
+        <span className="card-code">설문</span>
+        <span className="card-title">창의성 자기보고 — 사전·사후</span>
+        <span className="card-sess">
+          {svDone(pre) ? "사전 " + fmtTime(pre.submittedAt) : "사전 미제출"} · {svDone(post) ? "사후 " + fmtTime(post.submittedAt) : "사후 미제출"}
+        </span>
+      </div>
+      <div className="card-body">
+        <div className="tbl-scroll">
+          <table className="tbl sv-tbl" style={{ minWidth: 480 }}>
+            <thead><tr><th>척도 (1~5)</th><th style={{ width: 70 }}>사전</th><th style={{ width: 70 }}>사후</th><th style={{ width: 70 }}>변화</th></tr></thead>
+            <tbody>
+              {SURVEY_SCALES.map((sc) => {
+                const a = sPre ? sPre[sc.k] : null, b = sPost ? sPost[sc.k] : null;
+                return (
+                  <tr key={sc.k}>
+                    <td>{sc.name}<div className="hint">{sc.src}</div></td>
+                    <td className="mono">{a == null ? "-" : round2(a)}</td>
+                    <td className="mono">{b == null ? "-" : round2(b)}</td>
+                    <td><DeltaCell d={a != null && b != null ? b - a : null} /></td>
+                  </tr>
+                );
+              })}
+              <tr>
+                <td><strong>전체 평균</strong></td>
+                <td className="mono">{sPre && sPre.total != null ? round2(sPre.total) : "-"}</td>
+                <td className="mono">{sPost && sPost.total != null ? round2(sPost.total) : "-"}</td>
+                <td><DeltaCell d={sPre && sPost && sPre.total != null && sPost.total != null ? sPost.total - sPre.total : null} /></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {svDone(post) && post.extra && filled(post.extra.e3) && (
+          <div className="read-block" style={{ marginTop: 10 }}>
+            <div className="rl">사후 서술 — 생각이 가장 크게 바뀐 순간</div>
+            <div style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{post.extra.e3}</div>
+          </div>
+        )}
+        <p className="hint" style={{ marginTop: 8 }}>자기보고 점수는 행동 지표(창의성 축)·기록(변화 쌍)과 함께 볼 때에만 해석합니다. 점수 자체를 성적에 쓰지 않습니다.</p>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- 입장 (Firebase 인증) ---------- */
 
 function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
@@ -2808,6 +4165,7 @@ function SectionCard({ sec, ws, setField }) {
       </div>
       {sec.note && <div className="card-note">{sec.note}</div>}
       <div className="card-body">
+        {sec.ladder && <LadderRail sec={sec} ws={ws} />}
         <div className="f-grid">
           {sec.fields.map((f) => <FieldEditor key={f.k} sec={sec} f={f} ws={ws} setField={setField} />)}
         </div>
@@ -2828,6 +4186,12 @@ function StudentApp({ me, onExit, onGallery }) {
   const [saveState, setSaveState] = useState("saved"); // saved | dirty | saving | err
   const [savedAt, setSavedAt] = useState(null);
   const [grade, setGrade] = useState(null);
+  const [survey, setSurvey] = useState(null); // surveys/{학번} 문서 — 사전·사후 창의성 설문
+  const [svCfg, setSvCfg] = useState(DEFAULT_SURVEY);
+  const [svBusy, setSvBusy] = useState(false);
+  const svTimer = useRef(null);
+  const surveyRef = useRef(null);
+  surveyRef.current = survey;
   const timer = useRef(null);
   const retryTimer = useRef(null);
   const wsRef = useRef(ws);
@@ -2902,9 +4266,11 @@ function StudentApp({ me, onExit, onGallery }) {
       const saved = await store.get(WSKEY);
       if (saved) { setWs(saved); setSavedAt(saved._updatedAt || null); }
       setGrade(await store.get("grade:" + me.sid));
+      setSurvey((await store.get("survey:" + me.sid)) || {});
       const cfg = await store.get("config");
       const om = (cfg && cfg.open) || DEFAULT_OPEN;
       setOpenMap(om);
+      setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
       // 지난번에 보던 차시로 이어서 연다. 없으면 열린 차시 중 가장 뒤의 것
       let t0 = SESSIONS[0];
       if (saved && saved._lastTab && isOpen(om, saved._lastTab)) t0 = saved._lastTab;
@@ -2917,7 +4283,7 @@ function StudentApp({ me, onExit, onGallery }) {
 
   // 차시 공개 설정과 교사 피드백을 실시간으로 받음
   useEffect(() => {
-    const un1 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); });
+    const un1 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); });
     const un2 = fbStore.watchDoc("grade:" + me.sid, (g) => { if (g) setGrade(g); });
     return () => { un1(); un2(); };
   }, []);
@@ -2984,8 +4350,33 @@ function StudentApp({ me, onExit, onGallery }) {
       window.removeEventListener("blur", flush);
       if (timer.current) clearTimeout(timer.current);
       if (retryTimer.current) clearTimeout(retryTimer.current);
+      if (svTimer.current) clearTimeout(svTimer.current);
     };
   }, []);
+
+  /* 설문 — 응답은 0.8초 뒤 자동 저장(중간 이탈 분석용), 제출하면 잠긴다 */
+  const svChange = (phase, block) => {
+    const next = { ...(surveyRef.current || {}), ver: SURVEY_VER, [phase]: block };
+    setSurvey(next);
+    if (svTimer.current) clearTimeout(svTimer.current);
+    svTimer.current = setTimeout(() => { store.set("survey:" + me.sid, surveyRef.current); }, 800);
+  };
+  const svSubmit = async (phase) => {
+    const cur = surveyRef.current || {};
+    const block = cur[phase] || {};
+    const started = block.startedAt || now();
+    const sub = now();
+    const next = {
+      ...cur, ver: SURVEY_VER,
+      [phase]: { ...block, startedAt: started, submittedAt: sub, durSec: Math.max(0, Math.round((new Date(sub) - new Date(started)) / 1000)) },
+    };
+    setSvBusy(true);
+    if (svTimer.current) clearTimeout(svTimer.current);
+    setSurvey(next);
+    const ok = await store.set("survey:" + me.sid, next);
+    setSvBusy(false);
+    if (!ok) { alert("제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요."); setSurvey(cur); }
+  };
 
   const switchTab = (s) => {
     if (s === tab) return;
@@ -3049,6 +4440,15 @@ function StudentApp({ me, onExit, onGallery }) {
           </div>
         )}
 
+        {loaded && survey && surveyOpen(svCfg, "pre") && (
+          <SurveyCard phase="pre" block={survey.pre} busy={svBusy}
+            onChange={(b) => svChange("pre", b)} onSubmit={() => svSubmit("pre")} />
+        )}
+        {loaded && survey && surveyOpen(svCfg, "post") && (
+          <SurveyCard phase="post" block={survey.post} busy={svBusy}
+            onChange={(b) => svChange("post", b)} onSubmit={() => svSubmit("post")} />
+        )}
+
         {!isOpen(openMap, tab) ? (
           <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
             이 차시는 아직 열리지 않았습니다. 선생님이 수업 시간에 열어 주면 강의 노트와 학습지가 나타납니다.
@@ -3075,9 +4475,10 @@ function StudentApp({ me, onExit, onGallery }) {
 
 /* ---------- 교사: 학생 상세(열람 + 채점) ---------- */
 
-function TeacherStudentView({ sid, roster, wsData, gradeData, onBack, ids, onSel }) {
+function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack, ids, onSel }) {
   const [ws, setWs] = useState(null);
   const [grade, setGrade] = useState({});
+  const [survey, setSurvey] = useState(null);
   const [gradeDirty, setGradeDirty] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [subTab, setSubTab] = useState("기록 열람");
@@ -3101,13 +4502,16 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, onBack, ids, onSel
       if (isSample) {
         setWs(wsData || {});
         setGrade(gradeData || {});
+        setSurvey(surveyData || null);
       } else {
         const k = isPreview ? "preview" : sid;
         const w = (await store.get("ws:" + k)) || wsData || {};
         const g = (await store.get("grade:" + k)) || {};
+        const sv = (await store.get("survey:" + k)) || surveyData || null;
         if (!alive) return;
         setWs(w);
         setGrade(g);
+        setSurvey(sv);
       }
     })();
     return () => { alive = false; };
@@ -3121,6 +4525,97 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, onBack, ids, onSel
     // 저장하는 사이에 또 고쳤다면 dirty를 풀지 않는다
     if (ok && gradeRef.current === snap) setGradeDirty(false);
     setSaveMsg(ok ? "저장됨 " + fmtTime(now()) : "저장 실패 — 다시 시도하세요");
+  };
+
+  /* ---------- 학생 관리 (별명·학번 변경, 기록 초기화, 작품·계정 정리) ---------- */
+  const [mgmtMsg, setMgmtMsg] = useState("");
+  const [busyMgmt, setBusyMgmt] = useState(false);
+  const [newNick, setNewNick] = useState("");
+  const [newSid, setNewSid] = useState("");
+  const canManage = !isSample && !isPreview;
+
+  const changeNick = async () => {
+    const nick = newNick.trim().slice(0, 12);
+    if (!nick) return setMgmtMsg("새 별명을 입력하세요.");
+    const ok = await fbStore.setStudent(sid, { nick });
+    if (ok) { setNewNick(""); setMgmtMsg("별명을 「" + nick + "」(으)로 바꿨습니다. 목록으로 돌아가면 반영됩니다."); }
+    else setMgmtMsg("별명 변경에 실패했습니다.");
+  };
+
+  const changeSid = async () => {
+    const target = newSid.trim();
+    if (!/^\d{3,6}$/.test(target)) return setMgmtMsg("새 학번은 숫자 3~6자리입니다.");
+    if (target === sid) return setMgmtMsg("현재 학번과 같습니다.");
+    setBusyMgmt(true);
+    const [tWs, allRoster] = await Promise.all([store.get("ws:" + target), store.get("roster")]);
+    if ((allRoster && allRoster[target]) || tWs) { setBusyMgmt(false); return setMgmtMsg("학번 " + target + "은(는) 이미 사용 중입니다. 먼저 그 학번을 정리하세요."); }
+    if (!window.confirm(sid + " → " + target + " 학번을 바꿉니다.\n기록·미디어·채점이 새 학번으로 옮겨집니다. 학생이 지금 접속 중이 아닐 때 실행하세요.\n진행할까요?")) { setBusyMgmt(false); return; }
+    setMgmtMsg("옮기는 중… 창을 닫지 마세요.");
+    try {
+      if (!(await store.set("ws:" + target, ws))) throw new Error("기록지 복사 실패");
+      const refs = collectMediaRefs(ws);
+      for (const ref of refs) {
+        const v = await mediaStore.get(sid, ref);
+        if (v && !(await mediaStore.put(target, ref, v))) throw new Error("미디어 복사 실패");
+      }
+      const g = await store.get("grade:" + sid);
+      if (g && !(await store.set("grade:" + target, g))) throw new Error("채점 복사 실패");
+      await fbStore.setStudent(target, { nick: rec.nick || "" });
+      // 복사가 모두 성공한 뒤에만 원본을 지운다
+      for (const ref of refs) await mediaStore.remove(sid, ref);
+      await fbStore.remove("ws:" + sid);
+      await fbStore.remove("grade:" + sid);
+      await fbStore.removeStudent(sid);
+      setBusyMgmt(false); setMgmtMsg("");
+      window.alert("학번을 " + target + "(으)로 옮겼습니다.\n학생에게: 다음 입장부터 새 학번과 새 비밀번호 4자리로 들어오라고 안내하세요.\n예전 로그인 계정(" + sid + "@museum.class)은 Firebase 콘솔 Authentication에서 지우면 됩니다.");
+      if (onSel) onSel(target); else onBack();
+    } catch (e) {
+      setBusyMgmt(false);
+      setMgmtMsg("옮기다 중단됐습니다 (" + e.message + "). 원본 기록은 그대로 남아 있으니 다시 시도하세요.");
+    }
+  };
+
+  const resetRecords = async () => {
+    const token = window.prompt("이 학생의 기록지와 미디어를 모두 지웁니다. 별명(명부)과 채점은 남습니다.\n지우면 되돌릴 수 없습니다. 확인을 위해 학번 " + sid + "을(를) 입력하세요.");
+    if (token == null) return;
+    if (token.trim() !== sid) return setMgmtMsg("학번이 일치하지 않아 취소했습니다.");
+    setBusyMgmt(true); setMgmtMsg("지우는 중…");
+    for (const ref of collectMediaRefs(ws)) await mediaStore.remove(sid, ref);
+    await fbStore.remove("ws:" + sid);
+    setWs({});
+    setBusyMgmt(false);
+    setMgmtMsg("기록을 초기화했습니다. 학생이 다시 입장하면 빈 기록지로 시작합니다. (접속 중이던 학생은 화면을 새로 고침해야 합니다.)");
+  };
+
+  const deleteStudent = async () => {
+    const token = window.prompt("학생 " + sid + "의 명부·기록·미디어·채점을 모두 지웁니다. 되돌릴 수 없습니다.\n확인을 위해 학번을 입력하세요.");
+    if (token == null) return;
+    if (token.trim() !== sid) return setMgmtMsg("학번이 일치하지 않아 취소했습니다.");
+    setBusyMgmt(true); setMgmtMsg("지우는 중…");
+    for (const ref of collectMediaRefs(ws)) await mediaStore.remove(sid, ref);
+    await fbStore.remove("ws:" + sid);
+    await fbStore.remove("grade:" + sid);
+    await fbStore.removeStudent(sid);
+    setBusyMgmt(false);
+    window.alert("학생 " + sid + "의 자료를 모두 지웠습니다.\n로그인 계정(" + sid + "@museum.class)은 Firebase 콘솔 Authentication에서 지울 수 있습니다. 같은 학번으로 다시 입장하면 새로 시작됩니다.");
+    onBack();
+  };
+
+  const unpublishWork = async () => {
+    const next = { ...ws, "s7x.show": "비공개" };
+    if (await store.set("ws:" + sid, next)) { setWs(next); setMgmtMsg("작품을 전시에서 내렸습니다. 전시장에서 더 이상 보이지 않습니다."); }
+    else setMgmtMsg("전시 내리기에 실패했습니다.");
+  };
+
+  const deleteWorkImage = async () => {
+    const cur = ws["s7x.img"];
+    if (!cur || !cur.ref) return setMgmtMsg("지울 대표 이미지가 없습니다.");
+    if (!window.confirm("전시 대표 이미지를 지웁니다. 되돌릴 수 없습니다. 진행할까요?")) return;
+    await mediaStore.remove(sid, cur.ref);
+    const next = { ...ws, "s7x.img": "" };
+    await store.set("ws:" + sid, next);
+    setWs(next);
+    setMgmtMsg("대표 이미지를 지웠습니다.");
   };
 
   if (!ws) return <div style={{ padding: 30, color: "var(--sub)" }}>불러오는 중…</div>;
@@ -3151,10 +4646,88 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, onBack, ids, onSel
       </div>
 
       <div className="t-tabs">
-        {["기록 열람", "사고 변화", "채점"].map((t) => (
+        {["기록 열람", "번역 사고", "사고 변화", "채점", "관리"].map((t) => (
           <button key={t} className={"btn small " + (subTab === t ? "" : "ghost")} onClick={() => setSubTab(t)}>{t}{t === "채점" && gradeDirty ? " ●" : ""}</button>
         ))}
       </div>
+
+      {subTab === "관리" && (
+        <div>
+          {!canManage ? (
+            <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
+              {isSample ? "표본 학급 자료는 관리할 수 없습니다. 실제 학생이 입장하면 여기서 별명·학번 변경, 기록 초기화, 작품 정리를 할 수 있습니다." : "미리보기 기록은 관리 대상이 아닙니다."}
+            </div></div>
+          ) : (
+            <div>
+              {mgmtMsg && <div className="ok-note">{mgmtMsg}</div>}
+
+              <div className="card">
+                <div className="card-head"><span className="card-code">관리 1</span><span className="card-title">별명 변경</span></div>
+                <div className="card-body">
+                  <p style={{ fontSize: 13, marginBottom: 10 }}>현재 별명: <b>{rec.nick || "-"}</b>. 실명이 들어갔거나 부적절한 별명을 바로잡을 때 씁니다.</p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <input style={{ maxWidth: 200 }} maxLength={12} placeholder="새 별명 (실명 금지)" value={newNick} onChange={(e) => setNewNick(e.target.value)} />
+                    <button className="btn small" disabled={busyMgmt} onClick={changeNick}>별명 바꾸기</button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-head"><span className="card-code">관리 2</span><span className="card-title">학번 변경</span></div>
+                <div className="card-body">
+                  <p style={{ fontSize: 13, marginBottom: 10 }}>
+                    전학·오입력 등으로 학번을 바꿀 때 씁니다. 기록지·사진·음성·스케치·영상·채점이 모두 새 학번으로 옮겨집니다.
+                    옮긴 뒤 학생은 <b>새 학번 + 새 비밀번호 4자리</b>로 입장합니다. 학생이 접속 중이 아닐 때 실행하세요 — 접속 중이면 학생 화면의 자동 저장이 옛 학번 기록을 되살릴 수 있습니다.
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <input style={{ maxWidth: 160 }} inputMode="numeric" maxLength={6} placeholder="새 학번 (숫자 3~6자리)" value={newSid} onChange={(e) => setNewSid(e.target.value.replace(/\D/g, ""))} />
+                    <button className="btn small" disabled={busyMgmt} onClick={changeSid}>{busyMgmt ? "처리 중…" : "학번 옮기기"}</button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-head"><span className="card-code">관리 3</span><span className="card-title">전시 작품 정리</span></div>
+                <div className="card-body">
+                  <p style={{ fontSize: 13, marginBottom: 10 }}>
+                    현재 상태: <b>{ws["s7x.show"] === "공개" ? "전시 공개 중" : "비공개"}</b>
+                    {ws["s7x.no"] ? <> · 작품 번호 <span className="mono">{ws["s7x.no"]}</span></> : null}
+                    {ws["s7x.img"] && ws["s7x.img"].ref ? " · 대표 이미지 있음" : " · 대표 이미지 없음"}
+                  </p>
+                  {ws["s7x.img"] && ws["s7x.img"].ref && <div style={{ marginBottom: 10 }}><MediaThumb owner={sid} refId={ws["s7x.img"].ref} alt="전시 대표 이미지" size={110} /></div>}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="btn small ghost" disabled={busyMgmt || ws["s7x.show"] !== "공개"} onClick={unpublishWork}>전시에서 내리기</button>
+                    <button className="btn small ghost" disabled={busyMgmt || !(ws["s7x.img"] && ws["s7x.img"].ref)} onClick={deleteWorkImage}>대표 이미지 삭제</button>
+                  </div>
+                  <p className="hint" style={{ marginTop: 8 }}>부적절한 작품을 급히 내릴 때 씁니다. 내려도 학생의 기록지는 그대로 남고, 학생이 다시 「공개」로 바꿀 수 있습니다.</p>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-head"><span className="card-code">관리 4</span><span className="card-title">비밀번호(계정) 초기화</span></div>
+                <div className="card-body">
+                  <p style={{ fontSize: 13 }}>
+                    학생 비밀번호는 암호화되어 있어 이 화면에서 바꿀 수 없습니다. 잊어버린 학생이 있으면{" "}
+                    <a href="https://console.firebase.google.com/project/class-9f074/authentication/users" target="_blank" rel="noopener noreferrer">Firebase 콘솔 → Authentication</a>
+                    에서 <span className="mono">{sid}@museum.class</span> 계정을 삭제하세요. 같은 학번으로 다시 입장하면 새 비밀번호로 등록되고, 기록은 학번에 남아 있어 그대로 이어집니다.
+                  </p>
+                </div>
+              </div>
+
+              <div className="card" style={{ borderColor: "var(--seal)" }}>
+                <div className="card-head"><span className="card-code" style={{ color: "var(--seal)" }}>주의</span><span className="card-title">지우기 — 되돌릴 수 없습니다</span></div>
+                <div className="card-body">
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                    <button className="btn small ghost" disabled={busyMgmt} onClick={resetRecords}>기록 초기화 (기록·미디어 삭제, 별명·채점 유지)</button>
+                    <button className="btn small ghost" style={{ borderColor: "var(--seal)", color: "var(--seal)" }} disabled={busyMgmt} onClick={deleteStudent}>학생 완전 삭제 (명부·기록·미디어·채점)</button>
+                  </div>
+                  <p className="hint">두 작업 모두 확인을 위해 학번을 직접 입력해야 실행됩니다. 학기말 정리나 잘못 만든 계정을 지울 때만 쓰세요.</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {ws._act && Object.keys(ws._act).length > 0 && (
         <div className="card">
@@ -3187,7 +4760,14 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, onBack, ids, onSel
         </div>
       )}
 
-      {subTab === "사고 변화" ? <ChangeMap ws={ws} owner={isPreview ? "preview" : sid} /> : null}
+      {subTab === "번역 사고" ? <LadderMap ws={ws} /> : null}
+
+      {subTab === "사고 변화" ? (
+        <div>
+          {survey && <SurveyMini sv={survey} />}
+          <ChangeMap ws={ws} owner={isPreview ? "preview" : sid} />
+        </div>
+      ) : null}
 
       {subTab === "채점" && (
       <div className="grade-panel">
@@ -3580,6 +5160,213 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
   );
 }
 
+/* ---------- 교사: 설문 대시보드 (사전·사후 비교) ---------- */
+
+function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
+  const rows = ids.map((id) => {
+    const sv = surveyMap[id] || {};
+    const pre = svDone(sv.pre) ? surveyScores(sv.pre.ans) : null;
+    const post = svDone(sv.post) ? surveyScores(sv.post.ans) : null;
+    return { id, nick: (roster[id] || {}).nick || "", sv, pre, post };
+  });
+  const nPre = rows.filter((r) => r.pre).length;
+  const nPost = rows.filter((r) => r.post).length;
+  const paired = rows.filter((r) => r.pre && r.post);
+
+  const scaleStats = SURVEY_SCALES.map((sc) => ({ sc, st: pairedStats(paired.map((r) => [r.pre[sc.k], r.post[sc.k]])) }));
+  const totalStat = pairedStats(paired.map((r) => [r.pre.total, r.post.total]));
+
+  const itemStats = SURVEY_ITEMS.map((it, idx) => {
+    const st = pairedStats(paired.map((r) => {
+      const a = ((r.sv.pre || {}).ans || {})[it.k];
+      const b = ((r.sv.post || {}).ans || {})[it.k];
+      return [a >= 1 ? (it.rev ? 6 - a : a) : null, b >= 1 ? (it.rev ? 6 - b : b) : null];
+    }));
+    return { it, idx, st };
+  });
+
+  const extraMean = (k) => {
+    const vals = rows.filter((r) => r.post).map((r) => (((r.sv.post || {}).extra || {})[k])).filter((v) => v >= 1);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
+  const openTexts = rows
+    .map((r) => ({ id: r.id, nick: r.nick, text: ((r.sv.post || {}).extra || {}).e3 }))
+    .filter((x) => filled(x.text));
+
+  const exportSurveyCSV = () => {
+    const head = ["학번", "별명", "사전 제출 시각", "사전 소요(초)", "사후 제출 시각", "사후 소요(초)",
+      ...SURVEY_ITEMS.map((it) => "사전:" + it.k + (it.rev ? "(역)" : "")),
+      ...SURVEY_ITEMS.map((it) => "사후:" + it.k + (it.rev ? "(역)" : "")),
+      ...SURVEY_POST_LIKERT.map((it) => "사후회고:" + it.k),
+      "사후서술:e3",
+      ...SURVEY_SCALES.map((sc) => "사전척도:" + sc.name),
+      ...SURVEY_SCALES.map((sc) => "사후척도:" + sc.name),
+      "사전척도:전체", "사후척도:전체"];
+    const rws = rows.map((r) => {
+      const pre = r.sv.pre || {}, post = r.sv.post || {};
+      const pa = pre.ans || {}, po = post.ans || {};
+      return [r.id, r.nick,
+        svDone(pre) ? pre.submittedAt : "", pre.durSec != null ? pre.durSec : "",
+        svDone(post) ? post.submittedAt : "", post.durSec != null ? post.durSec : "",
+        ...SURVEY_ITEMS.map((it) => (pa[it.k] != null ? pa[it.k] : "")),
+        ...SURVEY_ITEMS.map((it) => (po[it.k] != null ? po[it.k] : "")),
+        ...SURVEY_POST_LIKERT.map((it) => (((post.extra || {})[it.k]) != null ? (post.extra || {})[it.k] : "")),
+        (post.extra || {}).e3 || "",
+        ...SURVEY_SCALES.map((sc) => (r.pre && r.pre[sc.k] != null ? round2(r.pre[sc.k]) : "")),
+        ...SURVEY_SCALES.map((sc) => (r.post && r.post[sc.k] != null ? round2(r.post[sc.k]) : "")),
+        r.pre && r.pre.total != null ? round2(r.pre.total) : "",
+        r.post && r.post.total != null ? round2(r.post.total) : ""];
+    });
+    const esc = (c) => {
+      let s = String(c);
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+      return '"' + s.replace(/"/g, '""') + '"';
+    };
+    const csv = "\uFEFF" + [head, ...rws].map((r) => r.map(esc).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+    a.href = url; a.download = "허구의아카이브_창의성설문" + (sampleMode ? "_표본" : "") + "_" + stamp + ".csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const fmtMS = (st, which) => st == null ? "-" :
+    round2(which === "pre" ? st.mPre : st.mPost) + " (" + round2(which === "pre" ? st.sdPre : st.sdPost) + ")";
+
+  return (
+    <div>
+      <div className="kpis">
+        <div className="kpi"><div className="n">{nPre}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {ids.length}</span></div><div className="l">사전 설문 제출</div></div>
+        <div className="kpi"><div className="n">{nPost}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {ids.length}</span></div><div className="l">사후 설문 제출</div></div>
+        <div className="kpi"><div className="n">{paired.length}</div><div className="l">사전·사후 짝 (분석 대상)</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">설문 1</span><span className="card-title">척도별 사전·사후 비교</span>
+          <span className="card-sess">5점 리커트 · 역문항 반전 채점</span></div>
+        <div className="card-body">
+          {paired.length === 0 ? (
+            <p className="hint">사전과 사후를 모두 제출한 학생이 아직 없습니다. 두 설문이 모두 모이면 짝지은 비교가 나타납니다.</p>
+          ) : (
+            <div className="tbl-scroll">
+              <table className="tbl sv-tbl">
+                <thead><tr><th>척도</th><th style={{ width: 40 }}>n</th><th style={{ width: 105 }}>사전 M (SD)</th><th style={{ width: 105 }}>사후 M (SD)</th><th style={{ width: 70 }}>Δ</th><th style={{ width: 70 }}>효과크기 dz</th></tr></thead>
+                <tbody>
+                  {scaleStats.map(({ sc, st }) => (
+                    <tr key={sc.k}>
+                      <td>{sc.name}<div className="hint">{sc.src}</div></td>
+                      <td className="mono">{st ? st.n : 0}</td>
+                      <td className="mono">{fmtMS(st, "pre")}</td>
+                      <td className="mono">{fmtMS(st, "post")}</td>
+                      <td>{st ? <DeltaCell d={st.mDiff} /> : "-"}</td>
+                      <td className="mono">{st && st.dz != null ? round2(st.dz) : "-"}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td><strong>전체 평균</strong></td>
+                    <td className="mono">{totalStat ? totalStat.n : 0}</td>
+                    <td className="mono">{fmtMS(totalStat, "pre")}</td>
+                    <td className="mono">{fmtMS(totalStat, "post")}</td>
+                    <td>{totalStat ? <DeltaCell d={totalStat.mDiff} /> : "-"}</td>
+                    <td className="mono">{totalStat && totalStat.dz != null ? round2(totalStat.dz) : "-"}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="hint" style={{ marginTop: 8 }}>
+            dz는 짝지은 표본의 Cohen 효과크기(변화 평균 ÷ 변화의 표준편차)입니다. 통제집단이 없는 단일집단 사전·사후 설계이므로 변화를 수업의 효과로 단정하지 말고,
+            행동 지표(창의성 탭)·기록(변화 쌍)과 함께 해석합니다. 표본이 한 학급이면 통계적 검정보다 기술통계와 개별 사례 서술이 정직합니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">설문 2</span><span className="card-title">문항별 변화</span>
+          <span className="card-sess">짝 표본 기준 · 역문항 반전 후</span></div>
+        <div className="card-body">
+          {paired.length === 0 ? <p className="hint">짝 표본이 생기면 문항 단위의 변화가 나타납니다.</p> : (
+            <div className="tbl-scroll">
+              <table className="tbl sv-tbl">
+                <thead><tr><th style={{ width: 34 }}>#</th><th>문항</th><th style={{ width: 60 }}>사전</th><th style={{ width: 60 }}>사후</th><th style={{ width: 64 }}>Δ</th></tr></thead>
+                <tbody>
+                  {itemStats.map(({ it, idx, st }) => (
+                    <tr key={it.k}>
+                      <td className="mono">{idx + 1}{it.rev ? <span title="역문항" style={{ color: "var(--seal)" }}>*</span> : ""}</td>
+                      <td style={{ fontSize: 12 }}>{it.text}<span className="hint" style={{ marginLeft: 6 }}>{(SURVEY_SCALES.find((s) => s.k === it.s) || {}).name}</span></td>
+                      <td className="mono">{st ? round2(st.mPre) : "-"}</td>
+                      <td className="mono">{st ? round2(st.mPost) : "-"}</td>
+                      <td>{st ? <DeltaCell d={st.mDiff} /> : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="hint" style={{ marginTop: 8 }}>* 표시는 역문항으로, 표의 값은 반전 채점(6-응답) 뒤의 값입니다.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">설문 3</span><span className="card-title">사후 회고 — 수업 경험</span></div>
+        <div className="card-body">
+          {SURVEY_POST_LIKERT.map((it) => {
+            const m = extraMean(it.k);
+            return (
+              <div className="hbar" key={it.k}>
+                <span className="lb" style={{ width: "60%", flex: "0 0 auto" }}>{it.text}</span>
+                <span className="tr"><i style={{ width: (m ? (m / 5) * 100 : 0) + "%" }} /></span>
+                <span className="v">{m ? round2(m) : "-"}</span>
+              </div>
+            );
+          })}
+          {openTexts.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div className="hint" style={{ marginBottom: 6 }}>생각이 가장 크게 바뀐 순간 (서술, {openTexts.length}명)</div>
+              {openTexts.map((x) => (
+                <div className="read-block" key={x.id}>
+                  <div className="rl">{x.id} · {x.nick}</div>
+                  <div style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{x.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="hint" style={{ marginTop: 8 }}>회고 문항은 사전·사후 비교에 넣지 않고, 변화의 해석(무엇이 변화를 만들었는가)에만 씁니다.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">설문 4</span><span className="card-title">학생별 제출 현황과 전체 점수</span></div>
+        <div className="card-body">
+          <div className="tbl-scroll">
+            <table className="roster">
+              <thead><tr><th>학번</th><th>별명</th><th>사전</th><th>사후</th><th>전체 사전</th><th>전체 사후</th><th>Δ</th><th></th></tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td className="mono">{r.id}</td>
+                    <td>{r.nick}</td>
+                    <td className="mono" style={{ fontSize: 11 }}>{svDone(r.sv.pre) ? fmtTime(r.sv.pre.submittedAt) : <span style={{ color: "var(--sub)" }}>-</span>}</td>
+                    <td className="mono" style={{ fontSize: 11 }}>{svDone(r.sv.post) ? fmtTime(r.sv.post.submittedAt) : <span style={{ color: "var(--sub)" }}>-</span>}</td>
+                    <td className="mono">{r.pre && r.pre.total != null ? round2(r.pre.total) : "-"}</td>
+                    <td className="mono">{r.post && r.post.total != null ? round2(r.post.total) : "-"}</td>
+                    <td>{r.pre && r.post && r.pre.total != null && r.post.total != null ? <DeltaCell d={r.post.total - r.pre.total} /> : "-"}</td>
+                    <td><button className="btn small ghost" onClick={() => onSel && onSel(r.id)}>열람</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
+            <button className="btn" onClick={exportSurveyCSV}>설문 원자료 CSV 내려받기</button>
+            <span className="hint">문항 응답은 역채점 전 원자료(1~5), 척도 점수는 역채점 반영값입니다. 논문 분석용 데이터는 이 파일을 씁니다.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- 교사: 수업 안내 (교사용 안내서) ---------- */
 
 function TeacherGuide() {
@@ -3589,6 +5376,47 @@ function TeacherGuide() {
       <div className="card">
         <div className="card-body" style={{ fontSize: 13, color: "var(--sub)" }}>
           차시별 교사용 안내서입니다. 120분 수업 흐름, 성취기준, 설계 근거(교육학적 참고)와 학생에게 보이는 읽기 자료를 함께 볼 수 있습니다. 학생 화면에는 학습 목표와 읽기 자료만 보입니다.
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-body">
+          <details>
+            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>연구 설계 참고 — 이론적 기반, 측정 도구, 데이터 수집 구조, 연구 윤리</summary>
+            <div style={{ fontSize: 13, lineHeight: 1.8, marginTop: 10 }}>
+              <p style={{ marginBottom: 10 }}>
+                <b>이론적 기반.</b> 이 단원이 기르려는 창의성은 Kaufman과 Beghetto의 4C 모형에서 <b>mini-c</b>(학습 과정에서 자기에게 새로운 해석)와{" "}
+                <b>little-c</b>(일상의 문제를 새롭고 적절하게 해결하는 창의성)입니다. big-C(역사적 창의성)는 학교 수업의 측정 대상이 아니므로,
+                수업과 측정 모두 little-c 수준의 행동·인식·산출을 겨냥합니다. 수업 설계의 축은 세 가지입니다.
+                ① Guilford의 확산적 사고와 수렴적 사고의 순환 — 생성 회차(발산)와 선별·제외(수렴)가 한 차시 안에서 반복되게 함.
+                ② Amabile의 성분 이론 — 영역 지식(1~4차시의 미술사·형식 학습), 창의적 사고 과정(점검·수정·전유), 내적 동기(자기 접점에서 출발하는 문제 선정)를 각 차시에 배치함.
+                ③ 인간-AI 공동창작 연구의 관점 — 생성형 AI를 아이디어를 대신 내는 기계가 아니라 <b>발산을 넓히는 도구</b>로 두고,
+                수렴(선별·제외·전유)의 판단을 학생에게 남겨 두는 역할 분담을 기록지 구조로 강제함(기록 H·I·K의 순서).
+              </p>
+              <p style={{ marginBottom: 10 }}>
+                <b>측정 설계.</b> 단일집단 사전·사후 설계에 과정 데이터를 더한 혼합 설계입니다. 세 갈래를 삼각검증합니다.
+                ① <b>자기보고</b> — 사전·사후 24문항 설문(창의적 자기효능감 Beghetto 2006 · Karwowski 2011, 창의적 정체성 Karwowski 2011,
+                아이디어 행동 RIBS Runco 외 2001, 창의성 성장 신념 Karwowski 2014, 일상 창의 행동, AI 협업 창의성 인식). 같은 문항을 두 번 실시하고
+                역문항 2개로 무성의 응답을 점검합니다. ② <b>행동 지표</b> — 창의성 6축(유창성·융통성·독창성·정교성·과정·멀티모달)을 기록 데이터에서 계산.
+                ③ <b>질적 기록</b> — 변화 쌍 8곳(사전·사후로 같은 질문에 두 번 답한 자리), 고쳐 쓰기 이력, 성찰문, 스스로 만든 질문(문제 발견).
+                통제집단이 없으므로 설문 변화만으로 효과를 주장하지 않고, 세 갈래가 같은 방향을 가리키는지 서술하는 것이 정직한 분석입니다.
+              </p>
+              <p style={{ marginBottom: 10 }}>
+                <b>데이터 수집 구조.</b> 설문은 <span className="mono">surveys</span> 컬렉션(학생당 1문서, 사전·사후·응답 시각·소요 시간)에,
+                과정 기록은 <span className="mono">worksheets</span>(수정 이력 <span className="mono">_log</span>, 차시별 활동 시간 <span className="mono">_act</span> 포함)에 쌓입니다.
+                「설문」 탭에서 문항 원자료 CSV(분석용)를, 「설정」 탭에서 종합 CSV(설문 척도 + 행동 지표 + 루브릭)를 내려받아
+                자기보고와 행동 지표의 상관, 사전·사후 변화(짝지은 기술통계와 효과크기 dz)를 분석할 수 있습니다.
+              </p>
+              <p style={{ marginBottom: 10 }}>
+                <b>실시 지침.</b> 사전 설문은 1차시 수업 내용을 만나기 전에(차시 공개 탭에서 열고, 시작하면 닫기), 사후 설문은 8차시 정리 단계에서 실시합니다.
+                실시 전에 반드시 안내할 것 — 정답이 없다는 것, 성적과 무관하다는 것, 잘 보이려는 답이 아니라 지금의 생각을 고르라는 것.
+              </p>
+              <p>
+                <b>연구 윤리.</b> 논문화하려면 학교장·보호자·학생의 사전 동의(연구 목적, 수집 항목, 익명 처리, 참여 거부 가능)를 받고,
+                분석 자료에서 학번을 가명 코드로 바꿉니다. 별명·기록에 실명과 개인정보가 들어가지 않게 하는 운영 원칙은 README를 따릅니다.
+                설문 미제출·중도 이탈 학생의 자료는 분석에서 제외하되 그 수를 보고합니다.
+              </p>
+            </div>
+          </details>
         </div>
       </div>
       <div className="card">
@@ -3624,15 +5452,922 @@ function TeacherGuide() {
   );
 }
 
+/* ============================================================
+   사고 과정 대시보드와 연구 자료 변환
+   ============================================================ */
+
+/* 파일 내려받기 공용 도우미 */
+const csvCell = (c) => {
+  let s = c == null ? "" : String(c);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;   // 스프레드시트 수식 주입 방지
+  return '"' + s.replace(/"/g, '""') + '"';
+};
+const toCSV = (head, rows) => "﻿" + [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
+const fileStamp = () => new Date().toISOString().slice(2, 10).replace(/-/g, "");
+function download(name, text, mime) {
+  const url = URL.createObjectURL(new Blob([text], { type: (mime || "text/plain") + ";charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- 교사: 학생 한 명의 번역 사고 과정 ---------- */
+
+function LadderMap({ ws }) {
+  const d = ws || {};
+  const tm = translationMetrics(d);
+  const back = {};
+  tm.backStages.forEach((b) => { back[b] = (back[b] || 0) + 1; });
+
+  return (
+    <div>
+      <div className="metrics">
+        {[
+          { v: tm.depth, u: "/ 7", l: "연속 도달 계단", h: "끊기지 않고 채운 마지막 계단" },
+          { v: tm.invN, u: "가지", l: "보이지 않는 것", h: "늘어놓은 항목 수" },
+          { v: tm.invTypeN, u: "갈래", l: "보이지 않음의 갈래", h: "여러 각도에서 보았는가" },
+          { v: tm.candN, u: "개", l: "사물 후보", h: "견주어 본 물건의 수" },
+          { v: tm.causalN, u: "행", l: "인과를 어림한 흔적", h: "동작과 반복까지 적은 흔적" },
+          { v: tm.revisitN, u: "회", l: "되돌아간 횟수", h: "읽히지 않아 앞 계단으로 간 횟수" },
+          { v: tm.stmtVers, u: "회", l: "진술 확정", h: "문장을 다시 세운 횟수" },
+          { v: tm.concGain == null ? "-" : (tm.concGain > 0 ? "+" : "") + tm.concGain, u: "", l: "구체성 변화", h: "초안 → 확정 진술" },
+        ].map((m, i) => (
+          <div className="metric" key={i}>
+            <div className="mv">{m.v}<small> {m.u}</small></div>
+            <div className="ml">{m.l}</div>
+            <div className="mh">{m.h}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">계단</span><span className="card-title">일곱 계단의 오르기</span></div>
+        <div className="card-body">
+          <div className="funnel">
+            {tm.stages.map((s) => {
+              const st = TRANSLATE_STAGES.find((x) => x.key === s.key);
+              return (
+                <div className="fr" key={s.key}>
+                  <span className="lb"><small>{s.key}</small>{st.full}</span>
+                  <span className="tr"><i className={s.ratio >= 0.999 ? "" : "part"} style={{ width: Math.round(s.ratio * 100) + "%" }} /></span>
+                  <span className="v">{s.done}/{s.total} · {s.chars}자{s.conc != null ? " · 구체성 " + s.conc : ""}</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="hint" style={{ marginTop: 10 }}>초록은 그 계단을 다 채운 상태, 흐린 색은 채우는 중입니다. 글자 수와 구체성은 그 계단에 남긴 글 전체를 대상으로 셉니다.</p>
+        </div>
+      </div>
+
+      <div className="pair">
+        <div className="pair-head">
+          <span className="pair-dim">번역 진술</span>
+          <span className="pair-label">초안(T5)에서 확정(T7)으로</span>
+        </div>
+        <div className="pair-body">
+          <div className="pair-cell">
+            <div className="pair-where">T5 흔적으로 옮기기 · 초안</div>
+            <div className={"pair-text " + (filled(tm.stmt1) ? "" : "empty")}>{tm.stmt1 || "미기록"}</div>
+            {tm.conc1 != null && <div style={{ marginTop: 6 }}><ConcChip text={tm.stmt1} /></div>}
+          </div>
+          <div className="pair-arrow">→</div>
+          <div className="pair-cell after">
+            <div className="pair-where">T7 되돌려 읽기 뒤 · 확정</div>
+            <div className={"pair-text " + (filled(tm.stmt2) ? "" : "empty")}>{tm.stmt2 || "미기록"}</div>
+            {tm.conc2 != null && <div style={{ marginTop: 6 }}><ConcChip text={tm.stmt2} /></div>}
+          </div>
+        </div>
+        <div className="pair-look">
+          {tm.overlap == null ? "두 진술이 모두 있어야 견줄 수 있습니다."
+            : "두 문장의 어휘가 " + tm.overlap + "% 겹칩니다. 겹침이 낮고 구체성이 오른 경우가 말이 바뀐 자리입니다."}
+          {filled(d["s3t4.moved"]) ? " 학생이 적은 변화: " + d["s3t4.moved"] : ""}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">되돌림</span><span className="card-title">읽히지 않아 되돌아간 자리</span></div>
+        <div className="card-body">
+          {tm.reverseN === 0 ? <p className="hint">아직 되돌려 읽기 기록이 없습니다.</p> : (
+            <div>
+              <p style={{ fontSize: 13, marginBottom: 8 }}>
+                짝의 읽기 {tm.reverseN}건 가운데 의도와 거의 같게 읽힌 것 {tm.gapSame}건, 다르게 읽힌 것 {tm.gapDiff}건.
+                되돌아가 고친 횟수 {tm.revisitN}회.
+              </p>
+              {Object.keys(back).length > 0 && (
+                <div className="funnel">
+                  {Object.keys(back).map((k) => (
+                    <div className="fr" key={k}>
+                      <span className="lb">{k}</span>
+                      <span className="tr"><i style={{ width: Math.min(100, back[k] * 50) + "%", background: "var(--seal)" }} /></span>
+                      <span className="v">{back[k]}회</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">기록</span><span className="card-title">사다리에 남은 글 전체</span></div>
+        <div className="card-body">
+          {SCHEMA.filter((sec) => sec.ladder).map((sec) => (
+            <div key={sec.id} style={{ marginBottom: 16 }}>
+              <div className="rl" style={{ color: "var(--seal)" }}>{sec.code} · {sec.title}</div>
+              {sec.fields.map((f) => <FieldReader key={f.k} sec={sec} f={f} ws={d} owner={null} />)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 교사: 학급 전체의 사고 과정 ---------- */
+
+function ConcSlope({ rows, onSel }) {
+  const W = 640, H = 250, pad = 34;
+  const pts = rows.filter((r) => r.tm.conc1 != null && r.tm.conc2 != null);
+  const y = (v) => H - pad - (v / 100) * (H - pad * 2);
+  const x1 = pad + 70, x2 = W - pad - 70;
+  return (
+    <div>
+      <svg className="slope" viewBox={"0 0 " + W + " " + H} preserveAspectRatio="xMidYMid meet" role="img" aria-label="번역 진술 구체성의 초안 대비 확정 변화">
+        <line className="ax" x1={x1} y1={pad} x2={x1} y2={H - pad} />
+        <line className="ax" x1={x2} y1={pad} x2={x2} y2={H - pad} />
+        {[0, 25, 50, 75, 100].map((v) => (
+          <g key={v}>
+            <line className="ax" x1={x1 - 4} y1={y(v)} x2={x1} y2={y(v)} />
+            <text x={x1 - 8} y={y(v) + 3} textAnchor="end">{v}</text>
+          </g>
+        ))}
+        <text x={x1} y={pad - 12} textAnchor="middle">T5 초안</text>
+        <text x={x2} y={pad - 12} textAnchor="middle">T7 확정</text>
+        {pts.map((r) => {
+          const up = r.tm.conc2 > r.tm.conc1, dn = r.tm.conc2 < r.tm.conc1;
+          return (
+            <g key={r.id} style={{ cursor: onSel ? "pointer" : "default" }} onClick={() => onSel && onSel(r.id)}>
+              <line className={"ln " + (up ? "up" : dn ? "dn" : "")} x1={x1} y1={y(r.tm.conc1)} x2={x2} y2={y(r.tm.conc2)} />
+              <circle className="dot" cx={x1} cy={y(r.tm.conc1)} r="2.5" />
+              <circle className="dot" cx={x2} cy={y(r.tm.conc2)} r="2.5" />
+              <title>{r.id} {r.nick} — 초안 {r.tm.conc1} → 확정 {r.tm.conc2}</title>
+            </g>
+          );
+        })}
+        {pts.length === 0 && <text x={W / 2} y={H / 2} textAnchor="middle">아직 초안과 확정 진술을 모두 쓴 학생이 없습니다</text>}
+      </svg>
+      <div className="tt-legend">
+        <span><i style={{ background: "var(--patina)" }} />구체성이 오른 학생</span>
+        <span><i style={{ background: "var(--seal)" }} />내려간 학생</span>
+        <span><i style={{ background: "var(--sub)" }} />변화 없음</span>
+        <span>선을 누르면 그 학생의 기록으로 갑니다</span>
+      </div>
+    </div>
+  );
+}
+
+function TranslationPanel({ ids, roster, wsMap, onSel }) {
+  const rows = ids.map((id) => ({ id, nick: (roster[id] || {}).nick || "", ws: wsMap[id] || {}, tm: translationMetrics(wsMap[id] || {}) }));
+  const N = rows.length;
+  if (!N) return <div className="card"><div className="card-body" style={{ color: "var(--sub)" }}>학생 기록이 쌓이면 사고 과정이 여기에 나타납니다.</div></div>;
+
+  const typeCount = {};
+  rows.forEach((r) => Object.keys(r.tm.invTypeFreq || {}).forEach((k) => { typeCount[k] = (typeCount[k] || 0) + r.tm.invTypeFreq[k]; }));
+  const typeTotal = Object.values(typeCount).reduce((a, b) => a + b, 0);
+  const backCount = {};
+  rows.forEach((r) => r.tm.backStages.forEach((b) => { backCount[b] = (backCount[b] || 0) + 1; }));
+  const st = prePostStats(rows.map((r) => r.tm.conc1), rows.map((r) => r.tm.conc2));
+
+  return (
+    <div>
+      <div className="kpis">
+        <div className="kpi"><div className="n">{r2(mean(rows.map((r) => r.tm.depth)))}</div><div className="l">평균 도달 계단 (7 만점)</div></div>
+        <div className="kpi"><div className="n">{rows.filter((r) => r.tm.depth >= 7).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">일곱 계단을 다 오른 학생</div></div>
+        <div className="kpi"><div className="n">{rows.reduce((a, r) => a + r.tm.revisitN, 0)}</div><div className="l">학급 전체 되돌림 횟수</div></div>
+        <div className="kpi"><div className="n">{st.n ? (st.diffM > 0 ? "+" : "") + r2(st.diffM) : "-"}</div><div className="l">구체성 평균 변화 (초안 → 확정)</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">과정 1</span><span className="card-title">계단별 도달률</span></div>
+        <div className="card-body">
+          <div className="funnel">
+            {TRANSLATE_STAGES.map((s, i) => {
+              const full = rows.filter((r) => r.tm.stages[i].ratio >= 0.999).length;
+              const part = rows.filter((r) => r.tm.stages[i].ratio > 0 && r.tm.stages[i].ratio < 0.999).length;
+              return (
+                <div className="fr" key={s.key}>
+                  <span className="lb"><small>{s.key}</small>{s.full}</span>
+                  <span className="tr">
+                    <i style={{ width: (full / N) * 100 + "%" }} />
+                    <i className="part" style={{ left: (full / N) * 100 + "%", width: (part / N) * 100 + "%" }} />
+                  </span>
+                  <span className="v">완료 {full} · 진행 {part}</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="hint" style={{ marginTop: 10 }}>완료가 급격히 줄어드는 계단이 이 학급이 막힌 자리입니다. 그 계단의 발문을 다음 차시 도입에서 다시 다룹니다.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">과정 2</span><span className="card-title">무엇 때문에 보이지 않는다고 보았는가</span></div>
+        <div className="card-body">
+          {typeTotal === 0 ? <p className="hint">아직 갈래를 고른 기록이 없습니다.</p> : (
+            <div className="funnel">
+              {INVIS_TYPES.map((t) => {
+                const c = typeCount[t.k] || 0;
+                return (
+                  <div className="fr" key={t.k}>
+                    <span className="lb">{t.label}</span>
+                    <span className="tr"><i style={{ width: (c / typeTotal) * 100 + "%" }} /></span>
+                    <span className="v">{c}건 · {Math.round((c / typeTotal) * 100)}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <p className="hint" style={{ marginTop: 10 }}>한 갈래에 몰려 있으면 학급 전체가 같은 각도에서만 문제를 본 것입니다. 비어 있는 갈래를 예시로 들어 주면 사물 후보가 넓어집니다.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">과정 3</span><span className="card-title">번역 진술의 구체성 변화</span></div>
+        <div className="card-body">
+          <ConcSlope rows={rows} onSel={onSel} />
+          <p className="hint" style={{ marginTop: 8 }}>
+            {st.n ? "두 진술을 모두 쓴 " + st.n + "명 기준 초안 평균 " + r2(st.preM) + ", 확정 평균 " + r2(st.postM) + ", 평균 변화 " + (st.diffM > 0 ? "+" : "") + r2(st.diffM) + "." : "두 진술을 모두 쓴 학생이 아직 없습니다."}
+            {" "}구체성은 위치·재질·변형·수량을 가리키는 말을 기계적으로 센 값이며 작품의 좋고 나쁨과는 무관합니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">과정 4</span><span className="card-title">되돌아간 계단</span></div>
+        <div className="card-body">
+          {Object.keys(backCount).length === 0 ? <p className="hint">아직 되돌아간 기록이 없습니다. 되돌려 읽기(T6)를 수업에서 함께 해 보세요.</p> : (
+            <div className="funnel">
+              {Object.keys(backCount).sort().map((k) => (
+                <div className="fr" key={k}>
+                  <span className="lb">{k}</span>
+                  <span className="tr"><i style={{ width: Math.min(100, (backCount[k] / N) * 100) + "%", background: "var(--seal)" }} /></span>
+                  <span className="v">{backCount[k]}회</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="hint" style={{ marginTop: 10 }}>되돌아간 기록은 실패가 아니라 자기 판단을 뒤집은 흔적입니다. 되돌림이 한 번도 없는 학생에게는 짝을 바꾸어 한 번 더 읽혀 봅니다.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">과정 5</span><span className="card-title">학생별 사고 과정 표</span></div>
+        <div className="card-body">
+          <div className="tbl-scroll">
+            <table className="roster">
+              <thead><tr>
+                <th>학번</th><th>별명</th><th>도달</th><th>보이지 않는 것</th><th>갈래</th><th>사물 후보</th><th>인과</th><th>되돌림</th><th>확정</th><th>구체성 초안→확정</th><th></th>
+              </tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td className="mono">{r.id}</td>
+                    <td>{r.nick}</td>
+                    <td className="mono">{r.tm.depth}/7</td>
+                    <td className="mono">{r.tm.invN}</td>
+                    <td className="mono">{r.tm.invTypeN}</td>
+                    <td className="mono">{r.tm.candN}</td>
+                    <td className="mono">{r.tm.causalN}</td>
+                    <td className="mono" style={{ color: r.tm.revisitN ? "var(--seal)" : "var(--sub)" }}>{r.tm.revisitN}</td>
+                    <td className="mono">{r.tm.stmtVers}</td>
+                    <td className="mono">{r.tm.conc1 == null ? "-" : r.tm.conc1}{" → "}{r.tm.conc2 == null ? "-" : r.tm.conc2}</td>
+                    <td><button className="btn small" onClick={() => onSel && onSel(r.id)}>열람</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   연구 자료 변환 — 수업 기록을 논문 작성용 자료로 옮긴다
+   ------------------------------------------------------------
+   1) 익명 참여자 번호를 붙이고 (학번·별명은 내보내지 않음)
+   2) 참여자 단위·계단 단위·문장 단위의 세 가지 자료 구조로 펼치고
+   3) 사전·사후 대응 자료와 기술통계 표를 만들고
+   4) 연구 방법·결과의 사실 서술만 채운 원고 초안을 낸다.
+   해석과 논의는 초안에 「연구자 서술」 자리로 비워 둔다.
+   ============================================================ */
+
+const GRADE_NUM = { "상": 3, "중": 2, "하": 1 };
+
+/* 변수 사전 — 내보내기·기술통계·코드북이 이 한 벌을 함께 쓴다 */
+const RESEARCH_VARS = [
+  { k: "progress_pct", name: "전체 기록률", unit: "%", def: "기록지 전체 필수 항목 가운데 채운 비율", get: (c) => overallProgress(c.ws) },
+  { k: "stage_depth", name: "연속 도달 계단", unit: "0–7", def: "T1부터 끊기지 않고 모두 채운 마지막 계단의 번호", get: (c) => c.tm.depth },
+  { k: "stage_reached", name: "완료 계단 수", unit: "0–7", def: "순서와 무관하게 필수 항목을 모두 채운 계단의 개수", get: (c) => c.tm.reached },
+  { k: "scenes_n", name: "관찰 장면 수", unit: "개", def: "T1에서 ‘무엇을 보았는가’ 칸을 채운 행의 수", get: (c) => c.tm.scenes },
+  { k: "sense_n", name: "감각 채널 수", unit: "0–5", def: "T1 장면에 표시된 서로 다른 감각의 종류 수", get: (c) => c.tm.senses },
+  { k: "invis_n", name: "보이지 않는 것 수", unit: "개", def: "T3에서 내용을 채운 항목의 수", get: (c) => c.tm.invN },
+  { k: "invis_type_n", name: "비가시성 갈래 수", unit: "0–5", def: "T3에서 고른 서로 다른 비가시성 유형의 수", get: (c) => c.tm.invTypeN },
+  { k: "invis_type_main", name: "주된 비가시성 갈래", unit: "명목", def: "T3에서 가장 자주 고른 유형", get: (c) => (INVIS_TYPES.find((t) => t.k === c.tm.invTypeMain) || {}).label || "", text: true },
+  { k: "cand_n", name: "사물 후보 수", unit: "개", def: "T4에서 사물 이름을 채운 행의 수", get: (c) => c.tm.candN },
+  { k: "cand_drop_n", name: "접은 후보 수", unit: "개", def: "T4에서 ‘접음’으로 판정한 후보의 수", get: (c) => c.tm.dropN },
+  { k: "drop_reason", name: "접은 이유 기록", unit: "0/1", def: "접은 후보의 이유를 서술했으면 1", get: (c) => c.tm.dropWhy },
+  { k: "trace_n", name: "흔적 번역 행 수", unit: "개", def: "T5에서 자리 또는 모양을 채운 행의 수", get: (c) => c.tm.traceN },
+  { k: "causal_n", name: "인과를 어림한 흔적 수", unit: "개", def: "T5에서 동작과 빈도(또는 기간)를 함께 적은 행의 수", get: (c) => c.tm.causalN },
+  { k: "reverse_n", name: "되돌려 읽기 건수", unit: "건", def: "T6에서 짝의 읽기를 기록한 건수", get: (c) => c.tm.reverseN },
+  { k: "gap_same", name: "의도대로 읽힌 건수", unit: "건", def: "T6에서 ‘거의 같게 읽음’으로 판정한 건수", get: (c) => c.tm.gapSame },
+  { k: "gap_diff", name: "다르게 읽힌 건수", unit: "건", def: "T6에서 ‘다르게 읽음’으로 판정한 건수", get: (c) => c.tm.gapDiff },
+  { k: "revisit_n", name: "되돌아간 횟수", unit: "회", def: "T6에서 앞 계단으로 되돌아가 고쳤다고 기록한 횟수", get: (c) => c.tm.revisitN },
+  { k: "stmt_versions", name: "진술 확정 횟수", unit: "회", def: "T5·T7의 번역 진술을 확정한 누적 횟수", get: (c) => c.tm.stmtVers },
+  { k: "conc_pre", name: "구체성(초안)", unit: "0–100", def: "T5 번역 진술 초안의 관찰어 지수", get: (c) => c.tm.conc1 },
+  { k: "conc_post", name: "구체성(확정)", unit: "0–100", def: "T7 번역 진술 확정문의 관찰어 지수", get: (c) => c.tm.conc2 },
+  { k: "conc_gain", name: "구체성 변화량", unit: "점", def: "확정 − 초안", get: (c) => c.tm.concGain },
+  { k: "lex_overlap", name: "초안·확정 어휘 겹침", unit: "%", def: "두 진술의 어절 자카드 유사도", get: (c) => c.tm.overlap },
+  { k: "len_pre", name: "진술 길이(초안)", unit: "자", def: "T5 진술 초안의 글자 수", get: (c) => c.tm.len1 },
+  { k: "len_post", name: "진술 길이(확정)", unit: "자", def: "T7 진술 확정문의 글자 수", get: (c) => c.tm.len2 },
+  { k: "cr_fluency", name: "창의성:시도의 양", unit: "0–100", def: "생성 회차·명칭 후보·에스키스의 갈래 수", get: (c) => c.ax.fluency },
+  { k: "cr_flexibility", name: "창의성:방법 바꾸기", unit: "0–100", def: "다듬기 방법·수정 방법·도구를 옮겨 다닌 폭", get: (c) => c.ax.flexibility },
+  { k: "cr_originality", name: "창의성:남다름", unit: "0–100", def: "문제·유물명·태도·진열 선택의 학급 내 희소도", get: (c) => c.ax.originality },
+  { k: "cr_elaboration", name: "창의성:설정의 촘촘함", unit: "0–100", def: "흔적·일대기·출토 맥락·명제표의 세부 밀도", get: (c) => c.ax.elaboration },
+  { k: "cr_process", name: "창의성:다시 보기", unit: "0–100", def: "불성립 선언·제외 근거·반론·고쳐 쓰기", get: (c) => c.ax.process },
+  { k: "cr_multimodal", name: "창의성:채집의 폭", unit: "0–100", def: "사진·소리·스케치·영상·링크의 고른 사용", get: (c) => c.ax.multimodal },
+  { k: "media_n", name: "멀티모달 자료 수", unit: "건", def: "기록지에 올린 사진·음성·스케치·영상의 총 건수", get: (c) => mediaCount(c.ws) },
+  { k: "edit_n", name: "고쳐 쓴 횟수", unit: "회", def: "자동 저장이 남긴 수정 이력의 건수", get: (c) => (c.ws._log || []).length },
+  { k: "dwell_min", name: "머문 시간", unit: "분", def: "화면이 보이고 조작이 있던 시간의 합", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60) },
+  { k: "read_min", name: "읽기 자료 열람", unit: "분", def: "강의 노트를 펼쳐 둔 채 머문 시간", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.readSec || 0), 0) / 60) },
+  { k: "rubric_mean", name: "루브릭 평균", unit: "1–3", def: "성취기준 4개 등급(상3·중2·하1)의 평균", get: (c) => {
+    const vs = [0, 1, 2, 3].map((i) => GRADE_NUM[(c.g || {})["r" + i]]).filter((x) => x != null);
+    return vs.length ? Math.round((vs.reduce((a, b) => a + b, 0) / vs.length) * 100) / 100 : null;
+  } },
+  { k: "survey_pre", name: "창의성 인식 사전", unit: "1–5", def: "사전 설문 전체 척도 평균", get: (c) => (c.svPre ? Math.round(c.svPre.total * 100) / 100 : null) },
+  { k: "survey_post", name: "창의성 인식 사후", unit: "1–5", def: "사후 설문 전체 척도 평균", get: (c) => (c.svPost ? Math.round(c.svPost.total * 100) / 100 : null) },
+];
+
+/* 사전·사후 대응 자료 */
+const RESEARCH_PAIRS = [
+  { k: "conc", name: "번역 진술의 구체성", pre: "conc_pre", post: "conc_post", preWhere: "3차시 T5 초안", postWhere: "3차시 T7 확정" },
+  { k: "len", name: "번역 진술의 길이", pre: "len_pre", post: "len_post", preWhere: "3차시 T5 초안", postWhere: "3차시 T7 확정" },
+  { k: "survey", name: "창의성 인식 설문 전체", pre: "survey_pre", post: "survey_post", preWhere: "단원 시작 전", postWhere: "단원 종료 후" },
+];
+
+/* 참여자 한 명의 계산 묶음 */
+function researchCases(ids, roster, wsMap, gradeMap, surveyMap) {
+  const wsOnly = {};
+  ids.forEach((id) => { wsOnly[id] = wsMap[id] || {}; });
+  const axAll = creativityAxesAll(wsOnly);
+  return ids.map((id, i) => {
+    const sv = (surveyMap || {})[id] || {};
+    return {
+      id, pid: "P" + String(i + 1).padStart(2, "0"),
+      nick: (roster[id] || {}).nick || "",
+      ws: wsMap[id] || {},
+      tm: translationMetrics(wsMap[id] || {}),
+      ax: axAll[id] || {},
+      g: (gradeMap || {})[id] || {},
+      svPre: svDone(sv.pre) ? surveyScores(sv.pre.ans) : null,
+      svPost: svDone(sv.post) ? surveyScores(sv.post.ans) : null,
+    };
+  });
+}
+
+const varVal = (c, k) => {
+  const v = RESEARCH_VARS.find((x) => x.k === k);
+  if (!v) return null;
+  const out = v.get(c);
+  return out === undefined ? null : out;
+};
+
+/* 기술통계 한 줄 */
+function describe(cases, v) {
+  const vals = cases.map((c) => varVal(c, v.k)).filter((x) => typeof x === "number" && isFinite(x));
+  return { v, n: vals.length, m: mean(vals), sd: sdev(vals), md: median(vals), mn: minv(vals), mx: maxv(vals) };
+}
+
+const mdRow = (cells) => "| " + cells.join(" | ") + " |";
+const mdHead = (cells) => mdRow(cells) + "\n" + mdRow(cells.map(() => "---"));
+
+function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, openMap }) {
+  const cases = researchCases(ids, roster, wsMap, gradeMap, surveyMap);
+  const N = cases.length;
+  const numVars = RESEARCH_VARS.filter((v) => !v.text);
+  const desc = numVars.map((v) => describe(cases, v)).filter((d) => d.n > 0);
+  const pairStats = RESEARCH_PAIRS.map((p) => ({
+    p, st: prePostStats(cases.map((c) => varVal(c, p.pre)), cases.map((c) => varVal(c, p.post))),
+  }));
+  const stamp = fileStamp();
+  const tag = sampleMode ? "_표본" : "";
+  const sampleWarn = sampleMode
+    ? "※ 경고 — 지금 화면의 학급은 화면 구조를 살펴보기 위한 가상 표본입니다. 이 자료를 연구 결과로 쓰면 안 됩니다.\n\n"
+    : "";
+
+  /* ---------- 1. 참여자 단위 (wide) ---------- */
+  const exportWide = () => {
+    const head = ["pid", ...RESEARCH_VARS.map((v) => v.k)];
+    const rows = cases.map((c) => [c.pid, ...RESEARCH_VARS.map((v) => { const x = varVal(c, v.k); return x == null ? "" : x; })]);
+    download("연구자료_참여자단위" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
+  };
+
+  /* ---------- 2. 계단 단위 (long) ---------- */
+  const exportLong = () => {
+    const head = ["pid", "stage_key", "stage_order", "stage_name", "stage_full", "items_total", "items_done",
+      "completion", "text_chars", "text_units", "sentences", "concreteness", "edits", "first_edit_at", "last_edit_at"];
+    const rows = [];
+    cases.forEach((c) => {
+      c.tm.stages.forEach((s) => {
+        const st = TRANSLATE_STAGES.find((x) => x.key === s.key);
+        rows.push([c.pid, s.key, s.n, s.name, st.full, s.total, s.done,
+          Math.round(s.ratio * 1000) / 1000, s.chars, s.units, s.sentences,
+          s.conc == null ? "" : s.conc, s.edits, s.first || "", s.last || ""]);
+      });
+    });
+    download("연구자료_계단단위" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
+  };
+
+  /* ---------- 3. 질적 코딩 시트 (문장 단위) ---------- */
+  const exportCoding = () => {
+    const head = ["pid", "session", "section_code", "section_title", "field_key", "field_label", "stage_key",
+      "unit_no", "sub", "sentence_no", "text", "chars", "has_number", "concrete_hits", "abstract_hits",
+      "concreteness", "code_1", "code_2", "memo"];
+    const rows = [];
+    cases.forEach((c) => {
+      SCHEMA.forEach((sec) => {
+        sec.fields.forEach((f) => {
+          const key = sec.id + "." + f.k;
+          const units = fieldUnits(f, c.ws[key]);
+          units.forEach((u, ui) => {
+            const sents = splitSentences(u.text);
+            const list = sents.length ? sents : [u.text];
+            list.forEach((t, si) => {
+              rows.push([c.pid, sec.session, sec.code, sec.title, key, String(f.label).slice(0, 80),
+                STAGE_OF_KEY[key] || "", ui + 1, u.sub, si + 1, t, t.length,
+                numHits(t) > 0 ? 1 : 0, lexHits(t, CONC_LEX), lexHits(t, ABST_LEX),
+                concreteness(t) == null ? "" : concreteness(t), "", "", ""]);
+            });
+          });
+        });
+      });
+    });
+    download("연구자료_코딩시트" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
+  };
+
+  /* ---------- 4. 사전·사후 텍스트 쌍 ---------- */
+  const exportPairs = () => {
+    const head = ["pid", "pair_id", "dimension", "pre_where", "pre_text", "post_where", "post_text",
+      "pre_chars", "post_chars", "pre_concreteness", "post_concreteness", "concreteness_delta", "lexical_overlap"];
+    const rows = [];
+    const add = (c, id2, dim, pw, pt, ow, ot) => {
+      const a = concreteness(pt), b = concreteness(ot);
+      rows.push([c.pid, id2, dim, pw, pt || "", ow, ot || "",
+        String(pt || "").length, String(ot || "").length,
+        a == null ? "" : a, b == null ? "" : b,
+        a == null || b == null ? "" : b - a,
+        filled(pt) && filled(ot) ? Math.round(jaccard(tokSet(pt), tokSet(ot)) * 100) : ""]);
+    };
+    cases.forEach((c) => {
+      add(c, "translate_stmt", "번역 진술", "3차시 T5 초안", c.tm.stmt1, "3차시 T7 확정", c.tm.stmt2);
+      const vs = stmtVersions(c.ws["s3t3.stmt1"]).concat(stmtVersions(c.ws["s3t4.stmt2"]));
+      vs.forEach((x, i) => { if (i > 0) add(c, "stmt_v" + i + "_v" + (i + 1), "진술 버전 이동", "v" + i, vs[i - 1].text, "v" + (i + 1), x.text); });
+      CHANGE_PAIRS.forEach((p, i) => {
+        const val = (spec) => {
+          if (spec.kind === "reflect") return ((c.ws[spec.k] || {}).pos) || "";
+          if (spec.kind === "inspect") {
+            const m = c.ws[spec.k] || {};
+            return INSPECT_ITEMS.filter((it) => (m[it.k] || {}).status === "불성립")
+              .map((it) => it.label + ": " + ((m[it.k] || {}).note || "")).join(" / ");
+          }
+          return c.ws[spec.k] || "";
+        };
+        add(c, "change_" + (i + 1), p.dim, p.before.where, val(p.before), p.after.where, val(p.after));
+      });
+    });
+    download("연구자료_사전사후쌍" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
+  };
+
+  /* ---------- 5. 기술통계 (Markdown) ---------- */
+  const descriptivesMD = () => {
+    const L = [];
+    L.push("# 기술통계 요약 — 허구의 아카이브 단원 (N = " + N + ")");
+    L.push("");
+    L.push(sampleWarn + "생성 시각: " + new Date().toLocaleString("ko-KR"));
+    L.push("");
+    L.push("## 표 1. 사고 과정 지표의 기술통계");
+    L.push("");
+    L.push(mdHead(["변수", "코드", "단위", "n", "M", "SD", "Mdn", "Min", "Max"]));
+    desc.forEach((d) => L.push(mdRow([d.v.name, d.v.k, d.v.unit, d.n, r2(d.m), r2(d.sd), r2(d.md), r2(d.mn), r2(d.mx)])));
+    L.push("");
+    L.push("## 표 2. 계단별 도달률");
+    L.push("");
+    L.push(mdHead(["계단", "내용", "완료 n", "완료 %", "평균 글자 수", "평균 구체성"]));
+    TRANSLATE_STAGES.forEach((st, i) => {
+      const full = cases.filter((c) => c.tm.stages[i].ratio >= 0.999).length;
+      L.push(mdRow([st.key, st.full, full, N ? Math.round((full / N) * 100) : 0,
+        r2(mean(cases.map((c) => c.tm.stages[i].chars))),
+        r2(mean(cases.map((c) => c.tm.stages[i].conc)))]));
+    });
+    L.push("");
+    L.push("## 표 3. 비가시성 갈래의 선택 분포");
+    L.push("");
+    const tc = {};
+    cases.forEach((c) => Object.keys(c.tm.invTypeFreq || {}).forEach((k) => { tc[k] = (tc[k] || 0) + c.tm.invTypeFreq[k]; }));
+    const tt = Object.values(tc).reduce((a, b) => a + b, 0);
+    L.push(mdHead(["갈래", "설명", "선택 건수", "%"]));
+    INVIS_TYPES.forEach((t) => L.push(mdRow([t.label, t.hint, tc[t.k] || 0, tt ? Math.round(((tc[t.k] || 0) / tt) * 100) : 0])));
+    L.push("");
+    L.push("## 표 4. 사전·사후 대응 비교");
+    L.push("");
+    L.push(mdHead(["비교", "n", "사전 M(SD)", "사후 M(SD)", "차이 M(SD)", "t", "df", "Cohen d(z)"]));
+    pairStats.forEach((x) => {
+      const s = x.st;
+      if (!s.n) { L.push(mdRow([x.p.name, 0, "-", "-", "-", "-", "-", "-"])); return; }
+      L.push(mdRow([x.p.name, s.n,
+        r2(s.preM) + " (" + r2(s.preSD) + ")", r2(s.postM) + " (" + r2(s.postSD) + ")",
+        r2(s.diffM) + " (" + r2(s.diffSD) + ")", r2(s.t), s.df, r2(s.d)]));
+    });
+    L.push("");
+    L.push("t 값과 효과크기는 참고용 계산이며 유의확률은 산출하지 않았습니다. 한 학급 단일 집단 자료이므로 통계적 일반화보다 기술통계와 사례 서술을 중심으로 해석해야 합니다.");
+    L.push("");
+    L.push("## 표 5. 주요 지표 간 상관 (Pearson r)");
+    L.push("");
+    const corrKeys = ["stage_depth", "invis_type_n", "cand_n", "causal_n", "revisit_n", "conc_gain", "cr_process", "cr_elaboration"];
+    const cv = {};
+    corrKeys.forEach((k) => { cv[k] = cases.map((c) => varVal(c, k)); });
+    L.push(mdHead(["", ...corrKeys]));
+    corrKeys.forEach((a) => {
+      L.push(mdRow([a, ...corrKeys.map((b) => (a === b ? "1" : r2(pearson(cv[a], cv[b]))))]));
+    });
+    L.push("");
+    L.push("빈칸은 두 변수 모두에 값이 있는 참여자가 3명 미만이어서 계산하지 않은 자리입니다.");
+    L.push("");
+    return L.join("\n");
+  };
+
+  /* ---------- 6. 변수 사전 (코드북) ---------- */
+  const codebookMD = () => {
+    const L = [];
+    L.push("# 변수 사전 — 자료 수집·산출 방식");
+    L.push("");
+    L.push(sampleWarn + "자료는 수업용 웹 애플리케이션이 학생의 기록지 저장 시점에 자동으로 남긴 값에서 산출했습니다. 별도의 검사 도구를 쓰지 않았습니다.");
+    L.push("");
+    L.push("## 참여자 식별");
+    L.push("");
+    L.push("- pid: 학번을 정렬해 P01부터 순서대로 붙인 익명 번호입니다. 학번·별명·계정 정보는 어떤 파일에도 들어가지 않습니다.");
+    L.push("- 학생은 실명 대신 별명으로 입장하며, 별명 역시 내보내지 않습니다.");
+    L.push("");
+    L.push("## 변수 목록");
+    L.push("");
+    L.push(mdHead(["코드", "변수명", "단위", "조작적 정의"]));
+    RESEARCH_VARS.forEach((v) => L.push(mdRow([v.k, v.name, v.unit, v.def])));
+    L.push("");
+    L.push("## 구체성 지수의 산출식");
+    L.push("");
+    L.push("구체성 = round( 0.6 × 비율항 + 0.4 × 밀도항 ) × 100");
+    L.push("");
+    L.push("- 비율항 = (구체어 적중 + 1.5 × 수량 표현 적중) ÷ (구체어 적중 + 1.5 × 수량 표현 적중 + 추상어 적중 + 2)");
+    L.push("- 밀도항 = min(1, (구체어 적중 + 수량 표현 적중) ÷ max(2, 글자 수 ÷ 45))");
+    L.push("- 구체어 사전 " + CONC_LEX.length + "개(위치 · 재질 · 변형 · 수리), 추상어 사전 " + ABST_LEX.length + "개, 수량 표현은 숫자와 단위의 결합으로 인식합니다.");
+    L.push("- 8자 미만의 글은 측정하지 않고 결측으로 둡니다.");
+    L.push("- 형태소 분석이 아니라 어간 문자열 일치로 세는 간이 지표입니다. 연구에 쓸 때는 코딩 시트로 표본을 뽑아 사람이 교차 검토한 뒤 신뢰도를 보고해야 합니다.");
+    L.push("");
+    L.push("## 계단과 기록 칸의 대응");
+    L.push("");
+    L.push(mdHead(["계단", "이름", "해당 기록 칸", "학생이 하는 일", "내놓을 것"]));
+    TRANSLATE_STAGES.forEach((st) => L.push(mdRow([st.key, st.full, st.keys.join(" / "), st.ask, st.out])));
+    L.push("");
+    return L.join("\n");
+  };
+
+  /* ---------- 7. 원고 초안 ---------- */
+  const manuscriptMD = () => {
+    const g = (k) => desc.find((d) => d.v.k === k) || { n: 0 };
+    const say = (k, unit) => { const d = g(k); return d.n ? r2(d.m) + (unit || "") + " (SD = " + r2(d.sd) + ")" : "자료 없음"; };
+    const concSt = pairStats.find((x) => x.p.k === "conc").st;
+    const svSt = pairStats.find((x) => x.p.k === "survey").st;
+    const tc = {};
+    cases.forEach((c) => Object.keys(c.tm.invTypeFreq || {}).forEach((k) => { tc[k] = (tc[k] || 0) + c.tm.invTypeFreq[k]; }));
+    const tt = Object.values(tc).reduce((a, b) => a + b, 0);
+    const topType = Object.keys(tc).sort((a, b) => tc[b] - tc[a])[0];
+    const topLabel = (INVIS_TYPES.find((t) => t.k === topType) || {}).label || "-";
+    const fullCount = cases.filter((c) => c.tm.depth >= 7).length;
+    const revisitTotal = cases.reduce((a, c) => a + c.tm.revisitN, 0);
+    const revisitAny = cases.filter((c) => c.tm.revisitN > 0).length;
+
+    const L = [];
+    L.push("# 「보이지 않는 것을 사물로 드러내기」 — 고등학교 미술 수업의 사고 과정 자료");
+    L.push("");
+    L.push(sampleWarn + "이 문서는 수업 기록 애플리케이션이 자동으로 채운 원고 초안입니다. 수치가 들어간 문장은 실제 자료에서 계산한 것이고, 「연구자 서술」이라고 표시된 자리는 비워 둔 곳입니다. 선행 연구·해석·논의는 연구자가 씁니다.");
+    L.push("");
+    L.push("생성 시각: " + new Date().toLocaleString("ko-KR"));
+    L.push("");
+    L.push("## 초록");
+    L.push("");
+    L.push("「연구자 서술 — 연구 목적과 방법을 3~4문장으로」");
+    L.push("");
+    L.push("주요어: 사회참여 미술, 비가시성, 사물의 흔적, 생성형 AI, 창작 과정 기록, 미술과 평가");
+    L.push("");
+    L.push("## 1. 서론");
+    L.push("");
+    L.push("「연구자 서술 — 연구의 필요성과 문제 제기」");
+    L.push("");
+    L.push("「연구자 서술 — 선행 연구 검토」");
+    L.push("");
+    L.push("연구 문제");
+    L.push("");
+    L.push("1. 학생들은 사회문제를 관찰한 뒤 보이지 않는 대상을 어떤 단계를 거쳐 사물의 흔적으로 옮기는가.");
+    L.push("2. 그 단계를 오르는 동안 학생의 진술은 어떻게 달라지는가.");
+    L.push("3. 되돌려 읽기에서 의도와 다른 읽기를 만난 학생은 사고를 어떻게 고치는가.");
+    L.push("");
+    L.push("## 2. 연구 방법");
+    L.push("");
+    L.push("### 2.1 연구 참여자");
+    L.push("");
+    L.push("고등학교 1학년 미술 수업의 한 학급 " + N + "명이 참여했다. 학생은 학번과 별명으로 입장하며 실명·얼굴 사진·개인정보를 입력하지 않는다. 자료 분석에는 학번을 정렬해 붙인 익명 번호(P01–P" + String(N).padStart(2, "0") + ")만 사용했다. 「연구자 서술 — 연구 윤리 심의와 동의 절차」");
+    L.push("");
+    L.push("### 2.2 수업 설계");
+    L.push("");
+    L.push("단원은 「실재한 적 없는 유물 이미지로 구성한 허구의 아카이브 전시」이며 8차시(차시당 120분)로 구성했다. 1~2차시는 레디메이드·개념미술·제도비평·파라픽션 감상, 3차시는 사회참여 미술과 관찰, 4차시는 박물관 장치와 유물 개념 설계, 5~6차시는 생성형 AI를 사용한 이미지 제작과 다듬기, 7차시는 전시 구성, 8차시는 상호평가와 비평이다.");
+    L.push("");
+    L.push("이 연구가 초점을 둔 곳은 3차시에 배치한 「번역 사다리」다. 사회문제 관찰에서 사물의 흔적 설계까지를 일곱 계단으로 나누고, 각 계단이 앞 계단의 산출물을 재료로 삼도록 구성했다.");
+    L.push("");
+    L.push(mdHead(["계단", "이름", "학생이 하는 일", "내놓을 것", "교사가 보는 곳"]));
+    TRANSLATE_STAGES.forEach((st) => L.push(mdRow([st.key, st.full, st.ask, st.out, st.look])));
+    L.push("");
+    L.push("T3에서 학생은 보이지 않는 이유를 다섯 갈래(" + INVIS_TYPES.map((t) => t.label).join(" · ") + ")로 나눈다. 갈래마다 다음 계단에서 찾을 사물과 흔적의 종류가 달라지도록 안내문을 연결해 두었다.");
+    L.push("");
+    L.push("### 2.3 자료 수집");
+    L.push("");
+    L.push("자료는 수업용 웹 애플리케이션이 학생의 기록 저장 시점에 자동으로 남긴 값이다. 별도의 검사 시간을 두지 않았다. 수집한 자료는 다음과 같다.");
+    L.push("");
+    L.push("- 기록지의 모든 서술문과 표 입력값 (계단·차시·항목 단위로 구분됨)");
+    L.push("- 번역 진술의 확정 버전 이력 (학생이 문장을 다시 세울 때마다 그 시점의 문장이 따로 저장됨)");
+    L.push("- 고쳐 쓰기 이력 (일정 시간 간격을 두고 문장이 크게 바뀌면 이전 문장을 보관)");
+    L.push("- 항목별 최초·최종 입력 시각과 편집 횟수");
+    L.push("- 차시별 머문 시간과 강의 노트 열람 시간 (조작이 있는 동안만 누적)");
+    L.push("- 관찰 사진·현장 소리·스케치·전시 영상 등 멀티모달 자료의 건수");
+    L.push("- 창의성 인식 설문(사전·사후, 5점 리커트)과 루브릭 등급");
+    L.push("");
+    L.push("### 2.4 측정 도구");
+    L.push("");
+    L.push("사고 과정 지표는 기록에서 기계적으로 산출했다. 주요 변수는 다음과 같으며 전체 목록과 조작적 정의는 변수 사전 파일에 실었다.");
+    L.push("");
+    L.push(mdHead(["변수", "단위", "조작적 정의"]));
+    ["stage_depth", "invis_n", "invis_type_n", "cand_n", "causal_n", "revisit_n", "stmt_versions", "conc_pre", "conc_post", "conc_gain", "lex_overlap"]
+      .forEach((k) => { const v = RESEARCH_VARS.find((x) => x.k === k); if (v) L.push(mdRow([v.name + " (" + v.k + ")", v.unit, v.def])); });
+    L.push("");
+    L.push("구체성 지수는 위치어·재질어·변형어와 수량 표현의 출현을 추상어와 견주어 0–100으로 환산한 값이다. 형태소 분석이 아닌 어간 일치 방식의 간이 지표이므로, 결과 해석에는 코딩 시트를 통한 사람의 교차 검토를 함께 두어야 한다. 「연구자 서술 — 코더 간 신뢰도 산출 결과」");
+    L.push("");
+    L.push("### 2.5 분석 방법");
+    L.push("");
+    L.push("참여자 단위(wide), 계단 단위(long), 문장 단위(코딩 시트)의 세 가지 구조로 자료를 펼쳤다. 양적 자료는 기술통계로 요약하고 사전·사후 대응 비교를 함께 보았다. 단일 학급 자료이므로 통계적 일반화 대신 기술통계와 사례 서술을 중심에 두었다. 질적 자료는 문장 단위 코딩 시트에 1차 자동 표지(계단·항목·구체어 적중 수)를 붙인 뒤 「연구자 서술 — 코딩 절차와 범주 생성 방식」");
+    L.push("");
+    L.push("## 3. 결과");
+    L.push("");
+    L.push("### 3.1 계단의 도달");
+    L.push("");
+    L.push("참여자 " + N + "명의 연속 도달 계단은 평균 " + say("stage_depth") + "이었고, 일곱 계단을 모두 채운 학생은 " + fullCount + "명(" + (N ? Math.round((fullCount / N) * 100) : 0) + "%)이었다. 계단별 완료 비율은 다음과 같다.");
+    L.push("");
+    L.push(mdHead(["계단", "내용", "완료 n", "완료 %"]));
+    TRANSLATE_STAGES.forEach((st, i) => {
+      const full = cases.filter((c) => c.tm.stages[i].ratio >= 0.999).length;
+      L.push(mdRow([st.key, st.full, full, N ? Math.round((full / N) * 100) : 0]));
+    });
+    L.push("");
+    L.push("「연구자 서술 — 도달이 급격히 줄어드는 계단에 대한 해석」");
+    L.push("");
+    L.push("### 3.2 보이지 않는 것을 가르는 방식");
+    L.push("");
+    L.push("학생들이 늘어놓은 보이지 않는 것은 1인당 평균 " + say("invis_n", "개") + "였고, 서로 다른 갈래의 수는 평균 " + say("invis_type_n", "갈래") + "였다. 전체 " + tt + "건의 갈래 선택 가운데 가장 많이 고른 것은 " + topLabel + "(" + (tc[topType] || 0) + "건, " + (tt ? Math.round(((tc[topType] || 0) / tt) * 100) : 0) + "%)이었다.");
+    L.push("");
+    L.push(mdHead(["갈래", "선택 건수", "%"]));
+    INVIS_TYPES.forEach((t) => L.push(mdRow([t.label, tc[t.k] || 0, tt ? Math.round(((tc[t.k] || 0) / tt) * 100) : 0])));
+    L.push("");
+    L.push("「연구자 서술 — 갈래 분포가 뜻하는 바」");
+    L.push("");
+    L.push("### 3.3 사물 후보와 흔적으로의 번역");
+    L.push("");
+    L.push("사물 후보는 1인당 평균 " + say("cand_n", "개") + " 나왔고, 흔적 번역 표에서 동작과 반복 횟수까지 어림한 행은 평균 " + say("causal_n", "행") + "이었다. 접은 후보의 이유를 서술한 학생은 " + cases.filter((c) => c.tm.dropWhy === 1).length + "명이었다.");
+    L.push("");
+    L.push("「연구자 서술 — 대표 사례 인용. 코딩 시트에서 pid와 문장을 골라 붙입니다」");
+    L.push("");
+    L.push("### 3.4 진술의 변화");
+    L.push("");
+    if (concSt.n) {
+      L.push("번역 진술을 초안(T5)과 확정(T7) 모두 쓴 학생은 " + concSt.n + "명이었다. 구체성 지수는 초안 " + r2(concSt.preM) + " (SD = " + r2(concSt.preSD) + ")에서 확정 " + r2(concSt.postM) + " (SD = " + r2(concSt.postSD) + ")으로 평균 " + r2(concSt.diffM) + "점 " + (concSt.diffM >= 0 ? "높아졌다" : "낮아졌다") + " (차이의 SD = " + r2(concSt.diffSD) + ", d = " + r2(concSt.d) + ").");
+      L.push("");
+      L.push("두 진술의 어휘 겹침은 평균 " + say("lex_overlap", "%") + "였고, 진술 길이는 초안 " + say("len_pre", "자") + "에서 확정 " + say("len_post", "자") + "로 바뀌었다.");
+    } else {
+      L.push("초안과 확정 진술을 모두 남긴 참여자가 아직 없어 이 절의 수치는 산출하지 않았다.");
+    }
+    L.push("");
+    L.push("「연구자 서술 — 진술이 바뀐 방향에 대한 질적 서술. 사전·사후 쌍 파일의 pre_text와 post_text를 나란히 인용합니다」");
+    L.push("");
+    L.push("### 3.5 되돌려 읽기와 수정");
+    L.push("");
+    L.push("되돌려 읽기 기록은 모두 " + cases.reduce((a, c) => a + c.tm.reverseN, 0) + "건이었다. 의도와 거의 같게 읽힌 경우가 " + cases.reduce((a, c) => a + c.tm.gapSame, 0) + "건, 다르게 읽힌 경우가 " + cases.reduce((a, c) => a + c.tm.gapDiff, 0) + "건이었다. 앞 계단으로 되돌아가 고친 기록은 " + revisitTotal + "회이며 " + revisitAny + "명(" + (N ? Math.round((revisitAny / N) * 100) : 0) + "%)에게서 나타났다.");
+    L.push("");
+    const bc = {};
+    cases.forEach((c) => c.tm.backStages.forEach((b) => { bc[b] = (bc[b] || 0) + 1; }));
+    if (Object.keys(bc).length) {
+      L.push(mdHead(["되돌아간 계단", "횟수"]));
+      Object.keys(bc).sort().forEach((k) => L.push(mdRow([k, bc[k]])));
+      L.push("");
+    }
+    L.push("「연구자 서술 — 되돌림이 사고 과정에서 갖는 뜻」");
+    L.push("");
+    L.push("### 3.6 창의성 지표와 인식 설문");
+    L.push("");
+    L.push(mdHead(["축", "n", "M", "SD"]));
+    CREATIVITY_AXES.forEach((a) => { const d = g("cr_" + a.key); L.push(mdRow([a.name, d.n, r2(d.m), r2(d.sd)])); });
+    L.push("");
+    if (svSt.n) {
+      L.push("창의성 인식 설문 전체 평균은 사전 " + r2(svSt.preM) + " (SD = " + r2(svSt.preSD) + ")에서 사후 " + r2(svSt.postM) + " (SD = " + r2(svSt.postSD) + ")으로 " + r2(svSt.diffM) + "점 변했다 (n = " + svSt.n + ", d = " + r2(svSt.d) + ").");
+    } else {
+      L.push("사전·사후 설문을 모두 제출한 참여자가 아직 없어 설문 비교는 산출하지 않았다.");
+    }
+    L.push("");
+    L.push("## 4. 논의");
+    L.push("");
+    L.push("「연구자 서술 — 결과의 해석」");
+    L.push("");
+    L.push("「연구자 서술 — 선행 연구와의 관계」");
+    L.push("");
+    L.push("「연구자 서술 — 수업 설계에 주는 시사점」");
+    L.push("");
+    L.push("### 연구의 제한점");
+    L.push("");
+    L.push("- 한 학급 " + N + "명의 단일 집단 자료이므로 결과를 다른 학교·학년으로 일반화할 수 없다.");
+    L.push("- 구체성 지수는 어휘 사전에 기반한 간이 지표이며 형태소 분석이나 문맥 판단을 하지 않는다.");
+    L.push("- 머문 시간은 조작이 있는 동안만 누적하므로 화면을 보며 생각한 시간은 과소 집계될 수 있다.");
+    L.push("- 계단의 완료 판정은 항목이 채워졌는지만 보고 내용의 질을 보지 않는다.");
+    L.push("- 사전·사후 비교의 t 값과 효과크기는 참고 계산이며 유의확률을 산출하지 않았다.");
+    L.push("");
+    L.push("## 부록 A. 자료 파일");
+    L.push("");
+    L.push("- 연구자료_참여자단위.csv — 참여자 1명이 1행. 변수 " + RESEARCH_VARS.length + "개.");
+    L.push("- 연구자료_계단단위.csv — 참여자 × 계단이 1행. 계단별 도달·글자 수·구체성·편집 시각.");
+    L.push("- 연구자료_코딩시트.csv — 참여자 × 항목 × 문장이 1행. code_1·code_2·memo 열은 연구자가 채우는 빈칸.");
+    L.push("- 연구자료_사전사후쌍.csv — 같은 물음에 두 번 답한 자리의 텍스트 쌍과 지표 차이.");
+    L.push("- 기술통계.md — 표 1~5.");
+    L.push("- 변수사전.md — 전체 변수의 조작적 정의와 산출식.");
+    L.push("");
+    L.push("## 부록 B. 윤리 고지");
+    L.push("");
+    L.push("- 학생은 실명 대신 별명으로 입장하며 얼굴 사진과 개인정보를 입력하지 않는다.");
+    L.push("- 관찰 사진에는 사람의 얼굴이, 현장 소리에는 사람의 목소리가 담기지 않도록 안내했다.");
+    L.push("- 내보낸 연구 자료에는 학번·별명·계정 정보가 들어 있지 않다.");
+    L.push("- 생성형 AI로 만든 이미지에는 허구 고지를 붙여 전시했다.");
+    L.push("");
+    return L.join("\n");
+  };
+
+  const [preview, setPreview] = React.useState("manuscript");
+  const previewText = preview === "manuscript" ? manuscriptMD() : preview === "desc" ? descriptivesMD() : codebookMD();
+
+  const FILES = [
+    { k: "wide", h: "참여자 단위 자료", fn: "연구자료_참여자단위" + tag + "_" + stamp + ".csv",
+      p: "참여자 1명이 1행. 사고 과정·창의성·활동 시간·루브릭·설문을 합쳐 변수 " + RESEARCH_VARS.length + "개를 담습니다. 통계 프로그램에 그대로 올릴 수 있습니다.", go: exportWide },
+    { k: "long", h: "계단 단위 자료", fn: "연구자료_계단단위" + tag + "_" + stamp + ".csv",
+      p: "참여자 × 일곱 계단이 1행. 계단별 도달률·글자 수·문장 수·구체성·편집 시각을 담아 사고의 진행을 시간 축으로 볼 수 있습니다.", go: exportLong },
+    { k: "coding", h: "질적 코딩 시트", fn: "연구자료_코딩시트" + tag + "_" + stamp + ".csv",
+      p: "참여자 × 항목 × 문장이 1행. 1차 자동 표지(계단·구체어 적중)를 붙여 두고 code_1·code_2·memo 열은 연구자가 채우도록 비워 둡니다.", go: exportCoding },
+    { k: "pairs", h: "사전·사후 텍스트 쌍", fn: "연구자료_사전사후쌍" + tag + "_" + stamp + ".csv",
+      p: "번역 진술의 초안과 확정, 진술 버전 사이의 이동, 단원 안의 사고 변화 쌍 " + CHANGE_PAIRS.length + "종을 텍스트와 지표 차이로 나란히 담습니다.", go: exportPairs },
+    { k: "desc", h: "기술통계 표", fn: "기술통계" + tag + "_" + stamp + ".md",
+      p: "표 1 기술통계, 표 2 계단 도달, 표 3 갈래 분포, 표 4 사전·사후 비교, 표 5 상관. 마크다운 표라 논문 편집기에 그대로 붙습니다.", go: () => download("기술통계" + tag + "_" + stamp + ".md", descriptivesMD(), "text/markdown") },
+    { k: "codebook", h: "변수 사전", fn: "변수사전" + tag + "_" + stamp + ".md",
+      p: "모든 변수의 조작적 정의, 구체성 지수의 산출식, 계단과 기록 칸의 대응표. 연구 방법 절의 측정 도구 서술에 씁니다.", go: () => download("변수사전" + tag + "_" + stamp + ".md", codebookMD(), "text/markdown") },
+    { k: "manuscript", h: "원고 초안", fn: "원고초안" + tag + "_" + stamp + ".md",
+      p: "연구 방법과 결과의 사실 서술을 수치까지 채워 넣은 초안. 해석·논의는 「연구자 서술」 자리로 비워 둡니다.", go: () => download("원고초안" + tag + "_" + stamp + ".md", manuscriptMD(), "text/markdown") },
+  ];
+
+  return (
+    <div>
+      {sampleMode && (
+        <div className="warn-note">
+          지금 보이는 학급은 화면 구조를 살펴보기 위한 <b>가상 표본</b>입니다. 여기서 내려받은 파일에는 파일명과 문서 첫머리에 표본 표시가 붙습니다.
+          실제 연구 자료로 쓰지 마세요. 학생이 입장하면 자동으로 실제 기록으로 바뀝니다.
+        </div>
+      )}
+      <div className="card">
+        <div className="card-head"><span className="card-code">연구 1</span><span className="card-title">익명 처리</span></div>
+        <div className="card-body">
+          <p style={{ fontSize: 13, marginBottom: 10 }}>
+            학번을 정렬해 P01부터 익명 번호를 붙입니다. 내려받는 파일에는 학번·별명·계정 정보가 들어가지 않습니다.
+            아래 대응표는 이 화면에서만 보이며 파일로 나가지 않으므로, 필요하면 교사가 따로 안전한 곳에 보관하세요.
+          </p>
+          <div className="tbl-scroll" style={{ maxHeight: 200, overflow: "auto" }}>
+            <table className="stat-tbl">
+              <thead><tr><th>익명 번호</th><th>학번</th><th>별명</th><th>기록률</th><th>도달 계단</th></tr></thead>
+              <tbody>
+                {cases.map((c) => (
+                  <tr key={c.id}>
+                    <td className="mono">{c.pid}</td><td className="mono">{c.id}</td><td style={{ textAlign: "left" }}>{c.nick}</td>
+                    <td className="mono">{overallProgress(c.ws)}%</td><td className="mono">{c.tm.depth}/7</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">연구 2</span><span className="card-title">자료 내려받기</span></div>
+        <div className="card-body">
+          <div className="res-grid">
+            {FILES.map((f) => (
+              <div className="res-card" key={f.k}>
+                <h4>{f.h}</h4>
+                <span className="fn">{f.fn}</span>
+                <p>{f.p}</p>
+                <button className="btn small" onClick={f.go} disabled={!N}>내려받기</button>
+              </div>
+            ))}
+          </div>
+          <button className="btn" disabled={!N} onClick={() => FILES.forEach((f, i) => setTimeout(f.go, i * 350))}>일곱 파일 한 번에 내려받기</button>
+          <p className="hint" style={{ marginTop: 10 }}>
+            CSV는 BOM을 붙여 저장하므로 한글이 깨지지 않고 엑셀에서 바로 열립니다.
+            마크다운 파일은 한글 워드프로세서나 논문 편집기에 붙여 넣으면 표가 그대로 살아납니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">연구 3</span><span className="card-title">기술통계 미리보기 (N = {N})</span></div>
+        <div className="card-body">
+          <div className="tbl-scroll">
+            <table className="stat-tbl">
+              <thead><tr><th>변수</th><th>코드</th><th>n</th><th>M</th><th>SD</th><th>Mdn</th><th>Min</th><th>Max</th></tr></thead>
+              <tbody>
+                {desc.map((d) => (
+                  <tr key={d.v.k}>
+                    <td>{d.v.name}</td><td className="mono" style={{ textAlign: "left" }}>{d.v.k}</td>
+                    <td className="mono">{d.n}</td><td className="mono">{r2(d.m)}</td><td className="mono">{r2(d.sd)}</td>
+                    <td className="mono">{r2(d.md)}</td><td className="mono">{r2(d.mn)}</td><td className="mono">{r2(d.mx)}</td>
+                  </tr>
+                ))}
+                {desc.length === 0 && <tr><td colSpan={8} style={{ textAlign: "left", color: "var(--sub)" }}>아직 계산할 수 있는 값이 없습니다.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <h4 className="serif" style={{ fontSize: 14, margin: "16px 0 8px" }}>사전·사후 대응 비교</h4>
+          <div className="tbl-scroll">
+            <table className="stat-tbl">
+              <thead><tr><th>비교</th><th>n</th><th>사전 M(SD)</th><th>사후 M(SD)</th><th>차이 M</th><th>t</th><th>d</th></tr></thead>
+              <tbody>
+                {pairStats.map((x) => (
+                  <tr key={x.p.k}>
+                    <td>{x.p.name}</td>
+                    <td className="mono">{x.st.n || 0}</td>
+                    <td className="mono">{x.st.n ? r2(x.st.preM) + " (" + r2(x.st.preSD) + ")" : "-"}</td>
+                    <td className="mono">{x.st.n ? r2(x.st.postM) + " (" + r2(x.st.postSD) + ")" : "-"}</td>
+                    <td className="mono">{x.st.n ? r2(x.st.diffM) : "-"}</td>
+                    <td className="mono">{x.st.n ? r2(x.st.t) : "-"}</td>
+                    <td className="mono">{x.st.n ? r2(x.st.d) : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="hint" style={{ marginTop: 8 }}>유의확률은 계산하지 않습니다. 한 학급 단일 집단 자료라 통계적 일반화보다 기술통계와 사례 서술이 맞습니다.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-head"><span className="card-code">연구 4</span><span className="card-title">문서 미리보기</span></div>
+        <div className="card-body">
+          <div className="t-tabs" style={{ marginBottom: 10 }}>
+            {[["manuscript", "원고 초안"], ["desc", "기술통계"], ["codebook", "변수 사전"]].map(([k, l]) => (
+              <button key={k} className={"btn small " + (preview === k ? "" : "ghost")} onClick={() => setPreview(k)}>{l}</button>
+            ))}
+            <button className="btn small ghost" onClick={() => {
+              if (navigator.clipboard) navigator.clipboard.writeText(previewText);
+            }}>내용 복사</button>
+          </div>
+          <div className="mdbox">{previewText}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TeacherApp({ onExit, onGallery }) {
   const [tab, setTab] = useState("현황");
   const [roster, setRoster] = useState({});
   const [wsMap, setWsMap] = useState({});
   const [gradeMap, setGradeMap] = useState({});
+  const [surveyMap, setSurveyMap] = useState({});
   const [sel, setSel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const [openMap, setOpenMap] = useState(DEFAULT_OPEN);
+  const [svCfg, setSvCfg] = useState(DEFAULT_SURVEY);
   const [sampleMode, setSampleMode] = useState(true);
   const [npin, setNpin] = useState("");
 
@@ -3640,10 +6375,11 @@ function TeacherApp({ onExit, onGallery }) {
     setLoading(true);
     const real = (await store.get("roster")) || {};
     const realIds = Object.keys(real);
-    let r = {}, wsMapNew = {}, gMapNew = {};
+    let r = {}, wsMapNew = {}, gMapNew = {}, svMapNew = {};
     if (realIds.length) {
       r = { ...real };
       const gs = await fbStore.allGrades();
+      svMapNew = await fbStore.allSurveys();
       await Promise.all(realIds.map(async (id) => {
         wsMapNew[id] = (await store.get("ws:" + id)) || {};
         gMapNew[id] = gs[id] || null;
@@ -3651,14 +6387,16 @@ function TeacherApp({ onExit, onGallery }) {
       setSampleMode(false);
     } else {
       const sample = buildSampleClass();
-      r = { ...sample.roster }; wsMapNew = { ...sample.ws }; gMapNew = { ...sample.grade };
+      r = { ...sample.roster }; wsMapNew = { ...sample.ws }; gMapNew = { ...sample.grade }; svMapNew = { ...sample.surveys };
       setSampleMode(true);
     }
     const cfg = await store.get("config");
     setOpenMap((cfg && cfg.open) || DEFAULT_OPEN);
+    setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
     setRoster(r);
     setWsMap(wsMapNew);
     setGradeMap(gMapNew);
+    setSurveyMap(svMapNew);
     setLoading(false);
   };
 
@@ -3676,6 +6414,16 @@ function TeacherApp({ onExit, onGallery }) {
     const ok = await store.set("config", { ...cfg, open: next, openUpdated: now() });
     if (ok) { setOpenMap(next); setMsg(val ? "모든 차시를 열었습니다." : "모든 차시를 닫았습니다."); }
   };
+  const toggleSurvey = async (phase) => {
+    const cfg = (await store.get("config")) || {};
+    const cur = cfg.survey || DEFAULT_SURVEY;
+    const next = { ...cur, [phase]: !surveyOpen(cur, phase) };
+    const ok = await store.set("config", { ...cfg, survey: next, surveyUpdated: now() });
+    if (ok) {
+      setSvCfg(next);
+      setMsg((phase === "pre" ? "사전" : "사후") + " 설문을 " + (next[phase] ? "열었습니다. 학생 화면 맨 위에 나타납니다." : "닫았습니다."));
+    } else setMsg("설정 저장에 실패했습니다.");
+  };
   useEffect(() => { loadAll(); }, []);
   // 알림 문구는 6초 뒤 스스로 사라짐 — 다른 탭에 남은 옛 메시지가 현재 조작의 결과처럼 보이지 않게
   useEffect(() => {
@@ -3692,8 +6440,11 @@ function TeacherApp({ onExit, onGallery }) {
     const un2 = fbStore.watchWorksheets((w) => {
       if (Object.keys(w).length) setWsMap((p) => ({ ...p, ...w }));
     });
-    const un3 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); });
-    return () => { un1(); un2(); un3(); };
+    const un3 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); });
+    const un4 = fbStore.watchSurveys((s) => {
+      if (Object.keys(s).length) setSurveyMap((p) => ({ ...p, ...s }));
+    });
+    return () => { un1(); un2(); un3(); un4(); };
   }, [sel]);
 
   const ids = Object.keys(roster).sort();
@@ -3705,6 +6456,8 @@ function TeacherApp({ onExit, onGallery }) {
     const head = ["학번", "별명", "진행률(%)", ...SESSIONS.map((s) => s + "(%)"),
       "변화 쌍", "생성 회차", "고친 요소", "불성립 발견", "근거 있는 불성립", "제외 근거", "동료에게 준 문장", "받은 의견 처리", "반대 근거 쓴 논쟁", "③까지 채운 논쟁", "미디어(사진·음성·스케치·영상)", "고쳐 쓴 횟수", "머문 시간(분)", "읽기 자료 열람(분)",
       ...CREATIVITY_AXES.map((a) => "창의성:" + a.name),
+      ...SURVEY_SCALES.map((sc) => "설문사전:" + sc.name), "설문사전:전체",
+      ...SURVEY_SCALES.map((sc) => "설문사후:" + sc.name), "설문사후:전체", "설문Δ:전체",
       ...RUBRIC.map((r) => r.std), ...RUBRIC.map((r) => r.std + " 메모"),
       "관찰 확인 수", "관찰 메모", "피드백(조형)", "피드백(개념)", "최근 저장"];
     const rows = ids.map((id) => {
@@ -3712,12 +6465,20 @@ function TeacherApp({ onExit, onGallery }) {
       const cm = creativityMetrics(w);
       const cv = (k) => (cm.find((x) => x.k === k) || {}).v || 0;
       const ax = axesAll[id] || {};
+      const sv = surveyMap[id] || {};
+      const sp = svDone(sv.pre) ? surveyScores(sv.pre.ans) : null;
+      const so = svDone(sv.post) ? surveyScores(sv.post.ans) : null;
       return [id, roster[id].nick || "", overallProgress(w),
         ...SESSIONS.map((s) => Math.round(sessionProgress(s, w) * 100)),
         cv("changed"), cv("rounds"), cv("revised"), cv("notPassed"), cv("ground"), cv("exclude"), cv("peerSent"), cv("peerBack"), cv("counter"), cv("debate"), mediaCount(w), (w._log || []).length,
         Math.round(Object.values(w._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60),
         Math.round(Object.values(w._act || {}).reduce((a, x) => a + (x.readSec || 0), 0) / 60),
         ...CREATIVITY_AXES.map((a) => (ax[a.key] == null ? "" : ax[a.key])),
+        ...SURVEY_SCALES.map((sc) => (sp && sp[sc.k] != null ? round2(sp[sc.k]) : "")),
+        sp && sp.total != null ? round2(sp.total) : "",
+        ...SURVEY_SCALES.map((sc) => (so && so[sc.k] != null ? round2(so[sc.k]) : "")),
+        so && so.total != null ? round2(so.total) : "",
+        sp && so && sp.total != null && so.total != null ? round2(so.total - sp.total) : "",
         ...[0, 1, 2, 3].map((i) => g["r" + i] || ""),
         ...[0, 1, 2, 3].map((i) => g["rm" + i] || ""),
         OBS_ITEMS.filter((_, i) => g["o" + i]).length,
@@ -3751,7 +6512,7 @@ function TeacherApp({ onExit, onGallery }) {
       <div className="wrap wide">
         {sel ? (
           <div style={{ paddingTop: 18 }}>
-            <TeacherStudentView key={sel} sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} ids={ids} onSel={setSel}
+            <TeacherStudentView key={sel} sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} surveyData={surveyMap[sel]} ids={ids} onSel={setSel}
               onBack={() => { setSel(null); loadAll(); }} />
           </div>
         ) : (
@@ -3762,7 +6523,7 @@ function TeacherApp({ onExit, onGallery }) {
               </div>
             )}
             <div className="t-tabs">
-              {["현황", "차시 공개", "수업 안내", "분석", "창의성", "설정"].map((t) => (
+              {["현황", "차시 공개", "수업 안내", "분석", "사고 과정", "창의성", "설문", "연구", "설정"].map((t) => (
                 <button key={t} className={"btn small " + (tab === t ? "" : "ghost")} onClick={() => setTab(t)}>{t}</button>
               ))}
             </div>
@@ -3848,6 +6609,38 @@ function TeacherApp({ onExit, onGallery }) {
                     <p className="hint" style={{ marginTop: 10 }}>차시를 닫아도 학생이 이미 작성한 내용은 저장된 상태로 남고, 교사 화면에서는 계속 열람과 채점이 됩니다.</p>
                   </div>
                 </div>
+                <div className="card">
+                  <div className="card-head"><span className="card-code">설문</span><span className="card-title">사전·사후 창의성 설문 열기와 닫기</span></div>
+                  <div className="card-body">
+                    <p style={{ fontSize: 13, marginBottom: 12 }}>
+                      열려 있는 동안 학생 화면 맨 위에 설문 카드가 나타나고, 제출한 학생에게는 다시 보이지 않습니다.
+                      사전 설문은 <b>1차시 수업을 시작하기 전</b>에 하고 수업이 시작되면 닫습니다. 사후 설문은 <b>8차시 정리 단계</b>에 엽니다. 결과는 「설문」 탭에서 봅니다.
+                    </p>
+                    <table className="roster">
+                      <thead><tr><th>설문</th><th>실시 시점</th><th>제출</th><th style={{ width: 110 }}>공개</th></tr></thead>
+                      <tbody>
+                        {[["pre", "사전 설문", "1차시 수업 전 약 5분"], ["post", "사후 설문", "8차시 정리 단계 약 7분"]].map(([ph, nm, when]) => {
+                          const open = surveyOpen(svCfg, ph);
+                          const done = ids.filter((id) => svDone((surveyMap[id] || {})[ph])).length;
+                          return (
+                            <tr key={ph}>
+                              <td>{nm}</td>
+                              <td style={{ fontSize: 12 }}>{when}</td>
+                              <td className="mono">{done} / {ids.length}</td>
+                              <td>
+                                <div className="seg">
+                                  <button className={open ? "on-ok" : ""} onClick={() => { if (!open) toggleSurvey(ph); }}>열림</button>
+                                  <button className={!open ? "on-no" : ""} onClick={() => { if (open) toggleSurvey(ph); }}>잠김</button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <p className="hint" style={{ marginTop: 10 }}>같은 24문항을 두 번 실시해 변화를 잽니다. 학생에게는 성적과 무관함을 반드시 미리 알립니다.</p>
+                  </div>
+                </div>
               </div>
             ) : tab === "수업 안내" ? (
               <TeacherGuide />
@@ -3916,8 +6709,14 @@ function TeacherApp({ onExit, onGallery }) {
                   </div>
                 </div>
               </div>
+            ) : tab === "사고 과정" ? (
+              <TranslationPanel ids={ids} roster={roster} wsMap={wsMap} onSel={setSel} />
+            ) : tab === "연구" ? (
+              <ResearchPanel ids={ids} roster={roster} wsMap={wsMap} gradeMap={gradeMap} surveyMap={surveyMap} sampleMode={sampleMode} openMap={openMap} />
             ) : tab === "창의성" ? (
               <CreativityPanel ids={ids} roster={roster} wsMap={wsMap} onSel={setSel} />
+            ) : tab === "설문" ? (
+              <SurveyPanel ids={ids} roster={roster} surveyMap={surveyMap} sampleMode={sampleMode} onSel={setSel} />
             ) : (
               <div>
                 {msg && <div className="ok-note">{msg}</div>}
@@ -3968,6 +6767,11 @@ function ChangeMap({ ws, owner }) {
 
   const cellText = (spec) => {
     if (spec.kind === "reflect") return (d[spec.k] || {}).pos || "";
+    if (spec.kind === "stmt") return stmtNow(d[spec.k]) || "";
+    if (spec.kind === "debate") {
+      const m = d[spec.k] || {};
+      return [m.pos && "① " + m.pos, m.counter && "② " + m.counter, m.hold && "③ " + m.hold].filter(Boolean).join("\n");
+    }
     if (spec.kind === "inspect") {
       const items = INSPECT_ITEMS.filter((it) => (insp[it.k] || {}).status === "불성립");
       if (!items.length) return "";
@@ -4065,22 +6869,39 @@ function ChangeMap({ ws, owner }) {
 /* ---------- 표본 학급 자료 (화면을 살펴보기 위한 가상 자료) ---------- */
 
 const SAMPLE_SEEDS = [
-  { id: "10102", nick: "물때", upto: 60, problem: "기후 재난", title: "수위선 1.2m", relic: "도장 박리 교실 사물함 문짝", no: "B-02", show: true,
+  { id: "10102", nick: "물때", upto: 60, ldr: 13, ivt: ["gone", "time", "gone"], back: "T4 사물 찾기", gap: "다르게 읽음",
+    st1: "물이 여기까지 찼다는 사실은 교실 사물함에 자국으로 남는다.",
+    st2: "반복된 침수는 사물함 문짝 아래쪽 12cm 높이에, 도장이 부풀어 벗겨지고 그 아래 합판이 갈라진 가로선으로 남는다. 이 흔적은 물이 같은 높이까지 차오르는 일을 해마다 세 차례씩 6년 반복했을 때 생긴다.", problem: "기후 재난", title: "수위선 1.2m", relic: "도장 박리 교실 사물함 문짝", no: "B-02", show: true,
     grade: { r0: "상", r1: "중", r2: "상", r3: "중", rm0: "관찰 기록에서 문제 선정까지 근거가 이어짐", o0: true, o1: true, o3: true,
       fbForm: "물때 선의 높이를 정한 근거를 화면 어디에서 확인할 수 있나요?", fbConcept: "이 유물이 경고하는 시점은 언제인가요?" } },
-  { id: "10107", nick: "열쇠", upto: 44, problem: "사라지는 동네", title: "37번 열쇠", relic: "고무줄 삭은 신발장 열쇠와 번호표", no: "C-05", show: true,
+  { id: "10107", nick: "열쇠", upto: 44, ldr: 9, ivt: ["gone", "record", "gone"], back: "T3 가르기", gap: "일부만 읽음",
+    st1: "사라진 가게의 기억은 신발장 열쇠에 남는다.", problem: "사라지는 동네", title: "37번 열쇠", relic: "고무줄 삭은 신발장 열쇠와 번호표", no: "C-05", show: true,
     grade: { r0: "중", r1: "상", r2: "중", r3: "상", o1: true, o2: true, fbForm: "숫자 획이 얕아진 부분을 접사로 더 볼 수 있을까요?" } },
-  { id: "10111", nick: "손수레", upto: 999, problem: "새벽 배송 노동", title: "오른손", relic: "합성고무 그립 마모 손수레 손잡이 파편", no: "A-01", show: true,
+  { id: "10111", nick: "손수레", upto: 999, ldr: 14, back: "T5 흔적 옮기기", gap: "다르게 읽음", problem: "새벽 배송 노동", title: "오른손", relic: "합성고무 그립 마모 손수레 손잡이 파편", no: "A-01", show: true,
     grade: { r0: "상", r1: "상", r2: "상", r3: "상", rm2: "불성립 세 항목을 물리적 근거와 함께 기록", o0: true, o1: true, o2: true, o3: true, o4: true, o5: true,
       obsMemo: "선별과 제외의 근거를 표현 의도와 연결해 말함", fbConcept: "이 이름이 관람자에게 무엇을 먼저 찾게 하나요?" } },
-  { id: "10114", nick: "야간등", upto: 30, problem: "고립된 노년", title: "", relic: "", no: "", show: false,
+  { id: "10114", nick: "야간등", upto: 30, ldr: 7, ivt: ["place", "time", "norm"], problem: "고립된 노년", title: "", relic: "", no: "", show: false,
     grade: { r0: "중", r3: "중" } },
-  { id: "10119", nick: "셔터", upto: 12, problem: "폐업한 상가", title: "", relic: "", no: "", show: false, grade: null },
-  { id: "10123", nick: "장갑", upto: 70, problem: "배달 노동", title: "왼쪽 검지", relic: "손끝 마모 방한 장갑", no: "D-03", show: true,
+  { id: "10119", nick: "셔터", upto: 12, ldr: 4, ivt: ["place", "gone", "place"], problem: "폐업한 상가", title: "", relic: "", no: "", show: false, grade: null },
+  { id: "10123", nick: "장갑", upto: 70, ldr: 13, ivt: ["time", "norm", "time"], back: "돌아가지 않음", gap: "거의 같게 읽음",
+    st1: "배달하는 사람의 손이 겪는 일은 장갑에 남는다.",
+    st2: "겨울마다 반복된 배달 노동은 방한 장갑 왼쪽 검지 끝에, 표면 섬유가 해어져 안쪽 솜이 드러나고 그 둘레가 검게 눌린 모양으로 남는다. 이 흔적은 화면을 두드려 배달을 확인하는 동작을 하루 90회씩 세 해 겨울 반복했을 때 생긴다.", problem: "배달 노동", title: "왼쪽 검지", relic: "손끝 마모 방한 장갑", no: "D-03", show: true,
     grade: { r0: "상", r1: "중", r2: "중", r3: "중", o0: true, o2: true } },
-  { id: "10126", nick: "급식판", upto: 9, problem: "음식물 쓰레기", title: "", relic: "", no: "", show: false, grade: null },
-  { id: "10130", nick: "우산", upto: 24, problem: "폭우와 침수", title: "", relic: "", no: "", show: false, grade: { r0: "하", rm0: "문제 선정의 근거가 아직 한 줄" } },
+  { id: "10126", nick: "급식판", upto: 9, ldr: 1, problem: "음식물 쓰레기", title: "", relic: "", no: "", show: false, grade: null },
+  { id: "10130", nick: "우산", upto: 24, ldr: 5, ivt: ["time", "time", "time"],
+    st1: "폭우가 잦아진 것은 우산에 남는다.", problem: "폭우와 침수", title: "", relic: "", no: "", show: false, grade: { r0: "하", rm0: "문제 선정의 근거가 아직 한 줄" } },
 ];
+
+/* 사다리 기록 칸의 순서 — 표본 학생마다 여기까지만 남겨 계단 도달을 다르게 만든다 */
+const LADDER_KEYS = ["s3a.scenes", "s3a.problem", "s3a.contact", "s3a.why",
+  "s3t1.list", "s3t1.pick", "s3t1.pickWhy", "s3t2.cands", "s3t2.dropWhy",
+  "s3t3.traces", "s3t3.stmt1", "s3t4.reverse", "s3t4.stmt2", "s3t4.moved"];
+
+/* 표본 진술을 학생마다 다르게 만들어 구체성 이동 그래프가 겹치지 않게 함 */
+const sampleStmt = (t1, t2, i) => ({
+  s1: { text: t1, at: "2026-03-12T02:" + String(20 + i).padStart(2, "0") + ":00.000Z", versions: [{ at: "2026-03-12T02:" + String(20 + i).padStart(2, "0") + ":00.000Z", text: t1 }] },
+  s2: { text: t2, at: "2026-03-12T05:" + String(10 + i).padStart(2, "0") + ":00.000Z", versions: [{ at: "2026-03-12T05:" + String(10 + i).padStart(2, "0") + ":00.000Z", text: t2 }] },
+});
 
 // DEMO_WS의 앞부분을 잘라 진행 정도가 다른 학생 기록을 만듦
 function buildSampleClass() {
@@ -4089,6 +6910,14 @@ function buildSampleClass() {
   SAMPLE_SEEDS.forEach((s, i) => {
     const w = {};
     keys.slice(0, s.upto).forEach((k) => { w[k] = DEMO_WS[k]; });
+    // 사다리는 seed의 ldr 만큼만 남긴다 (0이면 아직 시작하지 않은 상태)
+    LADDER_KEYS.forEach((k, j) => {
+      if (j < (s.ldr == null ? LADDER_KEYS.length : s.ldr)) w[k] = DEMO_WS[k];
+      else delete w[k];
+    });
+    if (s.ivt && w["s3t1.list"]) w["s3t1.list"] = w["s3t1.list"].map((r, j) => ({ ...r, type: s.ivt[j] || r.type }));
+    if (s.back && w["s3t4.reverse"]) w["s3t4.reverse"] = w["s3t4.reverse"].map((r, j) => (j === 0 ? { ...r, gap: s.gap || r.gap, backTo: s.back } : r));
+    if (s.st1 && w["s3t3.stmt1"]) { const p = sampleStmt(s.st1, s.st2 || s.st1, i); w["s3t3.stmt1"] = p.s1; if (w["s3t4.stmt2"]) w["s3t4.stmt2"] = p.s2; }
     if (s.problem) w["s3a.problem"] = s.problem;
     if (s.title) w["s6b.title"] = s.title;
     if (s.relic) w["s6b.relic"] = s.relic;
@@ -4111,7 +6940,42 @@ function buildSampleClass() {
     ws[s.id] = w;
     grade[s.id] = s.grade || null;
   });
-  return { roster, ws, grade };
+
+  // 표본 설문 — 「설문」 탭의 사전·사후 비교 화면을 살펴보기 위한 결정적 가상 응답
+  const E3_SAMPLES = [
+    "명제표를 바꿔 다는 활동에서, 그림이 아니라 이름이 읽기를 정한다는 걸 처음 느꼈다.",
+    "AI가 만든 균열을 살릴지 버릴지 정하던 순간. 고르는 것도 만드는 일이라는 생각이 들었다.",
+    "짝이 내 의도와 전혀 다르게 읽었을 때. 관람자가 작품을 절반은 만든다는 말이 이해됐다.",
+  ];
+  const surveys = {};
+  SAMPLE_SEEDS.forEach((s, i) => {
+    if (s.upto < 12) return; // 진행이 거의 없는 학생은 사전 설문도 미제출인 상태를 시연
+    const ansOf = (phase) => {
+      const a = {};
+      SURVEY_ITEMS.forEach((it, idx) => {
+        let v = 2 + ((i * 3 + idx) % 3); // 2~4 사이의 결정적 값
+        if (it.rev) v = 6 - v; // 역문항은 반대 방향으로 응답
+        if (phase === "post") {
+          const up = (i + idx) % 2; // 절반 정도의 문항이 한 단계 이동
+          v = it.rev ? Math.max(1, v - up) : Math.min(5, v + up);
+        }
+        a[it.k] = v;
+      });
+      return a;
+    };
+    const t0 = new Date(Date.now() - 40 * 86400000 - i * 3600000).toISOString();
+    const sv = { ver: SURVEY_VER, pre: { ans: ansOf("pre"), startedAt: t0, submittedAt: t0, durSec: 210 + i * 12 } };
+    if (s.upto >= 60) {
+      const t1 = new Date(Date.now() - 2 * 86400000 - i * 3600000).toISOString();
+      sv.post = {
+        ans: ansOf("post"), startedAt: t1, submittedAt: t1, durSec: 260 + i * 10,
+        extra: { e1: 3 + (i % 3), e2: 3 + ((i + 1) % 3), e3: E3_SAMPLES[i % E3_SAMPLES.length] },
+      };
+    }
+    surveys[s.id] = sv;
+  });
+
+  return { roster, ws, grade, surveys };
 }
 
 /* ---------- 전시장 ---------- */
@@ -4275,10 +7139,52 @@ const DEMO_WS = {
   "q8.reflect": { pos: "5차시에는 형식과 인과가 믿음을 만든다고 썼다. 지금은 하나를 더한다. 믿고 싶은 이야기일 때 우리는 형식을 덜 따진다. 관람자들이 내 유물을 배송 노동으로 읽고 싶어 했다는 것을 전시에서 봤다.", at: "2026-04-02T03:20:00.000Z" },
   "s12.def": "작가의 선택과 이름 붙이기, 그리고 그것을 전시라는 자리에 놓는 일",
   "s12.labelCmp": "같은 파이프 사진이 한쪽 명제표에서는 공구 파편으로, 다른 쪽에서는 노동의 기록으로 읽혔다.",
-  "s3a.scenes": "1. 새벽에 현관 앞에 놓여 있던 상자\n2. 편의점 앞에 세워진 배달 오토바이의 닳은 손잡이\n3. 아파트 분리수거장에 쌓인 택배 상자 더미",
+  "s3a.scenes": [
+    { when: "새벽 6시 20분", where: "우리 집 현관 앞", what: "밤사이 놓이고 간 상자 두 개와 문틀 옆에 눌린 자국", sense: "눈으로 본 것" },
+    { when: "밤 11시", where: "아파트 분리수거장", what: "상자 더미 옆에 세워 둔 손수레, 오른쪽 손잡이에만 테이프가 감겨 있음", sense: "눈으로 본 것" },
+    { when: "새벽 5시 40분", where: "동 입구 계단", what: "바퀴가 계단 턱에 부딪히는 소리가 창문 너머로 들림", sense: "귀로 들은 것" },
+  ],
   "s3a.problem": "새벽 배송 노동",
   "s3a.contact": "매일 아침 우리 집 현관에 놓이는 상자",
-  "s3a.why": "상자는 매일 도착하는데 그것을 놓고 가는 사람을 한 번도 본 적이 없다. 얼굴을 모르는 사람의 노동이 매일 우리 집에 도착한다는 사실이 이상하게 느껴졌다.",
+  "s3a.why": "상자는 매일 도착하는데 그것을 놓고 가는 사람을 한 번도 본 적이 없다. 후보로 떠올렸던 교실 분리수거 문제는 내가 매일 겪지만 눈에 다 보이는 일이었고, 이 문제는 내 집 앞에서 벌어지는데도 내가 볼 수 없는 시간대에 일어난다는 점이 달랐다. 얼굴을 모르는 사람의 노동이 매일 우리 집에 도착한다는 사실이 마음에 걸렸기 때문에 이 문제를 골랐다.",
+  "s3t1.list": [
+    { text: "상자를 놓고 가는 사람의 몸과 시간", type: "time", why: "새벽에만 오가서 4년 동안 한 번도 마주친 적이 없다" },
+    { text: "한 사람이 하루에 옮기는 상자의 개수", type: "record", why: "어디에도 적히지 않아 숫자로 확인할 방법이 없다" },
+    { text: "엘리베이터가 없는 동에서 계단을 오르내리는 일", type: "place", why: "건물 안에서 일어나는 일이라 바깥에서는 보이지 않는다" },
+  ],
+  "s3t1.pick": "상자를 놓고 가는 사람의 몸과 시간",
+  "s3t1.pickWhy": "세 가지를 나란히 놓고 사물의 흔적으로 옮길 수 있는 정도를 견주었다. 하루에 옮기는 개수는 숫자라서 물건에 자국을 남기지 않으므로 접었다. 계단을 오르내리는 일은 건물에 남지만 그 건물을 유물로 찍을 수는 없었다. 몸과 시간은 시간에 흩어져서 보이지 않는 갈래여서, 여러 번의 접촉이 겹쳐 남는 마모를 기대할 수 있어 남겼다.",
+  "s3t2.cands": [
+    { obj: "배송용 손수레의 손잡이", where: "분리수거장 옆에 세워 둠", whose: "배송 노동자의 오른손", act: "한 손으로 기울여 끌 때 손바닥이 그립을 비틀어 쥔다", verdict: "고름" },
+    { obj: "현관 앞에 놓인 종이 상자", where: "각 세대 문 앞", whose: "노동자의 두 팔", act: "들어 올렸다 내려놓기", verdict: "접음" },
+    { obj: "동 입구의 자동문 개폐 버튼", where: "1층 현관 벽", whose: "장갑 낀 손끝", act: "누르기", verdict: "접음" },
+  ],
+  "s3t2.dropWhy": "가장 아까웠던 후보는 종이 상자였다. 매일 눈앞에 있어 관람자도 바로 알아볼 물건이지만, 상자는 쓰고 버려지기 때문에 몇 년치 반복이 한 물건에 쌓이지 않는다. 흔적이 남기 전에 사라지는 물건은 시간을 말할 수 없다. 손수레 손잡이는 같은 사람이 몇 년을 계속 쥐는 물건이라 반복이 한자리에 겹쳐 남는다.",
+  "s3t3.traces": [
+    { inv: "상자를 놓고 가는 사람의 몸과 시간", spot: "오른쪽 그립의 손바닥이 닿는 자리", shape: "합성고무가 벗겨져 금속이 드러나고 그 위에 직물 테이프를 세 겹 감음. 테이프 아래 금속면은 손바닥 너비만큼 광택이 남음", act: "한 손으로 비틀어 쥐고 끌기", freq: "하루 200회", span: "4년" },
+    { inv: "계단을 오르내리는 일", spot: "손잡이 아래 이음매", shape: "용접 자리에 가로로 금이 가고 그 옆이 안쪽으로 휘어 있음", act: "계단 턱에 부딪히며 들어 올리기", freq: "하루 12회", span: "4년" },
+  ],
+  "s3t3.stmt1": {
+    text: "새벽에 상자를 옮기는 사람의 반복된 노동은 손수레 손잡이의 오른쪽에 마모로 남는다. 이 흔적은 한 손으로 끄는 동작을 오래 반복했을 때 생긴다.",
+    at: "2026-03-12T02:40:00.000Z",
+    versions: [
+      { at: "2026-03-12T02:22:00.000Z", text: "보이지 않는 노동은 손수레에 흔적으로 남는다." },
+      { at: "2026-03-12T02:40:00.000Z", text: "새벽에 상자를 옮기는 사람의 반복된 노동은 손수레 손잡이의 오른쪽에 마모로 남는다. 이 흔적은 한 손으로 끄는 동작을 오래 반복했을 때 생긴다." },
+    ],
+  },
+  "s3t4.reverse": [
+    { shown: "손수레 손잡이와 흔적 메모", read: "공사장에서 오래 쓴 공구 같다고 했다. 테이프를 감은 걸 보고 현장에서 급하게 고쳐 쓴 물건이라고 읽었다.", gap: "다르게 읽음", backTo: "T5 흔적 옮기기", fixed: "흔적을 손바닥 너비의 광택으로 좁히고, 테이프를 감은 방향을 끄는 방향과 맞춰 다시 적었다" },
+    { shown: "고친 흔적 메모", read: "한쪽만 닳은 걸 보고 한 손으로만 쓰는 물건이라고 했다. 짐을 나르는 일 같다고 읽었다.", gap: "일부만 읽음", backTo: "돌아가지 않음", fixed: "" },
+  ],
+  "s3t4.stmt2": {
+    text: "새벽마다 반복된 배송 노동은 손수레 오른쪽 그립의 손바닥이 닿는 자리에, 합성고무가 벗겨져 금속이 드러나고 그 위에 직물 테이프를 세 겹 감은 모양으로 남는다. 이 흔적은 한 손으로 손잡이를 비틀어 쥐고 끄는 동작을 하루 200회씩 4년 동안 반복했을 때 생긴다.",
+    at: "2026-03-12T05:10:00.000Z",
+    versions: [
+      { at: "2026-03-12T04:35:00.000Z", text: "새벽 배송 노동은 손수레 오른쪽 손잡이에 고무가 벗겨지고 테이프를 감은 모양으로 남는다. 한 손으로 끄는 동작을 여러 해 반복했을 때 생긴다." },
+      { at: "2026-03-12T05:10:00.000Z", text: "새벽마다 반복된 배송 노동은 손수레 오른쪽 그립의 손바닥이 닿는 자리에, 합성고무가 벗겨져 금속이 드러나고 그 위에 직물 테이프를 세 겹 감은 모양으로 남는다. 이 흔적은 한 손으로 손잡이를 비틀어 쥐고 끄는 동작을 하루 200회씩 4년 동안 반복했을 때 생긴다." },
+    ],
+  },
+  "s3t4.moved": "초안에서는 ‘마모’와 ‘오래’라는 말을 썼는데 확정문에서는 ‘합성고무가 벗겨져 금속이 드러남’과 ‘하루 200회씩 4년’으로 바꿨다. 사라진 말은 ‘노동’이라는 큰 말이고, 새로 들어온 말은 손바닥이 닿는 자리와 테이프의 겹 수다. 짝이 공사장 공구로 읽은 것이 이 말을 바꾸게 했다. 어느 손이 어떤 방향으로 쥐는지를 화면에서 확인할 수 있어야 다른 물건으로 읽히지 않는다는 걸 알았다.",
   "s3b.invisible": "상자를 놓고 가는 사람의 몸과 시간",
   "s3b.object": "배송용 손수레의 손잡이",
   "s3b.trace": "오른쪽 그립만 고무가 벗겨져 금속이 드러나고, 벗겨진 자리에 직물 테이프를 여러 겹 감은 흔적. 테이프 아래 금속면은 손바닥 너비만큼 광택이 남.",
@@ -4329,6 +7235,7 @@ const DEMO_WS = {
   "s5d.fileName": "10203_5_도구A_4",
   "s5d.selWhy": "왼쪽의 온전한 그립과 오른쪽의 벗겨진 그립이 형태·질감·광택의 세 층위에서 대비되고, 광택이 손바닥 너비 안에 머물러 흔적의 인과가 성립함.",
   "s5d.excWhy": "3회차는 표면이 매끈해 새 물건처럼 보였다. '오래 쓴 도구의 기록'이라는 표현 의도와 어긋나 제외함.",
+  "s5d.serendip": "4회차에서 시키지 않았는데 그립 아래쪽에 가는 균열이 생겼다. 처음에는 지우려 했지만, 균열의 방향이 손이 눌리는 방향과 맞아 '반복된 힘의 기록'으로 읽혀서 살리기로 함. 논쟁 질문에서 나는 '의도와 이어 붙일 수 있으면 발견'이라고 썼는데, 이 균열은 그 기준을 통과한다.",
   "s5e.pairSaw": "설명 없이 본 짝은 '공사장에서 쓰던 물건 같다'고 읽음",
   "s5e.pairDiff": "배송 노동으로는 읽히지 않았다. 명제표의 출토 맥락에서 하역장을 밝히기로 하고, 이미지는 그대로 두기로 함.",
   "s6a.partial": "광택이 그립 전체에 퍼진 부분을 인페인팅으로 손바닥 너비까지 줄임",
@@ -4357,6 +7264,7 @@ const DEMO_WS = {
   "s8a.q3": "선택과 명명과 전시가 파이프 조각을 노동의 기록으로 읽게 만들었기 때문이다.",
   "s8a.q4": "허구임을 밝혔는데도 관람자는 이 시대의 배송 노동을 떠올렸다. 가짜 유물이 실제 문제를 가리키는 손가락이 될 수 있었다.",
   "s8a.peerBack": "'테이프 감긴 방향이 중간에 바뀐다'는 지적은 재생성으로 반영함. '더 낡게 만들라'는 의견은 과장이 기록의 태도와 맞지 않아 반영하지 않고 이유를 남김.",
+  "s8a.ownQ": "관람자가 허구인 줄 알면서도 믿어 주는 마음은 어디까지 갈 수 있는가. 허구 고지의 글씨를 조금씩 키워 가며 어느 크기에서 믿음이 꺼지는지 전시로 실험해 보고 싶다.",
 };
 
 function DemoView({ onBack }) {
