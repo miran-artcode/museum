@@ -1149,7 +1149,7 @@ function fieldProgress(f, v) {
       return { total: 3, done: ["pos", "counter", "hold"].filter((k) => filled(m[k])).length };
     }
     case "reflect": return { total: 1, done: filled((v || {}).pos) ? 1 : 0 };
-    case "rounds": return { total: 1, done: rows.some((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.prompt))) ? 1 : 0 };
+    case "rounds": return { total: 1, done: rows.some((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change) || filled(r.prompt))) ? 1 : 0 };
     case "inspect": {
       const m = v || {};
       return { total: INSPECT_ITEMS.length, done: INSPECT_ITEMS.filter((it) => m[it.k] && m[it.k].status).length };
@@ -2128,6 +2128,20 @@ function creativityAxesAll(wsMap) {
   return out;
 }
 
+/* 값이 자주 바뀌는데 그 값으로 하는 계산이 무거울 때, 일정 간격으로만 따라가게 한다.
+   학생 화면은 타건마다, 교사 화면은 학생이 저장할 때마다 다시 그려지므로
+   유사도·붙여넣기 대조처럼 글 전체를 훑는 계산을 그대로 걸면 화면이 끊긴다. */
+function useSlow(value, ms) {
+  const [slow, setSlow] = useState(value);
+  const ref = useRef(value);
+  ref.current = value;
+  useEffect(() => {
+    const t = setInterval(() => setSlow(ref.current), ms || 1500);
+    return () => clearInterval(t);
+  }, [ms]);
+  return slow;
+}
+
 const median = (arr) => {
   const a = arr.filter((x) => x != null).sort((x, y) => x - y);
   if (!a.length) return null;
@@ -2171,13 +2185,35 @@ function writtenTextAll(ws) {
 
 const writtenMap = (ws) => new Map(writtenTextAll(ws));
 
+/* 키가 가리키는 칸의 글을 그대로 읽는다. "필드키#속성행번호"면 그 줄까지 짚는다.
+   writtenTextAll은 10자 미만을 버리므로 길이를 재려면 이쪽을 써야 한다. */
+function readAt(ws, k) {
+  const d = ws || {};
+  const s0 = String(k);
+  const hash = s0.indexOf("#");
+  if (hash < 0) return typeof d[s0] === "string" ? d[s0] : "";
+  const v = d[s0.slice(0, hash)];
+  const rest = s0.slice(hash + 1);
+  const m = rest.match(/^([a-zA-Z]+)(\d+)$/);
+  if (m && Array.isArray(v)) {
+    const row = v[Number(m[2])];
+    return row && typeof row[m[1]] === "string" ? row[m[1]] : "";
+  }
+  let cur = v;
+  for (const p of rest.split(".")) {
+    if (!cur || typeof cur !== "object") return "";
+    cur = cur[p];
+  }
+  return typeof cur === "string" ? cur : "";
+}
+
 /* 붙여넣기가 일어난 칸의 최종 글.
    표·점검표처럼 칸 하나가 여러 입력을 품는 자리는 어느 줄에 붙였는지까지는 알 수 없으므로,
    그 칸에 딸린 글을 모두 이어 붙여 대조한다. 그래야 표 안에 붙여넣은 문장도 잔존율이 잡힌다. */
 function pasteFinal(ws, k, wmap) {
-  const d = ws || {};
-  if (typeof d[k] === "string") return d[k];
-  const m = wmap || writtenMap(d);
+  const exact = readAt(ws, k);          // 줄까지 짚히면 그 줄만 견준다 — 가장 정확하다
+  if (exact) return exact;
+  const m = wmap || writtenMap(ws);
   const hit = m.get(k);
   if (hit) return hit;
   const pre = k + "#";
@@ -2186,11 +2222,84 @@ function pasteFinal(ws, k, wmap) {
   return parts.join("\n");
 }
 
+/* ---------- 기록지가 저장 한계에 닿지 않게 ----------
+   Firestore는 문서 하나가 1MiB를 넘으면 쓰기를 통째로 거부한다. 그러면 저장이 실패하고
+   학생은 저장되지 않는 줄 모른 채 계속 쓰게 된다 — 수업 중에 가장 나쁜 실패다.
+   학생이 쓴 글은 절대 건드리지 않고, 흔적 기록만 오래된 것부터 덜어 낸다.
+   무엇을 얼마나 덜어 냈는지는 _pruned에 남겨 연구 자료에서 확인할 수 있게 한다. */
+/* 한글은 UTF-8에서 글자당 3바이트다. 글자 수로 재면 한글 기록지의 크기를 3분의 1로 잘못 보아
+   한계에 닿았는데도 여유가 있다고 판단하게 된다. 반드시 바이트로 재야 한다. */
+function utf8Len(s) {
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) n += 1;
+    else if (c < 0x800) n += 2;
+    else if (c >= 0xD800 && c <= 0xDBFF) { n += 4; i++; }   // 서로게이트 쌍은 둘이 합쳐 4바이트
+    else n += 3;
+  }
+  return n;
+}
+const jsonBytes = (x) => { try { return utf8Len(JSON.stringify(x)); } catch (e) { return 0; } };
+
+const DOC_LIMIT = 1048576;   // Firestore 문서 하나의 한계
+const DOC_BUDGET = 800000;   // 필드 이름과 색인 몫을 남겨 둔 여유
+
+function pruneTrace(data) {
+  const d = data || {};
+  const log = Array.isArray(d._log) ? d._log : [];
+  const paste = Array.isArray(d._paste) ? d._paste : [];
+  if (log.length < 40 && paste.length < 40) return d;   // 값싼 관문 — 대개 여기서 끝난다
+
+  // 한 번만 재고 뺄셈으로 줄인다. 덜어 낼 때마다 문서 전체를 다시 재면 저장이 느려진다.
+  const rest = { ...d };
+  delete rest._log;
+  delete rest._paste;
+  const logB = log.map(jsonBytes);
+  const pasteB = paste.map(jsonBytes);
+  let total = jsonBytes(rest) + logB.reduce((a, b) => a + b, 0) + pasteB.reduce((a, b) => a + b, 0);
+  if (total < DOC_BUDGET) return d;
+
+  const out = { ...d };
+  let dropped = d._pruned || 0;
+
+  // ① 고쳐 쓰기 이력을 오래된 것부터. 이전 문장이 400자씩이라 가장 무겁다.
+  let li = 0;
+  while (li < logB.length - 20 && total >= DOC_BUDGET) { total -= logB[li]; li++; dropped++; }
+  out._log = log.slice(li);
+
+  // ② 그래도 넘치면 붙여넣기의 앞머리를 버린다.
+  //    건수와 수치는 남겨 연구 자료의 행이 사라지지 않게 한다 — 행이 줄면 집계가 조용히 틀어진다.
+  let P = paste;
+  if (total >= DOC_BUDGET) {
+    let saved = 0;
+    P = paste.map((e, i) => {
+      if (!e || !e.head) return e;
+      saved += utf8Len(e.head);
+      return { ...e, head: "", headDropped: true };
+    });
+    total -= saved;
+    if (saved > 0) dropped++;
+  }
+
+  // ③ 여기까지 와도 넘치면 오래된 붙여넣기 자체를 버린다 (사실상 일어나지 않는다)
+  let pi = 0;
+  while (pi < P.length - 20 && total >= DOC_BUDGET) { total -= pasteB[pi]; pi++; dropped++; }
+  out._paste = pi ? P.slice(pi) : P;
+  out._pruned = dropped;
+  return out;
+}
+
+/* 붙여넣은 앞머리가 그 글에 얼마나 남아 있는가 (%) */
+function surviveIn(head, finalText) {
+  if (!head || !finalText) return null;
+  return Math.round(overlapCoef(gramSet(head), gramSet(finalText)) * 100);
+}
+
 /* 한 건의 붙여넣기가 최종문에 얼마나 살아남았는가 (%) */
 function pasteSurvive(ws, e, wmap) {
-  const fin = pasteFinal(ws, e.k, wmap);
-  if (!e || !e.head || !fin) return null;
-  return Math.round(overlapCoef(gramSet(e.head), gramSet(fin)) * 100);
+  if (!e || !e.head) return null;
+  return surviveIn(e.head, pasteFinal(ws, e.k, wmap));
 }
 
 function pasteMetrics(ws) {
@@ -2211,12 +2320,14 @@ function pasteMetrics(ws) {
 
   const settles = ps.map((e) => e.settle).filter((x) => typeof x === "number");
   const srcOf = (s) => ps.filter((e) => e.src === s).length;
+  const aiChars = ps.filter((e) => e.src === "AI").reduce((a, e) => a + (e.n || 0), 0);
 
   return {
     pasteN: ps.length,
     pasteChars: chars,
     writtenLen,
     srcRatio: writtenLen > 0 ? Math.round(Math.min(1, chars / writtenLen) * 100) : (chars > 0 ? 100 : 0),
+    aiRatio: writtenLen > 0 ? Math.round(Math.min(1, aiChars / writtenLen) * 100) : (aiChars > 0 ? 100 : 0),
     approp: apN ? Math.round(apSum / apN) : null,
     settleMed: settles.length ? median(settles) : null,
     aiN: srcOf("AI"),
@@ -2398,9 +2509,14 @@ function aiTypesAll(wsMap) {
   const ids = Object.keys(wsMap || {});
   const pm = {};
   ids.forEach((id) => { pm[id] = pasteMetrics(wsMap[id]); });
-  const aps = ids.map((id) => pm[id].approp).filter((x) => x != null);
+  /* 두 중앙값은 반드시 같은 모집단에서 나와야 한다.
+     붙여넣기가 없는 학생의 가져온 양은 0이므로, 그들까지 넣으면 세로 기준선이 왼쪽 끝에 붙어
+     산점도에 찍힌 학생이 모두 선 오른쪽에 놓인다 — 사분면 읽기가 무의미해진다.
+     산점도에 나타나는 학생, 곧 붙여넣기 기록이 있는 학생만으로 두 선을 잡는다. */
+  const pasters = ids.filter((id) => pm[id].pasteN > 0);
+  const aps = pasters.map((id) => pm[id].approp).filter((x) => x != null);
   const apMed = median(aps);
-  const srMed = median(ids.map((id) => pm[id].srcRatio).filter((x) => x != null));
+  const srMed = median(pasters.map((id) => pm[id].srcRatio).filter((x) => x != null));
   const per = {};
   ids.forEach((id) => {
     const m = pm[id];
@@ -3998,8 +4114,9 @@ function FieldEditor({ sec, f, ws, setField }) {
 
   if (f.t === "text" || f.t === "area") {
     const meter = f.t === "area" && (f.steps || sec.kind === "learn" || sec.kind === "inquiry");
+    // data-fk는 SectionCard가 칸마다 감싸며 한 곳에서 달아 준다
     return (
-      <div className={"field " + (f.t === "area" ? "span2" : "")} data-fk={key}>
+      <div className={"field " + (f.t === "area" ? "span2" : "")}>
         {f.qtype ? (
           <div className="q-head"><span className={"q-type " + (f.qtype === "설계" ? "design" : "concept")}>{f.qtype}</span><label style={{ margin: 0 }}>{f.label}</label></div>
         ) : (
@@ -4553,7 +4670,7 @@ function FieldReader({ sec, f, ws, owner }) {
     const has = (r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change) || filled(r.prompt));
     const rows = (v || []).filter(has);
     if (!rows.length) return Empty;
-    const steps = promptMetrics({ "s5b.rounds": v || [] });
+    const steps = promptMetrics({ ...(ws || {}), "s5b.rounds": v || [] });
     return (
       <>
         <table className="tbl" style={{ marginBottom: 6 }}>
@@ -4566,7 +4683,10 @@ function FieldReader({ sec, f, ws, owner }) {
         </table>
         {steps.promptN >= 2 && (
           <p className="hint" style={{ marginBottom: 10 }}>
-            프롬프트 {steps.promptN}회 · 인접 회차 평균 변화량 {steps.stepSize}%
+            프롬프트 {steps.promptN}회
+            {steps.stepSize != null
+              ? " · 인접 회차 평균 변화량 " + steps.stepSize + "%"
+              : " · 회차 사이 변화량은 이어진 두 회차가 모두 적혀 있어야 잽니다"}
             {steps.stepEven != null ? " · 변화가 고른 정도 " + steps.stepEven + "%" : ""}
             {steps.planGap != null ? " · 5차시 계획과의 거리 " + steps.planGap + "%" : ""}
             {steps.growth != null ? " · 어휘 " + (steps.growth >= 0 ? "+" : "") + steps.growth + "개" : ""}
@@ -5288,10 +5408,15 @@ function StudentApp({ me, onExit, onGallery }) {
     savingRef.current = true;
     dirtyRef.current = false;
     setSaveState("saving");
-    const data = { ...drainAct(), _updatedAt: now() };
+    const data = pruneTrace({ ...drainAct(), _updatedAt: now() });
     const ok = await store.set(WSKEY, data);
     savingRef.current = false;
     if (ok) {
+      // 덜어 낸 것이 있으면 화면의 기록도 저장된 것과 같게 맞춘다
+      if (data._pruned && data._pruned !== (wsRef.current._pruned || 0)) {
+        wsRef.current = data;
+        setWs(data);
+      }
       setSavedAt(data._updatedAt);
       if (dirtyRef.current) { setSaveState("dirty"); doSave(); }
       else setSaveState("saved");
@@ -5367,7 +5492,7 @@ function StudentApp({ me, onExit, onGallery }) {
       const body = txt.trim();
       if (!k || body.length < PASTE_MIN) return;
       const at = now();
-      const entry = { k, at, n: body.length, head: body.slice(0, 120), base: strLen(wsRef.current[k]), src: "" };
+      const entry = { k, at, n: body.length, head: body.slice(0, 120), base: strLen(readAt(wsRef.current, k)), src: "" };
       setWs((p) => ({ ...p, _paste: [...(Array.isArray(p._paste) ? p._paste : []), entry].slice(-200) }));
       dirtyRef.current = true;
       setSaveState("dirty");
@@ -5518,8 +5643,7 @@ function StudentApp({ me, onExit, onGallery }) {
           <SectionCard key={sec.id} sec={sec} ws={ws} setField={setField} />
         ))}
         {/* 차시마다 그 차시에서 가져온 문장을, 8차시에는 전 과정을 모아 보여 준다 */}
-        {isOpen(openMap, tab) && tab !== "8차시" && <PasteBackCard ws={ws} session={tab} />}
-        {isOpen(openMap, tab) && tab === "8차시" && <PasteBackCard ws={ws} />}
+        {isOpen(openMap, tab) && <PasteBackCard ws={ws} session={tab === "8차시" ? undefined : tab} />}
       </div>
 
       {pasteAsk && (
@@ -5546,12 +5670,13 @@ function PasteMark({ ws, fieldKey }) {
   const d = ws || {};
   const ps = (Array.isArray(d._paste) ? d._paste : []).filter((e) => e && e.k === fieldKey);
   if (!ps.length) return null;
-  const wmap = writtenMap(d);
+  // 이 칸의 글만 읽는다 — 칸마다 기록지 전체를 훑으면 타건마다 그 비용이 반복된다
+  const fin = readAt(d, fieldKey);
   return (
     <div className="paste-mark">
       <span className="pm-n">가져온 문장 {ps.length}건</span>
       {ps.map((e, i) => {
-        const sv = pasteSurvive(d, e, wmap);
+        const sv = surviveIn(e.head, fin);
         const kept = sv != null && sv >= 60;
         return (
           <span key={i} className={"pm-chip " + (kept ? "kept" : "own")} title={e.head}>
@@ -5567,8 +5692,10 @@ function PasteMark({ ws, fieldKey }) {
    감시가 아니라 되돌림이 되게 하는 장치. 점수로 쓰지 않는다.
    session을 주면 그 차시 것만, 주지 않으면 전 과정을 모아 보여 준다. */
 function PasteBackCard({ ws, session }) {
-  const all = pasteRows(ws).filter((r) => r.head);
-  const rows = session ? all.filter((r) => r.session === session) : all;
+  // 기록지 전체를 훑어 대조하므로 타건마다 돌리지 않고 1.5초 간격으로 따라간다
+  const slow = useSlow(ws, 1500);
+  const all = useMemo(() => pasteRows(slow).filter((r) => r.head), [slow]);
+  const rows = useMemo(() => (session ? all.filter((r) => r.session === session) : all), [all, session]);
   if (!rows.length) return null;
   const kept = rows.filter((r) => r.survive != null && r.survive >= 60).length;
   const named = rows.filter((r) => r.src).length;
@@ -6061,7 +6188,7 @@ function ApproprScatter({ rows, apMed, srMed, hoverId, setHoverId, onSel }) {
   return (
     <div>
       <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: "auto" }} role="img" aria-label="가져온 양과 전유율의 학급 분포">
-        <title>가로: AI 소스 비중(%) · 세로: 전유율(%). 점 하나가 학생 한 명. 붙여넣기 기록이 있는 {pts.length}명만 나타납니다.</title>
+        <title>가로: 가져온 글의 비중(%) · 세로: 전유율(%). 점 하나가 학생 한 명. 붙여넣기 기록이 있는 {pts.length}명만 나타납니다.</title>
         <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="var(--line)" strokeWidth={1} />
         <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} stroke="var(--line)" strokeWidth={1} />
         {apMed != null && pts.length >= 3 && (
@@ -6195,17 +6322,10 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
   const axesAll = useMemo(() => creativityAxesAll(wsOnly), [wsOnly]);
   const aiAll = useMemo(() => aiTypesAll(wsOnly), [wsOnly]);
 
-  /* 동질화는 학급 전체를 규준으로 쌍마다 비교하므로 140명이면 만 쌍에 가깝고 0.3초쯤 걸린다.
-     학생이 저장할 때마다 기록이 새로 내려오므로, 그때마다 다시 계산하면 화면이 끊긴다.
-     15초에 한 번씩만 다시 잰다 — 동질화는 초 단위로 움직이는 값이 아니다. */
-  const wsSnapRef = useRef(wsOnly);
-  wsSnapRef.current = wsOnly;
-  const [simTick, setSimTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setSimTick((x) => x + 1), 15000);
-    return () => clearInterval(t);
-  }, []);
-  const simSnap = useMemo(() => wsSnapRef.current, [simTick, ids.length]);
+  /* 동질화는 학급 전체를 규준으로 쌍마다 비교한다. 학생이 저장할 때마다 기록이 새로 내려오므로
+     그때마다 다시 계산하면 화면이 끊긴다. 15초에 한 번씩만 다시 잰다 —
+     동질화는 초 단위로 움직이는 값이 아니다. */
+  const simSnap = useSlow(wsOnly, 15000);
   const simAll = useMemo(() => similarityAll(simSnap), [simSnap]);
   const rows = ids.map((id) => ({ id, nick: (roster[id] || {}).nick || id, ax: axesAll[id] || {} }));
 
@@ -7339,7 +7459,11 @@ const RESEARCH_VARS = [
   /* 가져온 글과 전유 — 붙여넣기를 막는 대신 기록해 얻는 변수들 */
   { k: "paste_n", name: "붙여넣기 건수", unit: "건", def: "서술 칸에 20자 이상을 붙여넣은 횟수", get: (c) => c.pm.pasteN },
   { k: "paste_chars", name: "붙여넣은 글자 수", unit: "자", def: "붙여넣기로 들어온 글자의 합", get: (c) => c.pm.pasteChars },
-  { k: "src_ratio", name: "AI 소스 비중", unit: "%", def: "붙여넣은 글자 수 ÷ 서술 칸 최종 글자 수", get: (c) => c.pm.srcRatio },
+  /* 이름에 AI를 넣지 않는다 — 이 값은 출처와 무관하게 모든 붙여넣기를 센다.
+     학생이 3차시에 쓴 자기 글을 8차시로 옮겨 붙여도 올라가므로, 출처를 단정하는 이름은
+     자료가 뒷받침하지 못한다. 출처를 스스로 AI라고 밝힌 몫은 src_ratio_ai로 따로 둔다. */
+  { k: "src_ratio", name: "가져온 글의 비중", unit: "%", def: "붙여넣은 글자 수 ÷ 기록지에 쓴 전체 글자 수 (출처를 가리지 않음)", get: (c) => c.pm.srcRatio },
+  { k: "src_ratio_ai", name: "AI라고 밝힌 몫", unit: "%", def: "학생이 출처를 AI로 고른 붙여넣기의 글자 수 ÷ 기록지에 쓴 전체 글자 수", get: (c) => c.pm.aiRatio },
   { k: "approp", name: "전유율", unit: "%", def: "붙인 앞머리가 최종문에서 사라진 정도 (1 − 잔존율)", get: (c) => (c.pm.approp == null ? null : c.pm.approp) },
   { k: "paste_settle", name: "붙인 뒤 손댄 시간", unit: "초", def: "붙여넣기부터 그 칸을 마지막으로 고칠 때까지의 중앙값", get: (c) => c.pm.settleMed },
   { k: "paste_src_ai", name: "출처를 AI로 표시", unit: "건", def: "학생이 스스로 AI라고 고른 붙여넣기 건수", get: (c) => c.pm.aiN },
@@ -7349,6 +7473,7 @@ const RESEARCH_VARS = [
   /* 지우고 다시 쓴 흔적 */
   { k: "rewrite_depth", name: "개작의 깊이", unit: "%", def: "남겨 둔 이전 문장이 최종문과 얼마나 멀어졌는가의 평균", get: (c) => c.rv.depth },
   { k: "rewrite_deep_n", name: "깊은 개작 건수", unit: "건", def: "이전 문장과 절반 이상 달라진 개작의 수", get: (c) => c.rv.deepN },
+  { k: "trace_pruned", name: "덜어 낸 흔적", unit: "건", def: "기록지가 저장 한계에 닿아 오래된 순으로 덜어 낸 흔적의 수. 0이 아니면 그 참여자의 고쳐 쓰기 이력은 완전하지 않다", get: (c) => (c.ws._pruned || 0) },
 
   /* 프롬프트 궤적 */
   { k: "prompt_n", name: "프롬프트 기록 회차", unit: "회", def: "전문을 남긴 생성 회차의 수", get: (c) => c.pr.promptN },
@@ -7453,11 +7578,19 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
      그리고 유형을 가르는 전유율 중앙값을 만든다 — 남은 학생의 값이 빠진 학생에게 좌우된다.
      동의 대장을 둔 취지가 바로 그것을 막는 데 있으므로 규준 자체에서 빼야 한다.
      익명 번호도 분석 대상에게만 붙인다. */
-  const excludedIds = ids.filter((id) => (consentMap || {})[id] === "제외");
-  const excluded = excludedIds.length;
-  const analysisIds = dropExcluded ? ids.filter((id) => (consentMap || {})[id] !== "제외") : ids;
-  const cases = researchCases(analysisIds, roster, wsMap, gradeMap, surveyMap, consentMap);
-  const pidOf = new Map(cases.map((c) => [c.id, c.pid]));
+  const excluded = ids.filter((id) => (consentMap || {})[id] === "제외").length;
+  const analysisIds = useMemo(
+    () => (dropExcluded ? ids.filter((id) => (consentMap || {})[id] !== "제외") : ids),
+    [ids, consentMap, dropExcluded]);
+
+  /* researchCases는 학급 전체의 유사도와 유형을 함께 계산한다 (창의성 탭과 같은 비용).
+     연구 탭을 열어 둔 채 수업을 하면 학생이 저장할 때마다 그 계산이 다시 돌아 화면이 멈추므로,
+     창의성 탭과 같은 간격으로 따라가게 하고 그 위에서만 다시 셈한다. */
+  const wsSlow = useSlow(wsMap, 15000);
+  const cases = useMemo(
+    () => researchCases(analysisIds, roster, wsSlow, gradeMap, surveyMap, consentMap),
+    [analysisIds, roster, wsSlow, gradeMap, surveyMap, consentMap]);
+  const pidOf = useMemo(() => new Map(cases.map((c) => [c.id, c.pid])), [cases]);
   const N = cases.length;
   const numVars = RESEARCH_VARS.filter((v) => !v.text);
   const desc = numVars.map((v) => describe(cases, v)).filter((d) => d.n > 0);
@@ -7985,6 +8118,12 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 머문 시간과 짧은 접속 기록은 몰입이나 이탈 의도를 재지 못한다. 수업 종료, 기기 반납, 통신 끊김이 로그상으로 구분되지 않으므로 차시 시각표와 대조해 해석하였다.");
     L.push("- 1인 1기기가 보장되지 않은 환경에서는 기기 공유와 로그아웃 누락으로 로그가 섞일 수 있다. 「연구자 서술 — 정제 과정에서 제외한 사례와 그 기준」");
     L.push("- 수집 사실을 사전에 고지하였으므로 학생의 행동이 관찰에 반응해 달라졌을 가능성을 배제할 수 없다. 고지 없는 수집은 연구윤리상 선택지가 아니었다.");
+    {
+      const pruned = cases.filter((c) => (c.ws._pruned || 0) > 0).length;
+      if (pruned > 0) {
+        L.push("- 기록지 한 건의 저장 한계에 닿아 오래된 고쳐 쓰기 이력을 덜어 낸 참여자가 " + pruned + "명 있다. 해당 참여자의 개작 횟수는 하한이며, 참여자별 건수는 변수 trace_pruned에 실었다. 붙여넣기 기록의 건수와 수치는 덜어 내지 않았다.");
+      }
+    }
     L.push("");
     L.push("## 부록 A. 자료 파일");
     L.push("");
