@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { fbStore, authApi } from "./src-fb.js";
+import {
+  useContent, watchContent, onContentChange, mergeLessons, mergeSchema,
+  ContentEditor, ContentStyle, LessonImages, LessonAsks, LessonNotice, WorkLinks,
+} from "./src-content.jsx";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -149,7 +153,7 @@ const RUBRIC = [
   { std: "[12미03-04]", name: "작품에 대한 견해 서술하기", data: "상호평가·비평과 성찰 (8차시)" },
 ];
 
-const SCHEMA = [
+const SCHEMA_DEF = [
   {
     id: "l1", session: "1차시", code: "1", kind: "learn", title: "레디메이드와 개념미술",
     note: "1차시 강의 노트를 읽고 작성합니다.",
@@ -974,7 +978,7 @@ function sessionProgress(session, ws) {
    readings는 수업 흐름의 단계(stage) 순서를 따른다.
    pedagogy는 그 차시 수업 설계의 교육학적 근거로, 교사용 참고 표시가 붙는다. */
 
-const LESSONS = [
+const LESSONS_DEF = [
   {
     n: 1, session: "1차시", title: "레디메이드에서 개념미술까지",
     goals: [
@@ -1015,8 +1019,8 @@ const LESSONS = [
           "이 사건에는 따져 볼 거리가 하나 더 있습니다. 원본이 사라졌는데도 「샘」은 20세기 미술사에서 가장 많이 논의된 작품으로 남았고, 복제 에디션들이 세계 여러 미술관에 소장되어 있습니다. 작품의 실체가 그 소변기 한 점에 있었다면 작품은 1917년에 없어졌어야 합니다. 실체가 관념과 사건에 있다면 복제품도 사진도 그 관념을 나르는 그릇이 됩니다. 이 물음은 여러분이 5차시에 만들 이미지, 곧 원본 사물이 없는 이미지의 지위를 미리 건드립니다.",
         ],
         works: [
-          { a: "마르셀 뒤샹", w: "「샘」", y: "1917", d: "기성품 선택·명명·출품. 원본 소실 후 사진과 복제 에디션으로 남음" },
-          { a: "앨프리드 스티글리츠", w: "「샘」 기록 사진", y: "1917", d: "사라진 원본을 대신해 작품을 전승한 매체가 사진이었다는 사실" },
+          { a: "마르셀 뒤샹", w: "「샘」", y: "1917", d: "기성품 선택·명명·출품. 원본 소실 후 사진과 복제 에디션으로 남음", links: [{ t: "마르셀 뒤샹", u: "https://ko.wikipedia.org/wiki/마르셀_뒤샹" }, { t: "「샘」(1917)", u: "https://ko.wikipedia.org/wiki/샘_(뒤샹)" }, { t: "테이트 소장 기록", u: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573" }] },
+          { a: "앨프리드 스티글리츠", w: "「샘」 기록 사진", y: "1917", d: "사라진 원본을 대신해 작품을 전승한 매체가 사진이었다는 사실", links: [{ t: "앨프리드 스티글리츠", u: "https://en.wikipedia.org/wiki/Alfred_Stieglitz" }, { t: "레디메이드란", u: "https://ko.wikipedia.org/wiki/레디메이드" }] },
         ],
       },
       {
@@ -1027,8 +1031,8 @@ const LESSONS = [
           "두 작가의 논리는 이 단원의 역할 분담을 설명합니다. 여러분이 유물의 개념과 흔적의 규칙을 설계하고 생성형 AI가 화면을 실행합니다. 르윗의 원칙을 따르면 저자는 규칙을 설계한 여러분입니다. 다만 이 원칙에는 5차시에 다시 만날 반론이 있습니다. 도구가 지시문에 없던 우연을 만들었을 때 그 우연의 저자는 누구인가 하는 물음입니다.",
         ],
         works: [
-          { a: "솔 르윗", w: "「월 드로잉」 연작", y: "1968~", d: "지시문과 실행의 분리. 작가 사후에도 재제작되는 저자성의 구조" },
-          { a: "조지프 코수스", w: "「하나 그리고 세 개의 의자」", y: "1965", d: "실물·사진·정의의 병치. 관념을 나르는 층에 대한 질문" },
+          { a: "솔 르윗", w: "「월 드로잉」 연작", y: "1968~", d: "지시문과 실행의 분리. 작가 사후에도 재제작되는 저자성의 구조", links: [{ t: "솔 르윗", u: "https://en.wikipedia.org/wiki/Sol_LeWitt" }, { t: "테이트 작가 자료", u: "https://www.tate.org.uk/art/artists/sol-lewitt-1504" }, { t: "개념미술이란", u: "https://www.tate.org.uk/art/art-terms/c/conceptual-art" }] },
+          { a: "조지프 코수스", w: "「하나 그리고 세 개의 의자」", y: "1965", d: "실물·사진·정의의 병치. 관념을 나르는 층에 대한 질문", links: [{ t: "조지프 코수스", u: "https://en.wikipedia.org/wiki/Joseph_Kosuth" }, { t: "「하나 그리고 세 개의 의자」", u: "https://en.wikipedia.org/wiki/One_and_Three_Chairs" }] },
         ],
       },
       {
@@ -1039,9 +1043,9 @@ const LESSONS = [
           "여기서 이 단원의 핵심 질문 하나가 나옵니다. 극사실주의는 실제 피사체를 찍은 사진을 손으로 옮겼습니다. 여러분이 만들 이미지는 사진의 외관을 갖지만 피사체가 없습니다. 사진 같은 표면이 믿음을 만든다면, 피사체 없는 사진 같은 표면은 무엇을 만들까요. 이 질문은 5차시의 이론(지표성)에서 정면으로 다룹니다.",
         ],
         works: [
-          { a: "척 클로스", w: "「빅 셀프 포트레이트」", y: "1968", d: "격자 전사로 사진의 시각을 회화에 옮김. 거리에 따라 달라지는 믿음" },
-          { a: "리처드 에스테스", w: "「이중 자화상」", y: "1976", d: "유리 반사의 정밀 묘사. 카메라보다 선명한 손" },
-          { a: "두에인 핸슨", w: "「관광객들」", y: "1970", d: "실물 크기 채색 조각. 전시장에서 사람으로 읽히는 경험" },
+          { a: "척 클로스", w: "「빅 셀프 포트레이트」", y: "1968", d: "격자 전사로 사진의 시각을 회화에 옮김. 거리에 따라 달라지는 믿음", links: [{ t: "척 클로스", u: "https://en.wikipedia.org/wiki/Chuck_Close" }, { t: "워커 아트센터 소장 기록", u: "https://walkerart.org/collections/artworks/big-self-portrait" }] },
+          { a: "리처드 에스테스", w: "「이중 자화상」", y: "1976", d: "유리 반사의 정밀 묘사. 카메라보다 선명한 손", links: [{ t: "리처드 에스테스", u: "https://en.wikipedia.org/wiki/Richard_Estes" }, { t: "포토리얼리즘", u: "https://ko.wikipedia.org/wiki/포토리얼리즘" }] },
+          { a: "두에인 핸슨", w: "「관광객들」", y: "1970", d: "실물 크기 채색 조각. 전시장에서 사람으로 읽히는 경험", links: [{ t: "두에인 핸슨", u: "https://en.wikipedia.org/wiki/Duane_Hanson" }, { t: "하이퍼리얼리즘", u: "https://ko.wikipedia.org/wiki/하이퍼리얼리즘" }] },
         ],
       },
       {
@@ -1092,7 +1096,7 @@ const LESSONS = [
           "이 관점에서 미술은 사물의 성질이기 앞서 관계의 이름입니다. 작가가 무엇을 내놓는가, 제도가 무엇을 받아들이는가, 관람자가 무엇으로 읽는가의 세 관계가 만나는 곳에 미술이 성립합니다. 1차시 모둠 토의에서 순위가 갈렸던 이유가 여기 있습니다. 세 관계 가운데 어디에 무게를 두는가에 따라 답이 달라지는 것입니다. 그리고 이 관계 구조를 알면 그것을 재료로 쓰는 작가들의 작업이 보이기 시작합니다.",
         ],
         works: [
-          { a: "문헌", w: "스타니스제프스키 『이것은 미술이 아니다』", y: "1995", d: "미술을 근대 제도가 만든 문화적 구성물로 설명" },
+          { a: "문헌", w: "스타니스제프스키 『이것은 미술이 아니다』", y: "1995", d: "미술을 근대 제도가 만든 문화적 구성물로 설명", links: [{ t: "미술이라는 제도 — 개념미술", u: "https://ko.wikipedia.org/wiki/개념미술" }, { t: "책 찾아보기", u: "https://ko.wikipedia.org/w/index.php?search=%EC%9D%B4%EA%B2%83%EC%9D%80+%EB%AF%B8%EC%88%A0%EC%9D%B4+%EC%95%84%EB%8B%88%EB%8B%A4+%EC%8A%A4%ED%83%80%EB%8B%88%EC%8A%A4%EC%A0%9C%ED%94%84%EC%8A%A4%ED%82%A4" }] },
         ],
       },
       {
@@ -1104,10 +1108,10 @@ const LESSONS = [
           "미술사가 캐리 램버트-비티는 2009년 이런 작업들을 파라픽션(parafiction)이라 이름 붙였습니다. 허구가 소설이나 영화라는 안전한 표지 없이 사실의 세계에 잠시 들어와 살아가게 하되, 관람자가 어느 순간 허구임을 알아차리도록 설계된 작업이라는 뜻입니다. 위조와의 차이가 여기 있습니다. 위조는 발각되면 끝나지만 파라픽션은 알아차림 이후가 본론입니다. 속았다가 깨어난 관람자는 자신이 무엇 때문에 믿었는지 되돌아보게 되고, 그 되돌아봄이 작품의 내용이 됩니다. 우리 단원의 허구 고지는 이 알아차림의 순간을 명제표 안에 미리 마련해 두는 장치입니다.",
         ],
         works: [
-          { a: "마르셀 브로타에스", w: "「현대미술관, 독수리 부서」", y: "1968~72", d: "가상 미술관과 ‘이것은 미술 작품이 아니다’ 명패. 제도의 권한을 전시" },
-          { a: "마크 디온", w: "「테이트 템스 발굴」", y: "1999", d: "실제 수집물의 박물관식 재분류. 아카이브 충동의 첫째 갈래" },
-          { a: "호안 폰트쿠베르타", w: "「파우나」", y: "1987", d: "가상 동물학자의 아카이브. 학술 형식을 갖춘 허구" },
-          { a: "아틀라스 그룹(왈리드 라아드)", w: "「아틀라스 그룹 아카이브」", y: "1989~2004", d: "레바논 내전에 관한 허구의 문서고. 기록 형식과 진실의 관계" },
+          { a: "마르셀 브로타에스", w: "「현대미술관, 독수리 부서」", y: "1968~72", d: "가상 미술관과 ‘이것은 미술 작품이 아니다’ 명패. 제도의 권한을 전시", links: [{ t: "마르셀 브로타에스", u: "https://en.wikipedia.org/wiki/Marcel_Broodthaers" }, { t: "제도비평이란", u: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" }] },
+          { a: "마크 디온", w: "「테이트 템스 발굴」", y: "1999", d: "실제 수집물의 박물관식 재분류. 아카이브 충동의 첫째 갈래", links: [{ t: "마크 디온", u: "https://en.wikipedia.org/wiki/Mark_Dion" }, { t: "테이트 소장 「템스 발굴」", u: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" }] },
+          { a: "호안 폰트쿠베르타", w: "「파우나」", y: "1987", d: "가상 동물학자의 아카이브. 학술 형식을 갖춘 허구", links: [{ t: "호안 폰트쿠베르타", u: "https://en.wikipedia.org/wiki/Joan_Fontcuberta" }, { t: "파라픽션이란", u: "https://en.wikipedia.org/wiki/Parafiction" }] },
+          { a: "아틀라스 그룹(왈리드 라아드)", w: "「아틀라스 그룹 아카이브」", y: "1989~2004", d: "레바논 내전에 관한 허구의 문서고. 기록 형식과 진실의 관계", links: [{ t: "왈리드 라아드", u: "https://en.wikipedia.org/wiki/Walid_Raad" }, { t: "아틀라스 그룹 아카이브(공식)", u: "https://www.theatlasgroup1989.org/" }] },
         ],
       },
       {
@@ -1155,8 +1159,8 @@ const LESSONS = [
           "그런데 보이게 하는 방식에는 함정이 있습니다. 수전 손택은 『타인의 고통』(2003)에서 참혹한 사진이 연민을 만들지만 그 연민이 우리는 저들과 다르다는 안도와 무력감으로 굳을 수 있다고 경고했습니다. 고통의 이미지를 반복해서 보면 감각이 무뎌지고, 찍힌 사람은 자기 고통의 관람 대상이 됩니다. 오늘 볼 작가들은 모두 이 함정을 알고 다른 길을 찾은 사람들입니다.",
         ],
         works: [
-          { a: "문헌", w: "랑시에르 『감각적인 것의 나눔』", y: "2000", d: "보이는 것과 보이지 않는 것의 분배로 예술의 정치성을 설명" },
-          { a: "문헌", w: "손택 『타인의 고통』", y: "2003", d: "고통 이미지의 소비가 만드는 무뎌짐과 구경의 문제" },
+          { a: "문헌", w: "랑시에르 『감각적인 것의 나눔』", y: "2000", d: "보이는 것과 보이지 않는 것의 분배로 예술의 정치성을 설명", links: [{ t: "자크 랑시에르", u: "https://ko.wikipedia.org/wiki/자크_랑시에르" }] },
+          { a: "문헌", w: "손택 『타인의 고통』", y: "2003", d: "고통 이미지의 소비가 만드는 무뎌짐과 구경의 문제", links: [{ t: "수전 손택", u: "https://ko.wikipedia.org/wiki/수전_손택" }, { t: "『타인의 고통』", u: "https://ko.wikipedia.org/wiki/타인의_고통" }] },
         ],
       },
       {
@@ -1168,10 +1172,10 @@ const LESSONS = [
           "임흥순의 「위로공단」(2015)은 한국 여성 노동의 역사를 다룬 영상 작품으로 베니스 비엔날레 은사자상을 받았습니다. 봉제 공장의 미싱, 실밥, 마스크 같은 노동 현장의 사물과 노동자들의 증언을 나란히 놓고, 재연 장면에서는 얼굴을 가린 인물을 등장시킵니다. 사물과 목소리가 앞에 서고 얼굴이 물러나는 이 구성은 당사자의 존엄을 지키면서 경험을 전하는 국내의 중요한 선례입니다.",
         ],
         works: [
-          { a: "알프레도 자", w: "「구테테 에메리타의 눈」", y: "1996", d: "참상 대신 목격자의 눈. 글을 먼저 읽게 하는 순서의 설계" },
-          { a: "크지슈토프 보디치코", w: "「노숙자 차량」", y: "1988~89", d: "당사자와 협의한 실물 장치. 사양이 곧 생활 조건의 번역" },
-          { a: "포렌식 아키텍처", w: "현장 재구성 프로젝트들", y: "2010~", d: "물리적 흔적의 측정과 재구성. 인과가 만드는 증언의 힘" },
-          { a: "임흥순", w: "「위로공단」", y: "2015", d: "사물과 증언을 앞에 두고 얼굴을 물리는 구성. 베니스 비엔날레 은사자상" },
+          { a: "알프레도 자", w: "「구테테 에메리타의 눈」", y: "1996", d: "참상 대신 목격자의 눈. 글을 먼저 읽게 하는 순서의 설계", links: [{ t: "알프레도 자", u: "https://en.wikipedia.org/wiki/Alfredo_Jaar" }, { t: "작가 공식 사이트", u: "https://alfredojaar.net/" }] },
+          { a: "크지슈토프 보디치코", w: "「노숙자 차량」", y: "1988~89", d: "당사자와 협의한 실물 장치. 사양이 곧 생활 조건의 번역", links: [{ t: "크지슈토프 보디치코", u: "https://en.wikipedia.org/wiki/Krzysztof_Wodiczko" }] },
+          { a: "포렌식 아키텍처", w: "현장 재구성 프로젝트들", y: "2010~", d: "물리적 흔적의 측정과 재구성. 인과가 만드는 증언의 힘", links: [{ t: "포렌식 아키텍처", u: "https://en.wikipedia.org/wiki/Forensic_Architecture" }, { t: "공식 사이트", u: "https://forensic-architecture.org/" }] },
+          { a: "임흥순", w: "「위로공단」", y: "2015", d: "사물과 증언을 앞에 두고 얼굴을 물리는 구성. 베니스 비엔날레 은사자상", links: [{ t: "임흥순", u: "https://ko.wikipedia.org/wiki/임흥순" }, { t: "「위로공단」", u: "https://ko.wikipedia.org/wiki/위로공단" }] },
         ],
       },
       {
@@ -1245,9 +1249,9 @@ const LESSONS = [
           "발굴 기록 사진의 형식도 이 지식 체계의 일부입니다. 중립 회색 배경은 사물 외의 정보를 지우고, 균일한 확산광은 그림자의 과장을 막고, 눈높이 정면 시점은 조사자의 시선을 표준화하고, 스케일 바는 크기를 증언합니다. 이 형식이 사물을 누군가의 물건에서 조사와 기록의 대상으로 바꿉니다. 형식을 알고 차용하는 것과 모르고 흉내 내는 것은 5차시 프롬프트의 정밀도에서 차이가 납니다.",
         ],
         works: [
-          { a: "개념", w: "포미안의 세미오포어", y: "1987", d: "쓸모에서 의미로 지위가 바뀐 사물. 박물관화의 이론적 뼈대" },
-          { a: "형식 자료", w: "분더카머 도판과 근대 박물관 진열", y: "16~19세기", d: "경이의 수집에서 분류의 지식으로. 명제표의 탄생" },
-          { a: "마크 디온", w: "「경이의 캐비닛」 연작", y: "2000~", d: "분더카머 형식을 되살려 분류라는 행위 자체를 보여 줌" },
+          { a: "개념", w: "포미안의 세미오포어", y: "1987", d: "쓸모에서 의미로 지위가 바뀐 사물. 박물관화의 이론적 뼈대", links: [{ t: "크시슈토프 포미안", u: "https://en.wikipedia.org/wiki/Krzysztof_Pomian" }, { t: "박물관학", u: "https://ko.wikipedia.org/wiki/박물관학" }] },
+          { a: "형식 자료", w: "분더카머 도판과 근대 박물관 진열", y: "16~19세기", d: "경이의 수집에서 분류의 지식으로. 명제표의 탄생", links: [{ t: "분더카머", u: "https://ko.wikipedia.org/wiki/분더카머" }, { t: "경이의 방(영문)", u: "https://en.wikipedia.org/wiki/Cabinet_of_curiosities" }] },
+          { a: "마크 디온", w: "「경이의 캐비닛」 연작", y: "2000~", d: "분더카머 형식을 되살려 분류라는 행위 자체를 보여 줌", links: [{ t: "마크 디온", u: "https://en.wikipedia.org/wiki/Mark_Dion" }, { t: "경이의 방(분더카머)", u: "https://en.wikipedia.org/wiki/Cabinet_of_curiosities" }] },
         ],
       },
       {
@@ -1309,10 +1313,10 @@ const LESSONS = [
           "생성형 AI 이미지는 사진의 외관을 갖지만 지표성이 없습니다. 카메라 앞의 피사체 자체가 없기 때문입니다. 장 보드리야르는 『시뮬라시옹』(1981)에서 원본 없이 실재처럼 유통되는 이미지를 시뮬라크르라 불렀고, 원본과 복제의 구분이 사라진 상태를 근심했습니다. 우리 작업은 시뮬라크르를 만들되 그것이 시뮬라크르임을 명제표에 적어 두는 작업입니다. 지표성 없는 이미지가 무엇으로 관람자를 설득하는지, 형식인지 인과인지 맥락인지를 여러분이 생성과 전시로 직접 실험하게 됩니다. 오늘 탐구 질문의 성찰 문항에 지금의 답을 적어 두면 8차시에 실험 후의 답과 비교할 수 있습니다.",
         ],
         works: [
-          { a: "문헌", w: "바르트 『밝은 방』", y: "1980", d: "지표성. ‘그것이 존재했음’이라는 사진의 확신" },
-          { a: "문헌", w: "바르트 「현실 효과」", y: "1968", d: "무심한 세부가 만드는 사실감. 이중 점검의 판정 언어" },
-          { a: "문헌", w: "보드리야르 『시뮬라시옹』", y: "1981", d: "원본 없는 이미지, 시뮬라크르. 허구 고지의 이론적 배경" },
-          { a: "호안 폰트쿠베르타", w: "「스푸트니크」", y: "1997", d: "가상 우주비행사의 기록 아카이브. 형식이 만드는 믿음의 실험" },
+          { a: "문헌", w: "바르트 『밝은 방』", y: "1980", d: "지표성. ‘그것이 존재했음’이라는 사진의 확신", links: [{ t: "롤랑 바르트", u: "https://ko.wikipedia.org/wiki/롤랑_바르트" }, { t: "『밝은 방』", u: "https://en.wikipedia.org/wiki/Camera_Lucida_(book)" }, { t: "지표성(indexicality)", u: "https://en.wikipedia.org/wiki/Indexicality" }] },
+          { a: "문헌", w: "바르트 「현실 효과」", y: "1968", d: "무심한 세부가 만드는 사실감. 이중 점검의 판정 언어", links: [{ t: "롤랑 바르트", u: "https://ko.wikipedia.org/wiki/롤랑_바르트" }] },
+          { a: "문헌", w: "보드리야르 『시뮬라시옹』", y: "1981", d: "원본 없는 이미지, 시뮬라크르. 허구 고지의 이론적 배경", links: [{ t: "장 보드리야르", u: "https://ko.wikipedia.org/wiki/장_보드리야르" }, { t: "『시뮬라시옹』", u: "https://en.wikipedia.org/wiki/Simulacra_and_Simulation" }, { t: "시뮬라크르", u: "https://ko.wikipedia.org/wiki/시뮬라크르" }] },
+          { a: "호안 폰트쿠베르타", w: "「스푸트니크」", y: "1997", d: "가상 우주비행사의 기록 아카이브. 형식이 만드는 믿음의 실험", links: [{ t: "호안 폰트쿠베르타", u: "https://en.wikipedia.org/wiki/Joan_Fontcuberta" }, { t: "파라픽션이란", u: "https://en.wikipedia.org/wiki/Parafiction" }] },
         ],
       },
       {
@@ -1369,10 +1373,10 @@ const LESSONS = [
           "명제표 작성에는 문학 이론가 제라르 주네트의 파라텍스트 개념이 쓸모 있습니다. 책의 제목·서문·표지처럼 본문을 둘러싸고 독서를 안내하는 장치들을 가리키는 말입니다. 명제표·작품 제목·허구 고지는 이미지의 파라텍스트입니다. 본문을 한 글자도 바꾸지 않고 읽기를 바꾸는 힘이 여기 있으므로, 문안의 한 줄 한 줄이 조형 요소만큼의 결정입니다. 복원 윤리의 관례도 참고가 됩니다. 문화재 복원의 국제 원칙(베니스 헌장, 1964)은 복원 부위를 원본과 구별할 수 있게 하라고 요구합니다. 어디까지가 발굴이고 어디부터가 손질인지 숨기지 않는 이 태도가, AI 활용 범위와 허구 고지를 명제표에 적는 우리 형식의 선례입니다.",
         ],
         works: [
-          { a: "문헌", w: "아리스토텔레스 『시학』", y: "기원전 4세기", d: "개연성. 일어날 법함이 허구를 지탱한다는 원리" },
-          { a: "개념", w: "모리 마사히로의 언캐니 밸리", y: "1970", d: "작은 어긋남이 전체 믿음을 무너뜨리는 지대" },
-          { a: "문헌", w: "주네트 『문턱들』(파라텍스트)", y: "1987", d: "본문을 둘러싸고 읽기를 정하는 장치. 명제표의 이론" },
-          { a: "규범", w: "베니스 헌장의 복원 구별 원칙", y: "1964", d: "손질의 범위를 숨기지 않는 태도. 허구 고지의 선례" },
+          { a: "문헌", w: "아리스토텔레스 『시학』", y: "기원전 4세기", d: "개연성. 일어날 법함이 허구를 지탱한다는 원리", links: [{ t: "『시학』", u: "https://ko.wikipedia.org/wiki/시학_(아리스토텔레스)" }] },
+          { a: "개념", w: "모리 마사히로의 언캐니 밸리", y: "1970", d: "작은 어긋남이 전체 믿음을 무너뜨리는 지대", links: [{ t: "불쾌한 골짜기", u: "https://ko.wikipedia.org/wiki/불쾌한_골짜기" }, { t: "Uncanny valley", u: "https://en.wikipedia.org/wiki/Uncanny_valley" }] },
+          { a: "문헌", w: "주네트 『문턱들』(파라텍스트)", y: "1987", d: "본문을 둘러싸고 읽기를 정하는 장치. 명제표의 이론", links: [{ t: "제라르 주네트", u: "https://ko.wikipedia.org/wiki/제라르_주네트" }, { t: "파라텍스트", u: "https://en.wikipedia.org/wiki/Paratext" }] },
+          { a: "규범", w: "베니스 헌장의 복원 구별 원칙", y: "1964", d: "손질의 범위를 숨기지 않는 태도. 허구 고지의 선례", links: [{ t: "베니스 헌장", u: "https://en.wikipedia.org/wiki/Venice_Charter" }, { t: "아나스틸로시스(복원 구별)", u: "https://en.wikipedia.org/wiki/Anastylosis" }] },
         ],
       },
       {
@@ -1422,9 +1426,9 @@ const LESSONS = [
           "조판은 이 결정의 마지막 층입니다. 같은 허구 고지도 본문 서체로 명제표 맨 아래 넣으면 기록 형식의 일부로 읽히고, 화면 옆에 크게 붙이면 허구성 자체가 작품의 앞면이 됩니다. 브로타에스가 ‘이것은 미술 작품이 아니다’ 명패로 했던 일을 여러분은 고지의 타이포그래피로 하게 됩니다.",
         ],
         works: [
-          { a: "문헌", w: "오도허티 『하얀 입방체 안에서』", y: "1976", d: "화이트큐브라는 형식의 발명. 거는 방식이 보는 방식을 정함" },
-          { a: "전시", w: "제만 「태도가 형식이 될 때」", y: "1969", d: "전시 구성 자체가 발언이 된 사례. 큐레이팅의 저자성" },
-          { a: "형식 자료", w: "살롱전 진열과 근대 미술관 진열 비교", y: "19~20세기", d: "빽빽한 벽에서 눈높이 한 점으로. 진열 관례의 역사" },
+          { a: "문헌", w: "오도허티 『하얀 입방체 안에서』", y: "1976", d: "화이트큐브라는 형식의 발명. 거는 방식이 보는 방식을 정함", links: [{ t: "브라이언 오도허티", u: "https://en.wikipedia.org/wiki/Brian_O'Doherty" }, { t: "화이트 큐브", u: "https://en.wikipedia.org/wiki/White_cube" }] },
+          { a: "전시", w: "제만 「태도가 형식이 될 때」", y: "1969", d: "전시 구성 자체가 발언이 된 사례. 큐레이팅의 저자성", links: [{ t: "하랄트 제만", u: "https://en.wikipedia.org/wiki/Harald_Szeemann" }, { t: "큐레이터", u: "https://ko.wikipedia.org/wiki/큐레이터" }] },
+          { a: "형식 자료", w: "살롱전 진열과 근대 미술관 진열 비교", y: "19~20세기", d: "빽빽한 벽에서 눈높이 한 점으로. 진열 관례의 역사", links: [{ t: "파리 살롱", u: "https://ko.wikipedia.org/wiki/파리_살롱" }, { t: "전시 디자인", u: "https://en.wikipedia.org/wiki/Exhibition_design" }] },
         ],
       },
       {
@@ -1477,7 +1481,7 @@ const LESSONS = [
           "마지막으로 1차시의 다섯 후보로 돌아갑니다. 기술·선택·명명·전시·관념. 그때 정한 순위가 지금도 같은지, 달라졌다면 어느 활동이 그것을 움직였는지 이야기해 봅니다. 뒤샹은 선택으로, 브로타에스는 제도의 장치로, 라아드는 허구의 형식으로 각자의 답을 만들었습니다. 여러분의 답은 이 여덟 차시의 기록 안에 있습니다.",
         ],
         works: [
-          { a: "복습", w: "뒤샹 「샘」 · 브로타에스 「독수리 부서」 · 아틀라스 그룹 아카이브", y: "-", d: "선택·제도·허구의 형식이라는 세 답을 자기 작품과 잇기" },
+          { a: "복습", w: "뒤샹 「샘」 · 브로타에스 「독수리 부서」 · 아틀라스 그룹 아카이브", y: "-", d: "선택·제도·허구의 형식이라는 세 답을 자기 작품과 잇기", links: [{ t: "뒤샹 「샘」", u: "https://ko.wikipedia.org/wiki/샘_(뒤샹)" }, { t: "브로타에스", u: "https://en.wikipedia.org/wiki/Marcel_Broodthaers" }, { t: "아틀라스 그룹 아카이브", u: "https://www.theatlasgroup1989.org/" }] },
         ],
       },
     ],
@@ -1490,6 +1494,16 @@ const LESSONS = [
    자기 판단을 한 번 세우고 나중에 뒤집을 기회를 가진 자리다.
    대시보드는 이 쌍을 나란히 놓아 변화의 유무와 방향을 확인한다.
    ============================================================ */
+
+/* ---------- 교사가 고친 수업 내용 얹기 ----------
+   LESSONS_DEF·SCHEMA_DEF는 코드에 있는 원본이고, 화면이 쓰는 LESSONS·SCHEMA는
+   그 위에 「수업 편집」 탭의 내용을 얹은 결과다. 편집이 없으면 원본 그대로다. */
+let LESSONS = LESSONS_DEF;
+let SCHEMA = SCHEMA_DEF;
+onContentChange(() => {
+  LESSONS = mergeLessons(LESSONS_DEF);
+  SCHEMA = mergeSchema(SCHEMA_DEF);
+});
 
 const CHANGE_PAIRS = [
   {
@@ -2507,6 +2521,7 @@ function LessonPanel({ L, teacher, onReading }) {
         {teacher && <span className="lesson-min">{total}MIN</span>}
       </div>
       <div className="lesson-body">
+        <LessonNotice text={L.notice} />
         <ul className="goal-list">
           {L.goals.map((g, i) => <li key={i}>{g}</li>)}
         </ul>
@@ -2535,13 +2550,15 @@ function LessonPanel({ L, teacher, onReading }) {
             <summary><span className="stage-tag">{rd.stage}</span>{rd.h}</summary>
             <div className="reading-in">
               {rd.p.map((para, j) => <p key={j}>{para}</p>)}
+              <LessonImages images={rd.images} />
+              <LessonAsks asks={rd.asks} />
               {rd.works && rd.works.length > 0 && (
                 <table className="works-tbl">
                   <caption>작품·문헌 살펴보기</caption>
                   <thead><tr><th>작가·구분</th><th>작품·자료</th><th>연도</th><th>보는 이유</th></tr></thead>
                   <tbody>
                     {rd.works.map((w, j) => (
-                      <tr key={j}><td>{w.a}</td><td>{w.w}</td><td>{w.y}</td><td>{w.d}</td></tr>
+                      <tr key={j}><td>{w.a}</td><td>{w.w}</td><td>{w.y}</td><td>{w.d}<WorkLinks links={w.links} /></td></tr>
                     ))}
                   </tbody>
                 </table>
@@ -4205,6 +4222,8 @@ function SectionCard({ sec, ws, setField }) {
 /* ---------- 학생 화면 (실시간 저장) ---------- */
 
 function StudentApp({ me, onExit, onGallery }) {
+  useContent();                              // 교사가 수업 내용을 고치면 이 화면도 다시 그린다
+  useEffect(() => watchContent(), []);
   const WSKEY = "ws:" + me.sid;
   const [ws, setWs] = useState({});
   const [loaded, setLoaded] = useState(false);
@@ -6479,6 +6498,8 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
 }
 
 function TeacherApp({ onExit, onGallery }) {
+  useContent();
+  useEffect(() => watchContent(), []);
   const [tab, setTab] = useState("현황");
   const [roster, setRoster] = useState({});
   const [wsMap, setWsMap] = useState({});
@@ -6644,7 +6665,7 @@ function TeacherApp({ onExit, onGallery }) {
               </div>
             )}
             <div className="t-tabs">
-              {["현황", "차시 공개", "수업 안내", "분석", "사고 과정", "창의성", "설문", "연구", "설정"].map((t) => (
+              {["현황", "차시 공개", "수업 안내", "수업 편집", "분석", "사고 과정", "창의성", "설문", "연구", "설정"].map((t) => (
                 <button key={t} className={"btn small " + (tab === t ? "" : "ghost")} onClick={() => setTab(t)}>{t}</button>
               ))}
             </div>
@@ -6765,6 +6786,8 @@ function TeacherApp({ onExit, onGallery }) {
               </div>
             ) : tab === "수업 안내" ? (
               <TeacherGuide />
+            ) : tab === "수업 편집" ? (
+              <ContentEditor lessonDefs={LESSONS_DEF} schemaDefs={SCHEMA_DEF} LessonPanel={LessonPanel} />
             ) : tab === "분석" ? (
               <div>
                 <div className="card">
@@ -7437,6 +7460,7 @@ function App() {
   return (
     <div className="app">
       <style>{CSS}</style>
+      <ContentStyle />
       {view === "gate" && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
         onTeacher={() => setView("teacher")}
