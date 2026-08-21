@@ -1919,11 +1919,11 @@ const stemKo = (w) => {
 const normText = (s) => String(s || "").toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, " ").replace(/\s+/g, " ").trim();
 const tokSet = (s) => new Set(normText(s).split(" ").filter(Boolean).map(stemKo));
 
-/* 글이 길면 앞 GRAM_CAP자만 본다 — 140명이면 학급 안의 쌍이 만 개에 가까워 전체를 재면 화면이 멈춘다 */
-const GRAM_CAP = 1200;
+/* 글 전체의 3-gram. 자르지 않는다 —
+   앞부분만 보면 뒤쪽 차시에 그대로 남겨 둔 문장이 "고쳐 썼다"로 뒤집혀 기록된다. */
 function gramSet(s, n) {
   const N = n || 3;
-  const t = normText(s).replace(/ /g, "").slice(0, GRAM_CAP);
+  const t = normText(s).replace(/ /g, "");
   const out = new Set();
   if (!t) return out;
   if (t.length <= N) { out.add(t); return out; }
@@ -1936,6 +1936,47 @@ function jaccard(a, b) {
   let inter = 0;
   for (const w of a) if (b.has(w)) inter++;
   return inter / (a.size + b.size - inter);
+}
+
+/* ---------- 학급 전체를 쌍마다 견주기 위한 축약 ----------
+   140명이면 학급 안의 쌍이 만 개에 가깝다. 글 전체의 3-gram으로 만 번을 견주면 화면이 멈춘다.
+   그렇다고 앞부분만 자르면 뒤쪽 차시의 글이 통째로 빠져 유사도가 1차시 답만 보고 매겨진다.
+   그래서 자르는 대신 전체에서 고르게 뽑는다 — 같은 3-gram은 언제나 같은 해시를 가지므로
+   두 학생에게서 같은 조각이 함께 뽑히고, 뽑힌 표본 위에서 잰 값이 전체 자카드의 추정값이 된다
+   (k-최소값 추정). 글이 짧아 표본을 다 채우지 못하면 그때는 정확한 자카드와 같아진다. */
+const SKETCH_K = 600;
+
+function hash32(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+
+/* 글 전체의 3-gram 가운데 해시가 작은 것 SKETCH_K개를 오름차순으로 */
+function gramSketch(s) {
+  const g = gramSet(s);
+  if (!g.size) return [];
+  const arr = new Array(g.size);
+  let i = 0;
+  for (const x of g) arr[i++] = hash32(x);
+  arr.sort((a, b) => a - b);
+  return arr.length > SKETCH_K ? arr.slice(0, SKETCH_K) : arr;
+}
+
+/* 두 축약본의 자카드. 둘 다 SKETCH_K보다 짧으면 정확한 값이고, 길면 추정값이다. */
+function sketchJaccard(a, b, k) {
+  if (!a.length || !b.length) return 0;
+  const K = k || SKETCH_K;
+  let i = 0, j = 0, seen = 0, both = 0;
+  while (seen < K && (i < a.length || j < b.length)) {
+    const av = i < a.length ? a[i] : Infinity;
+    const bv = j < b.length ? b[j] : Infinity;
+    if (av === bv) { i++; j++; both++; }
+    else if (av < bv) i++;
+    else j++;
+    seen++;
+  }
+  return seen ? both / seen : 0;
 }
 
 /* 겹침 계수 — a가 b 안에 얼마나 남아 있는가. 자카드와 달리 길이 차이에 벌점을 주지 않아
@@ -2239,7 +2280,7 @@ function similarityAll(wsMap) {
   const ids = Object.keys(wsMap || {});
   const N = ids.length;
   const fields = simFields();
-  const grams = {}, toks = {}, sigs = {};
+  const sk = {}, toks = {}, sigs = {}, size = {};
 
   /* 공용 문구는 먼저 걷어 낸다.
      기본값(허구 고지 문안 등)과 앞 칸에서 이어받은 문장은 여러 학생에게 글자 그대로 같이 들어가므로,
@@ -2271,7 +2312,8 @@ function similarityAll(wsMap) {
   ids.forEach((id) => {
     const parts = fields.map((k) => own(id, k)).filter((x) => x.trim().length > 0);
     const blob = parts.join("\n");
-    grams[id] = gramSet(blob);
+    sk[id] = gramSketch(blob);
+    size[id] = sk[id].length;
     toks[id] = tokSet(blob);
     const sg = new Set();
     fields.forEach((k, i) => { for (const x of structSig(own(id, k), "f" + i + ":")) sg.add(x); });
@@ -2283,12 +2325,12 @@ function similarityAll(wsMap) {
 
   const per = {};
   ids.forEach((id) => {
-    const empty = grams[id].size === 0;
+    const empty = size[id] === 0;
     if (N < 2 || empty) { per[id] = { peerSim: null, nnSim: null, nnId: null, structSim: null, hapax: empty ? null : 0 }; return; }
     let sum = 0, cnt = 0, mx = -1, mxId = null, ss = 0, sc = 0;
     ids.forEach((o) => {
-      if (o === id || grams[o].size === 0) return;
-      const s = jaccard(grams[id], grams[o]);
+      if (o === id || size[o] === 0) return;
+      const s = sketchJaccard(sk[id], sk[o]);
       sum += s; cnt++;
       if (s > mx) { mx = s; mxId = o; }
       if (sigs[id].size && sigs[o].size) { ss += jaccard(sigs[id], sigs[o]); sc++; }
@@ -2304,7 +2346,11 @@ function similarityAll(wsMap) {
     };
   });
 
-  // 학급이 몇 갈래로 쏠렸는가 — 분포의 섀넌 엔트로피를 최대값으로 나눠 0~100으로
+  /* 학급이 몇 갈래로 쏠렸는가 — 분포의 섀넌 엔트로피를 0~100으로.
+     분모는 반드시 <b>고를 수 있었던 갈래의 수</b>여야 한다. 고른 갈래만 세면
+     다섯 갈래 가운데 둘만 남은 학급이 100%(완전히 고름)로 나오고,
+     한 갈래로 완전히 쏠린 학급은 계산 불가로 빠져 화면에 "—"가 뜬다.
+     쏠림이 가장 심한 두 경우에서 지표가 거꾸로 읽히거나 사라지는 셈이다. */
   const entropy = (counts) => {
     const tot = counts.reduce((a, b) => a + b, 0);
     if (!tot || counts.length < 2) return null;
@@ -2314,12 +2360,21 @@ function similarityAll(wsMap) {
     return mxH > 0 ? Math.round((h / mxH) * 100) : null;
   };
   const countsOf = (key) => {
+    const [sid, fk] = String(key).split(".");
+    const sec = SCHEMA.find((s) => s.id === sid);
+    const f = sec ? sec.fields.find((x) => x.k === fk) : null;
+    const opts = f && Array.isArray(f.opts) ? f.opts : null;
     const m = {};
-    ids.forEach((id) => { const v = (wsMap[id] || {})[key]; if (filled(v)) m[v] = (m[v] || 0) + 1; });
-    return Object.values(m);
+    if (opts) opts.forEach((o) => { m[o] = 0; });   // 아무도 고르지 않은 갈래도 분모에 남긴다
+    let answered = 0;
+    ids.forEach((id) => {
+      const v = (wsMap[id] || {})[key];
+      if (filled(v)) { m[v] = (m[v] || 0) + 1; answered++; }
+    });
+    return answered ? Object.values(m) : [];
   };
 
-  const written = ids.filter((id) => grams[id].size > 0);
+  const written = ids.filter((id) => size[id] > 0);
   return {
     per,
     cls: {
@@ -5271,11 +5326,13 @@ function StudentApp({ me, onExit, onGallery }) {
           next._log = [...log, { k, at: now(), prev: prev.slice(0, 400) }].slice(-300);
         }
       }
-      // 붙여넣은 뒤 그 칸을 마지막으로 손댈 때까지의 초 — 붙이고 바로 넘어갔는지 붙잡고 고쳤는지
-      if (typeof v === "string" && Array.isArray(p._paste) && p._paste.length) {
+      /* 붙여넣은 뒤 그 칸을 마지막으로 손댈 때까지의 초 — 붙이고 바로 넘어갔는지 붙잡고 고쳤는지.
+         표·점검표는 setField가 배열이나 객체를 통째로 넘기므로 문자열 여부를 따지면 안 되고,
+         붙여넣기 키가 "s5b.rounds#prompt2"처럼 줄까지 가리키므로 "#" 앞으로 맞춰야 한다. */
+      if (Array.isArray(p._paste) && p._paste.length) {
         const ps = p._paste;
         for (let i = ps.length - 1; i >= 0; i--) {
-          if (ps[i].k !== k) continue;
+          if (String(ps[i].k).split("#")[0] !== k) continue;
           const sec = Math.round((Date.now() - new Date(ps[i].at).getTime()) / 1000);
           if (sec >= 0 && sec < 3600 && Math.abs(sec - (ps[i].settle || 0)) >= 2) {
             next._paste = ps.map((e, j) => (j === i ? { ...e, settle: sec } : e));
@@ -7391,9 +7448,16 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
   };
   const [dropExcluded, setDropExcluded] = useState(true);
 
-  const allCases = researchCases(ids, roster, wsMap, gradeMap, surveyMap, consentMap);
-  const excluded = allCases.filter((c) => c.consent === "제외").length;
-  const cases = dropExcluded ? allCases.filter((c) => c.consent !== "제외") : allCases;
+  /* 제외한 학생은 분석 집합에서 아예 빼고 계산한다.
+     계산한 뒤에 행만 걸러 내면 그 학생의 글이 여전히 학급 어휘 풀과 유사도 평균,
+     그리고 유형을 가르는 전유율 중앙값을 만든다 — 남은 학생의 값이 빠진 학생에게 좌우된다.
+     동의 대장을 둔 취지가 바로 그것을 막는 데 있으므로 규준 자체에서 빼야 한다.
+     익명 번호도 분석 대상에게만 붙인다. */
+  const excludedIds = ids.filter((id) => (consentMap || {})[id] === "제외");
+  const excluded = excludedIds.length;
+  const analysisIds = dropExcluded ? ids.filter((id) => (consentMap || {})[id] !== "제외") : ids;
+  const cases = researchCases(analysisIds, roster, wsMap, gradeMap, surveyMap, consentMap);
+  const pidOf = new Map(cases.map((c) => [c.id, c.pid]));
   const N = cases.length;
   const numVars = RESEARCH_VARS.filter((v) => !v.text);
   const desc = numVars.map((v) => describe(cases, v)).filter((d) => d.n > 0);
@@ -7760,6 +7824,10 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("구조 유사도를 내용 유사도와 따로 둔 까닭은, 학생이 가져온 글을 그대로 제출하지 않고 고쳐 쓰는 경우 어휘는 달라지지만 문장 수·나열 표지·연결어의 배치는 남기 때문이다. 내용 유사도만 보면 이 경우를 놓친다.");
     L.push("");
+    L.push("학급 내 유사도는 참여자 " + N + "명의 모든 쌍을 견주므로 비교 횟수가 참여자 수의 제곱에 비례한다. 글 전체의 3-gram을 그대로 대조하면 계산량이 감당하기 어려워지므로, 각 참여자의 3-gram 가운데 해시값이 작은 " + SKETCH_K + "개를 뽑아 만든 축약본 위에서 자카드를 산출하였다(k-최소값 추정). 같은 3-gram은 언제나 같은 해시를 가지므로 두 참여자에게서 같은 조각이 함께 뽑히며, 축약본을 다 채우지 못할 만큼 글이 짧은 경우에는 전체를 대조한 값과 일치한다. 앞부분만 잘라 비교하는 방식은 뒤쪽 차시의 서술이 통째로 빠지므로 사용하지 않았다.");
+    L.push("");
+    L.push("선택 분포의 고른 정도는 섀넌 엔트로피를 <b>고를 수 있었던 갈래의 수</b>로 정규화한 값이다. 실제로 선택된 갈래만으로 정규화하면 다섯 갈래 가운데 둘만 남은 학급이 최댓값으로 나타나 쏠림이 거꾸로 읽힌다.".replace(/<\/?b>/g, ""));
+    L.push("");
     L.push("구체성 지수는 위치어·재질어·변형어와 수량 표현의 출현을 추상어와 견주어 0–100으로 환산한 값이다. 형태소 분석이 아닌 어간 일치 방식의 간이 지표이므로, 결과 해석에는 코딩 시트를 통한 사람의 교차 검토를 함께 두어야 한다. 「연구자 서술 — 코더 간 신뢰도 산출 결과」");
     L.push("");
     L.push("### 2.5 분석 방법");
@@ -7979,32 +8047,43 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
             <table className="stat-tbl">
               <thead><tr><th>익명 번호</th><th>학번</th><th>별명</th><th>기록률</th><th>도달 계단</th><th style={{ width: 140 }}>연구 참여</th></tr></thead>
               <tbody>
-                {allCases.map((c) => (
-                  <tr key={c.id} style={c.consent === "제외" ? { opacity: 0.5 } : {}}>
-                    <td className="mono">{c.pid}</td><td className="mono">{c.id}</td><td style={{ textAlign: "left" }}>{c.nick}</td>
-                    <td className="mono">{overallProgress(c.ws)}%</td><td className="mono">{c.tm.depth}/9</td>
-                    <td>
-                      <div className="seg">
-                        <button className={c.consent === "동의" ? "on-ok" : ""} disabled={sampleMode || consentBusy}
-                          onClick={() => setConsent(c.id, c.consent === "동의" ? "" : "동의")}>동의</button>
-                        <button className={c.consent === "제외" ? "on-no" : ""} disabled={sampleMode || consentBusy}
-                          onClick={() => setConsent(c.id, c.consent === "제외" ? "" : "제외")}>제외</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {ids.map((id) => {
+                  const w = wsMap[id] || {};
+                  const cs = (consentMap || {})[id] || "";
+                  const pid = pidOf.get(id);
+                  return (
+                    <tr key={id} style={cs === "제외" ? { opacity: 0.5 } : {}}>
+                      <td className="mono">{pid || "—"}</td><td className="mono">{id}</td>
+                      <td style={{ textAlign: "left" }}>{(roster[id] || {}).nick || ""}</td>
+                      <td className="mono">{overallProgress(w)}%</td><td className="mono">{translationMetrics(w).depth}/9</td>
+                      <td>
+                        <div className="seg">
+                          <button className={cs === "동의" ? "on-ok" : ""} disabled={sampleMode || consentBusy}
+                            onClick={() => setConsent(id, cs === "동의" ? "" : "동의")}>동의</button>
+                          <button className={cs === "제외" ? "on-no" : ""} disabled={sampleMode || consentBusy}
+                            onClick={() => setConsent(id, cs === "제외" ? "" : "제외")}>제외</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <p className="hint" style={{ marginTop: 8 }}>
             <b>제외로 표시한 학생도 수업은 그대로 합니다.</b> 이 앱은 수업 도구이므로 연구 참여를 거부한 것이 수업에서 빠지는 것이 되어서는 안 됩니다.
-            표시는 내려받는 자료에서만 걸러집니다. 표시가 비어 있는 학생은 아직 확인하지 않은 것으로 보고 함께 포함됩니다.
+            표시가 비어 있는 학생은 아직 확인하지 않은 것으로 보고 함께 포함됩니다.
           </p>
           <label className="hint" style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
             <input type="checkbox" checked={dropExcluded} onChange={(e) => setDropExcluded(e.target.checked)} />
-            제외로 표시한 학생을 내려받기·기술통계에서 뺍니다
+            제외로 표시한 학생을 분석에서 뺍니다
             {excluded > 0 && <b style={{ color: "var(--seal)" }}>— 지금 {excluded}명, 분석 대상 {N}명</b>}
           </label>
+          <p className="hint" style={{ marginTop: 4 }}>
+            제외한 학생은 행만 빠지는 것이 아니라 <b>학급 규준에서도 빠집니다.</b> 학급 어휘 풀·유사도 평균·유형을 가르는
+            전유율 중앙값이 모두 분석 대상 {N}명으로만 계산되므로, 남은 학생의 값이 빠진 학생의 글에 좌우되지 않습니다.
+            익명 번호도 분석 대상에게만 붙으며, 표시를 바꾸면 번호가 다시 매겨집니다.
+          </p>
         </div>
       </div>
 
