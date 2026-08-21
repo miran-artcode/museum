@@ -66,10 +66,10 @@ const OBS_ITEMS = [
   "점검의 물리적 근거", "명제표를 전제한 판단", "짝의 읽기 처리",
 ];
 /* ============================================================
-   관찰 → 사물: 보이지 않는 것을 드러내는 일곱 계단
+   관찰 → 사물: 보이지 않는 것을 드러내는 아홉 계단
    ------------------------------------------------------------
    사회문제를 관찰하고, 그 안에서 보이지 않는 대상을 골라, 실제로 그 자리에
-   놓여 있는 사물의 흔적으로 옮기기까지를 일곱 계단으로 나눈다.
+   놓여 있는 사물의 흔적으로 옮기기까지를 아홉 계단으로 나눈다.
    계단마다 앞 계단의 답이 재료가 되고, 되돌아간 자리와 고쳐 쓴 문장이
    그대로 사고의 발전·변화 자료가 된다.
    ============================================================ */
@@ -2997,7 +2997,7 @@ function ThinkSteps({ steps }) {
 
 /* ---------- 번역 사다리 — 학생 화면 도우미 ---------- */
 
-/* 일곱 계단 띠. 지금 있는 칸을 표시하고, 각 계단의 채움 정도를 함께 보여 준다. */
+/* 아홉 계단 띠. 지금 있는 칸을 표시하고, 각 계단의 채움 정도를 함께 보여 준다. */
 function LadderRail({ sec, ws }) {
   const stats = TRANSLATE_STAGES.map((st) => stageStat(st, ws));
   const here = TRANSLATE_STAGES.filter((st) => st.sec === sec.id).map((st) => st.key);
@@ -5898,7 +5898,7 @@ function TeacherGuide() {
                 ① <b>자기보고</b> — 사전·사후 24문항 설문(창의적 자기효능감 Beghetto 2006 · Karwowski 2011, 창의적 정체성 Karwowski 2011,
                 아이디어 행동 RIBS Runco 외 2001, 창의성 성장 신념 Karwowski 2014, 일상 창의 행동, AI 협업 창의성 인식). 같은 문항을 두 번 실시하고
                 역문항 2개로 무성의 응답을 점검합니다. ② <b>행동 지표</b> — 창의성 6축(유창성·융통성·독창성·정교성·과정·멀티모달)을 기록 데이터에서 계산.
-                ③ <b>질적 기록</b> — 변화 쌍 8곳(사전·사후로 같은 질문에 두 번 답한 자리), 고쳐 쓰기 이력, 성찰문, 스스로 만든 질문(문제 발견).
+                ③ <b>질적 기록</b> — 변화 쌍 {CHANGE_PAIRS.length}곳(사전·사후로 같은 질문에 두 번 답한 자리), 고쳐 쓰기 이력, 성찰문, 스스로 만든 질문(문제 발견).
                 통제집단이 없으므로 설문 변화만으로 효과를 주장하지 않고, 세 갈래가 같은 방향을 가리키는지 서술하는 것이 정직한 분석입니다.
               </p>
               <p style={{ marginBottom: 10 }}>
@@ -5923,7 +5923,7 @@ function TeacherGuide() {
       <div className="card">
         <div className="card-body">
           <details>
-            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>번역 사다리 운영 — 일곱 계단을 수업 시간에 어떻게 굴리는가</summary>
+            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>번역 사다리 운영 — 아홉 계단을 수업 시간에 어떻게 굴리는가</summary>
             <div style={{ fontSize: 13, lineHeight: 1.8, marginTop: 10 }}>
               <p style={{ marginBottom: 10 }}>
                 3차시의 기록 B1~B7이 「번역 사다리」입니다. 사회문제를 관찰한 뒤 보이지 않는 대상을 사물의 흔적으로 드러내기까지를 아홉 계단으로 나눈 것으로,
@@ -6868,7 +6868,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("단원은 「실재한 적 없는 유물 이미지로 구성한 허구의 아카이브 전시」이며 8차시(차시당 120분)로 구성했다. 1~2차시는 레디메이드·개념미술·제도비평·파라픽션 감상, 3차시는 사회참여 미술과 관찰, 4차시는 박물관 장치와 유물 개념 설계, 5~6차시는 생성형 AI를 사용한 이미지 제작과 다듬기, 7차시는 전시 구성, 8차시는 상호평가와 비평이다.");
     L.push("");
-    L.push("이 연구가 초점을 둔 곳은 3차시에 배치한 「번역 사다리」다. 사회문제 관찰에서 사물의 흔적 설계까지를 일곱 계단으로 나누고, 각 계단이 앞 계단의 산출물을 재료로 삼도록 구성했다.");
+    L.push("이 연구가 초점을 둔 곳은 3차시에 배치한 「번역 사다리」다. 사회문제 관찰에서 사물의 흔적 설계까지를 아홉 계단으로 나누고, 각 계단이 앞 계단의 산출물을 재료로 삼도록 구성했다.");
     L.push("");
     L.push(mdHead(["계단", "이름", "학생이 하는 일", "내놓을 것", "교사가 보는 곳"]));
     TRANSLATE_STAGES.forEach((st) => L.push(mdRow([st.key, st.full, st.ask, st.out, st.look])));
@@ -6917,7 +6917,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("### 3.1 계단의 도달");
     L.push("");
-    L.push("참여자 " + N + "명의 연속 도달 계단은 평균 " + say("stage_depth") + "이었고, 일곱 계단을 모두 채운 학생은 " + fullCount + "명(" + (N ? Math.round((fullCount / N) * 100) : 0) + "%)이었다. 계단별 완료 비율은 다음과 같다.");
+    L.push("참여자 " + N + "명의 연속 도달 계단은 평균 " + say("stage_depth") + "이었고, 아홉 계단을 모두 채운 학생은 " + fullCount + "명(" + (N ? Math.round((fullCount / N) * 100) : 0) + "%)이었다. 계단별 완료 비율은 다음과 같다.");
     L.push("");
     L.push(mdHead(["계단", "내용", "완료 n", "완료 %"]));
     TRANSLATE_STAGES.forEach((st, i) => {
