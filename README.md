@@ -139,7 +139,9 @@ T1과 T2는 2차시 끝에 안내해 **한 주 과제**로 돌립니다. 3차시
 ```
 public/index.html      화면 뼈대
 public/app.js          앱 번들 (React + Firebase)
+public/img/lessons/    차시 읽기 자료 그림 (학생용 PPT에서 옮겨 압축한 도판)
 src-app.jsx            앱 소스
+src-lessons.jsx        차시별 수업 자료 원본 LESSONS_DEF (읽기 자료·발문·그림·작품 표)
 src-content.jsx        수업 내용 편집 계층 (발문·이론·그림·링크)
 src-fb.js              Firebase 연결 계층
 firebase.json          호스팅·규칙 설정
