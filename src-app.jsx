@@ -5,6 +5,7 @@ import {
   useContent, watchContent, onContentChange, mergeLessons, mergeSchema,
   ContentEditor, ContentStyle, LessonImages, LessonAsks, LessonNotice, WorkLinks,
 } from "./src-content.jsx";
+import { SurveyStyle, SurveyScaleBar, LikertRow } from "./src-survey-ui.jsx";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -5029,6 +5030,11 @@ function SurveyCard({ phase, block, onChange, onSubmit, busy }) {
   const done = SURVEY_ITEMS.filter((it) => ans[it.k] >= 1).length;
   const total = SURVEY_ITEMS.length;
   const extraDone = !isPost || SURVEY_POST_LIKERT.every((it) => (extra[it.k] || 0) >= 1);
+  /* 안 한 문항 표시는 「남은 N개」를 누른 뒤에만 켠다 — 처음부터 켜면 전부 오류처럼 보인다 */
+  const [showGaps, setShowGaps] = useState(false);
+  const gapItem = SURVEY_ITEMS.find((it) => !(ans[it.k] >= 1))
+    || (isPost ? SURVEY_POST_LIKERT.find((it) => !(extra[it.k] >= 1)) : null);
+  const remain = (total - done) + (isPost ? SURVEY_POST_LIKERT.filter((it) => !(extra[it.k] >= 1)).length : 0);
 
   if (svDone(sv)) {
     return (
@@ -5051,32 +5057,25 @@ function SurveyCard({ phase, block, onChange, onSubmit, busy }) {
       <div className="card-note">
         정답이 없고 성적과도 관계없는 설문입니다. 잘 보이려는 답이 아니라 지금의 나에게 가장 가까운 답을 고르세요.
         {isPost ? " 단원을 모두 마친 지금의 생각으로 답합니다. 사전 설문과 같은 문항이지만, 그때의 답을 기억해 맞출 필요는 없습니다." : " 단원을 시작하기 전, 지금 생각 그대로 답합니다. 약 5분이 걸립니다."}
+        {" 고른 답은 자동으로 저장되니 도중에 나갔다가 이어서 해도 됩니다."}
       </div>
-      <div className="card-body">
+      <div className={"card-body" + (showGaps ? " sv-gaps" : "")}>
+        <SurveyScaleBar labels={LIKERT} done={done} total={total} remain={remain}
+          firstGapKey={gapItem ? phase + "-" + gapItem.k : null} onRevealGaps={() => setShowGaps(true)} />
         <div className="sv-legend">{LIKERT.map((l, i) => <span key={i}><b>{i + 1}</b>{l}</span>)}</div>
         {SURVEY_ITEMS.map((it, idx) => (
-          <div className="sv-item" key={it.k}>
+          <div className={"sv-item" + (ans[it.k] >= 1 ? "" : " is-gap")} id={"sv-" + phase + "-" + it.k} key={it.k}>
             <div className="sv-q"><span className="sv-n">{String(idx + 1).padStart(2, "0")}</span>{it.text}</div>
-            <div className="likert" role="radiogroup" aria-label={it.text}>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button key={n} className={ans[it.k] === n ? "on" : ""} role="radio" aria-checked={ans[it.k] === n}
-                  title={LIKERT[n - 1]} onClick={() => setAns(it.k, n)}>{n}</button>
-              ))}
-            </div>
+            <LikertRow value={ans[it.k]} onPick={(n) => setAns(it.k, n)} label={it.text} labels={LIKERT} />
           </div>
         ))}
         {isPost && (
           <div>
             <div className="sv-block-t">단원을 돌아보며</div>
             {SURVEY_POST_LIKERT.map((it, idx) => (
-              <div className="sv-item" key={it.k}>
+              <div className={"sv-item" + (extra[it.k] >= 1 ? "" : " is-gap")} id={"sv-" + phase + "-" + it.k} key={it.k}>
                 <div className="sv-q"><span className="sv-n">추{idx + 1}</span>{it.text}</div>
-                <div className="likert" role="radiogroup" aria-label={it.text}>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} className={extra[it.k] === n ? "on" : ""} role="radio" aria-checked={extra[it.k] === n}
-                      title={LIKERT[n - 1]} onClick={() => setExtra(it.k, n)}>{n}</button>
-                  ))}
-                </div>
+                <LikertRow value={extra[it.k]} onPick={(n) => setExtra(it.k, n)} label={it.text} labels={LIKERT} />
               </div>
             ))}
             <div className="field" style={{ marginTop: 12 }}>
@@ -9357,6 +9356,7 @@ function App() {
     <div className="app">
       <style>{CSS}</style>
       <ContentStyle />
+      <SurveyStyle />
       {view === "gate" && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
         onTeacher={() => setView("teacher")}
