@@ -5666,7 +5666,9 @@ function ApproprScatter({ rows, apMed, srMed, hoverId, setHoverId, onSel }) {
   return (
     <div>
       <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: "auto" }} role="img" aria-label="가져온 양과 전유율의 학급 분포">
-        <title>가로: 가져온 글의 비중(%) · 세로: 전유율(%). 점 하나가 학생 한 명. 붙여넣기 기록이 있는 {pts.length}명만 나타납니다.</title>
+        {/* SVG title은 자식이 문자열 하나여야 한다 — 여러 조각으로 넘기면 React가 그리지 않아
+            마우스 설명과 화면 낭독기 라벨이 통째로 빈다 */}
+        <title>{"가로: 가져온 글의 비중(%) · 세로: 전유율(%). 점 하나가 학생 한 명. 붙여넣기 기록이 있는 " + pts.length + "명만 나타납니다."}</title>
         <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="var(--line)" strokeWidth={1} />
         <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} stroke="var(--line)" strokeWidth={1} />
         {apMed != null && pts.length >= 3 && (
@@ -5684,7 +5686,7 @@ function ApproprScatter({ rows, apMed, srMed, hoverId, setHoverId, onSel }) {
             fill={r.id === hoverId ? "var(--seal)" : "var(--patina)"} fillOpacity={r.id === hoverId ? 1 : 0.55}
             stroke="var(--card)" strokeWidth={1.5} style={{ cursor: "pointer" }}
             onMouseEnter={() => setHoverId(r.id)} onMouseLeave={() => setHoverId(null)} onClick={() => onSel(r.id)}>
-            <title>{r.nick} · 가져온 양 {r.pm.srcRatio}% · 전유율 {r.pm.approp}% · {r.pm.type || "미분류"}</title>
+            <title>{r.nick + " · 가져온 양 " + r.pm.srcRatio + "% · 전유율 " + r.pm.approp + "% · " + (r.pm.type || "미분류")}</title>
           </circle>
         ))}
       </svg>
@@ -5706,7 +5708,7 @@ function AxisStripRow({ axis, rows, first, hoverId, setHoverId, onSel }) {
     <div className="hbar" style={{ alignItems: "center" }}>
       <span className="lb" title={axis.desc}>{axis.name}</span>
       <svg viewBox={"0 0 " + W + " " + H} style={{ flex: "1 1 280px", height: H }} role="img" aria-label={axis.name + " 학급 분포"}>
-        <title>{axis.name} — 기록 {pts.length}명{med != null ? " · 중앙값 " + med + "점" : ""}. {axis.desc}</title>
+        <title>{axis.name + " — 기록 " + pts.length + "명" + (med != null ? " · 중앙값 " + med + "점" : "") + ". " + axis.desc}</title>
         <line x1={0} y1={Y} x2={W} y2={Y} stroke="var(--line)" strokeWidth={1} />
         {[0, W / 2, W].map((x, i) => <line key={i} x1={x} y1={Y - 3} x2={x} y2={Y + 3} stroke="var(--line2)" strokeWidth={1} />)}
         {first && [["0", 0, "start"], ["50", W / 2, "middle"], ["100", W, "end"]].map(([t, x, an]) => (
@@ -5720,7 +5722,7 @@ function AxisStripRow({ axis, rows, first, hoverId, setHoverId, onSel }) {
             fill={r.id === hoverId ? "var(--seal)" : "var(--patina)"} fillOpacity={r.id === hoverId ? 1 : 0.5}
             stroke="var(--card)" strokeWidth={1.5} style={{ cursor: "pointer" }}
             onMouseEnter={() => setHoverId(r.id)} onMouseLeave={() => setHoverId(null)} onClick={() => onSel(r.id)}>
-            <title>{r.nick} · {axis.name} {r.v}점</title>
+            <title>{r.nick + " · " + axis.name + " " + r.v + "점"}</title>
           </circle>
         ))}
         {hr && <text x={Math.min(Math.max((hr.v / 100) * W, 24), W - 24)} y={Y - 11} fontSize={10} fontFamily="var(--mono)" fill="var(--ink)" textAnchor="middle">{hr.nick} {hr.v}</text>}
@@ -5780,7 +5782,7 @@ function TimeScatter({ rows, hoverId, setHoverId, onSel }) {
             fill={r.id === hoverId ? "var(--seal)" : "var(--patina)"} fillOpacity={r.id === hoverId ? 1 : 0.65}
             stroke="var(--card)" strokeWidth={1.5} style={{ cursor: "pointer" }}
             onMouseEnter={() => setHoverId(r.id)} onMouseLeave={() => setHoverId(null)} onClick={() => onSel(r.id)}>
-            <title>{r.nick} · {r.min}분 · 축 평균 {r.score}</title>
+            <title>{r.nick + " · " + r.min + "분 · 축 평균 " + r.score}</title>
           </circle>
         ))}
         {hoverId && (() => {
