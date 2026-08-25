@@ -5,6 +5,7 @@ import {
   useContent, watchContent, onContentChange, mergeLessons, mergeSchema,
   ContentEditor, ContentStyle, LessonImages, LessonAsks, LessonNotice, WorkLinks,
 } from "./src-content.jsx";
+import { StanceCard, StanceStyle, StanceMini, stanceDone, STANCE_VER } from "./src-stance.jsx";
 import { SurveyStyle, SurveyScaleBar, LikertRow } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
 
@@ -1133,7 +1134,14 @@ function pairedStats(pairs) {
 }
 
 /* 설문 공개 설정 — config.survey = { pre, post } */
-const DEFAULT_SURVEY = { pre: true, post: false };
+const DEFAULT_SURVEY = { pre: true, post: false, sPre: false, sPost: false };
+/* 설문 네 가지 — 창의성 v1(pre·post)과 평가자 성향 s1(sPre·sPost) */
+const SURVEY_PHASES = [
+  { ph: "pre", nm: "사전 창의성 설문", when: "1차시 수업 전 약 5분", get: (sv) => (sv || {}).pre },
+  { ph: "sPre", nm: "사전 성향 설문", when: "1차시, 창의성 설문 바로 뒤 약 8분", get: (sv) => ((sv || {}).stance || {}).pre },
+  { ph: "post", nm: "사후 창의성 설문", when: "8차시 정리 단계 약 7분", get: (sv) => (sv || {}).post },
+  { ph: "sPost", nm: "사후 성향 설문", when: "8차시 뒤 약 5분", get: (sv) => ((sv || {}).stance || {}).post },
+];
 const surveyOpen = (cfgSurvey, phase) => (cfgSurvey || DEFAULT_SURVEY)[phase] === true;
 
 /* ---------- 진행률 계산 ---------- */
@@ -4985,6 +4993,35 @@ function StudentApp({ me, onExit, onGallery }) {
     if (!ok) { alert("제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요."); setSurvey(cur); }
   };
 
+  /* 평가자 성향 설문(s1) — 같은 surveys/{학번} 문서의 stance 블록. v1 응답은 건드리지 않는다 */
+  const stChange = (phase, block) => {
+    const cur = surveyRef.current || {};
+    const next = { ...cur, stance: { ...(cur.stance || {}), ver: STANCE_VER, [phase]: block } };
+    setSurvey(next);
+    if (svTimer.current) clearTimeout(svTimer.current);
+    svTimer.current = setTimeout(() => { store.set("survey:" + me.sid, surveyRef.current); }, 800);
+  };
+  const stSubmit = async (phase) => {
+    const cur = surveyRef.current || {};
+    const st = cur.stance || {};
+    const block = st[phase] || {};
+    const started = block.startedAt || now();
+    const sub = now();
+    const next = {
+      ...cur,
+      stance: {
+        ...st, ver: STANCE_VER,
+        [phase]: { ...block, startedAt: started, submittedAt: sub, durSec: Math.max(0, Math.round((new Date(sub) - new Date(started)) / 1000)) },
+      },
+    };
+    setSvBusy(true);
+    if (svTimer.current) clearTimeout(svTimer.current);
+    setSurvey(next);
+    const ok = await store.set("survey:" + me.sid, next);
+    setSvBusy(false);
+    if (!ok) { alert("제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요."); setSurvey(cur); }
+  };
+
   const switchTab = (s) => {
     if (s === tab) return;
     wsRef.current = { ...wsRef.current, _lastTab: s }; // 다음 입장 때 이 차시로 이어서 연다
@@ -5054,6 +5091,14 @@ function StudentApp({ me, onExit, onGallery }) {
         {loaded && survey && surveyOpen(svCfg, "post") && (
           <SurveyCard phase="post" block={survey.post} busy={svBusy}
             onChange={(b) => svChange("post", b)} onSubmit={() => svSubmit("post")} />
+        )}
+        {loaded && survey && surveyOpen(svCfg, "sPre") && (
+          <StanceCard phase="pre" block={(survey.stance || {}).pre} busy={svBusy}
+            onChange={(b) => stChange("pre", b)} onSubmit={() => stSubmit("pre")} />
+        )}
+        {loaded && survey && surveyOpen(svCfg, "sPost") && (
+          <StanceCard phase="post" block={(survey.stance || {}).post} busy={svBusy}
+            onChange={(b) => stChange("post", b)} onSubmit={() => stSubmit("post")} />
         )}
 
         {!isOpen(openMap, tab) ? (
@@ -7805,7 +7850,8 @@ function TeacherApp({ onExit, onGallery }) {
     const ok = await store.set("config", { ...cfg, survey: next, surveyUpdated: now() });
     if (ok) {
       setSvCfg(next);
-      setMsg((phase === "pre" ? "사전" : "사후") + " 설문을 " + (next[phase] ? "열었습니다. 학생 화면 맨 위에 나타납니다." : "닫았습니다."));
+      const nm = (SURVEY_PHASES.find((x) => x.ph === phase) || {}).nm || "설문";
+      setMsg(nm + "을 " + (next[phase] ? "열었습니다. 학생 화면 맨 위에 나타납니다." : "닫았습니다."));
     } else setMsg("설정 저장에 실패했습니다.");
   };
   useEffect(() => { loadAll(); }, []);
@@ -8003,9 +8049,9 @@ function TeacherApp({ onExit, onGallery }) {
                     <table className="roster">
                       <thead><tr><th>설문</th><th>실시 시점</th><th>제출</th><th style={{ width: 110 }}>공개</th></tr></thead>
                       <tbody>
-                        {[["pre", "사전 설문", "1차시 수업 전 약 5분"], ["post", "사후 설문", "8차시 정리 단계 약 7분"]].map(([ph, nm, when]) => {
+                        {SURVEY_PHASES.map(({ ph, nm, when, get }) => {
                           const open = surveyOpen(svCfg, ph);
-                          const done = ids.filter((id) => svDone((surveyMap[id] || {})[ph])).length;
+                          const done = ids.filter((id) => svDone(get(surveyMap[id]))).length;
                           return (
                             <tr key={ph}>
                               <td>{nm}</td>
@@ -8022,7 +8068,7 @@ function TeacherApp({ onExit, onGallery }) {
                         })}
                       </tbody>
                     </table>
-                    <p className="hint" style={{ marginTop: 10 }}>같은 24문항을 두 번 실시해 변화를 잽니다. 학생에게는 성적과 무관함을 반드시 미리 알립니다.</p>
+                    <p className="hint" style={{ marginTop: 10 }}>같은 문항을 두 번 실시해 변화를 잽니다. 학생에게는 성적과 무관함을 반드시 미리 알립니다. 성향 설문은 <b>반드시 1차시에</b> 받습니다 — 8차시 상호평가 직전에 AI 태도를 물으면 그 질문이 판정 기준을 흔듭니다.</p>
                   </div>
                 </div>
               </div>
@@ -8790,6 +8836,7 @@ function App() {
     <div className="app">
       <style>{CSS}</style>
       <ContentStyle />
+      <StanceStyle />
       <SurveyStyle />
       {view === "gate" && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}

@@ -9,14 +9,17 @@
    stance 블록에 따로 저장하고, 문항을 고치면 STANCE_VER만 올린다.
    v1의 문항·채점은 건드리지 않으므로 사전·사후 비교의 동일성이 유지된다.
 
-   화면 원칙(고2 대상, 42문항 한 번에 훑는 긴 설문):
+   화면(고2 대상, 42문항을 한 번에 훑는 긴 설문):
    - 머리띠를 고정해 지금 어느 묶음에 있고 몇 문항 했는지 늘 보이게 한다.
    - 숫자 보기의 뜻(1이 무엇, 5가 무엇)이 스크롤로 사라지지 않게 한다.
    - 묶음 이름은 학생의 말로 적는다. 척도 이름("인간중심 창의성 신념" 같은)은
      보여 주지 않는다 — 무엇을 재는지 알려 주면 답이 그쪽으로 쏠린다.
+   - 응답 단추·건너뛰기·미응답 표시는 src-survey-ui.jsx(v1 설문용으로 만든 계층)를
+     그대로 쓴다. 두 설문의 조작감이 같아야 응답이 비교된다.
    ============================================================ */
 
 import React, { useState, useEffect, useRef } from "react";
+import { LikertRow, scrollToSurveyItem, LIKERT_SHORT } from "./src-survey-ui.jsx";
 
 export const STANCE_VER = "s1";
 
@@ -162,14 +165,13 @@ export function stanceScores(ans) {
   return out;
 }
 
-/* CSV 열 이름 — 「연구」 탭에서 쓴다 */
+/* CSV — 파생 점수 열과 문항 원점수 열 */
 export const STANCE_DERIVED = [
   "atp", "atn", "thr", "exc", "emoP", "emoN", "emoEnv", "emoZ", "ant", "eff", "aut",
   "dis1", "dis2", "aop", "afn", "asi", "ain", "akn", "aknX",
   "useFreq", "useImg", "useBreadth", "useDepth", "useRaw", "useDisc", "aie",
 ];
 
-/* 문항 하나를 CSV 한 칸으로 — 격자는 낱말별로 펼친다 */
 export function stanceFlatCols() {
   const cols = [];
   STANCE_ITEMS.forEach((it) => {
@@ -178,6 +180,7 @@ export function stanceFlatCols() {
   });
   return cols;
 }
+
 export function stanceFlatRow(ans) {
   const a = ans || {};
   const row = [];
@@ -198,32 +201,39 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
   const items = stanceItemsFor(phase);
   const total = items.length;
   const done = stanceCount(ans, items);
+  const remain = total - done;
   const blocks = STANCE_BLOCKS.filter((b) => items.some((it) => it.b === b.k));
+  const submitted = stanceDone(sv);
 
-  const [act, setAct] = useState(0);      // 지금 보고 있는 묶음
-  const [topH, setTopH] = useState(56);   // 상단 띠 높이 — 그 아래에 머리띠를 붙인다
-  const [miss, setMiss] = useState(false); // 남은 문항 표시 켜기
+  const [act, setAct] = useState(0);       // 지금 보고 있는 묶음
+  const [topH, setTopH] = useState(56);    // 상단 띠 높이 — 그 아래에 머리띠를 붙인다
+  const [showGaps, setShowGaps] = useState(false);
   const barRef = useRef(null);
   const secRefs = useRef([]);
-  const cardRef = useRef(null);
 
-  /* 상단 띠 높이는 화면 폭에 따라 바뀐다 — 재서 붙인다 */
+  /* 상단 띠 높이는 화면 폭에 따라 바뀐다(topbar-in이 wrap된다) — 재서 따라간다.
+     --sv-top은 src-survey-ui.jsx의 scroll-margin-top 계산에도 쓰인다. */
   useEffect(() => {
-    const measure = () => {
-      const tb = document.querySelector(".topbar");
-      setTopH(tb ? Math.round(tb.getBoundingClientRect().height) : 56);
+    const bar = document.querySelector(".topbar");
+    const update = () => {
+      const h = bar ? Math.round(bar.getBoundingClientRect().height) : 56;
+      if (h > 0) {
+        setTopH(h);
+        document.documentElement.style.setProperty("--sv-top", h + "px");
+      }
     };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    update();
+    let ro = null;
+    if (bar && typeof ResizeObserver !== "undefined") { ro = new ResizeObserver(update); ro.observe(bar); }
+    window.addEventListener("resize", update);
+    return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", update); };
   }, []);
 
-  /* 스크롤에 따라 머리띠의 묶음 이름을 바꾼다 */
+  /* 스크롤에 따라 머리띠의 묶음 이름을 바꾼다 — 지금 무엇을 묻는 중인지 늘 보이게 */
   useEffect(() => {
-    if (stanceDone(sv)) return undefined;
+    if (submitted) return undefined;
     const onScroll = () => {
-      const bar = barRef.current;
-      const line = (bar ? bar.getBoundingClientRect().bottom : topH) + 12;
+      const line = (barRef.current ? barRef.current.getBoundingClientRect().bottom : topH) + 16;
       let cur = 0;
       secRefs.current.forEach((el, i) => { if (el && el.getBoundingClientRect().top <= line) cur = i; });
       setAct((p) => (p === cur ? p : cur));
@@ -231,9 +241,9 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [topH, blocks.length, sv.submittedAt]);
+  }, [topH, blocks.length, submitted]);
 
-  if (stanceDone(sv)) {
+  if (submitted) {
     return (
       <div className="ok-note">
         {isPost ? "사후" : "사전"} 성향 설문을 제출했습니다 · {fmtT(sv.submittedAt)} — 솔직하게 답해 주어 고맙습니다.
@@ -247,27 +257,24 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
   const toggleMany = (it, opt) => {
     const cur = Array.isArray(ans[it.k]) ? ans[it.k] : [];
     let next;
-    if (opt === it.none) next = cur.indexOf(opt) >= 0 ? [] : [opt];            // "쓴 적 없다"는 혼자만 선택된다
+    if (opt === it.none) next = cur.indexOf(opt) >= 0 ? [] : [opt];   // "쓴 적 없다"는 혼자만 선택된다
     else next = cur.indexOf(opt) >= 0 ? cur.filter((x) => x !== opt) : cur.filter((x) => x !== it.none).concat(opt);
     touch({ ...ans, [it.k]: next });
   };
 
-  const goMissing = () => {
-    setMiss(true);
-    const first = items.find((it) => !itemAnswered(it, ans[it.k]));
-    if (!first) return;
-    const el = cardRef.current && cardRef.current.querySelector('[data-sk="' + first.k + '"]');
-    if (!el) return;
-    const y = window.pageYOffset + el.getBoundingClientRect().top - (topH + 118);
-    window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+  const firstGap = items.find((it) => !itemAnswered(it, ans[it.k]));
+  const jump = () => {
+    setShowGaps(true);
+    if (firstGap) scrollToSurveyItem(phase + "-" + firstGap.k);
   };
 
   const b = blocks[act] || blocks[0];
-  const likertHere = items.some((it) => it.b === b.k && !it.t);
-  const pct = Math.round((done / total) * 100);
+  const here = items.filter((it) => it.b === b.k);
+  const likertHere = here.filter((it) => !it.t).length >= here.length / 2; // 이 묶음이 리커트 위주인가
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
-    <div className="card st-card" ref={cardRef}>
+    <div className="card st-card">
       <div className="card-head">
         <span className="card-code">{isPost ? "사후 설문 2" : "사전 설문 2"}</span>
         <span className="card-title">작품을 보는 나의 눈</span>
@@ -276,25 +283,42 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
       <div className="card-note">
         정답이 없고 성적과도 관계없는 설문입니다. 여러분이 작품을 어떤 눈으로 보는지 알아보려는 것이고, 개인의 답을 따로 확인하지 않습니다.
         {isPost ? " 단원을 모두 마친 지금의 생각으로 답합니다. 사전에 무엇이라 답했는지 기억해 맞출 필요는 없습니다." : " 잘 보이려는 답 말고 지금의 나에게 가장 가까운 답을 고르세요."}
+        {" 고른 답은 자동으로 저장되니 도중에 나갔다가 이어서 해도 됩니다."}
       </div>
 
-      <div className="card-body">
-        {/* 고정 머리띠 — 어디에 있고 얼마나 했고 숫자가 무슨 뜻인지 */}
-        <div className="st-sticky" ref={barRef} style={{ top: topH }}>
-          <div className="st-row1">
-            <span className="st-bno">{act + 1}/{blocks.length}</span>
-            <span className="st-bt">{b.t}</span>
-            <span className="st-count"><b>{done}</b> / {total}</span>
-          </div>
-          <div className="st-prog" aria-hidden="true"><i style={{ width: pct + "%" }} /></div>
-          <div className="st-bd">{b.d}</div>
-          {likertHere ? (
-            <div className="st-legend">
-              {LIK5.map((l, i) => <span key={i}><b>{i + 1}</b>{l}</span>)}
+      <div className={"card-body" + (showGaps ? " sv-gaps" : "")}>
+        {/* 고정 머리띠 — 지금 어느 묶음인지 · 몇 개 했는지 · 숫자가 무슨 뜻인지 */}
+        <div className="st-bar" ref={barRef} style={{ top: topH }}>
+          <div className="st-bar-l">
+            <div className="st-where">
+              <span className="st-bno">{act + 1}<i>/{blocks.length}</i></span>
+              <span className="st-bt">{b.t}</span>
             </div>
-          ) : (
-            <div className="st-legend st-legend-alt">문항마다 보기가 다릅니다 — 보기를 읽고 하나를 고르세요.</div>
-          )}
+            <p className="st-bd">{b.d}</p>
+          </div>
+          <div className="st-bar-r">
+            <div className="st-prog">
+              <span className="st-count">{done}<i>/{total}</i></span>
+              <span className="st-track" role="progressbar" aria-valuenow={done} aria-valuemin={0}
+                aria-valuemax={total} aria-label={"응답한 문항 " + done + "개, 전체 " + total + "개"}>
+                <span className="st-fill" style={{ width: pct + "%" }} />
+              </span>
+              {remain > 0 ? (
+                <button type="button" className="sv-scale-jump" onClick={jump}>
+                  남은 {remain}개<span aria-hidden="true"> ↓</span>
+                </button>
+              ) : <span className="sv-scale-ok">다 답했습니다</span>}
+            </div>
+            {likertHere ? (
+              <ol className="sv-scale-ticks" aria-label="응답 척도">
+                {LIK5.map((full, i) => (
+                  <li key={i} title={full}><b>{i + 1}</b><span>{LIKERT_SHORT[i] || full}</span></li>
+                ))}
+              </ol>
+            ) : (
+              <p className="st-hint">문항마다 보기가 다릅니다 — 보기를 읽고 고르세요.</p>
+            )}
+          </div>
         </div>
 
         {blocks.map((bl, bi) => {
@@ -302,35 +326,29 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
           return (
             <section className="st-sec" key={bl.k} ref={(el) => { secRefs.current[bi] = el; }}>
               <div className="st-sec-h">
-                <span className="st-sec-n">묶음 {bi + 1}</span>
+                <span className="st-sec-n">묶음 {bi + 1} / {blocks.length}</span>
                 <h4>{bl.t}</h4>
                 <p>{bl.d}</p>
               </div>
               {list.map((it) => {
                 const v = ans[it.k];
-                const bad = miss && !itemAnswered(it, v);
+                const ok = itemAnswered(it, v);
                 const no = String(items.indexOf(it) + 1).padStart(2, "0");
                 return (
-                  <div className={"st-item" + (bad ? " st-bad" : "") + (it.t ? " st-wide" : "")} key={it.k} data-sk={it.k}>
+                  <div className={"sv-item" + (it.t ? " st-wide" : "") + (ok ? "" : " is-gap")}
+                    id={"sv-" + phase + "-" + it.k} key={it.k}>
                     <div className="sv-q">
                       <span className="sv-n">{no}</span>{it.text}
                       {it.note && <em className="st-note">{it.note}</em>}
                     </div>
 
-                    {!it.t && (
-                      <div className="likert" role="radiogroup" aria-label={it.text}>
-                        {[1, 2, 3, 4, 5].map((n) => (
-                          <button key={n} className={v === n ? "on" : ""} role="radio" aria-checked={v === n}
-                            title={LIK5[n - 1]} onClick={() => setOne(it.k, n)}>{n}</button>
-                        ))}
-                      </div>
-                    )}
+                    {!it.t && <LikertRow value={v} onPick={(n) => setOne(it.k, n)} label={it.text} labels={LIK5} />}
 
                     {it.t === "one" && (
                       <div className="st-opts" role="radiogroup" aria-label={it.text}>
                         {it.o.map((o, i) => (
-                          <button key={o} className={v === i + 1 ? "on" : ""} role="radio" aria-checked={v === i + 1}
-                            onClick={() => setOne(it.k, i + 1)}>{o}</button>
+                          <button type="button" key={o} className={v === i + 1 ? "on" : ""}
+                            role="radio" aria-checked={v === i + 1} onClick={() => setOne(it.k, i + 1)}>{o}</button>
                         ))}
                       </div>
                     )}
@@ -340,7 +358,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
                         {it.o.map((o) => {
                           const on = Array.isArray(v) && v.indexOf(o) >= 0;
                           return (
-                            <button key={o} className={on ? "on" : ""} aria-pressed={on}
+                            <button type="button" key={o} className={on ? "on" : ""} aria-pressed={on}
                               onClick={() => toggleMany(it, o)}>{on ? "✓ " : ""}{o}</button>
                           );
                         })}
@@ -361,7 +379,8 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
                                 {it.o.map((l, i) => {
                                   const n = i + it.base;
                                   return (
-                                    <button key={n} className={gv === n ? "on" : ""} role="radio" aria-checked={gv === n}
+                                    <button type="button" key={n} className={gv === n ? "on" : ""}
+                                      role="radio" aria-checked={gv === n} aria-label={w + " — " + l}
                                       title={l} onClick={() => setGrid(it.k, w, n)}>{n}</button>
                                   );
                                 })}
@@ -379,12 +398,10 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
         })}
 
         <div className="sv-foot">
-          <button className="btn" disabled={done < total || busy} onClick={onSubmit}>
-            {busy ? "제출 중…" : done < total ? "아직 " + (total - done) + "문항 남았습니다" : "제출하기"}
+          <button className="btn" disabled={remain > 0 || busy} onClick={onSubmit}>
+            {busy ? "제출 중…" : remain > 0 ? "아직 " + remain + "문항 남았습니다" : "제출하기"}
           </button>
-          {done < total && (
-            <button className="st-jump" onClick={goMissing}>남은 문항으로 가기 →</button>
-          )}
+          {remain > 0 && <button type="button" className="st-jump" onClick={jump}>남은 문항으로 가기 →</button>}
           <span className="hint">답은 고르는 즉시 저장됩니다. 모두 답하면 제출 단추가 켜지고, 제출한 뒤에는 고칠 수 없습니다.</span>
         </div>
       </div>
@@ -419,7 +436,10 @@ export function StanceMini({ st }) {
           ))}
         </tbody>
       </table>
-      <p className="hint">사용 빈도 {f(pre && pre.useFreq)} · 이미지 AI {f(pre && pre.useImg)} · 용도 수 {f(pre && pre.useBreadth)} · 고쳐 시키는 깊이 {f(pre && pre.useDepth)}</p>
+      <p className="hint">
+        사용 빈도 {f(pre && pre.useFreq)} · 이미지 AI {f(pre && pre.useImg)} ·
+        용도 수 {f(pre && pre.useBreadth)} · 고쳐 시키는 깊이 {f(pre && pre.useDepth)}
+      </p>
     </div>
   );
 }
@@ -435,77 +455,83 @@ const fmtT = (iso) => {
 };
 
 /* ---------- 화면 스타일 ----------
-   거대한 CSS 상수를 건드리지 않도록 여기서 따로 내보낸다 (src-content.jsx와 같은 방식). */
+   거대한 CSS 상수를 건드리지 않도록 따로 내보낸다 (src-content.jsx의 선례).
+   응답 단추·미응답 표시·건너뛰기 강조는 src-survey-ui.jsx의 규칙을 그대로 쓰고,
+   여기서는 s1에만 있는 것(묶음 머리띠·보기 단추·낱말표)만 더한다. */
 
 const STANCE_CSS = `
 .st-card{border-top:3px solid var(--patina)}
-.st-card .card-body{padding-top:0}
 
-/* 고정 머리띠 */
-.st-sticky{position:sticky;z-index:15;margin:0 -18px 4px;padding:9px 18px 8px;
-  background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 6px 10px -8px rgba(36,38,31,.28)}
-.st-row1{display:flex;align-items:baseline;gap:9px}
-.st-bno{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--patina);
+/* 고정 머리띠 — card-body 안쪽 첫 자식이라 카드를 벗어나면 함께 사라진다 */
+.st-bar{
+  position:sticky; z-index:12;
+  margin:-16px -18px 12px; padding:8px 18px 7px;
+  background:var(--card2); border-bottom:1px solid var(--line);
+  display:flex; align-items:flex-end; justify-content:space-between; gap:6px 14px; flex-wrap:wrap;
+}
+.st-bar-l{min-width:0;flex:1 1 240px}
+.st-bar-r{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.st-where{display:flex;align-items:baseline;gap:7px;min-width:0}
+.st-bno{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--patina);
   border:1px solid var(--patina);padding:1px 5px;flex:0 0 auto}
-.st-bt{font-family:var(--serif);font-size:14px;font-weight:700;line-height:1.35;
+.st-bno i{font-style:normal;opacity:.7}
+.st-bt{font-family:var(--serif);font-size:14px;font-weight:700;line-height:1.3;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.st-count{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--sub);
-  font-variant-numeric:tabular-nums;flex:0 0 auto}
-.st-count b{font-size:16px;color:var(--ink)}
-.st-prog{height:4px;background:var(--line2);margin-top:7px;position:relative}
-.st-prog i{position:absolute;left:0;top:0;bottom:0;background:var(--patina);transition:width .18s ease}
-.st-bd{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.5}
-.st-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--sub);margin-top:6px}
-.st-legend b{font-family:var(--mono);color:var(--ink);margin-right:3px}
-.st-legend-alt{color:var(--sub)}
+.st-bd{font-size:11px;color:var(--sub);line-height:1.5;margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-prog{display:flex;align-items:center;gap:8px}
+.st-count{font-family:var(--mono);font-size:13px;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.st-count i{font-style:normal;font-size:11px;color:var(--sub)}
+.st-track{position:relative;display:block;width:56px;height:3px;background:var(--line);flex:0 0 auto}
+.st-fill{position:absolute;left:0;top:0;bottom:0;background:var(--patina);transition:width .25s ease}
+.st-hint{font-size:10.5px;color:var(--sub)}
 
-/* 묶음 */
-.st-sec{padding-top:6px}
-.st-sec-h{margin:16px 0 2px;padding-top:12px;border-top:1px solid var(--line2)}
-.st-sec-h .st-sec-n{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--patina)}
+/* 묶음 머리 */
+.st-sec-h{margin:18px 0 2px;padding-top:12px;border-top:1px solid var(--line2)}
+.st-sec:first-of-type .st-sec-h{margin-top:2px;padding-top:0;border-top:none}
+.st-sec-n{font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--patina)}
 .st-sec-h h4{font-family:var(--serif);font-size:15px;font-weight:700;margin-top:2px}
 .st-sec-h p{font-size:12px;color:var(--sub);margin-top:3px;line-height:1.6}
 
-/* 문항 */
-.st-item{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;
-  padding:9px 0;border-bottom:1px dashed var(--line2);scroll-margin-top:180px}
-.st-item:last-of-type{border-bottom:none}
-.st-item.st-wide{flex-direction:column;gap:8px}
-.st-item .sv-q{font-size:13px;line-height:1.6;flex:1}
-.st-item.st-bad{background:var(--seal-bg);box-shadow:0 0 0 6px var(--seal-bg)}
-.st-item.st-bad .sv-n{color:var(--seal)}
+/* 보기가 긴 문항은 세로로 편다 */
+.sv-item.st-wide{flex-direction:column;align-items:stretch;gap:8px}
 .st-note{display:block;font-style:normal;font-size:11px;color:var(--sub);margin-top:4px}
 
-/* 보기 고르기 */
+/* 하나 고르기 · 모두 고르기 */
 .st-opts{display:flex;flex-wrap:wrap;gap:6px;width:100%}
 .st-opts button{flex:0 1 auto;padding:8px 12px;border:1px solid var(--line);background:#fff;
   font-family:var(--sans);font-size:12.5px;color:var(--ink);cursor:pointer;text-align:left;line-height:1.4}
 .st-opts button:hover{border-color:var(--ink)}
+.st-opts button:focus-visible{outline:2px solid var(--patina);outline-offset:1px}
 .st-opts button.on{background:var(--patina);border-color:var(--patina);color:#fff}
 .st-many button.on{background:var(--patina-bg);border-color:var(--patina);color:var(--patina)}
 
 /* 낱말표 */
 .st-grid{width:100%;border:1px solid var(--line2);background:var(--card2);padding:10px 12px}
 .st-grid-key{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--sub);
-  padding-bottom:8px;margin-bottom:4px;border-bottom:1px dashed var(--line)}
+  padding-bottom:8px;margin-bottom:2px;border-bottom:1px dashed var(--line)}
 .st-grid-key b{font-family:var(--mono);color:var(--ink);margin-right:3px}
 .st-grow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0}
 .st-gw{font-size:13px}
 .st-grid .likert button{width:30px;height:30px;font-size:12px}
 
-/* 제출 */
 .st-jump{background:none;border:none;color:var(--patina);font-family:var(--sans);font-size:12px;
   text-decoration:underline;cursor:pointer;padding:0}
 .st-mini{margin-top:12px}
 
-@media(max-width:560px){
+@media (pointer:coarse){ .st-grid .likert button{width:36px;height:36px} }
+
+@media (max-width:560px){
+  .st-bar{gap:6px 10px}
   .st-bd{display:none}
-  .st-legend span:nth-child(2),.st-legend span:nth-child(3),.st-legend span:nth-child(4){display:none}
-  .st-item{flex-direction:column;gap:8px}
-  .st-item .likert{align-self:flex-end}
+  .st-bar-r{flex:1 1 100%;align-items:stretch}
+  .st-prog{justify-content:space-between}
+  .sv-scale-ticks{margin-left:auto}
   .st-opts button{flex:1 1 100%}
+  .sv-item.st-wide .likert{align-self:auto}
   .st-grow{gap:6px}
   .st-gw{font-size:12px}
+  .st-grid .likert button{width:34px;height:34px}
 }
 `;
 
