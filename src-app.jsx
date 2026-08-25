@@ -3747,8 +3747,10 @@ function FieldEditor({ sec, f, ws, setField }) {
     };
     return (
       <div className="tbl-scroll">
-        <table className="tbl">
-          <thead><tr><th>회차</th><th style={{ width: 92 }}>사용 도구</th><th style={{ minWidth: 240 }}>이번 회차에 넣은 프롬프트 전문</th><th>프롬프트에서 고친 한 가지</th><th style={{ width: 70 }}>산출물 번호</th><th>한 줄 판단</th><th style={{ width: 118 }}>결과 화면</th></tr></thead>
+        {/* 프롬프트 전문 칸이 들어와 열이 일곱이 되었다. .tbl-scroll의 기본 최소 너비(640px)로는
+            뒤쪽 열이 한 글자씩 접히므로 이 표만 따로 넓힌다 — 좁은 화면에서는 가로로 밀린다. */}
+        <table className="tbl" style={{ minWidth: 940 }}>
+          <thead><tr><th style={{ width: 40 }}>회차</th><th style={{ width: 92 }}>사용 도구</th><th style={{ minWidth: 240 }}>이번 회차에 넣은 프롬프트 전문</th><th style={{ width: 150 }}>프롬프트에서 고친 한 가지</th><th style={{ width: 70 }}>산출물 번호</th><th style={{ width: 150 }}>한 줄 판단</th><th style={{ width: 118 }}>결과 화면</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
@@ -4116,14 +4118,16 @@ function FieldReader({ sec, f, ws, owner }) {
     const steps = promptMetrics({ ...(ws || {}), "s5b.rounds": v || [] });
     return (
       <>
-        <table className="tbl" style={{ marginBottom: 6 }}>
-          <thead><tr><th>회차</th><th>도구</th><th style={{ minWidth: 200 }}>프롬프트 전문</th><th>고친 한 가지</th><th>산출물</th><th>한 줄 판단</th><th>결과 화면</th></tr></thead>
+        <div className="tbl-scroll" style={{ marginBottom: 6 }}>
+        <table className="tbl" style={{ minWidth: 860 }}>
+          <thead><tr><th style={{ width: 40 }}>회차</th><th style={{ width: 86 }}>도구</th><th style={{ minWidth: 220 }}>프롬프트 전문</th><th style={{ width: 130 }}>고친 한 가지</th><th style={{ width: 60 }}>산출물</th><th style={{ width: 140 }}>한 줄 판단</th><th style={{ width: 74 }}>결과 화면</th></tr></thead>
           <tbody>{(v || []).map((r, i) => (has(r) ?
             <tr key={i}><td className="rn">{i + 1}</td><td>{r.tool}</td>
               <td style={{ whiteSpace: "pre-wrap", fontSize: 12 }}>{r.prompt || "-"}</td>
               <td>{r.change}</td><td>{r.no}</td><td>{r.judge}</td><td>{r.img ? <MediaThumb owner={owner || OWNER} refId={r.img} alt={i + 1 + "회차"} size={56} /> : "-"}</td></tr> : null))}
           </tbody>
         </table>
+        </div>
         {steps.promptN >= 2 && (
           <p className="hint" style={{ marginBottom: 10 }}>
             프롬프트 {steps.promptN}회
@@ -8838,8 +8842,8 @@ function App() {
     <div className="app">
       <style>{CSS}</style>
       <ContentStyle />
-      <StanceStyle />
       <SurveyStyle />
+      <StanceStyle />
       {view === "gate" && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
         onTeacher={() => setView("teacher")}
