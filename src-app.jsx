@@ -1433,6 +1433,62 @@ function overlapCoef(a, b) {
 
 const simText = (x, y) => jaccard(gramSet(x), gramSet(y));
 
+/* ---------- 어휘 다양성 ----------
+   "이 학생만 쓴 낱말 수"(hapax)는 글이 길수록 커진다. 짧은 글에서는 어휘가 아니라 길이를 재므로
+   주 지표로 쓸 수 없다. 길이에 견고한 두 지표를 함께 낸다.
+   MATTR — 토큰 50개 창을 한 칸씩 밀며 잰 TTR의 평균.
+   HD-D  — 토큰 42개를 무작위로 뽑았을 때 각 낱말이 한 번이라도 나올 확률의 합을 42로 나눈 값.
+   둘 다 최소 토큰 수를 넘겨야 계산된다. 넘기지 못하면 null을 돌려주고 tokens_n을 함께 내보내
+   분석에서 사전 등록한 포함 기준을 적용할 수 있게 한다. */
+const MATTR_WIN = 50;
+const HDD_SAMPLE = 42;
+
+/* 어절을 조사·어미까지 떼어 낸 토큰 열 (집합이 아니라 순서 있는 열 — 창을 밀어야 하므로) */
+const tokList = (s) => normText(s).split(" ").filter(Boolean).map(stemKo);
+
+function mattr(tokens, win) {
+  const W = win || MATTR_WIN;
+  const n = tokens.length;
+  if (n < W) return null;
+  const cnt = new Map();
+  let types = 0, sum = 0, windows = 0;
+  const add = (t) => { const c = cnt.get(t) || 0; cnt.set(t, c + 1); if (c === 0) types++; };
+  const del = (t) => { const c = cnt.get(t); if (c === 1) { cnt.delete(t); types--; } else cnt.set(t, c - 1); };
+  for (let i = 0; i < W; i++) add(tokens[i]);
+  sum += types / W; windows++;
+  for (let i = W; i < n; i++) { add(tokens[i]); del(tokens[i - W]); sum += types / W; windows++; }
+  return Math.round((sum / windows) * 100);
+}
+
+/* 로그 감마 (Lanczos) — 큰 조합을 로그 공간에서 계산해 넘침을 피한다 */
+const LG_C = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+  -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+function lnGamma(x) {
+  let y = x, tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) ser += LG_C[j] / ++y;
+  return -tmp + Math.log(2.5066282746310005 * ser / x);
+}
+const lnChoose = (n, k) => (k < 0 || k > n ? -Infinity : lnGamma(n + 1) - lnGamma(k + 1) - lnGamma(n - k + 1));
+
+function hdd(tokens, sample) {
+  const S = sample || HDD_SAMPLE;
+  const N = tokens.length;
+  if (N < S) return null;
+  const cnt = new Map();
+  tokens.forEach((t) => cnt.set(t, (cnt.get(t) || 0) + 1));
+  const lnAll = lnChoose(N, S);
+  let sum = 0;
+  cnt.forEach((c) => {
+    // 그 낱말이 표본에 한 번도 안 나올 확률
+    const lnAbsent = lnChoose(N - c, S);
+    const pPresent = 1 - (lnAbsent === -Infinity ? 0 : Math.exp(lnAbsent - lnAll));
+    sum += pPresent;
+  });
+  return Math.round((sum / S) * 100);
+}
+
 /* 글의 뼈대 — 어휘가 달라도 구조가 같은 경우를 잡는다.
    학생은 AI 글을 그대로 내지 않고 고쳐서 낸다. 그러면 낱말은 바뀌지만
    문장 수 · 나열 표지 · 연결어의 배치는 남는다. 내용 유사도는 이것을 놓친다. */
@@ -1598,6 +1654,37 @@ const median = (arr) => {
    _paste 한 건 = { k 필드, at 시각, n 붙인 글자 수, head 앞 120자, base 붙이기 직전 그 칸의 길이,
                     src 학생이 고른 출처, settle 붙인 뒤 마지막으로 손댈 때까지의 초 }
    클립보드 전문은 저장하지 않는다. head 120자는 최종문에 얼마나 살아남았는지를 재기 위한 최소량이다. */
+
+/* ---------- 연구 참여 동의 ----------
+   포괄 동의 한 장이 아니라 항목마다 따로 받는다 (개인정보보호법 제22조 제1항).
+   항목을 이렇게 나눈 까닭: 수업 산출물은 정규 평가 자료의 2차 이용으로 설명되지만,
+   붙여넣기 기록과 활동 로그는 그 근거로 정당화되지 않아 별도 동의가 필요하다.
+   동의하지 않은 항목은 내려받는 자료에서 그 학생의 해당 열만 비운다 —
+   한 항목을 거부했다고 참여 전체가 빠지면 자료를 잃고, 학생에게도 불리하다. */
+const CONSENT_ITEMS = [
+  { k: "rec", label: "기록지 서술", desc: "학습지에 쓴 문장과 표 입력값", need: "수업 산출물" },
+  { k: "paste", label: "붙여넣기 기록", desc: "가져온 문장의 앞 120자·분량·출처 표시", need: "별도 근거 필요" },
+  { k: "prompt", label: "프롬프트 전문", desc: "생성 회차마다 실제로 넣은 문장", need: "수업 산출물" },
+  { k: "log", label: "활동 흔적", desc: "머문 시간·고쳐 쓴 이력", need: "별도 근거 필요" },
+  { k: "survey", label: "사전·사후 설문", desc: "창의성 인식 24문항과 성향 문항", need: "별도 근거 필요" },
+  { k: "media", label: "사진·음성·영상", desc: "관찰 사진·현장 소리·스케치·전시 영상", need: "별도 근거 필요" },
+];
+const CONSENT_KEYS = CONSENT_ITEMS.map((x) => x.k);
+
+/* 옛 표기("동의"/"제외" 문자열 하나)를 항목별 표로 바꾼다 */
+function consentOf(raw) {
+  if (raw && typeof raw === "object") return raw;
+  const all = raw === "동의";
+  const none = raw === "제외";
+  if (!all && !none) return {};
+  const m = {};
+  CONSENT_KEYS.forEach((k) => { m[k] = all; });
+  return m;
+}
+const consentAgreed = (raw, k) => consentOf(raw)[k] === true;
+/* 아무 항목에도 동의하지 않았으면 분석 대상이 아니다 */
+const consentAny = (raw) => CONSENT_KEYS.some((k) => consentOf(raw)[k] === true);
+const consentCount = (raw) => CONSENT_KEYS.filter((k) => consentOf(raw)[k] === true).length;
 
 const PASTE_SRC = ["AI", "내가 앞서 쓴 글", "자료", "친구"];
 const PASTE_MIN = 20; // 낱말 몇 개짜리 붙여넣기는 기록하지 않는다
@@ -1828,7 +1915,7 @@ function promptMetrics(ws) {
 
 /* ---------- 학급 동질화 ----------
    "이 학생의 답이 얼마나 비슷한가"는 그 학생만 봐서는 계산되지 않는다. 반드시 학급 전체가 규준이다.
-   학생 수준(peerSim·nnSim·structSim·hapax)과 학급 수준(lexPool·엔트로피)은 다른 질문이고
+   학생 수준(peerSim·nnSim·structSim·MATTR)과 학급 수준(lexPool·엔트로피)은 다른 질문이고
    결론이 엇갈릴 수 있다 — 엇갈리는 것 자체가 결과다. */
 function similarityAll(wsMap) {
   const ids = Object.keys(wsMap || {});
@@ -1863,12 +1950,15 @@ function similarityAll(wsMap) {
     return b && b.has(normText(raw)) ? "" : raw;
   };
 
+  const lex = {};
   ids.forEach((id) => {
     const parts = fields.map((k) => own(id, k)).filter((x) => x.trim().length > 0);
     const blob = parts.join("\n");
     sk[id] = gramSketch(blob);
     size[id] = sk[id].length;
     toks[id] = tokSet(blob);
+    const tl = tokList(blob);
+    lex[id] = { tokensN: tl.length, mattr: mattr(tl), hdd: hdd(tl) };
     const sg = new Set();
     fields.forEach((k, i) => { for (const x of structSig(own(id, k), "f" + i + ":")) sg.add(x); });
     sigs[id] = sg;
@@ -1880,7 +1970,10 @@ function similarityAll(wsMap) {
   const per = {};
   ids.forEach((id) => {
     const empty = size[id] === 0;
-    if (N < 2 || empty) { per[id] = { peerSim: null, nnSim: null, nnId: null, structSim: null, hapax: empty ? null : 0 }; return; }
+    if (N < 2 || empty) {
+      per[id] = { peerSim: null, nnSim: null, nnId: null, structSim: null, hapax: empty ? null : 0, ...lex[id] };
+      return;
+    }
     let sum = 0, cnt = 0, mx = -1, mxId = null, ss = 0, sc = 0;
     ids.forEach((o) => {
       if (o === id || size[o] === 0) return;
@@ -1896,7 +1989,8 @@ function similarityAll(wsMap) {
       nnSim: cnt ? Math.round(mx * 100) : null,
       nnId: cnt ? mxId : null,
       structSim: sc ? Math.round((ss / sc) * 100) : null,
-      hapax: hap,
+      hapax: hap,          // 길이 편향이 있어 보조 지표로만 쓴다
+      ...lex[id],          // tokensN · mattr · hdd
     };
   });
 
@@ -6000,8 +6094,8 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
           <AxisStripRow axis={{ key: "structSim", name: "구조 유사도", desc: "낱말이 달라도 문장 수·나열 표지·연결어의 뼈대가 같은 정도" }}
             rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).structSim }))}
             hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
-          <AxisStripRow axis={{ key: "hapax", name: "나만 쓴 낱말", desc: "학급 전체에서 이 학생만 사용한 어휘의 수 (0~40개를 눈금으로)" }} first
-            rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).hapax == null ? null : Math.min(100, Math.round(((simAll.per[r.id] || {}).hapax / 40) * 100)) }))}
+          <AxisStripRow axis={{ key: "mattr", name: "어휘 다양성", desc: "토큰 50개 창을 밀며 잰 TTR의 평균(MATTR). 글 길이에 견고해 '나만 쓴 낱말 수'보다 신뢰할 수 있다. 토큰 50개를 못 채우면 계산하지 않는다" }} first
+            rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).mattr }))}
             hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
           <p className="hint" style={{ marginTop: 8 }}>
             <b>구조 유사도를 함께 보는 이유</b> — 학생은 가져온 글을 그대로 내지 않고 고쳐서 냅니다. 그러면 낱말은 바뀌지만 뼈대는 남습니다.
@@ -6970,7 +7064,11 @@ const RESEARCH_VARS = [
   { k: "peer_sim", name: "학급 평균 유사도", unit: "%", def: "내 서술과 나머지 학생 서술의 3-gram 유사도 평균", get: (c) => c.sim.peerSim },
   { k: "nn_sim", name: "최근접 유사도", unit: "%", def: "가장 비슷한 한 명과의 유사도", get: (c) => c.sim.nnSim },
   { k: "struct_sim", name: "구조 유사도", unit: "%", def: "문장 수·나열 표지·연결어의 뼈대가 학급과 얼마나 겹치는가", get: (c) => c.sim.structSim },
-  { k: "hapax", name: "나만 쓴 낱말", unit: "개", def: "학급 전체에서 이 학생만 사용한 어휘의 수", get: (c) => c.sim.hapax },
+  { k: "mattr", name: "어휘 다양성 MATTR", unit: "0–100", def: "토큰 " + MATTR_WIN + "개 창을 한 칸씩 밀며 잰 TTR의 평균. 글 길이에 견고하다. 토큰이 " + MATTR_WIN + "개 미만이면 빈칸", get: (c) => c.sim.mattr },
+  { k: "hdd", name: "어휘 다양성 HD-D", unit: "0–100", def: "토큰 " + HDD_SAMPLE + "개를 뽑았을 때 각 낱말이 한 번이라도 나올 확률의 합 ÷ " + HDD_SAMPLE + ". 토큰이 " + HDD_SAMPLE + "개 미만이면 빈칸", get: (c) => c.sim.hdd },
+  { k: "tokens_n", name: "서술 토큰 수", unit: "개", def: "서술 칸 전체의 어절 토큰 수(조사·어미 제거 후). 어휘 다양성 지표의 포함 기준 판정에 쓴다", get: (c) => c.sim.tokensN },
+  /* hapax는 글이 길수록 커져 짧은 글에서는 어휘가 아니라 길이를 잰다 — 보조로만 둔다 */
+  { k: "hapax", name: "나만 쓴 낱말 (보조)", unit: "개", def: "학급 전체에서 이 학생만 사용한 어휘의 수. 길이 편향이 있어 주 지표로 쓰지 않으며 tokens_n과 함께 볼 때에만 해석한다", get: (c) => c.sim.hapax },
 ];
 
 /* 사전·사후 대응 자료 */
@@ -7009,9 +7107,25 @@ function researchCases(ids, roster, wsMap, gradeMap, surveyMap, consentMap) {
   });
 }
 
+/* 변수마다 어느 동의 항목에 기대는가. 적혀 있지 않은 변수는 기록지 서술("rec")에서 나온다. */
+const VAR_NEED = {
+  paste_n: "paste", paste_chars: "paste", src_ratio: "paste", src_ratio_ai: "paste",
+  approp: "paste", paste_settle: "paste", paste_src_ai: "paste", paste_src_named: "paste", ai_type: "paste",
+  prompt_n: "prompt", prompt_growth: "prompt", prompt_step: "prompt", prompt_even: "prompt", plan_gap: "prompt",
+  edit_n: "log", dwell_min: "log", read_min: "log",
+  rewrite_depth: "log", rewrite_deep_n: "log", trace_pruned: "log",
+  survey_pre: "survey", survey_post: "survey",
+  media_n: "media", cr_multimodal: "media",
+};
+
+/* 동의하지 않은 항목의 값은 빈칸으로 나간다.
+   참여 자체를 빼는 대신 열만 비우는 이유 — 한 항목을 거부한 학생의 나머지 기록까지
+   버리면 자료를 잃고, 학생에게도 자기 기록이 통째로 사라지는 일이 된다. */
 const varVal = (c, k) => {
   const v = RESEARCH_VARS.find((x) => x.k === k);
   if (!v) return null;
+  const need = VAR_NEED[k] || "rec";
+  if (c && c.consent !== undefined && !consentAgreed(c.consent, need)) return null;
   const out = v.get(c);
   return out === undefined ? null : out;
 };
@@ -7045,15 +7159,27 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     store.get("research:consent").then((v) => { if (alive && v && typeof v === "object") setConsentMap(v); });
     return () => { alive = false; };
   }, [sampleMode]);
-  const setConsent = async (sid, val) => {
-    if (sampleMode) return;
-    const next = { ...consentMap };
-    if (val) next[sid] = val; else delete next[sid];
+  const saveConsent = async (next) => {
+    const prev = consentMap;
     setConsentMap(next);
     setConsentBusy(true);
     const ok = await store.set("research:consent", next);
     setConsentBusy(false);
-    if (!ok) { setConsentMap(consentMap); alert("동의 표시를 저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요."); }
+    if (!ok) { setConsentMap(prev); alert("동의 표시를 저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요."); }
+  };
+  /* 항목 하나를 켜고 끈다 */
+  const toggleConsent = (sid, k) => {
+    if (sampleMode) return;
+    const cur = consentOf(consentMap[sid]);
+    const next = { ...consentMap, [sid]: { ...cur, [k]: !cur[k] } };
+    saveConsent(next);
+  };
+  /* 한 학생의 여섯 항목을 한꺼번에 */
+  const setAllConsent = (sid, on) => {
+    if (sampleMode) return;
+    const m = {};
+    CONSENT_KEYS.forEach((k) => { m[k] = on; });
+    saveConsent({ ...consentMap, [sid]: m });
   };
   const [dropExcluded, setDropExcluded] = useState(true);
 
@@ -7062,9 +7188,13 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
      그리고 유형을 가르는 전유율 중앙값을 만든다 — 남은 학생의 값이 빠진 학생에게 좌우된다.
      동의 대장을 둔 취지가 바로 그것을 막는 데 있으므로 규준 자체에서 빼야 한다.
      익명 번호도 분석 대상에게만 붙인다. */
-  const excluded = ids.filter((id) => (consentMap || {})[id] === "제외").length;
+  /* 기록지 서술에 동의하지 않은 학생은 분석 집합에서 뺀다 — 그 학생의 글이 빠져야
+     학급 어휘 풀·유사도 평균·유형 중앙값이 동의한 학생만으로 만들어진다.
+     나머지 다섯 항목은 참여는 하되 그 열만 비우므로 여기서 빼지 않는다. */
+  const excluded = ids.filter((id) => !consentAgreed((consentMap || {})[id], "rec")).length;
+  const partial = ids.filter((id) => { const n = consentCount((consentMap || {})[id]); return n > 0 && n < CONSENT_KEYS.length; }).length;
   const analysisIds = useMemo(
-    () => (dropExcluded ? ids.filter((id) => (consentMap || {})[id] !== "제외") : ids),
+    () => (dropExcluded ? ids.filter((id) => consentAgreed((consentMap || {})[id], "rec")) : ids),
     [ids, consentMap, dropExcluded]);
 
   /* researchCases는 학급 전체의 유사도와 유형을 함께 계산한다 (창의성 탭과 같은 비용).
@@ -7081,7 +7211,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
   const pairStats = RESEARCH_PAIRS.map((p) => ({
     p, st: prePostStats(cases.map((c) => varVal(c, p.pre)), cases.map((c) => varVal(c, p.post))),
   }));
-  const pasteTotal = cases.reduce((a, c) => a + c.pm.pasteN, 0);
+  const pasteTotal = cases.reduce((a, c) => a + (consentAgreed(c.consent, "paste") ? c.pm.pasteN : 0), 0);
   const stamp = fileStamp();
   const tag = sampleMode ? "_표본" : "";
   const sampleWarn = sampleMode
@@ -7105,6 +7235,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       "survive_pct", "approp_pct", "head_text"];
     const rows = [];
     cases.forEach((c) => {
+      if (!consentAgreed(c.consent, "paste")) return;   // 붙여넣기 항목에 동의한 학생만
       pasteRows(c.ws).forEach((r) => {
         rows.push([c.pid, r.no, r.at, r.session, r.code, r.key, r.where,
           r.chars, r.base, r.finalLen, r.src, r.settle == null ? "" : r.settle,
@@ -7423,6 +7554,15 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 관찰 사진·현장 소리·스케치·전시 영상 등 멀티모달 자료의 건수");
     L.push("- 창의성 인식 설문(사전·사후, 5점 리커트)과 루브릭 등급");
     L.push("");
+    {
+      const full = cases.filter((c) => consentCount(c.consent) === CONSENT_KEYS.length).length;
+      const some = cases.filter((c) => { const n = consentCount(c.consent); return n > 0 && n < CONSENT_KEYS.length; }).length;
+      L.push("");
+      L.push("동의는 포괄 서식 한 장이 아니라 " + CONSENT_KEYS.length + "개 항목으로 나누어 받았다(" +
+        CONSENT_ITEMS.map((x) => x.label).join(" · ") + "). 기록지 서술과 프롬프트 전문은 정규 평가 산출물의 2차 이용으로 설명되지만, 붙여넣기 기록·활동 흔적·설문·매체 자료는 그 근거로 정당화되지 않아 별도의 동의 항목으로 분리하였다. " +
+        "전 항목에 동의한 참여자는 " + full + "명, 일부 항목에만 동의한 참여자는 " + some + "명이며, 동의하지 않은 항목의 변수는 해당 참여자에 한해 결측으로 처리하였다. 항목별 동의 여부가 참여자의 성적이나 수업 활동에 영향을 주지 않음을 사전에 고지하였다. 「연구자 서술 — 동의 절차와 고지 문안」");
+      L.push("");
+    }
     L.push("붙여넣기는 차단하지 않고 기록했다. 이 단원이 발산을 생성형 도구에, 수렴과 전유를 학생에 두는 구조이므로 외부 텍스트를 가져오는 행위는 금지 대상이 아니라 관찰 대상이며, 기술적으로도 우클릭 차단은 붙여넣기를 막지 못한 채 보조기기 사용만 제한한다. 수집 사실과 그 범위는 사전에 고지하였다. 「연구자 서술 — 동의 절차와 고지 문안」");
     L.push("");
     L.push("### 2.4 측정 도구");
@@ -7436,10 +7576,16 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("생성형 도구의 사용 방식은 사용량과 전유 정도를 나누어 재었다. 전유율은 붙여넣은 문장의 앞 120자를 문자 3-gram으로 바꾼 뒤 그 학생의 최종 서술문에 남아 있는 비율을 구해 1에서 뺀 값이다. 한국어 어절은 조사·어미 때문에 같은 말이 다른 토큰이 되므로, 학급 대조에는 흔한 조사·어미를 잘라 낸 어절 토큰을, 두 글의 직접 비교에는 문자 3-gram을 사용하였다. 「연구자 서술 — 형태소 분석기를 쓰지 않은 이유와 그 한계」");
     L.push("");
     L.push(mdHead(["변수", "단위", "조작적 정의"]));
-    ["paste_n", "src_ratio", "approp", "paste_settle", "paste_src_ai", "ai_type", "rewrite_depth", "rewrite_deep_n", "prompt_n", "prompt_growth", "prompt_step", "prompt_even", "plan_gap", "peer_sim", "nn_sim", "struct_sim", "hapax"]
+    ["paste_n", "src_ratio", "approp", "paste_settle", "paste_src_ai", "ai_type", "rewrite_depth", "rewrite_deep_n", "prompt_n", "prompt_growth", "prompt_step", "prompt_even", "plan_gap", "peer_sim", "nn_sim", "struct_sim", "mattr", "hdd", "tokens_n", "hapax"]
       .forEach((k) => { const v = RESEARCH_VARS.find((x) => x.k === k); if (v) L.push(mdRow([v.name + " (" + v.k + ")", v.unit, v.def])); });
     L.push("");
-    L.push("구조 유사도를 내용 유사도와 따로 둔 까닭은, 학생이 가져온 글을 그대로 제출하지 않고 고쳐 쓰는 경우 어휘는 달라지지만 문장 수·나열 표지·연결어의 배치는 남기 때문이다. 내용 유사도만 보면 이 경우를 놓친다.");
+    L.push("구조 유사도를 내용 유사도와 따로 둔 까닭은, 학생이 가져온 글을 그대로 제출하지 않고 고쳐 쓰는 경우 어휘는 달라지지만 문장 수·나열 표지·연결어의 배치는 남기 때문이다. 내용 유사도만 보면 이 경우를 놓친다. 다만 본 연구의 구조 유사도는 문장 수·나열 표지·연결어·문말 어미의 일치를 세는 표층 지표이며, 품사 태그열의 압축비로 구조 다양성을 재는 방식과는 다르다. 후자는 형태소 분석을 전제하므로 수집 도구 안에서 계산하지 않고 별도 처리 단계로 남긴다. 「연구자 서술 — 구조 다양성 지표의 선택과 그 한계」");
+    L.push("");
+    L.push("어휘 다양성은 MATTR(창 " + MATTR_WIN + ")과 HD-D(표본 " + HDD_SAMPLE + ")로 잰다. 두 지표 모두 글의 길이에 견고하다. 참여자별 토큰 수(tokens_n)를 함께 보고하며, 창 또는 표본 크기에 미치지 못하는 참여자는 해당 지표를 결측으로 둔다. 최소 토큰 수에 따른 포함 기준은 분석 전에 정한다. 「연구자 서술 — 사전 등록한 포함 기준」");
+    L.push("");
+    L.push("특정 참여자만 사용한 어휘의 수(hapax)는 글이 길수록 커져 짧은 글에서는 어휘의 다양성이 아니라 분량을 재게 되므로 주 지표로 쓰지 않고, 토큰 수와 함께 볼 때에만 보조적으로 해석한다.");
+    L.push("");
+    L.push("토큰화는 형태소 분석기를 쓰지 않고 어절 끝의 흔한 조사·어미를 규칙으로 잘라 내는 방식이다. 형태소 분석기와 품사 필터를 적용한 값과는 직접 비교할 수 없으므로, 다른 연구의 수치와 나란히 놓지 않는다.");
     L.push("");
     L.push("학급 내 유사도는 참여자 " + N + "명의 모든 쌍을 견주므로 비교 횟수가 참여자 수의 제곱에 비례한다. 글 전체의 3-gram을 그대로 대조하면 계산량이 감당하기 어려워지므로, 각 참여자의 3-gram 가운데 해시값이 작은 " + SKETCH_K + "개를 뽑아 만든 축약본 위에서 자카드를 산출하였다(k-최소값 추정). 같은 3-gram은 언제나 같은 해시를 가지므로 두 참여자에게서 같은 조각이 함께 뽑히며, 축약본을 다 채우지 못할 만큼 글이 짧은 경우에는 전체를 대조한 값과 일치한다. 앞부분만 잘라 비교하는 방식은 뒤쪽 차시의 서술이 통째로 빠지므로 사용하지 않았다.");
     L.push("");
@@ -7479,7 +7625,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
         AI_TYPES.map((t) => t + " " + tCount(t) + "명").join(" · ") + "이며, 유형은 학급 전유율 중앙값을 기준으로 가른 상대 구분이다.");
       L.push("");
       L.push(mdHead(["지표", "평균", "표준편차", "중앙값", "최소", "최대", "n"]));
-      ["paste_n", "src_ratio", "approp", "paste_settle", "rewrite_depth", "peer_sim", "nn_sim", "struct_sim", "hapax"].forEach((k) => {
+      ["paste_n", "src_ratio", "approp", "paste_settle", "rewrite_depth", "peer_sim", "nn_sim", "struct_sim", "mattr", "hdd", "tokens_n"].forEach((k) => {
         const v = RESEARCH_VARS.find((x) => x.k === k);
         if (!v) return;
         const d0 = describe(cases, v);
@@ -7668,23 +7814,38 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
           </p>
           <div className="tbl-scroll" style={{ maxHeight: 240, overflow: "auto" }}>
             <table className="stat-tbl">
-              <thead><tr><th>익명 번호</th><th>학번</th><th>별명</th><th>기록률</th><th>도달 계단</th><th style={{ width: 140 }}>연구 참여</th></tr></thead>
+              <thead><tr>
+                <th style={{ width: 56 }}>익명</th><th style={{ width: 66 }}>학번</th><th style={{ width: 96 }}>별명</th>
+                {CONSENT_ITEMS.map((it) => (
+                  <th key={it.k} style={{ width: 74, textAlign: "center" }} title={it.desc + " — " + it.need}>{it.label}</th>
+                ))}
+                <th style={{ width: 74, textAlign: "center" }}>모두</th>
+              </tr></thead>
               <tbody>
                 {ids.map((id) => {
-                  const w = wsMap[id] || {};
-                  const cs = (consentMap || {})[id] || "";
+                  const raw = (consentMap || {})[id];
+                  const n = consentCount(raw);
                   const pid = pidOf.get(id);
                   return (
-                    <tr key={id} style={cs === "제외" ? { opacity: 0.5 } : {}}>
+                    <tr key={id} style={n === 0 ? { opacity: 0.55 } : {}}>
                       <td className="mono">{pid || "—"}</td><td className="mono">{id}</td>
                       <td style={{ textAlign: "left" }}>{(roster[id] || {}).nick || ""}</td>
-                      <td className="mono">{overallProgress(w)}%</td><td className="mono">{translationMetrics(w).depth}/9</td>
-                      <td>
+                      {CONSENT_ITEMS.map((it) => {
+                        const on = consentAgreed(raw, it.k);
+                        return (
+                          <td key={it.k} style={{ textAlign: "center" }}>
+                            <button className={"btn small " + (on ? "" : "ghost")} disabled={sampleMode || consentBusy}
+                              style={on ? { borderColor: "var(--patina)", color: "var(--patina)" } : { color: "var(--sub)" }}
+                              onClick={() => toggleConsent(id, it.k)} title={it.label + " — " + (on ? "동의함" : "동의 없음")}>
+                              {on ? "동의" : "—"}
+                            </button>
+                          </td>
+                        );
+                      })}
+                      <td style={{ textAlign: "center" }}>
                         <div className="seg">
-                          <button className={cs === "동의" ? "on-ok" : ""} disabled={sampleMode || consentBusy}
-                            onClick={() => setConsent(id, cs === "동의" ? "" : "동의")}>동의</button>
-                          <button className={cs === "제외" ? "on-no" : ""} disabled={sampleMode || consentBusy}
-                            onClick={() => setConsent(id, cs === "제외" ? "" : "제외")}>제외</button>
+                          <button disabled={sampleMode || consentBusy} onClick={() => setAllConsent(id, true)}>전부</button>
+                          <button disabled={sampleMode || consentBusy} onClick={() => setAllConsent(id, false)}>해제</button>
                         </div>
                       </td>
                     </tr>
@@ -7693,17 +7854,31 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
               </tbody>
             </table>
           </div>
+          {N === 0 && dropExcluded && (
+            <div className="warn-note" style={{ marginTop: 10 }}>
+              <b>아직 동의를 표시한 학생이 없어 분석 대상이 0명입니다.</b> 표시하지 않은 것은 동의하지 않은 것으로 봅니다 —
+              침묵을 동의로 간주할 수 없기 때문입니다. 종이 동의서를 받은 대로 위 표에 옮겨 주세요.
+              화면 구성을 먼저 둘러보려면 아래 체크를 잠시 해제하면 됩니다. 그 상태로 내려받은 자료는 연구에 쓸 수 없습니다.
+            </div>
+          )}
           <p className="hint" style={{ marginTop: 8 }}>
-            <b>제외로 표시한 학생도 수업은 그대로 합니다.</b> 이 앱은 수업 도구이므로 연구 참여를 거부한 것이 수업에서 빠지는 것이 되어서는 안 됩니다.
-            표시가 비어 있는 학생은 아직 확인하지 않은 것으로 보고 함께 포함됩니다.
+            <b>항목마다 따로 받습니다.</b> 포괄 동의 한 장은 개인정보보호법 제22조 제1항이 요구하는 분리 동의를 충족하지 못합니다.
+            특히 <b>붙여넣기 기록·활동 흔적·설문·매체</b>는 수업 산출물의 2차 이용으로 설명되지 않아 별도 근거가 필요한 항목입니다.
+          </p>
+          <p className="hint" style={{ marginTop: 4 }}>
+            동의하지 않은 항목은 <b>그 학생의 해당 열만 빈칸으로</b> 나갑니다. 한 항목을 거부했다고 참여 전체를 빼면
+            자료도 잃고 학생에게도 자기 기록이 통째로 사라지는 일이 됩니다.
+            <b> 표시가 없는 학생도 수업은 그대로 합니다.</b>
           </p>
           <label className="hint" style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
             <input type="checkbox" checked={dropExcluded} onChange={(e) => setDropExcluded(e.target.checked)} />
-            제외로 표시한 학생을 분석에서 뺍니다
-            {excluded > 0 && <b style={{ color: "var(--seal)" }}>— 지금 {excluded}명, 분석 대상 {N}명</b>}
+            기록지 서술에 동의하지 않은 학생을 분석에서 뺍니다
+            <b style={{ color: excluded ? "var(--seal)" : "var(--sub)" }}>
+              — 미동의 {excluded}명{partial > 0 ? " · 일부만 동의 " + partial + "명" : ""} · 분석 대상 {N}명
+            </b>
           </label>
           <p className="hint" style={{ marginTop: 4 }}>
-            제외한 학생은 행만 빠지는 것이 아니라 <b>학급 규준에서도 빠집니다.</b> 학급 어휘 풀·유사도 평균·유형을 가르는
+            기록지 서술에 동의하지 않은 학생은 행만 빠지는 것이 아니라 <b>학급 규준에서도 빠집니다.</b> 학급 어휘 풀·유사도 평균·유형을 가르는
             전유율 중앙값이 모두 분석 대상 {N}명으로만 계산되므로, 남은 학생의 값이 빠진 학생의 글에 좌우되지 않습니다.
             익명 번호도 분석 대상에게만 붙으며, 표시를 바꾸면 번호가 다시 매겨집니다.
           </p>
