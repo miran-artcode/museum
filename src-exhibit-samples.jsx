@@ -183,7 +183,7 @@ export function ExhibitSamples({ showPlate }) {
 .exs-head p{color:var(--sub);font-size:12.5px;max-width:620px;margin:0 auto}
 .work.exs-work{border-top:3px solid var(--seal)}
 .work.exs-work .work-img{aspect-ratio:1024/559}
-.exs-mark{background:var(--seal);color:#fff;font-size:12.5px;font-weight:700;text-align:center;padding:7px 10px;letter-spacing:.05em}
+.exs-mark{display:inline-block;margin:8px 14px 0;border:1px solid var(--seal);color:var(--seal);font-size:11px;font-weight:700;padding:2px 8px;letter-spacing:.04em}
 .exs-meta{margin:0 14px 10px;font-size:11.5px;color:var(--sub);font-family:var(--mono)}
 .exs-tail{margin:22px auto 0;border-top:1px dashed var(--line);max-width:620px;padding-top:10px;text-align:center;color:var(--sub);font-size:12px}
       `}</style>
@@ -200,7 +200,7 @@ export function ExhibitSamples({ showPlate }) {
         {EXHIBIT_SAMPLES.map((w) => (
           <div className="work exs-work" key={w.id}>
             <div className="work-img"><SampleImg id={w.id} alt={"예시 작품 " + w.no} /></div>
-            <div className="exs-mark">생성형 AI로 제작한 예시 이미지 — 실제 학생 작품이 아닙니다</div>
+            <div><span className="exs-mark">예시 — 실제 학생 작품 아님</span></div>
             <div className="work-no">{w.no}</div>
             <div className="work-title">{showPlate ? "「" + w.title + "」" : "무제 (2차 관람에서 공개)"}</div>
             {showPlate ? (

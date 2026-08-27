@@ -61,7 +61,7 @@ export function GateHeader({ onEnter, onUnits, onTeacher, onGallery, onDemo }) {
         </nav>
       </div>
       <div className="g4-masthead">
-        <button className="g4-logo" onClick={onUnits} aria-label="허구의 아카이브 — 처음으로">
+        <button className="g4-logo" onClick={onUnits} aria-label="허구의 아카이브 — 수업 소개로 이동">
           <span>FICTIVE</span>
           <span>ARCHIVE</span>
           <span className="g4-logo-kr">허구의 아카이브 · 창작 과정 기록실</span>
@@ -100,7 +100,7 @@ export function GateSections({ onEnter }) {
               </div>
               <h3>{s.title}</h3>
               <p>{s.body}</p>
-              <button className="g4-arrow" onClick={onEnter} aria-label={s.title + " — 기록실 입장으로 이동"}>→</button>
+              <button className="g4-arrow" onClick={onEnter} aria-label={s.title + " — 기록실 입장으로 이동"}>입장 →</button>
             </div>
           </article>
         ))}
@@ -121,7 +121,7 @@ export const GATE_CSS = `
 .g4-strip{border-bottom:1px solid #e6e6e6}
 .g4-strip-nav{max-width:1280px;margin:0 auto;padding:8px 20px;display:flex;justify-content:flex-end;gap:22px}
 .g4-strip-nav button{background:none;border:none;cursor:pointer;color:#555;
-  font-family:'Archivo','Noto Sans KR',sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;padding:2px 0}
+  font-family:'Archivo','Noto Sans KR',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;padding:8px 0}
 .g4-strip-nav button:hover{color:#000}
 .g4-strip-join{color:#000 !important;border-bottom:2px solid #000 !important}
 
@@ -135,23 +135,26 @@ export const GATE_CSS = `
   margin-top:10px;color:#666;text-transform:none;font-family:'Noto Sans KR',sans-serif}
 .g4-mainnav{display:flex;gap:26px;flex-wrap:wrap;padding-bottom:6px}
 .g4-mainnav button{background:none;border:none;cursor:pointer;color:#111;
-  font-size:15px;font-weight:500;letter-spacing:.01em;padding:2px 0;border-bottom:2px solid transparent}
+  font-size:15px;font-weight:500;letter-spacing:.01em;padding:8px 0;border-bottom:2px solid transparent}
 .g4-mainnav button:hover{border-bottom-color:#000}
 
 /* 본문 2단 — 왼쪽 네 개의 장, 오른쪽 입장 패널 (데스크톱) */
 .g4-main{max-width:1280px;margin:0 auto;padding:0 20px;
   display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:0 34px;align-items:start}
-@media(max-width:1100px){.g4-main{grid-template-columns:1fr}}
+@media(max-width:1100px){
+  .g4-main{grid-template-columns:1fr;display:flex;flex-direction:column}
+  .g4-main .g4-enter{order:-1} /* 폰에서 도판 4장을 다 지나야 입장칸이 나오던 문제 — 입장 패널을 맨 위로 */
+}
 
 /* 장 구분 캡션 줄 */
 .g4-units-cap{padding:10px 0;
   display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
   border-top:1px solid #e6e6e6;border-bottom:1px solid #e6e6e6;
-  font-family:'Archivo','Noto Sans KR',sans-serif;font-size:10px;font-weight:500;letter-spacing:.16em;color:#888}
+  font-family:'Archivo','Noto Sans KR',sans-serif;font-size:11px;font-weight:500;letter-spacing:.14em;color:#666}
 
 /* 4열 그리드 */
 .g4-grid{padding:22px 0 10px;
-  display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px}
 .g4-col-img{aspect-ratio:3/4.4;overflow:hidden;background:#f2f2f2}
 .g4-col-img img{width:100%;height:100%;object-fit:cover;display:block;
   transition:transform .6s ease}
@@ -160,15 +163,12 @@ export const GATE_CSS = `
 .g4-no{font-family:'Archivo',sans-serif;font-size:clamp(40px,4.5vw,56px);font-weight:900;line-height:1;letter-spacing:-.02em}
 .g4-col-meta{display:flex;gap:10px;align-items:baseline;margin:10px 0 6px}
 .g4-sess{font-size:11px;font-weight:700;color:#111;background:#f0f0f0;padding:2px 7px}
-.g4-en{font-family:'Archivo',sans-serif;font-size:10px;font-weight:700;letter-spacing:.2em;color:#999}
+.g4-en{font-family:'Archivo',sans-serif;font-size:11px;font-weight:700;letter-spacing:.16em;color:#666}
 .g4-col-txt h3{font-size:17px;font-weight:700;line-height:1.35;margin-bottom:6px}
 .g4-col-txt p{font-size:12.5px;line-height:1.75;color:#555}
 .g4-arrow{position:absolute;right:0;bottom:0;background:none;border:none;cursor:pointer;
-  font-size:22px;line-height:1;color:#111;padding:4px 2px;transition:transform .25s ease}
+  font-size:14px;font-weight:700;line-height:1;color:#111;padding:8px 2px;transition:transform .25s ease}
 .g4-arrow:hover{transform:translateX(5px)}
-@media(max-width:1240px){.g4-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:1100px){.g4-grid{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:960px){.g4-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:540px){.g4-grid{grid-template-columns:1fr}.g4-col-img{aspect-ratio:4/3}}
 
 /* 입장 패널 — 데스크톱에서는 오른쪽에 붙박이, 좁은 화면에서는 그리드 아래 */
@@ -180,17 +180,18 @@ export const GATE_CSS = `
 .g4 .tab-switch button.on{background:#111;color:#fff}
 .g4 .field input,.g4 .field textarea{border-color:#ddd;background:#fff;color:#111}
 .g4 .field input:focus,.g4 .field textarea:focus{outline-color:#111}
-.g4 .field label{color:#777}
+.g4 .field label{color:#666}
 .g4 .btn{background:#111;color:#fff}
-.g4 .gate-note{color:#888}
+.g4 .btn.ghost{background:transparent;color:#111;border:1px solid #111}
+.g4 .gate-note{color:#666}
 
 /* 바닥글 */
 .g4-foot{border-top:1px solid #e6e6e6;margin-top:30px}
 .g4-foot-in{max-width:1280px;margin:0 auto;padding:22px 20px 40px;
   display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start}
 .g4-foot-logo{font-family:'Archivo',sans-serif;font-size:15px;font-weight:900;letter-spacing:.02em}
-.g4-foot-copy{font-size:11px;color:#888;margin-top:8px;line-height:1.8}
-.g4-foot-note{font-size:11px;color:#888;line-height:1.8;text-align:right}
+.g4-foot-copy{font-size:11px;color:#666;margin-top:8px;line-height:1.8}
+.g4-foot-note{font-size:11px;color:#666;line-height:1.8;text-align:right}
 @media(max-width:540px){.g4-foot-note{text-align:left}}
 `;
 

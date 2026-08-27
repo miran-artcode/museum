@@ -13,7 +13,7 @@ import {
   AnchorCard, AnchorPanel, AnchorStyle, DEFAULT_ANCHOR, ANCHOR_VER, AI_LEVELS,
   anchorOpen, anchorDone, anchorScore, anchorPlateRate,
 } from "./src-anchor.jsx";
-import { SurveyStyle, SurveyScaleBar, LikertRow } from "./src-survey-ui.jsx";
+import { SurveyStyle, SurveyScaleBar, LikertRow, useTopbarHeight } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
@@ -29,6 +29,7 @@ import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 
 const store = {
   get: (k) => fbStore.get(k),
+  getSafe: (k) => fbStore.getSafe(k), // "없음"과 "읽기 실패"를 구분 — 실패를 빈 문서로 오인해 덮어쓰지 않기 위함
   set: (k, v) => fbStore.set(k, v),
 };
 
@@ -492,12 +493,12 @@ const SCHEMA_DEF = [
     ],
   },
   {
-    id: "s3o", session: "3차시", code: "B1", title: "번역 사다리 ① 관찰 방법 정하기", ladder: true,
+    id: "s3o", session: "3차시", code: "B1", title: "번역 사다리 ① 관찰 방법 정하기 (T1)", ladder: true,
     note: "사회참여 미술은 자료 조사가 아니라 내 몸이 지나간 자리의 관찰에서 시작합니다. 다만 ‘잘 살펴보라’는 말만으로는 아무것도 모이지 않습니다. 다섯 가지 관찰 방법 가운데 하나를 골라 그 절차대로 모읍니다. 방법마다 잘 잡히는 것과 놓치는 것이 다릅니다.",
     fields: [
-      { k: "method", t: "cards", src: "obs", label: "T1 · 이번에 쓸 관찰 방법 — 하나를 고릅니다" },
+      { k: "method", t: "cards", src: "obs", label: "이번에 쓸 관찰 방법 — 하나를 고릅니다 〔T1〕" },
       {
-        k: "methodWhy", t: "area", label: "T1 · 왜 이 방법인가",
+        k: "methodWhy", t: "area", label: "왜 이 방법인가 〔T1〕",
         steps: [
           "떠올리기 — 내가 마음에 걸려 하는 일이 언제·어디서 일어나는지 대강 그려 보기",
           "맞대기 — 다섯 방법의 ‘잘 잡아내는 것’을 읽고, 내 짐작과 맞는 방법 고르기",
@@ -505,25 +506,25 @@ const SCHEMA_DEF = [
         ],
       },
       {
-        k: "blind", t: "area", label: "T1 · 이 방법이 놓치는 것과, 그것을 메울 방도",
+        k: "blind", t: "area", label: "이 방법이 놓치는 것과, 그것을 메울 방도 〔T1〕",
         steps: [
           "읽기 — 고른 방법의 ‘놓치는 것’을 다시 읽기",
           "따지기 — 그 한계가 내가 보려는 문제에서 실제로 문제가 되는지 판단하기",
           "정하기 — 메울 방도를 하나 정하기 (다른 방법을 한 번 곁들이기 · 시간대를 바꿔 한 번 더 가기 · 짝에게 물어보기)",
         ],
       },
-      { k: "second", t: "cards", src: "obs", opt: true, label: "T1 · 곁들여 쓴 방법 (선택) — 한 방법만으로 부족했다면" },
+      { k: "second", t: "cards", src: "obs", opt: true, label: "곁들여 쓴 방법 (선택) — 한 방법만으로 부족했다면 〔T1〕" },
     ],
   },
   {
-    id: "s3a", session: "3차시", code: "B2", title: "번역 사다리 ② 장면 채집과 문제 좁히기", ladder: true,
+    id: "s3a", session: "3차시", code: "B2", title: "번역 사다리 ② 장면 채집과 문제 좁히기 (T2·T3)", ladder: true,
     note: "고른 방법의 절차대로 걸으며 장면을 모읍니다. 해석하지 말고 본 것만 적습니다. 세 장면이 모이면 그때 한 문제로 묶습니다.",
     fields: [
-      { k: "scenes", t: "scenes", label: "T2 · 고른 방법대로 모은 장면 — 언제 · 어디서 · 무엇을, 그리고 어느 감각으로 걸렸는지" },
-      { k: "problem", t: "text", label: "T3 · 고른 사회문제" },
-      { k: "contact", t: "text", label: "T3 · 이 문제를 내가 직접 보거나 겪는 때와 곳 (예: 밤 11시 아파트 분리수거장, 등굣길 무인 편의점 앞)" },
+      { k: "scenes", t: "scenes", label: "고른 방법대로 모은 장면 — 언제 · 어디서 · 무엇을, 그리고 어느 감각으로 걸렸는지 〔T2〕" },
+      { k: "problem", t: "text", label: "고른 사회문제 〔T3〕" },
+      { k: "contact", t: "text", label: "이 문제를 내가 직접 보거나 겪는 때와 곳 (예: 밤 11시 아파트 분리수거장, 등굣길 무인 편의점 앞) 〔T3〕" },
       {
-        k: "why", t: "area", label: "T3 · 왜 다른 문제가 아니라 이 문제인지",
+        k: "why", t: "area", label: "왜 다른 문제가 아니라 이 문제인지 〔T3〕",
         steps: [
           "견주기 — 후보로 떠올렸다가 접은 다른 문제 하나와 나란히 놓아 보기",
           "좁히기 — 이 문제만이 가진, 나와 이어진 지점 찾기",
@@ -535,22 +536,22 @@ const SCHEMA_DEF = [
     ],
   },
   {
-    id: "s3e", session: "3차시", code: "B3", title: "번역 사다리 ③ 사회를 드러내는 방법 정하기", ladder: true,
+    id: "s3e", session: "3차시", code: "B3", title: "번역 사다리 ③ 사회를 드러내는 방법 정하기 (T4)", ladder: true,
     note: "같은 문제를 다뤄도 어떤 방법으로 드러내느냐에 따라 관람자가 하는 일이 달라지고 작가가 지는 책임도 달라집니다. 여덟 갈래를 읽고 내 작업이 설 자리를 정합니다. 방법마다 위험이 따로 있으므로, 고른 이유와 그 위험을 다룰 방도를 함께 적습니다.",
     fields: [
-      { k: "mode", t: "cards", src: "engage", label: "T4 · 내 작업이 설 자리 — 주된 방법 하나를 고릅니다" },
-      { k: "sub", t: "cards", src: "engage", opt: true, label: "T4 · 곁들일 방법 (선택) — 두 갈래를 겹쳐 쓸 수도 있습니다" },
+      { k: "mode", t: "cards", src: "engage", label: "내 작업이 설 자리 — 주된 방법 하나를 고릅니다 〔T4〕" },
+      { k: "sub", t: "cards", src: "engage", opt: true, label: "곁들일 방법 (선택) — 두 갈래를 겹쳐 쓸 수도 있습니다 〔T4〕" },
       {
-        k: "why", t: "area", label: "T4 · 왜 이 방법인가 — 내 문제의 어떤 성격이 이 방법을 부르는가",
+        k: "why", t: "area", label: "왜 이 방법인가 — 내 문제의 어떤 성격이 이 방법을 부르는가 〔T4〕",
         steps: [
           "짚기 — 내 문제가 왜 잘 안 보이는지 한 줄로 말해 보기 (아직 안 일어났다 · 벽 뒤에 있다 · 세어지지 않는다 · 이미 사라졌다)",
           "맞대기 — 여덟 갈래의 ‘이럴 때 맞습니다’를 읽고 내 문제의 성격과 겹치는 자리 찾기",
           "정리 — ‘내 문제는 ~이기 때문에 ~ 방법으로 드러낸다’로 쓰기",
         ],
       },
-      { k: "dropMode", t: "cards", src: "engage", label: "T4 · 견주었다가 접은 방법 하나" },
+      { k: "dropMode", t: "cards", src: "engage", label: "견주었다가 접은 방법 하나 〔T4〕" },
       {
-        k: "dropWhy", t: "area", label: "T4 · 그 방법을 접은 이유 — 그 방법으로 하면 내 작업에서 무엇이 잘못되는가",
+        k: "dropWhy", t: "area", label: "그 방법을 접은 이유 — 그 방법으로 하면 내 작업에서 무엇이 잘못되는가 〔T4〕",
         steps: [
           "그려 보기 — 접은 방법으로 내 문제를 다룬다면 작품이 어떤 모습일지 한 줄로 상상하기",
           "따지기 — 그 모습에서 무엇이 어긋나는지 짚기 (당사자를 대신 말하게 된다 · 구경거리가 된다 · 문제와 끊긴다)",
@@ -558,7 +559,7 @@ const SCHEMA_DEF = [
         ],
       },
       {
-        k: "risk", t: "area", label: "T4 · 고른 방법의 위험을 내 작업에서 어떻게 다룰 것인가",
+        k: "risk", t: "area", label: "고른 방법의 위험을 내 작업에서 어떻게 다룰 것인가 〔T4〕",
         steps: [
           "읽기 — 고른 카드의 ‘이 방법의 위험’을 다시 읽기",
           "옮기기 — 그 위험이 내 작업에서 구체적으로 어떤 장면으로 나타날지 적기",
@@ -566,7 +567,7 @@ const SCHEMA_DEF = [
         ],
       },
       {
-        k: "form", t: "area", label: "T4 · 이 단원의 형식으로 어떻게 실현할 것인가 — 유물 이미지 한 점과 명제표로",
+        k: "form", t: "area", label: "이 단원의 형식으로 어떻게 실현할 것인가 — 유물 이미지 한 점과 명제표로 〔T4〕",
         steps: [
           "확인 — 이 단원의 결과물은 실재한 적 없는 유물의 기록 사진 한 점과 명제표라는 것",
           "옮기기 — 내가 고른 방법을 그 형식 안에서 어느 요소가 맡을지 정하기 (화면의 흔적 · 유물 명칭 · 명제표 문안 · 진열 방식 · 허구 고지)",
@@ -576,13 +577,13 @@ const SCHEMA_DEF = [
     ],
   },
   {
-    id: "s3t1", session: "3차시", code: "B4", title: "번역 사다리 ④ 보이지 않는 것 가르기", ladder: true,
+    id: "s3t1", session: "3차시", code: "B4", title: "번역 사다리 ④ 보이지 않는 것 가르기 (T5)", ladder: true,
     note: "이 문제에서 겉으로 드러나지 않는 것을 먼저 늘어놓고, 왜 보이지 않는지를 다섯 갈래로 나눕니다. 갈래가 정해지면 다음 계단에서 찾을 사물과 흔적의 종류가 달라집니다.",
     fields: [
-      { k: "list", t: "invis", label: "T5 · 보이지 않는 것 목록 — 세 가지 이상 늘어놓고, 각각 왜 보이지 않는지 갈래를 고릅니다" },
-      { k: "pick", t: "pickinv", label: "T5 · 이 가운데 내 유물이 대신 말해 줄 하나" },
+      { k: "list", t: "invis", label: "보이지 않는 것 목록 — 세 가지 이상 늘어놓고, 각각 왜 보이지 않는지 갈래를 고릅니다 〔T5〕" },
+      { k: "pick", t: "pickinv", label: "이 가운데 내 유물이 대신 말해 줄 하나 〔T5〕" },
       {
-        k: "pickWhy", t: "area", label: "T5 · 그 하나를 고른 이유 — 접은 항목이 무엇이고 왜 접었는지도 함께",
+        k: "pickWhy", t: "area", label: "그 하나를 고른 이유 — 접은 항목이 무엇이고 왜 접었는지도 함께 〔T5〕",
         steps: [
           "견주기 — 목록에 늘어놓은 항목들을 나란히 놓고, 사물의 흔적으로 옮길 수 있는 정도를 견주기",
           "접기 — 접은 항목 하나를 골라 왜 흔적으로 옮기기 어려운지 쓰기 (예: 마음은 사물에 자국을 남기지 않는다)",
@@ -592,12 +593,12 @@ const SCHEMA_DEF = [
     ],
   },
   {
-    id: "s3t2", session: "3차시", code: "B5", title: "번역 사다리 ⑤ 사물 후보 찾기와 고르기", ladder: true,
+    id: "s3t2", session: "3차시", code: "B5", title: "번역 사다리 ⑤ 사물 후보 찾기와 고르기 (T6)", ladder: true,
     note: "앞 계단에서 고른 갈래에 맞는 사물을 세 가지 이상 찾습니다. 머릿속에서 지어낸 물건이 아니라 그 문제의 자리에 실제로 놓여 있는 물건이어야 합니다.",
     fields: [
-      { k: "cands", t: "cands", label: "T6 · 사물 후보 — 어디에 실제로 있는가 · 누구의 몸이 닿는가 · 어떤 동작이 닿는가" },
+      { k: "cands", t: "cands", label: "사물 후보 — 어디에 실제로 있는가 · 누구의 몸이 닿는가 · 어떤 동작이 닿는가 〔T6〕" },
       {
-        k: "dropWhy", t: "area", label: "T6 · 고르지 않은 후보를 접은 이유 — 한 후보 이상에 대해 씁니다",
+        k: "dropWhy", t: "area", label: "고르지 않은 후보를 접은 이유 — 한 후보 이상에 대해 씁니다 〔T6〕",
         steps: [
           "고르기 — 접은 후보 가운데 가장 아까웠던 하나 정하기",
           "따지기 — 그 물건이 왜 이 문제를 대신 말하기 어려운지 짚기 (닿는 몸이 없다 · 흔적이 남지 않는다 · 다른 물건으로 읽힌다)",
@@ -607,21 +608,21 @@ const SCHEMA_DEF = [
     ],
   },
   {
-    id: "s3t3", session: "3차시", code: "B6", title: "번역 사다리 ⑥ 흔적으로 옮기기", ladder: true,
+    id: "s3t3", session: "3차시", code: "B6", title: "번역 사다리 ⑥ 흔적으로 옮기기 (T7)", ladder: true,
     note: "보이지 않는 것을 사물의 어느 자리에 어떤 모양으로 남길지 정합니다. 위치와 모양은 눈으로 확인할 수 있는 말로만 씁니다. 마지막 칸에는 그 흔적이 생기려면 어떤 동작이 얼마나 반복되어야 하는지 어림합니다.",
     fields: [
-      { k: "traces", t: "traces", label: "T7 · 흔적 번역 표 — 보이지 않는 것 하나가 사물의 어느 자리에 어떤 모양으로 남는가" },
-      { k: "stmt1", t: "stmt", stage: "T7", label: "T7 · 번역 진술 (초안) — 아래 문장 틀을 채워 한 문장으로 만듭니다" },
+      { k: "traces", t: "traces", label: "흔적 번역 표 — 보이지 않는 것 하나가 사물의 어느 자리에 어떤 모양으로 남는가 〔T7〕" },
+      { k: "stmt1", t: "stmt", stage: "T7", label: "번역 진술 (초안) — 아래 문장 틀을 채워 한 문장으로 만듭니다 〔T7〕" },
     ],
   },
   {
-    id: "s3t4", session: "3차시", code: "B7", title: "번역 사다리 ⑦ 되돌려 읽기와 진술 확정", ladder: true,
+    id: "s3t4", session: "3차시", code: "B7", title: "번역 사다리 ⑦ 되돌려 읽기와 진술 확정 (T8·T9)", ladder: true,
     note: "흔적만 보고 남이 그 문제를 읽어 낼 수 있는지 확인합니다. 읽히지 않으면 어느 계단으로 돌아갈지 정하고, 돌아가 고친 뒤 다시 내려와 진술을 확정합니다.",
     fields: [
-      { k: "reverse", t: "reverse", label: "T8 · 되돌려 읽기 — 짝에게 사물과 흔적만 말해 주고 무엇으로 읽었는지 적습니다 (두 사람에게)" },
-      { k: "stmt2", t: "stmt", stage: "T9", prev: "s3t3.stmt1", label: "T9 · 번역 진술 (확정) — 되돌려 읽기를 거친 뒤 다시 씁니다" },
+      { k: "reverse", t: "reverse", label: "되돌려 읽기 — 짝에게 사물과 흔적만 말해 주고 무엇으로 읽었는지 적습니다 (두 사람에게) 〔T8〕" },
+      { k: "stmt2", t: "stmt", stage: "T9", prev: "s3t3.stmt1", label: "번역 진술 (확정) — 되돌려 읽기를 거친 뒤 다시 씁니다 〔T9〕" },
       {
-        k: "moved", t: "area", label: "T9 · 초안과 확정 사이에서 무엇이 달라졌는가 — 바뀐 말과 그 말을 바꾼 이유",
+        k: "moved", t: "area", label: "초안과 확정 사이에서 무엇이 달라졌는가 — 바뀐 말과 그 말을 바꾼 이유 〔T9〕",
         steps: [
           "맞대기 — 초안 진술과 확정 진술을 한 줄씩 나란히 놓기",
           "짚기 — 사라진 말과 새로 들어온 말을 각각 하나씩 지목하기",
@@ -2577,7 +2578,7 @@ body{background:var(--bg)}
 .topbar-in{max-width:1080px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .brand{font-family:var(--serif);font-weight:700;font-size:16px;letter-spacing:.02em}
 .brand small{display:block;font-family:var(--mono);font-weight:400;font-size:10px;color:var(--sub);letter-spacing:.08em}
-.top-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--sub)}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--sub);flex-wrap:wrap;justify-content:flex-end}
 
 /* 입장 */
 .gate{max-width:460px;margin:0 auto;padding:48px 16px 80px}
@@ -2626,8 +2627,8 @@ body{background:var(--bg)}
 .sess-tab .dot.full{background:var(--patina)}
 .sess-tab.on{background:var(--ink);color:var(--card)}
 
-.sess-tab.locked{opacity:.5;cursor:not-allowed;background:var(--card2)}
-.sess-tab .lock{font-family:var(--mono);font-size:9px;color:var(--sub);border:1px solid var(--line);padding:1px 4px}
+.sess-tab.locked{cursor:not-allowed;background:var(--card2);color:var(--sub);border-style:dashed}
+.sess-tab .lock{font-family:var(--mono);font-size:10px;color:var(--sub);border:1px solid var(--line);padding:1px 4px}
 .gate-note{font-size:11px;color:var(--sub);margin-top:10px;line-height:1.6}
 
 /* 기록 카드 (명제표 형식) */
@@ -2658,6 +2659,7 @@ body{background:var(--bg)}
 .checkline{display:flex;flex-wrap:wrap;gap:8px}
 .chk{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;padding:6px 10px;font-size:13px;cursor:pointer;user-select:none}
 .chk.on{background:var(--patina-bg);border-color:var(--patina);color:var(--patina)}
+.chk:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .hint{font-size:11px;color:var(--sub);line-height:1.5}
 
 /* 저장 상태 */
@@ -2667,11 +2669,12 @@ body{background:var(--bg)}
 .dot-check{font-size:11px;color:var(--patina);font-weight:700;line-height:1}
 .tbl-scroll{overflow-x:auto}
 .tbl-scroll .tbl{min-width:640px}
+.tbl-scroll .roster{min-width:720px}
 .sample-banner{border:1px solid var(--amber);background:#F5EFE2;color:#6F5527;padding:10px 14px;font-size:13px;margin-top:18px}
 
 /* 교사 대시보드 */
 .t-tabs{display:flex;gap:6px;margin:18px 0;flex-wrap:wrap}
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
 @media(max-width:640px){.kpis{grid-template-columns:1fr}}
 .kpi{background:var(--card);border:1px solid var(--line);padding:14px 16px}
 .kpi .n{font-family:var(--serif);font-size:26px;font-weight:700}
@@ -2702,7 +2705,7 @@ body{background:var(--bg)}
 .back-link{font-size:13px;color:var(--sub);cursor:pointer;background:none;border:none;font-family:var(--sans);padding:0;margin-bottom:12px;text-decoration:underline}
 .feedback-card{background:var(--patina-bg);border:1px solid var(--patina);padding:14px 16px;margin-bottom:18px}
 .paste-ask{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--card);border-top:2px solid var(--ink);box-shadow:0 -6px 24px rgba(0,0,0,.14)}
-.paste-ask-in{max-width:1060px;margin:0 auto;padding:12px 18px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.paste-ask-in{max-width:1060px;margin:0 auto;padding:12px 18px calc(12px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
 .paste-ask .pa-q{font-weight:600;font-size:14px}
 .paste-ask .pa-opts{display:flex;flex-wrap:wrap;gap:6px}
 .paste-ask .pa-note{flex:1 1 100%;font-size:11.5px;color:var(--sub);line-height:1.6}
@@ -2734,7 +2737,7 @@ body{background:var(--bg)}
 .mm-strip{display:flex;gap:8px;flex-wrap:wrap}
 .mm-item{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .mm-thumb{border:1px solid var(--line2);display:block}
-.mm-del{border:none;background:none;font-family:var(--sans);font-size:11px;color:var(--seal);cursor:pointer;padding:0;text-decoration:underline}
+.mm-del{border:none;background:none;font-family:var(--sans);font-size:12px;color:var(--seal);cursor:pointer;padding:6px 8px;text-decoration:underline}
 .mm-load{font-family:var(--mono);font-size:11px;color:var(--sub)}
 .mm-rec{font-family:var(--mono);font-size:12px;color:var(--seal)}
 .sketch-box{border:1px dashed var(--line);background:#fff;padding:10px}
@@ -2805,8 +2808,10 @@ body{background:var(--bg)}
 .reading summary{cursor:pointer;padding:10px 14px;font-family:var(--serif);font-size:14px;font-weight:700;list-style:none;display:flex;align-items:center;gap:8px}
 .reading summary::before{content:"＋";font-family:var(--mono);color:var(--seal);font-weight:400}
 .reading[open] summary::before{content:"－"}
+.reading summary .rd-i{font-family:var(--mono);font-size:10px;color:var(--sub);flex:0 0 auto}
+.reading summary .rd-seen{margin-left:auto;color:var(--patina);font-size:12px;font-weight:400}
 .reading-in{padding:0 16px 14px}
-.reading-in p{font-size:13px;line-height:1.8;margin-bottom:10px;text-align:justify}
+.reading-in p{font-size:13px;line-height:1.8;margin-bottom:10px;text-align:left;word-break:keep-all}
 .works-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
 .works-tbl caption{text-align:left;font-family:var(--mono);font-size:10px;color:var(--seal);letter-spacing:.15em;margin-bottom:4px}
 .works-tbl th{background:var(--card2);border:1px solid var(--line2);padding:4px 8px;font-weight:500;color:var(--sub);text-align:left}
@@ -2822,7 +2827,10 @@ body{background:var(--bg)}
 .gal-hero .acc{font-family:var(--mono);font-size:11px;letter-spacing:.25em;color:var(--seal);margin-bottom:10px}
 .gal-hero h1{font-family:var(--serif);font-size:24px;font-weight:700;line-height:1.4}
 .gal-hero p{color:var(--sub);font-size:13px;margin-top:8px;max-width:560px;margin-left:auto;margin-right:auto}
-.gal-controls{display:flex;justify-content:center;gap:10px;margin:18px 0 26px;flex-wrap:wrap}
+.gal-controls{display:flex;justify-content:center;gap:8px 10px;margin:18px 0 26px;flex-wrap:wrap;align-items:center;position:sticky;top:var(--sv-top,52px);z-index:10;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--line2)}
+.gal-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.gal-find{padding:7px 10px;border:1px solid var(--line);font-family:var(--sans);font-size:13px;width:180px}
+.gal-when{font-family:var(--mono);font-size:11px;color:var(--sub);display:flex;align-items:center}
 .gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
 .work{background:var(--card);border:1px solid var(--line);display:flex;flex-direction:column}
 .work-img{background:#DBD9D2;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden;border-bottom:1px solid var(--line2)}
@@ -2833,6 +2841,7 @@ body{background:var(--bg)}
 .plate{margin:0 14px 12px;border:1px solid var(--line);background:#fff;padding:10px 12px;font-size:12px}
 .plate.hidden-plate{background:var(--card2);color:var(--sub);text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.15em;padding:16px}
 .plate dl{display:grid;grid-template-columns:88px 1fr;gap:3px 8px}
+@media(max-width:480px){.plate dl{grid-template-columns:1fr}.plate dt{margin-top:5px}}
 .plate dt{color:var(--sub)}
 .plate dd{margin:0}
 .plate .notice{grid-column:1/-1;margin-top:7px;padding-top:7px;border-top:1px dashed var(--line);color:var(--seal);font-size:11px}
@@ -2865,7 +2874,8 @@ body{background:var(--bg)}
 
 /* 번역 사다리 — 학생 화면 */
 .ladder{display:flex;gap:0;margin:0 0 14px;flex-wrap:wrap;border:1px solid var(--line);background:var(--card2)}
-.ld-step{flex:1 1 92px;min-width:92px;padding:8px 8px 9px;border-right:1px solid var(--line2);position:relative;text-align:center}
+.ld-step{flex:1 1 92px;min-width:92px;padding:8px 8px 9px;border:none;border-right:1px solid var(--line2);position:relative;text-align:center;background:transparent;font-family:inherit;color:inherit;cursor:pointer;display:block}
+.ld-step:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
 .ld-step:last-child{border-right:0}
 .ld-step .k{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--sub)}
 .ld-step .nm{font-size:12px;font-weight:700;margin-top:2px;line-height:1.3}
@@ -2919,10 +2929,10 @@ body{background:var(--bg)}
 .funnel .fr .lb small{font-family:var(--mono);color:var(--sub);font-size:10px;margin-right:5px}
 .funnel .fr .tr{flex:1;height:14px;background:var(--line2);position:relative}
 .funnel .fr .tr i{position:absolute;left:0;top:0;bottom:0;background:var(--patina)}
-.funnel .fr .tr i.part{background:var(--amber);opacity:.55}
+.funnel .fr .tr i.part{background:repeating-linear-gradient(135deg,var(--amber) 0 4px,transparent 4px 7px)}
 .funnel .fr .v{width:78px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--sub)}
 .slope{width:100%;height:250px;display:block}
-.slope text{font-family:var(--mono);font-size:9px;fill:var(--sub)}
+.slope text{font-family:var(--mono);font-size:11px;fill:var(--sub)}
 .slope .ln{stroke:var(--sub);stroke-width:1.2;opacity:.5}
 .slope .ln.up{stroke:var(--patina);opacity:.85}
 .slope .ln.dn{stroke:var(--seal);opacity:.85}
@@ -2954,7 +2964,7 @@ body{background:var(--bg)}
 .pcard.on .pc-h{color:var(--seal)}
 .pcard .pc-s{font-size:11.5px;color:var(--sub);line-height:1.45}
 .pcard .pc-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:auto}
-.pc-tag{font-style:normal;font-family:var(--mono);font-size:9px;letter-spacing:.02em;padding:1px 4px;border:1px solid var(--line)}
+.pc-tag{font-style:normal;font-family:var(--mono);font-size:10px;letter-spacing:.02em;padding:1px 4px;border:1px solid var(--line)}
 .pc-tag.unit{color:var(--patina);border-color:var(--patina);background:var(--patina-bg)}
 .pc-tag.used{color:var(--amber);border-color:var(--amber)}
 .pc-detail{border:1px solid var(--line);border-left:3px solid var(--seal);background:var(--card2);padding:12px 14px;font-size:13px;line-height:1.7}
@@ -2974,6 +2984,27 @@ body{background:var(--bg)}
 .obs-echo{border:1px dashed var(--patina);background:var(--patina-bg);padding:8px 10px;margin-bottom:8px;font-size:12.5px;line-height:1.6}
 .obs-echo b{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--patina);display:block;margin-bottom:3px}
 .obs-echo ol{margin:4px 0 0;padding-left:17px}
+
+/* 터치 기기 보정 — 16px 미만 입력은 iOS가 강제 확대하고, 30px 미만 버튼은 오조작을 부른다 */
+@media(pointer:coarse){
+  .field input,.field textarea,.field select,.tbl input,.tbl textarea,.tbl select,
+  .lt td input,.lt td textarea,.debate-cell textarea{font-size:16px}
+  .btn.small{padding:9px 12px;font-size:13px}
+  .seg button{padding:8px 12px;min-height:38px}
+  .ivt button{padding:8px 10px;font-size:13px}
+  .mm-del{padding:10px 10px}
+  .back-link{padding:8px 0}
+  .sk-color{width:34px;height:34px}
+  .chk{padding:9px 12px}
+  .toggle-row button{padding:10px 14px}
+  /* 폰에서 표는 거의 항상 가로 스크롤 안에 갇힌다 — 밀 수 있음을 알려 준다 */
+  .tbl-scroll::after{content:"← 옆으로 밀면 열이 더 있습니다";display:block;font-family:var(--sans);font-size:11px;color:var(--sub);padding:4px 0 0}
+}
+
+/* 움직임 줄이기 설정 존중 — 게이트의 확대·이동 효과까지 함께 끈다 */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;scroll-behavior:auto!important}
+}
 `;
 
 function ProgressBar({ pct }) {
@@ -2995,6 +3026,12 @@ function SessionDot({ ratio }) {
 
 function LessonPanel({ L, teacher, onReading }) {
   const total = L.flow.reduce((a, r) => a + r[1], 0);
+  const [seen, setSeen] = useState({}); // 한 번이라도 펼쳐 본 읽기 자료 — 어디까지 읽었는지 표시
+  const bodyRef = useRef(null);
+  const expandAll = () => {
+    if (!bodyRef.current) return;
+    bodyRef.current.querySelectorAll("details.reading").forEach((d) => { d.open = true; });
+  };
   return (
     <div className="lesson">
       <div className="lesson-head">
@@ -3002,7 +3039,7 @@ function LessonPanel({ L, teacher, onReading }) {
         <span className="lesson-title">{L.title}</span>
         {teacher && <span className="lesson-min">{total}MIN</span>}
       </div>
-      <div className="lesson-body">
+      <div className="lesson-body" ref={bodyRef}>
         <LessonNotice text={L.notice} />
         <ul className="goal-list">
           {L.goals.map((g, i) => <li key={i}>{g}</li>)}
@@ -3027,9 +3064,20 @@ function LessonPanel({ L, teacher, onReading }) {
             </div>
           </details>
         )}
+        {L.readings.length > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
+            <span className="hint">읽기 자료 {L.readings.length}개 — 수업 흐름 순서대로 놓여 있습니다.</span>
+            <button type="button" className="btn small ghost" onClick={expandAll}>모두 펼치기</button>
+          </div>
+        )}
         {L.readings.map((rd, i) => (
-          <details className="reading" key={i} onToggle={(e) => onReading && onReading(e.target.open)}>
-            <summary><span className="stage-tag">{rd.stage}</span>{rd.h}</summary>
+          <details className="reading" key={i}
+            onToggle={(e) => { if (e.target.open) setSeen((p) => (p[i] ? p : { ...p, [i]: true })); onReading && onReading(e.target.open); }}>
+            <summary>
+              <span className="stage-tag">{rd.stage}</span>
+              <span className="rd-i">{i + 1}/{L.readings.length}</span>{rd.h}
+              {seen[i] && <span className="rd-seen" aria-label="펼쳐 본 자료">✓</span>}
+            </summary>
             <div className="reading-in">
               {rd.p.map((para, j) => <p key={j}>{para}</p>)}
               <LessonImages images={rd.images} />
@@ -3140,7 +3188,7 @@ function sentenceCount(t) {
 function ThinkMeter({ text }) {
   if (!filled(text)) return null;
   const n = sentenceCount(text);
-  if (n <= 1) return <span className="think-meter warn">지금은 한 문장입니다. “왜냐하면 …”(그렇게 생각한 이유)과 “예를 들면 …”(수업에서 본 구체적 예)을 한 줄씩 이어 붙여 생각의 과정을 남겨 보세요.</span>;
+  if (n <= 1) return <span className="think-meter warn">한 문장 더 — 왜 그렇게 생각했는지(“왜냐하면 …”)를 이어 붙여 보세요.</span>;
   return <span className="think-meter ok">문장 {n}개 — 생각의 과정이 남고 있습니다.</span>;
 }
 
@@ -3169,12 +3217,14 @@ function LadderRail({ sec, ws }) {
           const s = stats[i];
           const done = s.ratio >= 0.999;
           return (
-            <div key={st.key} className={"ld-step " + (here.includes(st.key) ? "now " : "") + (done ? "done" : "")}
-              title={st.full + " — " + st.ask}>
+            /* 계단은 현위치 표시만 하던 장식이었는데, 누르면 그 계단의 카드로 이동한다 */
+            <button type="button" key={st.key} className={"ld-step " + (here.includes(st.key) ? "now " : "") + (done ? "done" : "")}
+              title={st.full + " — " + st.ask}
+              onClick={() => { const el = document.getElementById("sec-" + st.sec); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
               <div className="k">{st.key}{done ? " ✓" : ""}</div>
               <div className="nm">{st.name}</div>
               <div className="bar"><i style={{ width: Math.round(s.ratio * 100) + "%" }} /></div>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -3688,6 +3738,13 @@ function CardPick({ f, fieldKey, v, setField, ws }) {
 function FieldEditor({ sec, f, ws, setField }) {
   const key = sec.id + "." + f.k;
   const v = ws[key];
+  // 사진 처리 오류를 alert 대신 그 칸 안에 보여 준다 — 모바일에서 alert은 맥락을 가린다
+  const [imgErr, setImgErr] = useState("");
+  // 상한의 80%를 넘으면 카운터를 보여 준다 — 조용히 잘리는 maxLength의 예고
+  const lenHint = (val, max) => {
+    const n = String(val || "").length;
+    return n >= max * 0.8 ? <span className="hint" style={{ color: n >= max ? "var(--seal)" : "var(--sub)" }}> {n.toLocaleString()} / {max.toLocaleString()}자</span> : null;
+  };
 
   if (f.t === "text" || f.t === "area") {
     const meter = f.t === "area" && (f.steps || sec.kind === "learn" || sec.kind === "inquiry");
@@ -3707,6 +3764,7 @@ function FieldEditor({ sec, f, ws, setField }) {
         ) : (
           <textarea rows={f.rows || 3} value={v ?? ""} maxLength={4000} placeholder={f.ph || ""} onChange={(e) => setField(key, e.target.value)} />
         )}
+        {lenHint(v, f.t === "text" ? 300 : 4000)}
         {meter && <ThinkMeter text={v} />}
       </div>
     );
@@ -3773,15 +3831,16 @@ function FieldEditor({ sec, f, ws, setField }) {
     const pick = async (e) => {
       const files = Array.from(e.target.files || []).slice(0, 3 - list.length);
       e.target.value = "";
+      setImgErr("");
       for (const file of files) {
-        if (!/^image\//.test(file.type)) { alert("이미지 파일만 올릴 수 있습니다."); continue; }
+        if (!/^image\//.test(file.type)) { setImgErr("이미지 파일만 올릴 수 있습니다."); continue; }
         try {
           const data = await compress(file, 800, 150000);
           const ref = key + "." + Date.now() + Math.floor(Math.random() * 100);
           const ok = await mediaStore.put(OWNER, ref, data);
-          if (!ok) { alert("사진 저장에 실패했습니다."); continue; }
+          if (!ok) { setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요."); continue; }
           setField(key, [...(list || []), { ref, at: now() }].slice(0, 3));
-        } catch (err) { alert("사진을 처리하지 못했습니다. 더 작은 파일로 시도하세요."); }
+        } catch (err) { setImgErr("사진을 처리하지 못했습니다. 더 작은 파일로 시도하세요."); }
       }
     };
     return (
@@ -3798,6 +3857,7 @@ function FieldEditor({ sec, f, ws, setField }) {
           </div>
           {list.length < 3 && <input type="file" accept="image/*" multiple onChange={pick} style={{ fontSize: 12 }} />}
           <span className="hint">{list.length}/3장 · 가로세로 800px 이하로 줄여 저장합니다.</span>
+          {imgErr && <span className="hint" role="alert" style={{ color: "var(--seal)", flex: "1 1 100%" }}>{imgErr}</span>}
         </div>
       </div>
     );
@@ -3839,14 +3899,15 @@ function FieldEditor({ sec, f, ws, setField }) {
       const file = e.target.files && e.target.files[0];
       e.target.value = "";
       if (!file) return;
-      if (!/^image\//.test(file.type)) return alert("이미지 파일만 올릴 수 있습니다.");
+      setImgErr("");
+      if (!/^image\//.test(file.type)) return setImgErr("이미지 파일만 올릴 수 있습니다.");
       try {
         const data = await compress(file, f.k === "img" ? 1000 : 800, f.k === "img" ? 400000 : 150000);
         const ref = key + "." + Date.now();
         const ok = await mediaStore.put(OWNER, ref, data);
-        if (!ok) return alert("사진 저장에 실패했습니다.");
+        if (!ok) return setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요.");
         setField(key, { ref, at: now() });
-      } catch (err) { alert("사진을 처리하지 못했습니다. 더 작은 파일로 시도하세요."); }
+      } catch (err) { setImgErr("사진을 처리하지 못했습니다. 더 작은 파일로 시도하세요."); }
     };
     const cur = typeof v === "string" ? null : v;
     return (
@@ -3860,6 +3921,7 @@ function FieldEditor({ sec, f, ws, setField }) {
             </div>
           ) : <span className="hint">사진 한 장을 올립니다.</span>}
           <input type="file" accept="image/*" onChange={pick} style={{ fontSize: 12 }} />
+          {imgErr && <span className="hint" role="alert" style={{ color: "var(--seal)", flex: "1 1 100%" }}>{imgErr}</span>}
         </div>
       </div>
     );
@@ -3912,7 +3974,7 @@ function FieldEditor({ sec, f, ws, setField }) {
                         const data = await compress(file, 700, 120000);
                         const ref = key + ".r" + i + "." + Date.now();
                         if (await mediaStore.put(OWNER, ref, data)) up(i, "img", ref);
-                      } catch (err) { alert("사진을 처리하지 못했습니다."); }
+                      } catch (err) { setImgErr("사진을 처리하지 못했습니다. 더 작은 파일로 시도하세요."); }
                     }} />
                   )}
                 </td>
@@ -3920,6 +3982,7 @@ function FieldEditor({ sec, f, ws, setField }) {
             ))}
           </tbody>
         </table>
+        {imgErr && <span className="hint" role="alert" style={{ color: "var(--seal)" }}>{imgErr}</span>}
       </div>
     );
   }
@@ -4336,9 +4399,10 @@ function AudioField({ f, fieldKey, v, setField }) {
         stream.getTracks().forEach((t) => t.stop());
         clearInterval(timerRef.current);
         const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
-        if (blob.size > 900000) { setErr("녹음이 너무 깁니다. 더 짧게 다시 말해 보세요."); setRec(null); setSec(0); return; }
+        if (blob.size > 900000) { setErr("녹음 파일이 저장 한도(약 0.9MB)를 넘어 담지 못했습니다. 조금 더 짧게 나눠 녹음해 주세요."); setRec(null); setSec(0); return; }
         const fr = new FileReader();
         fr.onload = async () => {
+          if (cur) await mediaStore.remove(OWNER, cur.ref); // 다시 녹음하면 이전 녹음 문서를 지운다 (서버에 잔존물이 쌓이지 않게)
           const ref = fieldKey + "." + Date.now();
           const ok = await mediaStore.put(OWNER, ref, fr.result);
           if (ok) setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) });
@@ -4384,6 +4448,7 @@ function AudioField({ f, fieldKey, v, setField }) {
         ) : (
           <button className="btn small ghost" onClick={start}>{cur ? "다시 녹음하기" : "녹음 시작"}</button>
         )}
+        <span className="hint">최대 {MAX}초 · 약 0.5MB까지 저장됩니다.</span>
         {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
       </div>
     </div>
@@ -4393,6 +4458,10 @@ function AudioField({ f, fieldKey, v, setField }) {
 /* 스케치 캔버스 (디지털 에스키스) — 그린 뒤 저장하면 JPEG로 줄여 media 컬렉션에 남긴다 */
 
 const SKETCH_COLORS = ["#26241E", "#8A3B2E", "#4A5A6A"];
+
+/* 화면 어딘가의 스케치에 저장 안 된 획이 있는지 — 차시 이동·창 닫기 전 확인에 쓴다.
+   스케치 획은 컴포넌트 상태로만 있어 언마운트되면 소리 없이 사라지기 때문. */
+const sketchDirty = { current: false };
 
 function SketchField({ f, fieldKey, v, setField }) {
   const cvRef = useRef(null);
@@ -4405,6 +4474,11 @@ function SketchField({ f, fieldKey, v, setField }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const cur = typeof v === "string" ? null : v;
+
+  useEffect(() => {
+    sketchDirty.current = dirty;
+    return () => { sketchDirty.current = false; };
+  }, [dirty]);
 
   const redraw = () => {
     const cv = cvRef.current;
@@ -4601,19 +4675,22 @@ function ReflectField({ f, fieldKey, m, ws, setField }) {
 
 /* ---------- 사전·사후 창의성 설문 (학생 작성 카드) ---------- */
 
-function SurveyCard({ phase, block, onChange, onSubmit, busy }) {
+function SurveyCard({ phase, block, onChange, onSubmit, busy, saveInfo }) {
   const sv = block || {};
   const ans = sv.ans || {};
   const extra = sv.extra || {};
   const isPost = phase === "post";
-  const done = SURVEY_ITEMS.filter((it) => ans[it.k] >= 1).length;
-  const total = SURVEY_ITEMS.length;
+  // 사후에는 돌아보기 문항까지 필수이므로 머리의 분모도 같이 늘린다 —
+  // 24/24를 채웠는데 버튼이 "돌아보기 문항이 남았습니다"라고 말하면 숫자와 어긋난다
+  const done = SURVEY_ITEMS.filter((it) => ans[it.k] >= 1).length
+    + (isPost ? SURVEY_POST_LIKERT.filter((it) => (extra[it.k] || 0) >= 1).length : 0);
+  const total = SURVEY_ITEMS.length + (isPost ? SURVEY_POST_LIKERT.length : 0);
   const extraDone = !isPost || SURVEY_POST_LIKERT.every((it) => (extra[it.k] || 0) >= 1);
   /* 안 한 문항 표시는 「남은 N개」를 누른 뒤에만 켠다 — 처음부터 켜면 전부 오류처럼 보인다 */
   const [showGaps, setShowGaps] = useState(false);
   const gapItem = SURVEY_ITEMS.find((it) => !(ans[it.k] >= 1))
     || (isPost ? SURVEY_POST_LIKERT.find((it) => !(extra[it.k] >= 1)) : null);
-  const remain = (total - done) + (isPost ? SURVEY_POST_LIKERT.filter((it) => !(extra[it.k] >= 1)).length : 0);
+  const remain = total - done;
 
   if (svDone(sv)) {
     return (
@@ -4631,7 +4708,9 @@ function SurveyCard({ phase, block, onChange, onSubmit, busy }) {
       <div className="card-head">
         <span className="card-code">{isPost ? "사후 설문" : "사전 설문"}</span>
         <span className="card-title">나의 창의성에 대한 생각</span>
-        <span className="card-sess">{done}/{total}</span>
+        <span className="card-sess" role="status" aria-live="polite">
+          {saveInfo === "err" ? "저장 실패 — 연결 확인 · " : saveInfo === "saving" ? "저장 중… · " : saveInfo === "saved" ? "저장됨 · " : ""}{done}/{total}
+        </span>
       </div>
       <div className="card-note">
         정답이 없고 성적과도 관계없는 설문입니다. 잘 보이려는 답이 아니라 지금의 나에게 가장 가까운 답을 고르세요.
@@ -4785,53 +4864,63 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
     onTeacher();
   };
 
-  const scrollTo = (id) => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  const scrollTo = (id, focus) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // 키보드 사용자가 스크롤 뒤에도 헤더에 남지 않도록 입장 패널로 포커스를 옮긴다
+    if (focus) setTimeout(() => { try { el.focus({ preventScroll: true }); } catch (e) {} }, 400);
+  };
+  const [showT, setShowT] = useState(false); // 관리자 코드 표시 — 첫 설정 때 오타가 그대로 학급 코드로 굳는 것을 막는다
 
   return (
     <div className="g4">
       <GateStyle />
       <GateHeader
-        onEnter={() => { setMode("student"); setErr(""); scrollTo("g4-enter"); }}
+        onEnter={() => { setMode("student"); setErr(""); scrollTo("g4-enter", true); }}
         onUnits={() => scrollTo("g4-units")}
-        onTeacher={() => { setMode("teacher"); setErr(""); scrollTo("g4-enter"); }}
+        onTeacher={() => { setMode("teacher"); setErr(""); scrollTo("g4-enter", true); }}
         onGallery={onGallery}
         onDemo={onDemo} />
       <div className="g4-main">
-        <GateSections onEnter={() => scrollTo("g4-enter")} />
-        <aside className="g4-enter" id="g4-enter">
+        <GateSections onEnter={() => scrollTo("g4-enter", true)} />
+        <aside className="g4-enter" id="g4-enter" tabIndex={-1}>
           <div className="ticket">
         <div className="tab-switch" role="tablist">
-          <button className={mode === "student" ? "on" : ""} onClick={() => { setMode("student"); setErr(""); }}>학생</button>
-          <button className={mode === "teacher" ? "on" : ""} onClick={() => { setMode("teacher"); setErr(""); }}>교사</button>
-          <button className={mode === "guest" ? "on" : ""} onClick={() => { setMode("guest"); setErr(""); }}>둘러보기</button>
+          <button role="tab" aria-selected={mode === "student"} className={mode === "student" ? "on" : ""} disabled={busy} onClick={() => { setMode("student"); setErr(""); }}>학생</button>
+          <button role="tab" aria-selected={mode === "teacher"} className={mode === "teacher" ? "on" : ""} disabled={busy} onClick={() => { setMode("teacher"); setErr(""); }}>교사</button>
+          <button role="tab" aria-selected={mode === "guest"} className={mode === "guest" ? "on" : ""} disabled={busy} onClick={() => { setMode("guest"); setErr(""); }}>둘러보기</button>
         </div>
-        {err && <div className="err">{err}</div>}
         {mode === "student" ? (
-          <div>
-            <div className="field"><label>학번 (숫자만, 예: 10203)</label>
-              <input inputMode="numeric" value={sid} onChange={(e) => setSid(e.target.value.replace(/\D/g, ""))} maxLength={6} /></div>
-            <div className="field"><label>별명 (처음 입장할 때 정합니다 · 실명 금지)</label>
-              <input value={nick} onChange={(e) => setNick(e.target.value)} maxLength={12} /></div>
-            <div className="field"><label>비밀번호 숫자 4자리</label>
-              <input type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} maxLength={4}
-                onKeyDown={(e) => { if (e.key === "Enter") enterStudent(); }} /></div>
-            <button className="btn full" disabled={busy} onClick={enterStudent}>{busy ? "확인 중…" : "기록실 입장"}</button>
+          <form onSubmit={(e) => { e.preventDefault(); enterStudent(); }}>
+            <div className="field"><label htmlFor="g4-sid">학번 (숫자만, 예: 10203)</label>
+              <input id="g4-sid" inputMode="numeric" value={sid} onChange={(e) => setSid(e.target.value.replace(/\D/g, ""))} maxLength={6} /></div>
+            <div className="field"><label htmlFor="g4-nick">별명 (처음 한 번만 정합니다 · 이미 정했다면 비워 두세요 · 실명 금지)</label>
+              <input id="g4-nick" value={nick} onChange={(e) => setNick(e.target.value)} maxLength={12} /></div>
+            <div className="field"><label htmlFor="g4-pin">비밀번호 숫자 4자리</label>
+              <input id="g4-pin" type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} maxLength={4} /></div>
+            {err && <div className="err" role="alert">{err}</div>}
+            <button type="submit" className="btn full" disabled={busy}>{busy ? "확인 중…" : "기록실 입장"}</button>
             <p className="gate-note">처음 입장하면 학번과 별명이 등록되고, 다음부터는 학번과 비밀번호로 이어서 작성합니다.</p>
-          </div>
+          </form>
         ) : mode === "teacher" ? (
-          <div>
-            <div className="field"><label>관리자 코드 (6자리 이상)</label>
-              <input type="password" value={tpin} onChange={(e) => setTpin(e.target.value)} maxLength={32}
-                onKeyDown={(e) => { if (e.key === "Enter") enterTeacher(); }} /></div>
-            <button className="btn full seal" disabled={busy} onClick={enterTeacher}>{busy ? "확인 중…" : "관리자 입장"}</button>
-            <p className="gate-note">처음 입력한 코드가 이 학급의 관리자 코드가 됩니다.</p>
-          </div>
+          <form onSubmit={(e) => { e.preventDefault(); enterTeacher(); }}>
+            <div className="field"><label htmlFor="g4-tpin">관리자 코드 (6자리 이상)</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input id="g4-tpin" type={showT ? "text" : "password"} value={tpin} onChange={(e) => setTpin(e.target.value)} maxLength={32} style={{ flex: 1 }} />
+                <button type="button" className="btn small ghost" onClick={() => setShowT(!showT)} aria-pressed={showT}>{showT ? "숨기기" : "표시"}</button>
+              </div></div>
+            {err && <div className="err" role="alert">{err}</div>}
+            <button type="submit" className="btn full seal" disabled={busy}>{busy ? "확인 중…" : "관리자 입장"}</button>
+            <p className="gate-note">처음 입력한 코드가 이 학급의 관리자 코드가 됩니다. 새로 설정한다면 「표시」를 눌러 오타가 없는지 확인한 뒤 입장하세요.</p>
+          </form>
         ) : (
           <div>
             <p style={{ fontSize: 13, color: "var(--sub)", marginBottom: 14 }}>
-              예시 작품 「오른손」의 기록지를 로그인 없이 볼 수 있습니다.
+              공개된 학급 작품이 걸린 전시장과, 예시 작품 「오른손」의 기록지를 로그인 없이 볼 수 있습니다.
             </p>
-            <button className="btn full" onClick={onDemo}>예시 기록지 「오른손」</button>
+            <button className="btn full" onClick={onGallery}>전시장 들어가기</button>
+            <button className="btn full ghost" style={{ marginTop: 8 }} onClick={onDemo}>예시 기록지 「오른손」</button>
           </div>
         )}
           </div>
@@ -4857,7 +4946,7 @@ function SectionCard({ sec, ws, setField }) {
   const sp = sectionProgress(sec, ws);
   const complete = sp.total > 0 && sp.done >= sp.total;
   return (
-    <div className="card">
+    <div className="card" id={"sec-" + sec.id} style={{ scrollMarginTop: "var(--sv-top, 60px)" }}>
       {complete && <div className="stamp">기록됨</div>}
       <div className="card-head">
         <span className="card-code">{sec.kind === "learn" ? "배움 확인" : sec.kind === "inquiry" ? "탐구 질문" : "기록"} {sec.code}</span>
@@ -4890,9 +4979,21 @@ function StudentApp({ me, onExit, onGallery }) {
   const WSKEY = "ws:" + me.sid;
   const [ws, setWs] = useState({});
   const [loaded, setLoaded] = useState(false);
+  const [readErr, setReadErr] = useState(false); // 최초 로드 실패 — 덮어쓰기를 막으려 학습지를 잠근다
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  const [closeNote, setCloseNote] = useState(null); // 쓰던 차시를 선생님이 닫았을 때의 안내
   const [openMap, setOpenMap] = useState(DEFAULT_OPEN);
   const [tab, setTab] = useState(SESSIONS[0]);
-  useEffect(() => { if (loaded && !isOpen(openMap, tab)) { const first = SESSIONS.find((s) => isOpen(openMap, s)); if (first) setTab(first); } }, [loaded, openMap]);
+  useEffect(() => {
+    if (loaded && !isOpen(openMap, tab)) {
+      flush(); // 닫히기 직전까지 쓴 내용부터 저장
+      const first = SESSIONS.find((s) => isOpen(openMap, s));
+      if (first) {
+        setCloseNote("선생님이 「" + tab + "」를 닫아 「" + first + "」로 이동했습니다. 쓰던 내용은 저장되어 있습니다.");
+        setTab(first);
+      }
+    }
+  }, [loaded, openMap]);
   const [saveState, setSaveState] = useState("saved"); // saved | dirty | saving | err
   const [savedAt, setSavedAt] = useState(null);
   const [grade, setGrade] = useState(null);
@@ -4901,6 +5002,7 @@ function StudentApp({ me, onExit, onGallery }) {
   const [anCfg, setAnCfg] = useState(DEFAULT_ANCHOR);
   const [cfgAll, setCfgAll] = useState(null);   // 설정 문서 전체 — 붙여넣기 출처 묻기 같은 토글을 읽는다
   const [svBusy, setSvBusy] = useState(false);
+  const [svSave, setSvSave] = useState(null); // 설문 자동 저장 상태: null | saving | saved | err
   const svTimer = useRef(null);
   const surveyRef = useRef(null);
   surveyRef.current = survey;
@@ -4909,6 +5011,7 @@ function StudentApp({ me, onExit, onGallery }) {
   const wsRef = useRef(ws);
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
+  const loadedRef = useRef(false); // 로드 완료 전에는 어떤 경로로도 저장하지 않는다 (빈 문서 덮어쓰기 방지)
   wsRef.current = ws;
 
   /* 살펴본 시간 기록 — 마우스·키보드·스크롤이 움직인 시간만 차시별로 센다 */
@@ -4972,14 +5075,18 @@ function StudentApp({ me, onExit, onGallery }) {
     if (open) accAct(tabRef.current, { opens: 1 });
   };
 
-  useEffect(() => {
+  const loadAll = async () => {
     setMediaOwner(me.sid);
-    (async () => {
-      const saved = await store.get(WSKEY);
-      if (saved) { setWs(saved); setSavedAt(saved._updatedAt || null); }
-      setGrade(await store.get("grade:" + me.sid));
-      setSurvey((await store.get("survey:" + me.sid)) || {});
-      const cfg = await store.get("config");
+    setReadErr(false);
+    // 읽기 실패를 "기록 없음"으로 오인하면 빈 학습지가 뜨고, 한 글자만 쳐도
+    // 서버의 기존 기록 전체를 빈 문서로 덮어쓴다. 실패면 잠그고 다시 시도하게 한다.
+    const res = await store.getSafe(WSKEY);
+    if (!res.ok) { setReadErr(true); return; }
+    const saved = res.data;
+    if (saved) { setWs(saved); wsRef.current = saved; setSavedAt(saved._updatedAt || null); }
+    setGrade(await store.get("grade:" + me.sid));
+    setSurvey((await store.get("survey:" + me.sid)) || {});
+    const cfg = await store.get("config");
       const om = (cfg && cfg.open) || DEFAULT_OPEN;
       setOpenMap(om);
       setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
@@ -4989,11 +5096,12 @@ function StudentApp({ me, onExit, onGallery }) {
       let t0 = SESSIONS[0];
       if (saved && saved._lastTab && isOpen(om, saved._lastTab)) t0 = saved._lastTab;
       else { const lastOpen = [...SESSIONS].reverse().find((s) => isOpen(om, s)); if (lastOpen) t0 = lastOpen; }
-      setTab(t0);
-      accAct(t0, { visits: 1 }); // 입장 방문은 실제로 열린 차시에 귀속
-      setLoaded(true);
-    })();
-  }, []);
+    setTab(t0);
+    accAct(t0, { visits: 1 }); // 입장 방문은 실제로 열린 차시에 귀속
+    loadedRef.current = true;
+    setLoaded(true);
+  };
+  useEffect(() => { loadAll(); }, []);
 
   // 차시 공개 설정과 교사 피드백을 실시간으로 받음
   useEffect(() => {
@@ -5003,12 +5111,17 @@ function StudentApp({ me, onExit, onGallery }) {
   }, []);
 
   const doSave = async () => {
-    if (savingRef.current) return;
+    if (!loadedRef.current || savingRef.current) return;
     savingRef.current = true;
     dirtyRef.current = false;
     setSaveState("saving");
     const data = pruneTrace({ ...drainAct(), _updatedAt: now() });
-    const ok = await store.set(WSKEY, data);
+    // 오프라인이면 setDoc이 거부되지 않고 미해결로 남아 "저장 중…"에 영원히 갇힌다.
+    // 8초 안에 답이 없으면 실패로 치고 재시도 루프에 태운다 (늦게 성공해도 같은 내용이라 무해).
+    const ok = await Promise.race([
+      store.set(WSKEY, data),
+      new Promise((res) => setTimeout(() => res(false), 8000)),
+    ]);
     savingRef.current = false;
     if (ok) {
       // 덜어 낸 것이 있으면 화면의 기록도 저장된 것과 같게 맞춘다
@@ -5128,13 +5241,25 @@ function StudentApp({ me, onExit, onGallery }) {
 
   useEffect(() => {
     const onHide = () => { if (document.visibilityState === "hidden") flush(); };
+    // 저장이 끝나지 않은 채 창을 닫으면 경고 — 오프라인 큐 유실을 마지막에 한 번 더 막는다
+    const onBefore = (e) => {
+      if (dirtyRef.current || savingRef.current || sketchDirty.current) { e.preventDefault(); e.returnValue = ""; }
+    };
+    const onOn = () => { setOnline(true); if (dirtyRef.current) doSave(); };
+    const onOff = () => setOnline(false);
     window.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", flush);
     window.addEventListener("blur", flush);
+    window.addEventListener("beforeunload", onBefore);
+    window.addEventListener("online", onOn);
+    window.addEventListener("offline", onOff);
     return () => {
       window.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", flush);
       window.removeEventListener("blur", flush);
+      window.removeEventListener("beforeunload", onBefore);
+      window.removeEventListener("online", onOn);
+      window.removeEventListener("offline", onOff);
       if (timer.current) clearTimeout(timer.current);
       if (retryTimer.current) clearTimeout(retryTimer.current);
       if (svTimer.current) clearTimeout(svTimer.current);
@@ -5142,13 +5267,23 @@ function StudentApp({ me, onExit, onGallery }) {
   }, []);
 
   /* 설문 — 응답은 0.8초 뒤 자동 저장(중간 이탈 분석용), 제출하면 잠긴다 */
+  const svPersist = () => {
+    // 응답 자동 저장 — 결과를 배지로 보여 준다. "자동 저장됩니다"라고 말해 놓고
+    // 실패를 침묵하면 학생이 24문항을 잃고도 모른다.
+    setSvSave("saving");
+    Promise.race([
+      store.set("survey:" + me.sid, surveyRef.current),
+      new Promise((res) => setTimeout(() => res(false), 8000)),
+    ]).then((ok) => setSvSave(ok ? "saved" : "err"));
+  };
   const svChange = (phase, block) => {
     const next = { ...(surveyRef.current || {}), ver: SURVEY_VER, [phase]: block };
     setSurvey(next);
     if (svTimer.current) clearTimeout(svTimer.current);
-    svTimer.current = setTimeout(() => { store.set("survey:" + me.sid, surveyRef.current); }, 800);
+    svTimer.current = setTimeout(svPersist, 800);
   };
   const svSubmit = async (phase) => {
+    if (!window.confirm("제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?")) return;
     const cur = surveyRef.current || {};
     const block = cur[phase] || {};
     const started = block.startedAt || now();
@@ -5171,9 +5306,10 @@ function StudentApp({ me, onExit, onGallery }) {
     const next = { ...cur, stance: { ...(cur.stance || {}), ver: STANCE_VER, [phase]: block } };
     setSurvey(next);
     if (svTimer.current) clearTimeout(svTimer.current);
-    svTimer.current = setTimeout(() => { store.set("survey:" + me.sid, surveyRef.current); }, 800);
+    svTimer.current = setTimeout(svPersist, 800);
   };
   const stSubmit = async (phase) => {
+    if (!window.confirm("제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?")) return;
     const cur = surveyRef.current || {};
     const st = cur.stance || {};
     const block = st[phase] || {};
@@ -5222,6 +5358,8 @@ function StudentApp({ me, onExit, onGallery }) {
 
   const switchTab = (s) => {
     if (s === tab) return;
+    // 스케치의 미저장 획은 컴포넌트 안에만 있어 탭이 바뀌면(언마운트) 사라진다
+    if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
     wsRef.current = { ...wsRef.current, _lastTab: s }; // 다음 입장 때 이 차시로 이어서 연다
     setWs(wsRef.current);
     dirtyRef.current = true; // flush가 _lastTab까지 함께 저장하도록
@@ -5242,7 +5380,8 @@ function StudentApp({ me, onExit, onGallery }) {
           <div className="brand">허구의 아카이브 기록실<small>STUDENT · {me.sid}</small></div>
           <div className="top-right">
             <span>{me.nick}</span>
-            <span className={"save-pill " + (saveState === "dirty" || saveState === "saving" ? "dirty" : saveState === "err" ? "err" : "")}>
+            <span role={saveState === "err" ? "alert" : "status"} aria-live="polite"
+              className={"save-pill " + (saveState === "dirty" || saveState === "saving" ? "dirty" : saveState === "err" ? "err" : "")}>
               {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "err" ? "저장 실패 — 5초 뒤 재시도" : "저장됨 " + fmtTime(savedAt)}
             </span>
             {saveState === "err" && <button className="btn small" onClick={doSave}>지금 저장</button>}
@@ -5252,7 +5391,29 @@ function StudentApp({ me, onExit, onGallery }) {
         </div>
       </div>
       <div className="wrap">
-        <div className="prog-strip">
+        {!online && (
+          <div className="warn-note" role="alert" style={{ marginBottom: 10 }}>
+            인터넷이 끊겼습니다. 지금 쓰는 내용은 이 기기에 임시로 담겨 있다가 연결이 돌아오면 자동으로 저장됩니다 — 그전에 창을 닫지 마세요.
+          </div>
+        )}
+        {closeNote && (
+          <div className="ok-note" role="status" style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center" }}>
+            <span style={{ flex: 1 }}>{closeNote}</span>
+            <button className="btn small ghost" onClick={() => setCloseNote(null)}>닫기</button>
+          </div>
+        )}
+        {readErr && (
+          <div className="warn-note" role="alert" style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ flex: 1, minWidth: 200 }}>기록을 불러오지 못했습니다. 저장된 기록을 지키기 위해 학습지를 잠갔습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.</span>
+            <button className="btn small" onClick={loadAll}>다시 불러오기</button>
+          </div>
+        )}
+        {!loaded && !readErr && (
+          <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
+            기록을 불러오는 중… 잠시만 기다려 주세요.
+          </div></div>
+        )}
+        {loaded && <div className="prog-strip">
           <ProgressBar pct={Math.round(sessionProgress(tab, ws) * 100)} />
           <span className="prog-num">{(() => {
             let t = 0, d = 0;
@@ -5260,9 +5421,9 @@ function StudentApp({ me, onExit, onGallery }) {
             return "이번 차시 " + d + "/" + t;
           })()}</span>
           <span className="prog-num">전체 {pct}%</span>
-          <span className="prog-num">미디어 {mediaCount(ws)}건</span>
-        </div>
-        <div className="sess-tabs" role="tablist">
+          <span className="prog-num">올린 사진·녹음 {mediaCount(ws)}개</span>
+        </div>}
+        {loaded && <div className="sess-tabs" role="tablist">
           {SESSIONS.map((s) => {
             const open = isOpen(openMap, s);
             return (
@@ -5272,7 +5433,7 @@ function StudentApp({ me, onExit, onGallery }) {
               </button>
             );
           })}
-        </div>
+        </div>}
 
         {grade && (filled(grade.fbForm) || filled(grade.fbConcept)) && (
           <div className="feedback-card">
@@ -5283,19 +5444,30 @@ function StudentApp({ me, onExit, onGallery }) {
         )}
 
         {loaded && survey && surveyOpen(svCfg, "pre") && (
-          <SurveyCard phase="pre" block={survey.pre} busy={svBusy}
+          <SurveyCard phase="pre" block={survey.pre} busy={svBusy} saveInfo={svSave}
             onChange={(b) => svChange("pre", b)} onSubmit={() => svSubmit("pre")} />
         )}
         {loaded && survey && surveyOpen(svCfg, "post") && (
-          <SurveyCard phase="post" block={survey.post} busy={svBusy}
+          <SurveyCard phase="post" block={survey.post} busy={svBusy} saveInfo={svSave}
             onChange={(b) => svChange("post", b)} onSubmit={() => svSubmit("post")} />
         )}
         {loaded && survey && surveyOpen(svCfg, "sPre") && (
-          <StanceCard phase="pre" block={(survey.stance || {}).pre} busy={svBusy}
-            onChange={(b) => stChange("pre", b)} onSubmit={() => stSubmit("pre")} />
+          // 사전 설문 두 개가 동시에 열렸을 때는 순서를 정해 준다 — 첫 설문을 마치기 전에는 접어 둠
+          surveyOpen(svCfg, "pre") && !(survey.pre && survey.pre.submittedAt) ? (
+            <details className="card" style={{ marginBottom: 14 }}>
+              <summary className="card-body" style={{ cursor: "pointer", fontSize: 13 }}>
+                ② 평가자 성향 설문 (약 8분) — 위의 ① 사전 설문을 먼저 마친 뒤 눌러서 열어 주세요
+              </summary>
+              <StanceCard phase="pre" block={(survey.stance || {}).pre} busy={svBusy} saveInfo={svSave}
+                onChange={(b) => stChange("pre", b)} onSubmit={() => stSubmit("pre")} />
+            </details>
+          ) : (
+            <StanceCard phase="pre" block={(survey.stance || {}).pre} busy={svBusy} saveInfo={svSave}
+              onChange={(b) => stChange("pre", b)} onSubmit={() => stSubmit("pre")} />
+          )
         )}
         {loaded && survey && surveyOpen(svCfg, "sPost") && (
-          <StanceCard phase="post" block={(survey.stance || {}).post} busy={svBusy}
+          <StanceCard phase="post" block={(survey.stance || {}).post} busy={svBusy} saveInfo={svSave}
             onChange={(b) => stChange("post", b)} onSubmit={() => stSubmit("post")} />
         )}
         {loaded && survey && anchorOpen(anCfg) && (
@@ -5303,12 +5475,12 @@ function StudentApp({ me, onExit, onGallery }) {
             onChange={anChange} onSubmit={anSubmit} />
         )}
 
-        {!isOpen(openMap, tab) ? (
+        {loaded && !isOpen(openMap, tab) ? (
           <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
             이 차시는 아직 열리지 않았습니다. 선생님이 수업 시간에 열어 주면 강의 노트와 학습지가 나타납니다.
           </div></div>
         ) : null}
-        {isOpen(openMap, tab) && LESSONS.filter((L) => L.session === tab).map((L) => {
+        {loaded && isOpen(openMap, tab) && LESSONS.filter((L) => L.session === tab).map((L) => {
           const confirmSec = secs.find((s) => s.id === "l" + L.n);
           const inquirySec = secs.find((s) => s.id === "q" + L.n);
           return (
@@ -5319,7 +5491,7 @@ function StudentApp({ me, onExit, onGallery }) {
             </React.Fragment>
           );
         })}
-        {isOpen(openMap, tab) && secs.filter((s) => s.kind !== "learn" && s.kind !== "inquiry").map((sec) => (
+        {loaded && isOpen(openMap, tab) && secs.filter((s) => s.kind !== "learn" && s.kind !== "inquiry").map((sec) => (
           <SectionCard key={sec.id} sec={sec} ws={ws} setField={setField} />
         ))}
       </div>
@@ -5345,13 +5517,13 @@ function StudentApp({ me, onExit, onGallery }) {
 
 /* ---------- 교사: 학생 상세(열람 + 채점) ---------- */
 
-function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack, ids, onSel }) {
+function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack, ids, onSel, initialTab }) {
   const [ws, setWs] = useState(null);
   const [grade, setGrade] = useState({});
   const [survey, setSurvey] = useState(null);
   const [gradeDirty, setGradeDirty] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
-  const [subTab, setSubTab] = useState("기록 열람");
+  const [subTab, setSubTab] = useState(initialTab || "기록 열람");
   const [sessFilter, setSessFilter] = useState("전체");
   const upGrade = (g) => { setGrade(g); setGradeDirty(true); };
   const guarded = (fn) => () => {
@@ -5395,7 +5567,14 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
     // 저장하는 사이에 또 고쳤다면 dirty를 풀지 않는다
     if (ok && gradeRef.current === snap) setGradeDirty(false);
     setSaveMsg(ok ? "저장됨 " + fmtTime(now()) : "저장 실패 — 다시 시도하세요");
+    return ok;
   };
+  // 저장 문구가 남아 있으면 다음에 같은 학생을 열었을 때 옛 시각이 현재 결과처럼 보인다
+  useEffect(() => {
+    if (!saveMsg || saveMsg === "저장 중…") return;
+    const t = setTimeout(() => setSaveMsg(""), 6000);
+    return () => clearTimeout(t);
+  }, [saveMsg]);
 
   /* ---------- 학생 관리 (별명·학번 변경, 기록 초기화, 작품·계정 정리) ---------- */
   const [mgmtMsg, setMgmtMsg] = useState("");
@@ -5599,7 +5778,8 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
         </div>
       )}
 
-      {(() => {
+      {/* 붙여넣기·시간 카드는 기록 열람에서만 — 채점·관리 탭 위에 끼어들면 목표 표까지 스크롤이 길어진다 */}
+      {subTab === "기록 열람" && (() => {
         const prs = pasteRows(ws);
         if (!prs.length) return null;
         const pm = pasteMetrics(ws);
@@ -5644,7 +5824,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
         );
       })()}
 
-      {ws._act && Object.keys(ws._act).length > 0 && (
+      {subTab === "기록 열람" && ws._act && Object.keys(ws._act).length > 0 && (
         <div className="card">
           <div className="card-body">
             <details>
@@ -5715,8 +5895,9 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
         </div>
         <div className="checkline" style={{ marginBottom: 12 }}>
           {OBS_ITEMS.map((o, i) => (
-            <span key={i} className={"chk " + (grade["o" + i] ? "on" : "")}
-              onClick={() => upGrade({ ...grade, ["o" + i]: !grade["o" + i] })}>
+            <span key={i} className={"chk " + (grade["o" + i] ? "on" : "")} role="checkbox" aria-checked={!!grade["o" + i]} tabIndex={0}
+              onClick={() => upGrade({ ...grade, ["o" + i]: !grade["o" + i] })}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); upGrade({ ...grade, ["o" + i]: !grade["o" + i] }); } }}>
               {grade["o" + i] ? "☑" : "☐"} {o}
             </span>
           ))}
@@ -5732,9 +5913,16 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <button className="btn" disabled={isSample} onClick={saveGrade}>채점 저장</button>
           {pos >= 0 && pos < order.length - 1 && (
-            <button className="btn ghost" onClick={() => { if (gradeDirty) return window.alert("저장하지 않은 채점이 있습니다. 먼저 「채점 저장」을 누르세요."); goto(order[pos + 1]); }}>다음 학생 →</button>
+            /* 상단 네비의 「다음 학생」과 이름이 같은데 동작이 다르면 어느 쪽이 안전한지 배울 수 없다 —
+               여기는 연속 채점 흐름이므로 저장부터 하고 이동한다 */
+            <button className="btn ghost" onClick={async () => {
+              if (gradeDirty && !isSample) { const ok = await saveGrade(); if (!ok) return; } // 저장이 실패했는데 이동하면 채점이 사라진다
+              goto(order[pos + 1]);
+            }}>
+              {gradeDirty && !isSample ? "저장하고 다음 학생 →" : "다음 학생 →"}
+            </button>
           )}
-          <span className="hint">{saveMsg}</span>
+          <span className="hint" role="status" aria-live="polite">{saveMsg}</span>
         </div>
       </div>
       )}
@@ -5820,6 +6008,26 @@ function ApproprScatter({ rows, apMed, srMed, hoverId, setHoverId, onSel }) {
         붙여넣기 기록이 있는 {pts.length}명만 나타납니다{none > 0 ? " (직접 쓴 학생 " + none + "명은 이 그림에 없습니다)" : ""}.
         {pts.length < 3 ? " 중앙값 선은 3명부터 그립니다." : ""}
       </p>
+      {pts.length > 0 && (
+        /* 점의 설명은 호버에만 있어 터치 화면에서는 읽을 수 없다 — 같은 값을 표로도 제공 */
+        <details style={{ marginTop: 6 }}>
+          <summary className="hint" style={{ cursor: "pointer" }}>표로 보기 (터치 화면용 — 점과 같은 값)</summary>
+          <div className="tbl-scroll"><table className="tbl" style={{ marginTop: 8, minWidth: 420 }}>
+            <thead><tr><th>별명</th><th style={{ width: 90 }}>가져온 양</th><th style={{ width: 80 }}>전유율</th><th style={{ width: 90 }}>유형</th><th style={{ width: 70 }}></th></tr></thead>
+            <tbody>
+              {pts.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.nick}</td>
+                  <td className="mono">{r.pm.srcRatio}%</td>
+                  <td className="mono">{r.pm.approp}%</td>
+                  <td>{r.pm.type || "미분류"}</td>
+                  <td><button className="btn small ghost" onClick={() => onSel(r.id)}>열람</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </details>
+      )}
     </div>
   );
 }
@@ -5917,6 +6125,24 @@ function TimeScatter({ rows, hoverId, setHoverId, onSel }) {
         })()}
       </svg>
       {noTime > 0 && <p className="hint">시간 기록이 없는 학생 {noTime}명은 이 그림에서 빠져 있습니다.</p>}
+      {data.length > 0 && (
+        <details style={{ marginTop: 6 }}>
+          <summary className="hint" style={{ cursor: "pointer" }}>표로 보기 (터치 화면용 — 점과 같은 값)</summary>
+          <div className="tbl-scroll"><table className="tbl" style={{ marginTop: 8, minWidth: 360 }}>
+            <thead><tr><th>별명</th><th style={{ width: 90 }}>머문 시간</th><th style={{ width: 90 }}>축 평균</th><th style={{ width: 70 }}></th></tr></thead>
+            <tbody>
+              {data.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.nick}</td>
+                  <td className="mono">{r.min}분</td>
+                  <td className="mono">{r.score}</td>
+                  <td><button className="btn small ghost" onClick={() => onSel(r.id)}>열람</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </details>
+      )}
     </div>
   );
 }
@@ -5934,6 +6160,13 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
   const simSnap = useSlow(wsOnly, 15000);
   const simAll = useMemo(() => similarityAll(simSnap), [simSnap]);
   const rows = ids.map((id) => ({ id, nick: (roster[id] || {}).nick || id, ax: axesAll[id] || {} }));
+
+  // 학생 0명일 때 0으로 채운 카드 8장을 그리면 고장 난 화면처럼 보인다
+  if (!ids.length) {
+    return <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
+      학생 기록이 쌓이면 창의성 6축 대시보드가 여기에 나타납니다.
+    </div></div>;
+  }
 
   const meanMed = median(rows.map((r) => r.ax.mean));
   const zeroMedia = rows.filter((r) => mediaCount(wsMap[r.id]) === 0);
@@ -6024,7 +6257,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
                       );
                     })}
                     <td className="mono" style={{ fontFamily: "var(--serif)", fontWeight: 700 }}>{r.ax.mean == null ? "—" : r.ax.mean}</td>
-                    <td><button className="btn small" onClick={() => onSel(r.id)}>기록 열람</button></td>
+                    <td><button className="btn small" onClick={() => onSel(r.id)}>열람</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -6179,13 +6412,13 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
                       <td className="mono">{g("notPassed")}</td>
                       <td className="mono">{mediaCount(w)}</td>
                       <td className="mono">{(w._log || []).length}</td>
-                      <td><button className="btn small" onClick={() => onSel(id)}>변화 보기</button></td>
+                      <td><button className="btn small" onClick={() => onSel(id, "사고 변화")}>열람</button></td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            <p className="hint" style={{ marginTop: 10 }}>학생을 눌러 들어간 뒤 「사고 변화」에서 앞뒤 답을 나란히 봅니다. 채점은 이 화면의 근거를 먼저 읽고 매깁니다.</p>
+            <p className="hint" style={{ marginTop: 10 }}>「열람」을 누르면 그 학생의 「사고 변화」 탭이 바로 열려 앞뒤 답을 나란히 봅니다. 채점은 이 화면의 근거를 먼저 읽고 매깁니다.</p>
           </div>
         </div>
       </div>
@@ -6196,6 +6429,11 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
 /* ---------- 교사: 설문 대시보드 (사전·사후 비교) ---------- */
 
 function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
+  if (!ids.length) {
+    return <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
+      학생이 입장해 설문을 제출하면 사전·사후 비교 대시보드가 여기에 나타납니다.
+    </div></div>;
+  }
   const rows = ids.map((id) => {
     const sv = surveyMap[id] || {};
     const pre = svDone(sv.pre) ? surveyScores(sv.pre.ans) : null;
@@ -6594,7 +6832,7 @@ function TeacherGuide() {
             <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>「연구」 탭 — 수업 기록을 논문 작성용 자료로 바꾸기</summary>
             <div style={{ fontSize: 13, lineHeight: 1.8, marginTop: 10 }}>
               <p style={{ marginBottom: 10 }}>
-                「연구」 탭은 학급 기록을 논문에 바로 쓸 수 있는 네 가지 자료 구조와 세 가지 문서로 바꿔 줍니다.
+                「연구」 탭은 학급 기록을 논문에 바로 쓸 수 있는 다섯 가지 자료 구조와 세 가지 문서(모두 여덟 파일)로 바꿔 줍니다.
                 내려받는 파일에는 학번·별명·계정 정보가 들어가지 않고, 학번을 정렬해 붙인 익명 번호(P01, P02…)만 남습니다.
                 익명 번호와 학번의 대응표는 화면에서만 보이며 파일로 나가지 않으므로, 필요하면 교사가 따로 안전한 곳에 보관하세요.
               </p>
@@ -6602,6 +6840,7 @@ function TeacherGuide() {
                 <thead><tr><th style={{ width: 130 }}>파일</th><th style={{ width: 150 }}>한 행의 단위</th><th>논문의 어느 자리에 쓰는가</th></tr></thead>
                 <tbody>
                   <tr><td>참여자 단위 CSV</td><td>참여자 1명</td><td>기술통계, 상관분석, 사전·사후 비교. 통계 프로그램에 그대로 올립니다.</td></tr>
+                  <tr><td>붙여넣기 단위 CSV</td><td>붙여넣기 1건</td><td>가져온 글의 양·출처 자기보고·정착 시간을 다루는 결과 절. 전유 분석의 원자료입니다.</td></tr>
                   <tr><td>계단 단위 CSV</td><td>참여자 × 아홉 계단</td><td>계단별 도달률과 사고의 두께를 시간 축으로 보는 결과 절. 반복측정 구조의 자료입니다.</td></tr>
                   <tr><td>질적 코딩 시트 CSV</td><td>참여자 × 항목 × 문장</td><td>질적 분석. 계단·구체어 적중 같은 1차 자동 표지가 붙어 있고 code_1·code_2·memo 열은 연구자가 채웁니다.</td></tr>
                   <tr><td>사전·사후 텍스트 쌍 CSV</td><td>참여자 × 비교 쌍</td><td>같은 물음에 두 번 답한 자리의 원문을 나란히 인용하는 결과 절.</td></tr>
@@ -6843,8 +7082,11 @@ function ConcSlope({ rows, onSel }) {
             <text x={x1 - 8} y={y(v) + 3} textAnchor="end">{v}</text>
           </g>
         ))}
-        <text x={x1} y={pad - 12} textAnchor="middle">T5 초안</text>
-        <text x={x2} y={pad - 12} textAnchor="middle">T7 확정</text>
+        {/* 값의 출처는 s3t3.stmt1(T7)과 s3t4.stmt2(T9) — 축 이름이 실제 계단과 다르면
+            엉뚱한 계단의 발문을 보강하게 된다 (LadderMap·원고 초안의 T7→T9 표기와 일치시킴) */}
+        <text x={x1} y={pad - 12} textAnchor="middle">T7 초안</text>
+        <text x={x2} y={pad - 12} textAnchor="middle">T9 확정</text>
+        <text x={x1 - 8} y={pad - 24} textAnchor="end" fontSize={9} fill="var(--sub)">구체성 0~100</text>
         {pts.map((r) => {
           const up = r.tm.conc2 > r.tm.conc1, dn = r.tm.conc2 < r.tm.conc1;
           return (
@@ -8013,8 +8255,12 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
               </div>
             ))}
           </div>
-          <button className="btn" disabled={!N} onClick={() => FILES.forEach((f, i) => setTimeout(f.go, i * 350))}>일곱 파일 한 번에 내려받기</button>
+          <button className="btn" disabled={!N} onClick={() => FILES.forEach((f, i) => setTimeout(f.go, i * 350))}>{FILES.length}개 파일 한 번에 내려받기</button>
           <p className="hint" style={{ marginTop: 10 }}>
+            브라우저가 연속 다운로드를 막으면 두 번째 파일부터 저장되지 않을 수 있습니다 — 주소창 옆 차단 알림을 허용하거나, 위 카드에서 하나씩 받으세요.
+            받은 뒤 파일이 {FILES.length}개인지 세어 보세요.
+          </p>
+          <p className="hint" style={{ marginTop: 6 }}>
             CSV는 BOM을 붙여 저장하므로 한글이 깨지지 않고 엑셀에서 바로 열립니다.
             마크다운 파일은 한글 워드프로세서나 논문 편집기에 붙여 넣으면 표가 그대로 살아납니다.
           </p>
@@ -8094,6 +8340,8 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
   const pick = (fn) => { const m = {}; ids.forEach((id) => { if (fn(id)) m[id] = true; }); setSel(m); };
   const pctOf = (id) => overallProgress(wsMap[id]);
 
+  const [tone, setTone] = useState("ok"); // 성공·진행은 초록, 실패·취소만 붉게 — 삭제 성공이 경고색으로 뜨면 실패로 오독한다
+  const say = (t, text) => { setTone(t); setMsg(text); };
   const del = async () => {
     if (sampleMode || !chosen.length) return;
     const names = chosen.map((id) => id + (roster[id] && roster[id].nick ? "(" + roster[id].nick + ")" : "")).join(", ");
@@ -8102,13 +8350,13 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
       "\n\n기록지·미디어·채점·설문·명부와 동의 대장의 해당 칸이 모두 사라지며 되돌릴 수 없습니다." +
       "\n계속하려면 지울 인원 수 " + chosen.length + " 을(를) 입력하세요.");
     if (token == null) return;
-    if (token.trim() !== String(chosen.length)) return setMsg("인원 수가 일치하지 않아 취소했습니다.");
+    if (token.trim() !== String(chosen.length)) return say("warn", "인원 수가 일치하지 않아 취소했습니다.");
 
     setBusy(true);
     let done = 0;
     try {
       for (const id of chosen) {
-        setMsg("지우는 중… " + (done + 1) + " / " + chosen.length + " (" + id + ")");
+        say("ok", "지우는 중… " + (done + 1) + " / " + chosen.length + " (" + id + ")");
         for (const ref of collectMediaRefs(wsMap[id] || {})) await mediaStore.remove(id, ref);
         await fbStore.remove("ws:" + id);
         await fbStore.remove("grade:" + id);
@@ -8123,10 +8371,10 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
         await store.set("research:consent", next);
       }
       setSel({});
-      setMsg(done + "명을 지웠습니다. 로그인 계정은 Firebase 콘솔의 Authentication에서 따로 지워야 하며, 같은 학번으로 다시 입장하면 빈 기록지로 새로 시작합니다.");
+      say("ok", done + "명을 지웠습니다. 로그인 계정은 Firebase 콘솔의 Authentication에서 따로 지워야 하며, 같은 학번으로 다시 입장하면 빈 기록지로 새로 시작합니다.");
       if (onDone) onDone();
     } catch (e) {
-      setMsg("지우다 중단됐습니다 (" + done + "명 처리). 남은 학생은 다시 고르고 실행하세요.");
+      say("warn", "지우다 중단됐습니다 (" + done + "명 처리). 남은 학생은 다시 고르고 실행하세요.");
     }
     setBusy(false);
   };
@@ -8139,7 +8387,7 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
           시험 삼아 들어가 본 학번을 정리할 때 씁니다. 고른 학생의 <b>기록지·미디어·채점·설문·명부</b>와
           동의 대장의 해당 칸이 함께 사라집니다. <b>되돌릴 수 없습니다.</b>
         </p>
-        {msg && <div className={busy ? "ok-note" : "warn-note"} style={{ marginBottom: 10 }}>{msg}</div>}
+        {msg && <div role="status" className={tone === "warn" ? "warn-note" : "ok-note"} style={{ marginBottom: 10 }}>{msg}</div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
           <button className="btn small ghost" disabled={busy} onClick={() => pick(() => true)}>전체 고르기</button>
           <button className="btn small ghost" disabled={busy} onClick={() => pick((id) => pctOf(id) === 0)}>기록이 없는 학생만</button>
@@ -8199,6 +8447,8 @@ function TeacherApp({ onExit, onGallery }) {
   const [gradeMap, setGradeMap] = useState({});
   const [surveyMap, setSurveyMap] = useState({});
   const [sel, setSel] = useState(null);
+  const [selTab, setSelTab] = useState(null); // 학생 상세를 열 때 곧장 보여 줄 서브탭 (예: 「변화 보기」→사고 변화)
+  const openStudent = (id, tab2) => { setSelTab(tab2 || null); setSel(id); };
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const [openMap, setOpenMap] = useState(DEFAULT_OPEN);
@@ -8207,6 +8457,13 @@ function TeacherApp({ onExit, onGallery }) {
   const [cfgAll, setCfgAll] = useState(null);   // 설정 문서 전체 — 붙여넣기 출처 묻기 토글을 읽는다
   const [sampleMode, setSampleMode] = useState(true);
   const [npin, setNpin] = useState("");
+  // 수업 편집 원고가 저장 전이면 탭 이동 한 번으로 통째로 사라진다 — 편집기가 dirty를 올려 주면 이동을 막는다
+  const [edDirty, setEdDirty] = useState(false);
+  const switchTab = (t) => {
+    if (t !== tab && tab === "수업 편집" && edDirty &&
+      !window.confirm("저장하지 않은 수업 편집 원고가 있습니다. 이동하면 사라집니다. 이동할까요?")) return;
+    setTab(t);
+  };
 
   const loadAll = async () => {
     setLoading(true);
@@ -8246,6 +8503,11 @@ function TeacherApp({ onExit, onGallery }) {
     else setMsg("설정 저장에 실패했습니다.");
   };
   const setAllSessions = async (val) => {
+    // 오클릭 한 번으로 전 학생 화면에서 학습지가 사라지는 조작이라 닫기만은 확인을 거친다
+    if (!val) {
+      const openCnt = SESSIONS.filter((s) => isOpen(openMap, s)).length;
+      if (!window.confirm("지금 열린 " + openCnt + "개 차시를 모두 닫습니다. 학생 화면에서 학습지가 사라집니다. 계속할까요?")) return;
+    }
     const cfg = (await store.get("config")) || {};
     const next = {};
     SESSIONS.forEach((s) => { next[s] = val; });
@@ -8345,8 +8607,10 @@ function TeacherApp({ onExit, onGallery }) {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
-    a.href = url; a.download = "허구의아카이브_학급기록" + (sampleMode ? "_표본" : "") + "_" + stamp + ".csv"; a.click();
+    // 파일명에 개인정보 포함 사실을 박아 둔다 — 연구 탭의 익명 CSV와 뒤섞이는 사고 방지
+    a.href = url; a.download = "허구의아카이브_학급기록_학번별명포함" + (sampleMode ? "_표본" : "") + "_" + stamp + ".csv"; a.click();
     URL.revokeObjectURL(url);
+    setMsg("CSV를 내려받았습니다 — 이 파일에는 학번과 별명이 그대로 들어 있습니다. 외부 공유 전에 확인하세요. (연구용 익명 자료는 「연구」 탭)");
   };
 
   return (
@@ -8364,7 +8628,7 @@ function TeacherApp({ onExit, onGallery }) {
       <div className="wrap wide">
         {sel ? (
           <div style={{ paddingTop: 18 }}>
-            <TeacherStudentView key={sel} sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} surveyData={surveyMap[sel]} ids={ids} onSel={setSel}
+            <TeacherStudentView key={sel} sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} surveyData={surveyMap[sel]} ids={ids} onSel={openStudent} initialTab={selTab}
               onBack={() => { setSel(null); loadAll(); }} />
           </div>
         ) : (
@@ -8375,8 +8639,10 @@ function TeacherApp({ onExit, onGallery }) {
               </div>
             )}
             <div className="t-tabs">
-              {["현황", "차시 공개", "수업 안내", "수업 편집", "분석", "사고 과정", "창의성", "설문", "연구", "설정"].map((t) => (
-                <button key={t} className={"btn small " + (tab === t ? "" : "ghost")} onClick={() => setTab(t)}>{t}</button>
+              {["현황", "차시 공개", "수업 안내", "수업 편집", "기록 현황", "사고 과정", "창의성", "설문", "연구", "설정"].map((t) => (
+                <button key={t} className={"btn small " + (tab === t ? "" : "ghost")} onClick={() => switchTab(t)}>
+                  {t}{t === "수업 편집" && edDirty ? " ●" : ""}
+                </button>
               ))}
             </div>
             {loading ? <div style={{ color: "var(--sub)" }}>학급 기록을 불러오는 중…</div> : tab === "현황" ? (
@@ -8385,9 +8651,12 @@ function TeacherApp({ onExit, onGallery }) {
                   <div className="kpi"><div className="n">{ids.length}</div><div className="l">등록 학생</div></div>
                   <div className="kpi"><div className="n">{avg}%</div><div className="l">평균 진행률</div></div>
                   <div className="kpi"><div className="n">{gradedCount}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {ids.length}</span></div><div className="l">루브릭 채점 완료</div></div>
-                  <div className="kpi" style={{ cursor: "pointer" }} onClick={() => setTab("차시 공개")} title="차시 공개 탭으로 이동">
+                  <div className="kpi" role="button" tabIndex={0} style={{ cursor: "pointer" }}
+                    onClick={() => switchTab("차시 공개")}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); switchTab("차시 공개"); } }}
+                    title="차시 공개 탭으로 이동">
                     <div className="n" style={{ fontSize: 17 }}>{SESSIONS.filter((s) => isOpen(openMap, s)).map((s) => s.replace("차시", "")).join(" · ") || "없음"}</div>
-                    <div className="l">열린 차시 (누르면 설정)</div>
+                    <div className="l">열린 차시 — 설정 →</div>
                   </div>
                 </div>
                 {ids.length === 0 ? (
@@ -8410,11 +8679,12 @@ function TeacherApp({ onExit, onGallery }) {
                               <td><span className="mini-bar"><i style={{ width: p + "%" }} /></span> <span className="mono" style={{ fontSize: 11 }}>{p}%</span></td>
                               <td><div className="sess-dots">{SESSIONS.map((s) => {
                                 const r = sessionProgress(s, w);
-                                return <span key={s} className={r >= 0.999 ? "full" : r > 0 ? "part" : ""} title={s} />;
+                                const st = r >= 0.999 ? "완료" : r > 0 ? "진행 중" : "기록 없음";
+                                return <span key={s} className={r >= 0.999 ? "full" : r > 0 ? "part" : ""} role="img" aria-label={s + " " + st} title={s + " · " + st} />;
                               })}</div></td>
                               <td className="mono" style={{ fontSize: 11 }}>{fmtTime(w._updatedAt)}</td>
                               <td>{graded ? <span style={{ color: "var(--patina)" }}>완료</span> : g ? <span style={{ color: "var(--amber)" }}>일부</span> : <span style={{ color: "var(--sub)" }}>-</span>}</td>
-                              <td><button className="btn small" onClick={() => setSel(id)}>열람·채점</button></td>
+                              <td><button className="btn small" onClick={() => openStudent(id)}>열람</button></td>
                             </tr>
                           );
                         })}
@@ -8422,7 +8692,12 @@ function TeacherApp({ onExit, onGallery }) {
                     </table>
                   </div>
                 )}
-                <p className="hint" style={{ marginTop: 10 }}>학생이 저장하면 잠시 후 이 화면에 자동으로 반영됩니다.</p>
+                <p className="hint" style={{ marginTop: 10 }}>
+                  학생이 저장하면 잠시 후 이 화면에 자동으로 반영됩니다.
+                  차시별 점: <span className="sess-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}><span className="full" /></span> 완료 ·{" "}
+                  <span className="sess-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}><span className="part" /></span> 진행 중 ·{" "}
+                  <span className="sess-dots" style={{ display: "inline-flex", verticalAlign: "middle" }}><span /></span> 기록 없음 (점 위에 올리면 차시와 상태가 보입니다)
+                </p>
               </div>
             ) : tab === "차시 공개" ? (
               <div>
@@ -8435,7 +8710,7 @@ function TeacherApp({ onExit, onGallery }) {
                       <button className="btn small ghost" onClick={() => setAllSessions(true)}>모두 열기</button>
                       <button className="btn small ghost" onClick={() => setAllSessions(false)}>모두 닫기</button>
                     </div>
-                    <table className="roster">
+                    <div className="tbl-scroll"><table className="roster">
                       <thead><tr><th>차시</th><th>수업 내용</th><th>기록 중인 학생</th><th style={{ width: 110 }}>공개</th></tr></thead>
                       <tbody>
                         {SESSIONS.map((s) => {
@@ -8457,7 +8732,7 @@ function TeacherApp({ onExit, onGallery }) {
                           );
                         })}
                       </tbody>
-                    </table>
+                    </table></div>
                     <p className="hint" style={{ marginTop: 10 }}>차시를 닫아도 학생이 이미 작성한 내용은 저장된 상태로 남고, 교사 화면에서는 계속 열람과 채점이 됩니다.</p>
                   </div>
                 </div>
@@ -8468,7 +8743,7 @@ function TeacherApp({ onExit, onGallery }) {
                       열려 있는 동안 학생 화면 맨 위에 설문 카드가 나타나고, 제출한 학생에게는 다시 보이지 않습니다.
                       사전 설문은 <b>1차시 수업을 시작하기 전</b>에 하고 수업이 시작되면 닫습니다. 사후 설문은 <b>8차시 정리 단계</b>에 엽니다. 결과는 「설문」 탭에서 봅니다.
                     </p>
-                    <table className="roster">
+                    <div className="tbl-scroll"><table className="roster">
                       <thead><tr><th>설문</th><th>실시 시점</th><th>제출</th><th style={{ width: 110 }}>공개</th></tr></thead>
                       <tbody>
                         {SURVEY_PHASES.map(({ ph, nm, when, get }) => {
@@ -8489,7 +8764,7 @@ function TeacherApp({ onExit, onGallery }) {
                           );
                         })}
                       </tbody>
-                    </table>
+                    </table></div>
                     <p className="hint" style={{ marginTop: 10 }}>같은 문항을 두 번 실시해 변화를 잽니다. 학생에게는 성적과 무관함을 반드시 미리 알립니다. 성향 설문은 <b>반드시 1차시에</b> 받습니다 — 8차시 상호평가 직전에 AI 태도를 물으면 그 질문이 판정 기준을 흔듭니다.</p>
                   </div>
                 </div>
@@ -8501,7 +8776,7 @@ function TeacherApp({ onExit, onGallery }) {
                       고른 값은 연구 자료의 <span className="mono">src_selfreport</span> 열에 남습니다.
                       끄면 학생 화면에 아무 반응도 나타나지 않고 기록만 조용히 쌓입니다.
                     </p>
-                    <table className="roster">
+                    <div className="tbl-scroll"><table className="roster">
                       <thead><tr><th>설정</th><th>학생이 보는 것</th><th style={{ width: 110 }}>상태</th></tr></thead>
                       <tbody>
                         <tr>
@@ -8517,7 +8792,7 @@ function TeacherApp({ onExit, onGallery }) {
                           </td>
                         </tr>
                       </tbody>
-                    </table>
+                    </table></div>
                     <p className="hint" style={{ marginTop: 10 }}>
                       학생은 서로의 글을 볼 수 없으므로 보기에 「친구」를 두지 않았습니다. 실제로 가능한 출처는
                       생성형 도구, 인터넷·자료, 자기가 앞 차시에 쓴 글입니다.
@@ -8531,21 +8806,16 @@ function TeacherApp({ onExit, onGallery }) {
                     </p>
                   </div>
                 </div>
-                <AnchorPanel ids={ids} roster={roster} surveyMap={surveyMap} cfg={anCfg} sampleMode={sampleMode}
-                  onSave={async (next) => {
-                    const cfg = (await store.get("config")) || {};
-                    const ok = await store.set("config", { ...cfg, anchor: next, anchorUpdated: now() });
-                    if (ok) setAnCfg(next); else setMsg("앵커 설정을 저장하지 못했습니다.");
-                  }} />
+                <p className="hint" style={{ marginTop: 8 }}>앵커 판정 실험 설정은 「연구」 탭 맨 아래로 옮겼습니다 — 이 탭은 수업 중 급한 공개 조작만 담습니다.</p>
               </div>
             ) : tab === "수업 안내" ? (
               <TeacherGuide />
             ) : tab === "수업 편집" ? (
-              <ContentEditor lessonDefs={LESSONS_DEF} schemaDefs={SCHEMA_DEF} LessonPanel={LessonPanel} />
-            ) : tab === "분석" ? (
+              <ContentEditor lessonDefs={LESSONS_DEF} schemaDefs={SCHEMA_DEF} LessonPanel={LessonPanel} onDirty={setEdDirty} />
+            ) : tab === "기록 현황" ? (
               <div>
                 <div className="card">
-                  <div className="card-head"><span className="card-code">분석 1</span><span className="card-title">차시별 학급 평균 기록률</span></div>
+                  <div className="card-head"><span className="card-code">기록 1</span><span className="card-title">차시별 학급 평균 기록률</span></div>
                   <div className="card-body">
                     {SESSIONS.map((s) => {
                       const v = ids.length ? Math.round(ids.reduce((a, id) => a + sessionProgress(s, wsMap[id]), 0) / ids.length * 100) : 0;
@@ -8561,7 +8831,7 @@ function TeacherApp({ onExit, onGallery }) {
                   </div>
                 </div>
                 <div className="card">
-                  <div className="card-head"><span className="card-code">분석 2</span><span className="card-title">기록 구간별 미기록 학생</span></div>
+                  <div className="card-head"><span className="card-code">기록 2</span><span className="card-title">기록 구간별 미기록 학생</span></div>
                   <div className="card-body">
                     {SCHEMA.filter((sec) => isOpen(openMap, sec.session)).map((sec) => {
                       const missing = ids.filter((id) => sectionProgress(sec, wsMap[id]).done === 0);
@@ -8585,7 +8855,7 @@ function TeacherApp({ onExit, onGallery }) {
                   </div>
                 </div>
                 <div className="card">
-                  <div className="card-head"><span className="card-code">분석 3</span><span className="card-title">루브릭 등급 분포</span></div>
+                  <div className="card-head"><span className="card-code">기록 3</span><span className="card-title">루브릭 등급 분포</span></div>
                   <div className="card-body">
                     {RUBRIC.map((r, i) => {
                       const cnt = { 상: 0, 중: 0, 하: 0 };
@@ -8599,30 +8869,40 @@ function TeacherApp({ onExit, onGallery }) {
                             {tot > 0 && <i style={{ position: "static", width: (cnt.중 / tot) * 100 + "%", background: "var(--amber)" }} />}
                             {tot > 0 && <i style={{ position: "static", width: (cnt.하 / tot) * 100 + "%", background: "var(--seal)" }} />}
                           </span>
-                          <span className="v">{tot}명</span>
+                          <span className="v" style={{ width: "auto", minWidth: 78 }}>상 {cnt.상} · 중 {cnt.중} · 하 {cnt.하}</span>
                         </div>
                       );
                     })}
-                    <p className="hint" style={{ marginTop: 8 }}>초록 상 · 갈색 중 · 붉은색 하. 채점은 학생 열람 화면에서 합니다.</p>
+                    <p className="hint" style={{ marginTop: 8 }}>막대 순서는 왼쪽부터 상(초록)·중(갈색)·하(붉은색)이고, 인원수는 오른쪽 숫자로 읽습니다. 채점은 학생 열람 화면에서 합니다.</p>
                   </div>
                 </div>
               </div>
             ) : tab === "사고 과정" ? (
-              <TranslationPanel ids={ids} roster={roster} wsMap={wsMap} onSel={setSel} />
+              <TranslationPanel ids={ids} roster={roster} wsMap={wsMap} onSel={openStudent} />
             ) : tab === "연구" ? (
-              <ResearchPanel ids={ids} roster={roster} wsMap={wsMap} gradeMap={gradeMap} surveyMap={surveyMap} sampleMode={sampleMode} openMap={openMap} />
+              <div>
+                <ResearchPanel ids={ids} roster={roster} wsMap={wsMap} gradeMap={gradeMap} surveyMap={surveyMap} sampleMode={sampleMode} openMap={openMap} />
+                <AnchorPanel ids={ids} roster={roster} surveyMap={surveyMap} cfg={anCfg} sampleMode={sampleMode}
+                  onSave={async (next) => {
+                    const cfg = (await store.get("config")) || {};
+                    const ok = await store.set("config", { ...cfg, anchor: next, anchorUpdated: now() });
+                    if (ok) setAnCfg(next); else setMsg("앵커 설정을 저장하지 못했습니다.");
+                    return ok; // 패널이 저장 성공 여부를 배지로 보여 준다
+                  }} />
+              </div>
             ) : tab === "창의성" ? (
-              <CreativityPanel ids={ids} roster={roster} wsMap={wsMap} onSel={setSel} />
+              <CreativityPanel ids={ids} roster={roster} wsMap={wsMap} onSel={openStudent} />
             ) : tab === "설문" ? (
-              <SurveyPanel ids={ids} roster={roster} surveyMap={surveyMap} sampleMode={sampleMode} onSel={setSel} />
+              <SurveyPanel ids={ids} roster={roster} surveyMap={surveyMap} sampleMode={sampleMode} onSel={openStudent} />
             ) : (
               <div>
                 {msg && <div className="ok-note">{msg}</div>}
                 <div className="card">
                   <div className="card-head"><span className="card-code">설정 1</span><span className="card-title">내보내기</span></div>
                   <div className="card-body">
-                    <p style={{ fontSize: 13, marginBottom: 10 }}>학번·별명·차시별 기록률·루브릭 등급·관찰 체크·피드백을 CSV 파일로 내려받습니다. 채점 협의 자료나 성적 입력 참고 자료로 쓸 수 있습니다.</p>
-                    <button className="btn" onClick={exportCSV}>CSV 내려받기</button>
+                    <p style={{ fontSize: 13, marginBottom: 10 }}>학번·별명·차시별 기록률·루브릭 등급·관찰 체크·피드백을 CSV 파일로 내려받습니다. 채점 협의 자료나 성적 입력 참고 자료로 쓸 수 있습니다. <b>이 파일에는 학번과 별명이 들어갑니다</b> — 익명 연구 자료는 「연구」 탭에서 받으세요.</p>
+                    <button className="btn" disabled={!ids.length} onClick={exportCSV}>CSV 내려받기</button>
+                    {!ids.length && <p className="hint" style={{ marginTop: 6 }}>등록된 학생이 없어 내려받을 내용이 없습니다.</p>}
                   </div>
                 </div>
                 <div className="card">
@@ -8956,9 +9236,12 @@ function buildSampleClass() {
 
 /* ---------- 전시장 ---------- */
 
-function Gallery({ onBack }) {
+function Gallery({ onBack, backLabel }) {
+  useTopbarHeight(); // 관람 전환 막대(.gal-controls)의 sticky top이 상단바 높이를 따라간다
   const [works, setWorks] = useState(null);
   const [showPlate, setShowPlate] = useState(false); // 1차 관람: 명제표 가림
+  const [lastLoad, setLastLoad] = useState(null); // 자동 갱신(30초)이 언제 기준인지 보여 준다
+  const [numQ, setNumQ] = useState(""); // 작품 번호로 찾기 — 번호 관람 전제인데 번호로 찾을 수단이 없던 문제
 
   const load = async () => {
     const sample = buildSampleClass();
@@ -8994,6 +9277,7 @@ function Gallery({ onBack }) {
     });
     list.sort((a, b) => a.no.localeCompare(b.no, "ko"));
     setWorks(list);
+    setLastLoad(new Date());
   };
   useEffect(() => {
     load();
@@ -9007,7 +9291,7 @@ function Gallery({ onBack }) {
         <div className="topbar-in">
           <div className="brand">학급 가상 컬렉션 전시장<small>FICTIVE ARCHIVE · EXHIBITION</small></div>
           <div className="top-right">
-            <button className="btn small ghost" onClick={onBack}>입장 화면으로</button>
+            <button className="btn ghost" onClick={onBack}>{backLabel || "입장 화면으로"}</button>
           </div>
         </div>
       </div>
@@ -9023,25 +9307,36 @@ function Gallery({ onBack }) {
         </div>
         <div className="gal-controls">
           <div className="toggle-row" role="tablist">
-            <button className={!showPlate ? "on" : ""} onClick={() => setShowPlate(false)}>1차 관람 — 명제표 가림</button>
-            <button className={showPlate ? "on" : ""} onClick={() => setShowPlate(true)}>2차 관람 — 명제표 공개</button>
+            <button role="tab" aria-selected={!showPlate} className={!showPlate ? "on" : ""} onClick={() => setShowPlate(false)}>1차 관람 — 명제표 가림</button>
+            <button role="tab" aria-selected={showPlate} className={showPlate ? "on" : ""} onClick={() => setShowPlate(true)}>2차 관람 — 명제표 공개</button>
+          </div>
+          <div className="gal-tools">
+            <input className="gal-find" inputMode="text" placeholder="작품 번호로 찾기 (예: A-01)"
+              value={numQ} onChange={(e) => setNumQ(e.target.value)} aria-label="작품 번호로 찾기" />
+            <span className="gal-when">
+              {lastLoad ? "마지막 갱신 " + String(lastLoad.getHours()).padStart(2, "0") + ":" + String(lastLoad.getMinutes()).padStart(2, "0") : ""}
+              <button className="btn small ghost" style={{ marginLeft: 6 }} onClick={load}>새로고침</button>
+            </span>
           </div>
         </div>
+        {works !== null && works.length === 0 && (
+          <div className="warn-note" style={{ maxWidth: 640, margin: "0 auto 16px" }}>
+            아직 출품된 학급 작품이 없습니다 — 아래 세 점은 자료집의 예시 작품입니다.
+            학생용 학습지의 7차시 「기록 R — 전시 출품」에서 작품 번호를 적고 전시 공개로 바꾸면 이 벽면에 걸립니다.
+          </div>
+        )}
         <ExhibitSamples showPlate={showPlate} />
         {works === null ? (
           <p style={{ textAlign: "center", color: "var(--sub)" }}>전시 작품을 불러오는 중…</p>
-        ) : works.length === 0 ? (
-          <div className="card" style={{ maxWidth: 520, margin: "0 auto" }}>
-            <div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
-              공개된 작품이 없습니다. 학생용 학습지의 7차시 「기록 R — 전시 출품」에서 작품 번호를 적고 전시 공개로 바꾸면 이 벽면에 걸립니다.
-            </div>
-          </div>
-        ) : (
+        ) : works.length === 0 ? null : (() => {
+          const shown = works.filter((w) => !numQ.trim() || w.no.toLowerCase().includes(numQ.trim().toLowerCase()));
+          if (!shown.length) return <p style={{ textAlign: "center", color: "var(--sub)", fontSize: 13 }}>「{numQ}」에 맞는 작품 번호가 없습니다.</p>;
+          return (
           <div className="gal-grid">
-            {works.map((w, i) => (
+            {shown.map((w, i) => (
               <div className="work" key={i}>
                 <div className="work-img">
-                  {w.img && w.img.ref ? <MediaThumb owner={w.owner === "미리보기" ? "preview" : w.owner} refId={w.img.ref} alt={"작품 " + w.no} size={9999} /> : typeof w.img === "string" && w.img ? <img src={w.img} alt={"작품 " + w.no} /> : <span className="ph">IMAGE NOT SUBMITTED</span>}
+                  {w.img && w.img.ref ? <MediaThumb owner={w.owner === "미리보기" ? "preview" : w.owner} refId={w.img.ref} alt={"작품 " + w.no} size={9999} /> : typeof w.img === "string" && w.img ? <img src={w.img} alt={"작품 " + w.no} /> : <span className="ph">대표 이미지가 아직 없습니다</span>}
                 </div>
                 <div className="work-no">작품 {w.no}</div>
                 <div className="work-title">{showPlate ? "「" + w.title + "」" : "무제 (2차 관람에서 공개)"}</div>
@@ -9066,7 +9361,8 @@ function Gallery({ onBack }) {
               </div>
             ))}
           </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
@@ -9259,13 +9555,15 @@ const DEMO_WS = {
 };
 
 function DemoView({ onBack }) {
+  // 학생 화면과 같은 차시 탭 — 8차시 전체를 한 화면에 쏟아 놓으면 스크롤로만 훑어야 한다
+  const [tab, setTab] = useState(SESSIONS[0]);
   return (
     <div>
       <div className="topbar">
         <div className="topbar-in">
           <div className="brand">예시 기록지 「오른손」<small>SAMPLE RECORD · READ ONLY</small></div>
           <div className="top-right">
-            <button className="btn small ghost" onClick={onBack}>입장 화면으로</button>
+            <button className="btn ghost" onClick={onBack}>입장 화면으로</button>
           </div>
         </div>
       </div>
@@ -9275,7 +9573,13 @@ function DemoView({ onBack }) {
             자료집의 예시 작품 A 「오른손」(새벽 배송 노동)으로 채워 둔 기록지입니다. 생성형 AI로 만든 가상의 사례이며 실제 학생 작품이 아닙니다. 여기서는 읽기만 할 수 있고, 자기 기록은 학생 입장에서 작성합니다.
           </div>
         </div>
-        {SESSIONS.map((sess) => (
+        <div className="sess-tabs" role="tablist">
+          {SESSIONS.map((s) => (
+            <button key={s} role="tab" aria-selected={tab === s} className={"sess-tab " + (tab === s ? "on" : "")}
+              onClick={() => { setTab(s); window.scrollTo({ top: 0 }); }}>{s}</button>
+          ))}
+        </div>
+        {[tab].map((sess) => (
           <div key={sess}>
             {LESSONS.filter((L) => L.session === sess).map((L) => <LessonPanel key={L.n} L={L} />)}
             {SCHEMA.filter((s) => s.session === sess).map((sec) => (
@@ -9303,6 +9607,9 @@ function DemoView({ onBack }) {
 function App() {
   const [view, setView] = useState("gate");
   const [me, setMe] = useState(null);
+  // 전시장은 게이트·학생·교사 어디서든 들어오므로, 돌아갈 곳과 버튼 문구를 진입 지점에 맞춘다
+  const [galFrom, setGalFrom] = useState("gate");
+  const goGallery = (from) => { setGalFrom(from); setView("gallery"); };
 
   return (
     <div className="app">
@@ -9315,11 +9622,12 @@ function App() {
       {view === "gate" && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
         onTeacher={() => setView("teacher")}
-        onGallery={() => setView("gallery")}
+        onGallery={() => goGallery("gate")}
         onDemo={() => setView("demo")} />}
-      {view === "student" && me && <StudentApp me={me} onGallery={() => setView("gallery")} onExit={() => { setMe(null); setMediaOwner("preview"); setView("gate"); }} />}
-      {view === "teacher" && <TeacherApp onGallery={() => setView("gallery")} onExit={() => setView("gate")} />}
-      {view === "gallery" && <Gallery onBack={() => setView(me ? "student" : "gate")} />}
+      {view === "student" && me && <StudentApp me={me} onGallery={() => goGallery("student")} onExit={() => { setMe(null); setMediaOwner("preview"); setView("gate"); }} />}
+      {view === "teacher" && <TeacherApp onGallery={() => goGallery("teacher")} onExit={() => setView("gate")} />}
+      {view === "gallery" && <Gallery onBack={() => setView(galFrom === "student" && !me ? "gate" : galFrom)}
+        backLabel={galFrom === "student" && me ? "기록실로 돌아가기" : galFrom === "teacher" ? "교사 화면으로" : "입장 화면으로"} />}
       {view === "demo" && <DemoView onBack={() => setView("gate")} />}
     </div>
   );

@@ -194,7 +194,7 @@ export function stanceFlatRow(ans) {
 
 /* ---------- 학생 화면 ---------- */
 
-export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
+export function StanceCard({ phase, block, onChange, onSubmit, busy, saveInfo }) {
   const sv = block || {};
   const ans = sv.ans || {};
   const isPost = phase === "post";
@@ -262,7 +262,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
       <div className="card-head">
         <span className="card-code">{isPost ? "사후 설문 2" : "사전 설문 2"}</span>
         <span className="card-title">작품을 보는 나의 눈</span>
-        <span className="card-sess">{total}문항 · 약 {isPost ? 5 : 8}분</span>
+        <span className="card-sess" role="status" aria-live="polite">{saveInfo === "err" ? "저장 실패 — 연결 확인 · " : saveInfo === "saving" ? "저장 중… · " : saveInfo === "saved" ? "저장됨 · " : ""}{total}문항 · 약 {isPost ? 5 : 8}분</span>
       </div>
       <div className="card-note">
         정답이 없고 성적과도 관계없는 설문입니다. 여러분이 작품을 어떤 눈으로 보는지 알아보려는 것이고, 개인의 답을 따로 확인하지 않습니다.

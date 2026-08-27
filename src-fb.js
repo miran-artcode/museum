@@ -6,7 +6,8 @@
 
 import { initializeApp } from "firebase/app";
 import {
-  getFirestore, doc, getDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc,
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  doc, getDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc,
 } from "firebase/firestore";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -23,7 +24,17 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// 오프라인 지속 캐시: 와이파이가 끊겨도 쓰던 내용이 IndexedDB에 쌓였다가
+// 연결이 돌아오면 자동 전송된다. 탭을 닫아도 큐가 사라지지 않는다.
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
+} catch (e) {
+  // 사파리 사생활 보호 모드 등 IndexedDB가 막힌 환경 — 메모리 캐시로 계속
+  db = initializeFirestore(app, {});
+}
 const auth = getAuth(app);
 
 const DOMAIN = "@museum.class";
@@ -118,6 +129,25 @@ export const fbStore = {
       const data = s.data();
       return data && data.v !== undefined ? data.v : data;
     } catch (e) { console.error("read fail", key, e); return null; }
+  },
+
+  /* get과 같으나 "없음"과 "읽기 실패"를 구분해 돌려준다.
+     실패를 없음으로 오인해 빈 문서로 덮어쓰는 사고를 막는 용도 —
+     학생 기록 최초 로드처럼 실패 시 쓰기를 잠가야 하는 곳에서 쓴다. */
+  async getSafe(key) {
+    try {
+      const r = route(key);
+      if (r.kind === "roster") {
+        const snap = await getDocs(collection(db, "students"));
+        const out = {};
+        snap.forEach((d) => { out[d.id] = d.data(); });
+        return { ok: true, data: Object.keys(out).length ? out : null };
+      }
+      const s = await getDoc(doc(db, r.path[0], r.path[1]));
+      if (!s.exists()) return { ok: true, data: null };
+      const data = s.data();
+      return { ok: true, data: data && data.v !== undefined ? data.v : data };
+    } catch (e) { console.error("read fail", key, e); return { ok: false, data: null }; }
   },
 
   async set(key, value) {

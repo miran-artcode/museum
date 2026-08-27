@@ -13,11 +13,12 @@ export const THEME_CSS = `
 /* ---------- 팔레트·글꼴 재정의 — 베이지 유물 톤 → 흰 배경 흑백 ---------- */
 :root{
   --bg:#fff; --card:#fff; --card2:#f6f6f6;
-  --ink:#111; --sub:#767676;
+  --ink:#111; --sub:#6e6e6e;
   --line:#ddd; --line2:#ebebeb;
   --seal:#B5382A; --seal-bg:#F8ECEA;
   --patina:#31684F; --patina-bg:#EAF1ED;
-  --amber:#96712F;
+  --amber:#6F5527; /* 4.5:1 미달이던 #96712F를 글자용으로는 어둡게; 점·막대 채움은 --amber-fill */
+  --amber-fill:#96712F;
   --serif:'Noto Sans KR','IBM Plex Sans KR',sans-serif;
   --sans:'Noto Sans KR','IBM Plex Sans KR',sans-serif;
 }
@@ -27,21 +28,22 @@ body{background:#fff}
 .topbar{background:#fff;border-bottom:1px solid #111}
 .topbar-in{padding:14px 20px}
 .brand{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:16px;letter-spacing:-.01em}
-.brand small{font-family:'Archivo',sans-serif;font-weight:700;font-size:9px;letter-spacing:.22em;color:#999;margin-top:3px}
+.brand small{font-family:'Archivo',sans-serif;font-weight:700;font-size:10px;letter-spacing:.12em;color:#666;margin-top:3px}
 .btn.ghost{border-color:#111}
 .save-pill{background:#fff;border-color:#ddd}
 
 /* ---------- 제목 위계 — 산세리프 중량으로 ---------- */
 .gal-hero h1{font-weight:900;font-size:30px;letter-spacing:-.01em}
-.gal-hero .acc,.gate-head .acc{font-family:'Archivo',sans-serif;font-weight:700;letter-spacing:.24em;color:#999}
+.gal-hero .acc,.gate-head .acc{font-family:'Archivo',sans-serif;font-weight:700;letter-spacing:.24em;color:#666}
 .card-title,.lesson-title,.work-title,.pair-label{font-weight:700}
 .kpi .n,.metric .mv{font-family:'Archivo','Noto Sans KR',sans-serif;font-weight:900}
 
 /* ---------- 하드코딩돼 있던 베이지 표면 ---------- */
 .work-img{background:#f2f2f2}
-.rv.empty,.pair-text.empty{color:#bbb}
+.rv.empty,.pair-text.empty{color:#767676}
 .sample-banner{background:#FBF6E9}
 .tbl input:focus,.tbl textarea:focus,.tbl select:focus{outline-color:#111}
+.field input,.field textarea,.field select,.toggle-row button,.seg button,.tab-switch{border-color:#9a9a9a}
 
 /* ---------- 카드·탭의 마감선을 게이트와 같은 문법으로 ---------- */
 .card,.lesson,.pair,.work{border-color:#e2e2e2}
@@ -50,6 +52,7 @@ body{background:#fff}
 .sess-tab{border-color:#ddd}
 .sess-tab.on{border-color:#111}
 .ticket{background:#fff;border-color:#ddd}
+.sess-dots span.part,.sess-tab .dot.part,.dot.part{background:var(--amber-fill)}
 `;
 
 export function ThemeStyle() { return <style>{THEME_CSS}</style>; }

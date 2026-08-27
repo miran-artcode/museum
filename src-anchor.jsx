@@ -243,7 +243,11 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
   const conf = cfg || DEFAULT_ANCHOR;
   const pairs = conf.pairs || DEFAULT_ANCHOR.pairs;
   const [busy, setBusy] = useState(false);
-  const ready = anchorReady(conf);
+  const [draft, setDraft] = useState(null);   // 편집 중인 쌍 — 키 입력마다 서버에 쓰지 않고 로컬에 들고 있다가 0.8초 쉬면 저장
+  const [saveSt, setSaveSt] = useState(null); // null | saving | saved | err
+  const saveT = useRef(null);
+  const livePairs = draft || pairs;
+  const ready = anchorReady({ ...conf, pairs: livePairs });
 
   const blocks = ids.map((id) => ({ id, nick: (roster[id] || {}).nick || "", an: (surveyMap[id] || {}).anchor || null }))
     .filter((r) => r.an && (r.an.items || []).length);
@@ -260,10 +264,17 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
   const tagN = ANCHOR_TAGS.map((t) => ({ t, n: flat.filter((x) => x.tag === t.k).length }));
 
   const setPair = (i, side, key, val) => {
-    const next = JSON.parse(JSON.stringify({ ...DEFAULT_ANCHOR, ...conf, pairs }));
-    next.pairs[i][side][key] = val;
-    onSave(next);
+    const next = JSON.parse(JSON.stringify(livePairs));
+    next[i][side][key] = val;
+    setDraft(next);
+    setSaveSt("saving");
+    if (saveT.current) clearTimeout(saveT.current);
+    saveT.current = setTimeout(async () => {
+      const ok = await onSave({ ...DEFAULT_ANCHOR, ...conf, pairs: next });
+      setSaveSt(ok === false ? "err" : "saved");
+    }, 800);
   };
+  useEffect(() => () => { if (saveT.current) clearTimeout(saveT.current); }, []);
   const toggleOpen = async () => {
     if (!ready && !conf.open) return;
     setBusy(true);
@@ -292,7 +303,7 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = "연구자료_앵커판정_" + new Date().toISOString().slice(2, 10).replace(/-/g, "") + ".csv";
+    a.download = "앵커판정_학번포함_" + new Date().toISOString().slice(2, 10).replace(/-/g, "") + ".csv";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -319,12 +330,16 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
           </span>
         </div>
 
-        <div className="sv-block-t">쌍 설정</div>
+        <div className="sv-block-t">쌍 설정
+          {saveSt && <span className="hint" role="status" aria-live="polite" style={{ marginLeft: 8, fontWeight: 400, color: saveSt === "err" ? "var(--seal)" : "var(--sub)" }}>
+            {saveSt === "saving" ? "저장 중…" : saveSt === "err" ? "저장 실패 — 잠시 뒤 다시 입력해 보세요" : "저장됨"}
+          </span>}
+        </div>
         <p className="hint" style={{ marginBottom: 8 }}>
           이미지는 <code>public/img/anchor/</code>에 넣고 <code>img/anchor/a1.jpg</code>처럼 적거나, 인터넷 주소를 그대로 붙여 넣습니다.
           두 조건이 <b>완전히 같은 이미지</b>를 봐야 하므로 이미지는 쌍마다 하나씩만 정하면 됩니다.
         </p>
-        {pairs.map((p, i) => (
+        {livePairs.map((p, i) => (
           <div className="an-edit" key={p.id}>
             <div className="an-edit-h">{p.id}</div>
             {["a", "b"].map((side) => (
@@ -354,7 +369,7 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
         </p>
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
           <button className="btn" onClick={exportCSV} disabled={!doneRows.length}>앵커 판정 CSV 내려받기</button>
-          <span className="hint">성향 설문 점수와 학번으로 이어 붙여 분석합니다.</span>
+          <span className="hint">성향 설문 점수와 학번으로 이어 붙여 분석합니다. <b>이 파일에는 학번·별명이 들어갑니다</b> — 「연구」 탭의 익명 자료와 섞이지 않게 보관하세요.</span>
         </div>
         <div className="warn-note" style={{ marginTop: 12 }}>
           <b>판정이 끝나면 반드시 알려 주세요.</b> 같은 이미지에 서로 다른 고지 문구를 붙였다는 사실을 밝히고,
@@ -373,7 +388,7 @@ const ANCHOR_CSS = `
 .an-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .an-work{border:1px solid var(--line);background:#fff;padding:10px;display:flex;flex-direction:column;gap:8px}
 .an-work.on{border-color:var(--amber);box-shadow:0 0 0 2px var(--amber) inset}
-.an-img{background:#DBD9D2;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.an-img{background:var(--card2,#f2f2f2);aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .an-img img{width:100%;height:100%;object-fit:cover}
 .an-img .ph{font-family:var(--mono);font-size:11px;color:var(--sub);letter-spacing:.15em}
 .an-title{font-family:var(--serif);font-size:15px;font-weight:700}

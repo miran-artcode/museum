@@ -19,6 +19,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { fbStore } from "./src-fb.js";
+import { useTopbarHeight } from "./src-survey-ui.jsx";
 
 export const CONTENT_KEY = "lessonEdits";
 const TEACHER = "teacher";
@@ -412,13 +413,14 @@ function ReadingEditor({ rd, i, count, n, onPatch, onMove, onDel }) {
   );
 }
 
-export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel }) {
+export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) {
   const [draft, setDraft] = useState(null);
   const [n, setN] = useState(lessonDefs[0] ? lessonDefs[0].n : 1);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [preview, setPreview] = useState(false);
+  useTopbarHeight(); // 편집 바(.ed-bar)의 sticky top이 상단바 실제 높이를 따라가게 한다
 
   useEffect(() => {
     let live = true;
@@ -438,6 +440,12 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel }) {
     const h = (e) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
+  }, [dirty]);
+
+  // 탭 이동(언마운트)으로도 원고가 사라지므로, 부모(교사 화면)가 이동을 막을 수 있게 dirty를 올린다
+  useEffect(() => {
+    if (onDirty) onDirty(dirty);
+    return () => { if (onDirty) onDirty(false); };
   }, [dirty]);
 
   if (!draft) return <div className="card"><div className="card-body" style={{ color: "var(--sub)" }}>수업 내용을 불러오는 중…</div></div>;
@@ -658,7 +666,7 @@ export const CONTENT_CSS = `
 .lz-fig{flex:1 1 260px;max-width:100%;margin:0}
 .lz-img{display:block;width:100%;height:auto;border:1px solid var(--line);background:#fff}
 .lz-fig figcaption{font-size:11.5px;color:var(--sub);line-height:1.6;padding-top:5px}
-.lz-cr{display:block;font-family:var(--mono);font-size:10px;color:var(--sub);opacity:.85}
+.lz-cr{display:block;font-family:var(--mono);font-size:11px;color:var(--sub)}
 .lz-load{display:inline-block;font-size:11px;color:var(--sub);padding:6px 0}
 .lz-asks{border-left:3px solid var(--patina);background:var(--patina-bg);padding:9px 14px;margin:4px 0 14px}
 .lz-asks-h{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--patina);margin-bottom:5px}
@@ -671,7 +679,7 @@ export const CONTENT_CSS = `
 /* 편집 화면 */
 .ed-root{padding-bottom:20px}
 .ed-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--seal);margin-left:5px;vertical-align:middle}
-.ed-bar{position:sticky;top:52px;z-index:15;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+.ed-bar{position:sticky;top:var(--sv-top,52px);z-index:15;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   background:var(--card);border:1px solid var(--line);padding:8px 12px;margin-bottom:14px}
 .ed-bar.on{border-color:var(--seal);background:var(--seal-bg)}
 .ed-bar.bottom{position:static;margin-top:6px}
