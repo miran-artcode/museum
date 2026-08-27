@@ -19,7 +19,7 @@
    ============================================================ */
 
 import React, { useState, useEffect, useRef } from "react";
-import { LikertRow, scrollToSurveyItem, LIKERT_SHORT } from "./src-survey-ui.jsx";
+import { LikertRow, scrollToSurveyItem, LIKERT_SHORT, useTopbarHeight, SurveyProgress } from "./src-survey-ui.jsx";
 
 export const STANCE_VER = "s1";
 
@@ -206,28 +206,13 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
   const submitted = stanceDone(sv);
 
   const [act, setAct] = useState(0);       // 지금 보고 있는 묶음
-  const [topH, setTopH] = useState(56);    // 상단 띠 높이 — 그 아래에 머리띠를 붙인다
   const [showGaps, setShowGaps] = useState(false);
   const barRef = useRef(null);
   const secRefs = useRef([]);
 
-  /* 상단 띠 높이는 화면 폭에 따라 바뀐다(topbar-in이 wrap된다) — 재서 따라간다.
-     --sv-top은 src-survey-ui.jsx의 scroll-margin-top 계산에도 쓰인다. */
-  useEffect(() => {
-    const bar = document.querySelector(".topbar");
-    const update = () => {
-      const h = bar ? Math.round(bar.getBoundingClientRect().height) : 56;
-      if (h > 0) {
-        setTopH(h);
-        document.documentElement.style.setProperty("--sv-top", h + "px");
-      }
-    };
-    update();
-    let ro = null;
-    if (bar && typeof ResizeObserver !== "undefined") { ro = new ResizeObserver(update); ro.observe(bar); }
-    window.addEventListener("resize", update);
-    return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", update); };
-  }, []);
+  /* 상단 띠 높이(그 아래에 머리띠를 붙인다)는 화면 폭에 따라 바뀐다 — src-survey-ui.jsx의
+     공용 훅이 재서 따라가고 --sv-top도 거기서 세운다. 두 설문이 같은 측정을 쓴다. */
+  const topH = useTopbarHeight();
 
   /* 스크롤에 따라 머리띠의 묶음 이름을 바꾼다 — 지금 무엇을 묻는 중인지 늘 보이게 */
   useEffect(() => {
@@ -271,7 +256,6 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
   const b = blocks[act] || blocks[0];
   const here = items.filter((it) => it.b === b.k);
   const likertHere = here.filter((it) => !it.t).length >= here.length / 2; // 이 묶음이 리커트 위주인가
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
     <div className="card st-card">
@@ -288,7 +272,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
 
       <div className={"card-body" + (showGaps ? " sv-gaps" : "")}>
         {/* 고정 머리띠 — 지금 어느 묶음인지 · 몇 개 했는지 · 숫자가 무슨 뜻인지 */}
-        <div className="st-bar" ref={barRef} style={{ top: topH }}>
+        <div className="st-bar sv-stickybar" ref={barRef} style={{ top: topH }}>
           <div className="st-bar-l">
             <div className="st-where">
               <span className="st-bno">{act + 1}<i>/{blocks.length}</i></span>
@@ -297,18 +281,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy }) {
             <p className="st-bd">{b.d}</p>
           </div>
           <div className="st-bar-r">
-            <div className="st-prog">
-              <span className="st-count">{done}<i>/{total}</i></span>
-              <span className="st-track" role="progressbar" aria-valuenow={done} aria-valuemin={0}
-                aria-valuemax={total} aria-label={"응답한 문항 " + done + "개, 전체 " + total + "개"}>
-                <span className="st-fill" style={{ width: pct + "%" }} />
-              </span>
-              {remain > 0 ? (
-                <button type="button" className="sv-scale-jump" onClick={jump}>
-                  남은 {remain}개<span aria-hidden="true"> ↓</span>
-                </button>
-              ) : <span className="sv-scale-ok">다 답했습니다</span>}
-            </div>
+            <SurveyProgress done={done} total={total} remain={remain} onJump={jump} />
             {likertHere ? (
               <ol className="sv-scale-ticks" aria-label="응답 척도">
                 {LIK5.map((full, i) => (
@@ -460,15 +433,10 @@ const fmtT = (iso) => {
    여기서는 s1에만 있는 것(묶음 머리띠·보기 단추·낱말표)만 더한다. */
 
 const STANCE_CSS = `
-.st-card{border-top:3px solid var(--patina)}
+/* 뼈대(.sv-stickybar)와 진행률(.sv-prog*)은 src-survey-ui.jsx에 있다.
+   여기서 넘기는 것은 이 카드만의 값 — 막대 색과 여백뿐이다. */
+.st-card{border-top:3px solid var(--patina);--sv-accent:var(--patina);--sv-bar-gap:12px;--sv-bar-rowgap:6px}
 
-/* 고정 머리띠 — card-body 안쪽 첫 자식이라 카드를 벗어나면 함께 사라진다 */
-.st-bar{
-  position:sticky; z-index:12;
-  margin:-16px -18px 12px; padding:8px 18px 7px;
-  background:var(--card2); border-bottom:1px solid var(--line);
-  display:flex; align-items:flex-end; justify-content:space-between; gap:6px 14px; flex-wrap:wrap;
-}
 .st-bar-l{min-width:0;flex:1 1 240px}
 .st-bar-r{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
 .st-where{display:flex;align-items:baseline;gap:7px;min-width:0}
@@ -479,11 +447,6 @@ const STANCE_CSS = `
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .st-bd{font-size:11px;color:var(--sub);line-height:1.5;margin-top:3px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.st-prog{display:flex;align-items:center;gap:8px}
-.st-count{font-family:var(--mono);font-size:13px;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
-.st-count i{font-style:normal;font-size:11px;color:var(--sub)}
-.st-track{position:relative;display:block;width:56px;height:3px;background:var(--line);flex:0 0 auto}
-.st-fill{position:absolute;left:0;top:0;bottom:0;background:var(--patina);transition:width .25s ease}
 .st-hint{font-size:10.5px;color:var(--sub)}
 
 /* 묶음 머리 */
@@ -522,11 +485,10 @@ const STANCE_CSS = `
 @media (pointer:coarse){ .st-grid .likert button{width:36px;height:36px} }
 
 @media (max-width:560px){
-  .st-bar{gap:6px 10px}
+  .st-card{--sv-bar-colgap:10px}
   .st-bd{display:none}
   .st-bar-r{flex:1 1 100%;align-items:stretch}
-  .st-prog{justify-content:space-between}
-  .sv-scale-ticks{margin-left:auto}
+  .st-card .sv-prog{justify-content:space-between}
   .st-opts button{flex:1 1 100%}
   .sv-item.st-wide .likert{align-self:auto}
   .st-grow{gap:6px}

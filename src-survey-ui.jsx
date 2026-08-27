@@ -23,7 +23,7 @@ export const LIKERT_SHORT = ["전혀", "아니다", "보통", "그렇다", "매�
 
 /* 상단 topbar가 sticky(top:0)이므로 그 높이만큼 내려서 겹치지 않게 한다.
    topbar-in은 flex-wrap이라 화면 폭에 따라 높이가 변한다 — 측정해서 따라간다. */
-function useTopbarHeight() {
+export function useTopbarHeight() {
   const [h, setH] = useState(56);
   useEffect(() => {
     const bar = document.querySelector(".topbar");
@@ -65,11 +65,30 @@ function prefersReducedMotion() {
     : false;
 }
 
+/* 진행률 묶음 — 몇 개 했는지 · 막대 · 남은 문항으로 건너뛰기.
+   창의성 설문(v1)과 성향 설문(s1)이 같이 쓴다. 막대 색은 카드가 --sv-accent로 정한다. */
+export function SurveyProgress({ done, total, remain, onJump }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  return (
+    <div className="sv-prog">
+      <span className="sv-prog-count">{done}<i>/{total}</i></span>
+      <span className="sv-prog-track" role="progressbar" aria-valuenow={done} aria-valuemin={0}
+        aria-valuemax={total} aria-label={"응답한 문항 " + done + "개, 전체 " + total + "개"}>
+        <span className="sv-prog-fill" style={{ width: pct + "%" }} />
+      </span>
+      {remain > 0 && onJump ? (
+        <button type="button" className="sv-scale-jump" onClick={onJump}>
+          남은 {remain}개<span aria-hidden="true"> ↓</span>
+        </button>
+      ) : remain === 0 ? <span className="sv-scale-ok">다 답했습니다</span> : null}
+    </div>
+  );
+}
+
 /* 화면에 고정되는 척도 막대.
    왼쪽은 진행률, 오른쪽은 1~5 눈금(아래 응답 단추와 같은 너비·간격으로 정렬). */
 export function SurveyScaleBar({ labels, done, total, remain, firstGapKey, onRevealGaps }) {
   const top = useTopbarHeight();
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   const jump = () => {
     if (onRevealGaps) onRevealGaps();
@@ -77,20 +96,9 @@ export function SurveyScaleBar({ labels, done, total, remain, firstGapKey, onRev
   };
 
   return (
-    <div className="sv-scale" style={{ top }}>
-      <div className="sv-scale-prog">
-        <span className="sv-scale-count">{done}<i>/{total}</i></span>
-        <span className="sv-scale-track" role="progressbar" aria-valuenow={done} aria-valuemin={0}
-          aria-valuemax={total} aria-label={"응답한 문항 " + done + "개, 전체 " + total + "개"}>
-          <span className="sv-scale-fill" style={{ width: pct + "%" }} />
-        </span>
-        {remain > 0 && firstGapKey && (
-          <button type="button" className="sv-scale-jump" onClick={jump}>
-            남은 {remain}개<span aria-hidden="true"> ↓</span>
-          </button>
-        )}
-        {remain === 0 && <span className="sv-scale-ok">다 답했습니다</span>}
-      </div>
+    <div className="sv-scale sv-stickybar" style={{ top }}>
+      <SurveyProgress done={done} total={total} remain={remain}
+        onJump={firstGapKey ? jump : null} />
       <ol className="sv-scale-ticks" aria-label="응답 척도">
         {labels.map((full, i) => (
           <li key={i} title={full}>
@@ -135,18 +143,25 @@ export function LikertRow({ value, onPick, label, labels }) {
 }
 
 const SURVEY_UI_CSS = `
-/* 고정 척도 막대 — card-body 안쪽 첫 자식. 카드를 벗어나면 자연히 함께 사라진다 */
-.sv-scale{
+/* 고정 막대의 공통 뼈대 — card-body 안쪽 첫 자식이라 카드를 벗어나면 함께 사라진다.
+   창의성 설문(.sv-scale)과 성향 설문(.st-bar)이 같이 쓴다. 카드마다 다른 값은
+   --sv-accent(막대 색) · --sv-bar-gap(아래 여백) · --sv-bar-rowgap(줄바꿈 간격)으로 넘긴다.
+   두 stylesheet의 순서에 기대지 않도록 덮어쓰기는 전부 사용자 정의 속성으로 한다. */
+.sv-stickybar{
   position:sticky; z-index:12;
-  margin:-16px -18px 14px; padding:8px 18px 7px;
+  margin:-16px -18px var(--sv-bar-gap, 14px); padding:8px 18px 7px;
   background:var(--card2); border-bottom:1px solid var(--line);
-  display:flex; align-items:flex-end; justify-content:space-between; gap:10px 14px; flex-wrap:wrap;
+  display:flex; align-items:flex-end; justify-content:space-between;
+  gap:var(--sv-bar-rowgap, 10px) var(--sv-bar-colgap, 14px); flex-wrap:wrap;
 }
-.sv-scale-prog{display:flex;align-items:center;gap:8px;min-width:0;padding-bottom:2px}
-.sv-scale-count{font-family:var(--mono);font-size:12px;color:var(--ink);white-space:nowrap}
-.sv-scale-count i{font-style:normal;color:var(--sub)}
-.sv-scale-track{position:relative;display:block;width:56px;height:3px;background:var(--line);flex:0 0 auto}
-.sv-scale-fill{position:absolute;left:0;top:0;bottom:0;background:var(--seal);transition:width .25s ease}
+.sv-card{--sv-accent:var(--seal)}
+
+/* 진행률 묶음 — 두 설문 공용 */
+.sv-prog{display:flex;align-items:center;gap:8px;min-width:0;padding-bottom:2px}
+.sv-prog-count{font-family:var(--mono);font-size:13px;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sv-prog-count i{font-style:normal;font-size:11px;color:var(--sub)}
+.sv-prog-track{position:relative;display:block;width:56px;height:3px;background:var(--line);flex:0 0 auto}
+.sv-prog-fill{position:absolute;left:0;top:0;bottom:0;background:var(--sv-accent, var(--seal));transition:width .25s ease}
 .sv-scale-jump{
   border:1px solid var(--line); background:var(--card);
   font-family:var(--mono); font-size:11px; color:var(--sub);
@@ -188,12 +203,12 @@ const SURVEY_UI_CSS = `
 }
 @media (prefers-reduced-motion: reduce){
   .sv-item.sv-hit{animation:none;background:var(--seal-bg)}
-  .sv-scale-fill{transition:none}
+  .sv-prog-fill{transition:none}
 }
 
 @media (max-width:560px){
-  .sv-scale{margin:-16px -14px 12px;padding:7px 14px 6px}
-  .sv-scale-track{width:40px}
+  .sv-stickybar{margin:-16px -14px var(--sv-bar-gap, 12px);padding:7px 14px 6px}
+  .sv-prog-track{width:40px}
   .sv-item{scroll-margin-top:calc(var(--sv-top, 56px) + 88px)}
 }
 `;
