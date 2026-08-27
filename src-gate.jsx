@@ -22,7 +22,7 @@ export const GATE_SECTIONS = [
     no: "02",
     sess: "3–4차시",
     en: "DESIGN",
-    title: "관찰에서 유물로",
+    title: "문제 관찰과 유물 설계",
     body: "사회참여 미술 감상과 문제 관찰, 허구 유물의 세계관·화면 설계",
     img: "/img/lessons/L4_s27_4.jpg",
     alt: "학 무늬가 상감된 청자 매병",
@@ -82,7 +82,7 @@ export function GateSections({ onEnter }) {
   return (
     <section className="g4-units" id="g4-units">
       <div className="g4-units-cap">
-        <span>고1 미술 · 8차시</span>
+        <span>고2 미술 · 8차시 · 2026</span>
         <span>실재한 적 없는 유물 이미지로 구성한 허구의 아카이브 전시</span>
         <span>FOUR CHAPTERS</span>
       </div>
@@ -189,6 +189,7 @@ export const GATE_CSS = `
 .g4-foot-in{max-width:1280px;margin:0 auto;padding:22px 20px 40px;
   display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start}
 .g4-foot-logo{font-family:'Archivo',sans-serif;font-size:15px;font-weight:900;letter-spacing:.02em}
+.g4-foot-copy{font-size:11px;color:#888;margin-top:8px;line-height:1.8}
 .g4-foot-note{font-size:11px;color:#888;line-height:1.8;text-align:right}
 @media(max-width:540px){.g4-foot-note{text-align:left}}
 `;

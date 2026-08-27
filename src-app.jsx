@@ -13,7 +13,7 @@ import { ThemeStyle } from "./src-theme.jsx";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
-   단원: 실재한 적 없는 유물 이미지로 구성한 허구의 아카이브 전시 (고1 미술, 8차시)
+   단원: 실재한 적 없는 유물 이미지로 구성한 허구의 아카이브 전시 (고2 미술, 8차시)
    학생: 학번+별명+4자리 코드로 입장, 창작 과정 기록지 작성 (자동 저장, 이어서 작성)
    교사: 관리자 코드로 입장, 진행 현황·기록 열람·루브릭 채점·분석·CSV 내보내기
    저장: window.storage (shared) — 학급 공용 데이터
@@ -4802,10 +4802,14 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
       </div>
       <footer className="g4-foot">
         <div className="g4-foot-in">
-          <div className="g4-foot-logo">FICTIVE ARCHIVE</div>
+          <div>
+            <div className="g4-foot-logo">FICTIVE ARCHIVE</div>
+            <div className="g4-foot-copy">© 2026 허구의 아카이브 · 고2 미술 수업</div>
+          </div>
           <div className="g4-foot-note">
             기록은 학급 서버에 자동 저장되어 어느 기기에서 접속해도 이어서 작성할 수 있습니다.<br />
-            실명·얼굴 사진·개인정보는 어디에도 입력하지 않습니다.
+            실명·얼굴 사진·개인정보는 어디에도 입력하지 않습니다.<br />
+            문의: 카피라이터 황미란 (sooremond@gmail.com)
           </div>
         </div>
       </footer>
@@ -7531,7 +7535,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("### 2.1 연구 참여자");
     L.push("");
-    L.push("고등학교 1학년 미술 수업의 한 학급 " + N + "명이 참여했다. 학생은 학번과 별명으로 입장하며 실명·얼굴 사진·개인정보를 입력하지 않는다. 자료 분석에는 학번을 정렬해 붙인 익명 번호(P01–P" + String(N).padStart(2, "0") + ")만 사용했다. 「연구자 서술 — 연구 윤리 심의와 동의 절차」");
+    L.push("고등학교 2학년 미술 수업의 한 학급 " + N + "명이 참여했다. 학생은 학번과 별명으로 입장하며 실명·얼굴 사진·개인정보를 입력하지 않는다. 자료 분석에는 학번을 정렬해 붙인 익명 번호(P01–P" + String(N).padStart(2, "0") + ")만 사용했다. 「연구자 서술 — 연구 윤리 심의와 동의 절차」");
     L.push("");
     L.push("### 2.2 수업 설계");
     L.push("");
@@ -8965,7 +8969,7 @@ const DEMO_WS = {
   "s6b.mat": "강철 파이프, 합성고무 그립, 직물 테이프",
   "s6b.size": "길이 24cm, 지름 3.2cm",
   "s6b.context": "물류 창고 하역장 자리로 추정되는 지층에서 파이프가 절단된 상태로 수습되었다. 오른쪽 그립만 고무가 벗겨져 금속이 드러나 있고, 벗겨진 자리에는 직물 테이프를 여러 겹 감아 수리한 흔적이 남아 있다.",
-  "s6b.coll": "○○고등학교 1학년 ○반 가상 컬렉션",
+  "s6b.coll": "○○고등학교 2학년 ○반 가상 컬렉션",
   "s6b.aiScope": "이미지 생성 및 부분 수정, 화면 편집. 명제표 문안과 작가 노트는 학생이 작성함.",
   "s6b.notice": "이 이미지는 생성형 AI로 제작한, 실재한 적 없는 유물입니다.",
   "s7.mode": "단독",
