@@ -17,7 +17,7 @@ import { SurveyStyle, SurveyScaleBar, LikertRow } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
-import { ExhibitSamples } from "./src-exhibit-samples.jsx";
+import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -1706,6 +1706,24 @@ const consentCount = (raw) => (CONSENT_ON ? CONSENT_KEYS.filter((k) => consentOf
 
 const PASTE_MIN = 20; // 낱말 몇 개짜리 붙여넣기는 기록하지 않는다
 
+/* 붙여넣은 직후 학생에게 출처를 묻는다 — 교사가 「차시 공개」 탭에서 켜고 끈다.
+   켜 두면 자료에 출처 자기보고가 남고, 학생은 자기가 무엇을 가져왔는지 한 번 짚게 된다.
+   꺼 두면 학생 화면에 아무 반응이 없고 기록만 조용히 남는다.
+
+   보기에서 「친구」를 뺐다 — 학생은 서로의 글을 볼 수 없으므로 있을 수 없는 답이고,
+   있을 수 없는 보기를 두면 응답이 그리로 새기만 한다. 실제로 가능한 출처는
+   생성형 도구, 인터넷·자료, 그리고 자기가 앞 차시에 쓴 글이다. */
+const PASTE_SRC = [
+  { k: "AI", label: "AI로 만든 글" },
+  { k: "인터넷", label: "인터넷·자료에서" },
+  { k: "내 글", label: "내가 앞서 쓴 글" },
+  { k: "기타", label: "그 밖" },
+];
+/* 기본값은 켬 — 설정 문서에 값이 아직 없으면 물어보는 쪽으로 시작한다.
+   교사가 「차시 공개」 탭에서 끄면 false가 저장되어 그때부터 조용해진다. */
+const DEFAULT_PASTE_ASK = true;
+const pasteAskOn = (cfg) => (cfg && cfg.pasteAsk !== undefined ? cfg.pasteAsk === true : DEFAULT_PASTE_ASK);
+
 /* 기록지 안에 학생이 쓴 글을 모두 훑는다 — 서술 칸뿐 아니라 표·사다리·점검표 안의 칸까지.
    표 안의 칸은 "필드키#속성행번호"로 가리킨다 (예: s5b.rounds#prompt2).
    붙여넣기가 어디서든 일어날 수 있으므로 전유율의 분모도 전 과정의 글이어야 한다. */
@@ -1869,15 +1887,23 @@ function pasteMetrics(ws) {
   });
 
   const settles = ps.map((e) => e.settle).filter((x) => typeof x === "number");
+  const srcOf = (k) => ps.filter((e) => e.src === k).length;
+  const aiBytes = ps.filter((e) => e.src === "AI").reduce((a, e) => a + (typeof e.b === "number" ? e.b : (e.n || 0) * 3), 0);
 
   return {
     pasteN: ps.length,
+    srcNamed: ps.filter((e) => filled(e.src)).length,
+    aiN: srcOf("AI"),
+    netN: srcOf("인터넷"),
+    ownN: srcOf("내 글"),
+    aiBytes,
     pasteChars: chars,
     pasteBytes: bytes,
     writtenLen,
     writtenBytes,
     srcRatio: writtenLen > 0 ? Math.round(Math.min(1, chars / writtenLen) * 100) : (chars > 0 ? 100 : 0),
     byteRatio: writtenBytes > 0 ? Math.round(Math.min(1, bytes / writtenBytes) * 100) : (bytes > 0 ? 100 : 0),
+    aiByteRatio: writtenBytes > 0 ? Math.round(Math.min(1, aiBytes / writtenBytes) * 100) : (aiBytes > 0 ? 100 : 0),
     approp: apN ? Math.round(apSum / apN) : null,
     settleMed: settles.length ? median(settles) : null,
     fieldsTouched: new Set(ps.map((e) => e.k)).size,
@@ -2212,6 +2238,7 @@ function pasteRows(ws) {
         where: (m.kind ? m.kind + " " + m.code + " · " : "") + m.label.slice(0, 40) + (m.subName ? " · " + m.subName : ""),
         chars: e.n || 0,
         bytes: typeof e.b === "number" ? e.b : (e.n || 0) * 3,   // b가 없는 옛 기록은 한글 기준으로 어림
+        src: e.src || "",
         base: e.base || 0,
         settle: typeof e.settle === "number" ? e.settle : null,
         survive: sv,
@@ -2674,6 +2701,11 @@ body{background:var(--bg)}
 .grade-row .g-name small{display:block;color:var(--sub);font-size:11px}
 .back-link{font-size:13px;color:var(--sub);cursor:pointer;background:none;border:none;font-family:var(--sans);padding:0;margin-bottom:12px;text-decoration:underline}
 .feedback-card{background:var(--patina-bg);border:1px solid var(--patina);padding:14px 16px;margin-bottom:18px}
+.paste-ask{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--card);border-top:2px solid var(--ink);box-shadow:0 -6px 24px rgba(0,0,0,.14)}
+.paste-ask-in{max-width:1060px;margin:0 auto;padding:12px 18px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.paste-ask .pa-q{font-weight:600;font-size:14px}
+.paste-ask .pa-opts{display:flex;flex-wrap:wrap;gap:6px}
+.paste-ask .pa-note{flex:1 1 100%;font-size:11.5px;color:var(--sub);line-height:1.6}
 .feedback-card h3{font-family:var(--serif);font-size:14px;color:var(--patina);margin-bottom:8px}
 .feedback-card p{font-size:13px;white-space:pre-wrap}
 
@@ -4867,6 +4899,7 @@ function StudentApp({ me, onExit, onGallery }) {
   const [survey, setSurvey] = useState(null); // surveys/{학번} 문서 — 사전·사후 창의성 설문
   const [svCfg, setSvCfg] = useState(DEFAULT_SURVEY);
   const [anCfg, setAnCfg] = useState(DEFAULT_ANCHOR);
+  const [cfgAll, setCfgAll] = useState(null);   // 설정 문서 전체 — 붙여넣기 출처 묻기 같은 토글을 읽는다
   const [svBusy, setSvBusy] = useState(false);
   const svTimer = useRef(null);
   const surveyRef = useRef(null);
@@ -4950,6 +4983,7 @@ function StudentApp({ me, onExit, onGallery }) {
       const om = (cfg && cfg.open) || DEFAULT_OPEN;
       setOpenMap(om);
       setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
+      setCfgAll(cfg || {});
     setAnCfg((cfg && cfg.anchor) || DEFAULT_ANCHOR);
       // 지난번에 보던 차시로 이어서 연다. 없으면 열린 차시 중 가장 뒤의 것
       let t0 = SESSIONS[0];
@@ -4963,7 +4997,7 @@ function StudentApp({ me, onExit, onGallery }) {
 
   // 차시 공개 설정과 교사 피드백을 실시간으로 받음
   useEffect(() => {
-    const un1 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); if (cfg) setAnCfg(cfg.anchor || DEFAULT_ANCHOR); });
+    const un1 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); if (cfg) setCfgAll(cfg); if (cfg) setAnCfg(cfg.anchor || DEFAULT_ANCHOR); });
     const un2 = fbStore.watchDoc("grade:" + me.sid, (g) => { if (g) setGrade(g); });
     return () => { un1(); un2(); };
   }, []);
@@ -5042,19 +5076,17 @@ function StudentApp({ me, onExit, onGallery }) {
     timer.current = setTimeout(doSave, 600); // 입력이 멈추면 0.6초 안에 저장
   };
 
-  /* 붙여넣기 기록 — 막지 않고 조용히 남긴다.
-     학생 화면에는 아무것도 나타나지 않는다. 표시도, 묻는 말도, 되돌아보기 표도 없다.
-     기록은 교사 화면에서만 확인한다.
-
-     그래서 고지가 앱 밖으로 옮겨 간다 — 화면에 아무 단서가 없으므로
-     「붙여넣기 기록」 동의 항목과 사전 안내로만 학생이 이 수집을 알 수 있다.
-     동의 절차에서 반드시 실제로 알려야 한다.
-
-     출처는 더 이상 학생에게 묻지 않으므로 저장하지 않는다. 어느 글이 생성형 도구에서
-     왔는지 이 도구는 알지 못하며, 자료는 "외부에서 들어온 글"까지만 말한다.
-
+  /* 붙여넣기 기록 — 막지 않고 남긴다.
      저장하는 것: 어느 칸에 · 언제 · 몇 자 · 몇 바이트 · 붙이기 직전 그 칸의 길이 · 앞 120자.
-     클립보드 전문은 저장하지 않는다. */
+     클립보드 전문은 저장하지 않는다.
+
+     출처 묻기는 교사가 켜고 끈다(「차시 공개」 탭).
+     켜면 붙인 직후 화면 아래에 한 줄이 떠 학생이 스스로 고르고, 그 값이 자료에 남는다.
+     끄면 학생 화면에 아무 반응이 없고 기록만 조용히 남는다 — 그때는 화면에 단서가
+     전혀 없으므로 수집 사실을 알리는 일이 동의 절차와 사전 안내에만 남는다. */
+  const [pasteAsk, setPasteAsk] = useState(null);
+  const askOnRef = useRef(false);
+  askOnRef.current = pasteAskOn(cfgAll);
   useEffect(() => {
     const onPaste = (e) => {
       if (!loaded) return;
@@ -5064,8 +5096,9 @@ function StudentApp({ me, onExit, onGallery }) {
       const txt = ((e.clipboardData || window.clipboardData || {}).getData ? (e.clipboardData || window.clipboardData).getData("text") : "") || "";
       const body = txt.trim();
       if (!k || body.length < PASTE_MIN) return;
+      const at = now();
       const entry = {
-        k, at: now(),
+        k, at,
         n: body.length,            // 글자 수
         b: utf8Len(body),          // 바이트 수 (한글은 글자당 3바이트)
         head: body.slice(0, 120),
@@ -5076,10 +5109,22 @@ function StudentApp({ me, onExit, onGallery }) {
       setSaveState("dirty");
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(doSave, 800);
+      if (askOnRef.current) setPasteAsk({ k, at });
     };
     document.addEventListener("paste", onPaste, true);
     return () => document.removeEventListener("paste", onPaste, true);
   }, [loaded]);
+
+  const setPasteSrc = (at, src) => {
+    setWs((p) => ({ ...p, _paste: (Array.isArray(p._paste) ? p._paste : []).map((e) => (e.at === at ? { ...e, src } : e)) }));
+    dirtyRef.current = true;
+    setSaveState("dirty");
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(doSave, 400);
+    setPasteAsk(null);
+  };
+  // 교사가 도중에 끄면 떠 있던 물음도 함께 걷는다
+  useEffect(() => { if (!pasteAskOn(cfgAll) && pasteAsk) setPasteAsk(null); }, [cfgAll]);
 
   useEffect(() => {
     const onHide = () => { if (document.visibilityState === "hidden") flush(); };
@@ -5278,6 +5323,21 @@ function StudentApp({ me, onExit, onGallery }) {
           <SectionCard key={sec.id} sec={sec} ws={ws} setField={setField} />
         ))}
       </div>
+
+      {pasteAsk && (
+        <div className="paste-ask" role="dialog" aria-label="붙여넣은 문장의 출처">
+          <div className="paste-ask-in">
+            <span className="pa-q">방금 붙여넣은 문장은 어디에서 왔나요?</span>
+            <div className="pa-opts">
+              {PASTE_SRC.map((s) => (
+                <button key={s.k} className="btn small" onClick={() => setPasteSrc(pasteAsk.at, s.k)}>{s.label}</button>
+              ))}
+              <button className="btn small ghost" onClick={() => setPasteAsk(null)}>닫기</button>
+            </div>
+            <span className="pa-note">붙여넣기는 막지 않습니다. 어디서 왔는지 스스로 짚어 두면 나중에 무엇을 내 말로 바꿨는지 볼 수 있습니다.</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -7066,6 +7126,12 @@ const RESEARCH_VARS = [
   { k: "paste_bytes", name: "붙여넣은 바이트", unit: "B", def: "붙여넣기로 들어온 글의 UTF-8 바이트 합 (한글은 글자당 3바이트)", get: (c) => c.pm.pasteBytes },
   { k: "written_bytes", name: "쓴 글 전체 바이트", unit: "B", def: "기록지에 쓴 모든 글의 UTF-8 바이트 합", get: (c) => c.pm.writtenBytes },
   { k: "byte_ratio", name: "바이트 기준 비중", unit: "%", def: "붙여넣은 바이트 ÷ 쓴 글 전체 바이트. 글자 수 기준보다 실제 분량에 가깝다", get: (c) => c.pm.byteRatio },
+  /* 아래 넷은 「출처 묻기」를 켠 동안에만 채워진다. 학생 자기보고이므로 미응답이 섞이며,
+     빈칸을 AI로 간주해서는 안 된다. */
+  { k: "src_named_n", name: "출처를 고른 건수", unit: "건", def: "붙여넣기 가운데 학생이 출처를 고른 건수 (자기보고 응답률)", get: (c) => c.pm.srcNamed },
+  { k: "src_ai_n", name: "AI라고 고른 건수", unit: "건", def: "학생이 스스로 AI로 만든 글이라고 고른 붙여넣기 건수", get: (c) => c.pm.aiN },
+  { k: "src_net_n", name: "인터넷이라고 고른 건수", unit: "건", def: "학생이 인터넷·자료에서 가져왔다고 고른 붙여넣기 건수", get: (c) => c.pm.netN },
+  { k: "ai_byte_ratio", name: "AI라고 밝힌 바이트 비중", unit: "%", def: "AI로 고른 붙여넣기의 바이트 ÷ 쓴 글 전체 바이트", get: (c) => c.pm.aiByteRatio },
   /* 이름에 AI를 넣지 않는다 — 이 값은 출처와 무관하게 모든 붙여넣기를 센다.
      학생이 3차시에 쓴 자기 글을 8차시로 옮겨 붙여도 올라간다. 이 도구는 어느 글이
      생성형 도구에서 왔는지 알지 못하므로, 출처를 단정하는 이름을 쓰지 않는다. */
@@ -7137,6 +7203,7 @@ function researchCases(ids, roster, wsMap, gradeMap, surveyMap, consentMap) {
 const VAR_NEED = {
   paste_n: "paste", paste_chars: "paste", paste_bytes: "paste", written_bytes: "paste",
   src_ratio: "paste", byte_ratio: "paste", approp: "paste", paste_settle: "paste", ai_type: "paste",
+  src_named_n: "paste", src_ai_n: "paste", src_net_n: "paste", ai_byte_ratio: "paste",
   prompt_n: "prompt", prompt_growth: "prompt", prompt_step: "prompt", prompt_even: "prompt", plan_gap: "prompt",
   edit_n: "log", dwell_min: "log", read_min: "log",
   rewrite_depth: "log", rewrite_deep_n: "log", trace_pruned: "log",
@@ -7257,14 +7324,14 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
      앞 120자만 나가며 붙여넣은 글 전체는 애초에 저장하지 않는다. */
   const exportPaste = () => {
     const head = ["pid", "paste_no", "at", "session", "sec_code", "field_key", "where",
-      "chars", "bytes", "field_len_before", "field_len_final", "settle_sec",
+      "chars", "bytes", "field_len_before", "field_len_final", "src_selfreport", "settle_sec",
       "survive_pct", "approp_pct", "head_text"];
     const rows = [];
     cases.forEach((c) => {
       if (!consentAgreed(c.consent, "paste")) return;   // 붙여넣기 항목에 동의한 학생만
       pasteRows(c.ws).forEach((r) => {
         rows.push([c.pid, r.no, r.at, r.session, r.code, r.key, r.where,
-          r.chars, r.bytes, r.base, r.finalLen, r.settle == null ? "" : r.settle,
+          r.chars, r.bytes, r.base, r.finalLen, r.src, r.settle == null ? "" : r.settle,
           r.survive == null ? "" : r.survive, r.approp == null ? "" : r.approp, r.head]);
       });
     });
@@ -7468,6 +7535,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       ["field_len_before", "붙이기 직전 그 칸에 있던 글자 수"],
       ["field_len_final", "그 칸의 최종 글자 수"],
       ["bytes", "붙여넣은 글의 UTF-8 바이트 수 (한글은 글자당 3바이트)"],
+      ["src_selfreport", "학생이 붙인 직후 고른 출처(AI · 인터넷 · 내 글 · 기타). 「출처 묻기」를 끈 동안에는 비며, 빈칸을 AI로 간주하지 않는다"],
       ["settle_sec", "붙여넣기부터 그 칸을 마지막으로 고칠 때까지의 초"],
       ["survive_pct", "붙인 앞머리의 문자 3-gram이 최종문에 남은 비율"],
       ["approp_pct", "100 − survive_pct. 전유율"],
@@ -8012,6 +8080,116 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
   );
 }
 
+/* ---------- 명부 관리 — 여러 학생을 한 번에 지운다 ----------
+   시험 삼아 만든 학번으로 들어가 본 뒤 정리할 때 쓴다.
+   학생 상세의 「학생 완전 삭제」는 한 명씩이라 열댓 개를 지우려면 번거롭다.
+   지우는 것: 기록지 · 미디어 · 채점 · 설문 · 명부 · 동의 대장의 그 학생 칸.
+   지우지 못하는 것: 로그인 계정 자체 (Firebase 콘솔에서만 지울 수 있다). */
+function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
+  const [sel, setSel] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const chosen = ids.filter((id) => sel[id]);
+  const toggle = (id) => setSel((p) => ({ ...p, [id]: !p[id] }));
+  const pick = (fn) => { const m = {}; ids.forEach((id) => { if (fn(id)) m[id] = true; }); setSel(m); };
+  const pctOf = (id) => overallProgress(wsMap[id]);
+
+  const del = async () => {
+    if (sampleMode || !chosen.length) return;
+    const names = chosen.map((id) => id + (roster[id] && roster[id].nick ? "(" + roster[id].nick + ")" : "")).join(", ");
+    const token = window.prompt(
+      "학생 " + chosen.length + "명을 지웁니다.\n\n" + names +
+      "\n\n기록지·미디어·채점·설문·명부와 동의 대장의 해당 칸이 모두 사라지며 되돌릴 수 없습니다." +
+      "\n계속하려면 지울 인원 수 " + chosen.length + " 을(를) 입력하세요.");
+    if (token == null) return;
+    if (token.trim() !== String(chosen.length)) return setMsg("인원 수가 일치하지 않아 취소했습니다.");
+
+    setBusy(true);
+    let done = 0;
+    try {
+      for (const id of chosen) {
+        setMsg("지우는 중… " + (done + 1) + " / " + chosen.length + " (" + id + ")");
+        for (const ref of collectMediaRefs(wsMap[id] || {})) await mediaStore.remove(id, ref);
+        await fbStore.remove("ws:" + id);
+        await fbStore.remove("grade:" + id);
+        await fbStore.remove("survey:" + id);
+        await fbStore.removeStudent(id);
+        done++;
+      }
+      const cm = await store.get("research:consent");
+      if (cm && typeof cm === "object") {
+        const next = { ...cm };
+        chosen.forEach((id) => { delete next[id]; });
+        await store.set("research:consent", next);
+      }
+      setSel({});
+      setMsg(done + "명을 지웠습니다. 로그인 계정은 Firebase 콘솔의 Authentication에서 따로 지워야 하며, 같은 학번으로 다시 입장하면 빈 기록지로 새로 시작합니다.");
+      if (onDone) onDone();
+    } catch (e) {
+      setMsg("지우다 중단됐습니다 (" + done + "명 처리). 남은 학생은 다시 고르고 실행하세요.");
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="card">
+      <div className="card-head"><span className="card-code">명부</span><span className="card-title">학생 정보 삭제</span></div>
+      <div className="card-body">
+        <p style={{ fontSize: 13, marginBottom: 10 }}>
+          시험 삼아 들어가 본 학번을 정리할 때 씁니다. 고른 학생의 <b>기록지·미디어·채점·설문·명부</b>와
+          동의 대장의 해당 칸이 함께 사라집니다. <b>되돌릴 수 없습니다.</b>
+        </p>
+        {msg && <div className={busy ? "ok-note" : "warn-note"} style={{ marginBottom: 10 }}>{msg}</div>}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          <button className="btn small ghost" disabled={busy} onClick={() => pick(() => true)}>전체 고르기</button>
+          <button className="btn small ghost" disabled={busy} onClick={() => pick((id) => pctOf(id) === 0)}>기록이 없는 학생만</button>
+          <button className="btn small ghost" disabled={busy} onClick={() => setSel({})}>고른 것 해제</button>
+        </div>
+        <div className="tbl-scroll" style={{ maxHeight: 320, overflow: "auto" }}>
+          <table className="roster">
+            <thead><tr>
+              <th style={{ width: 44 }}>고름</th><th style={{ width: 80 }}>학번</th><th>별명</th>
+              <th style={{ width: 76 }}>기록률</th><th style={{ width: 70 }}>미디어</th><th style={{ width: 76 }}>설문</th><th style={{ width: 132 }}>마지막 저장</th>
+            </tr></thead>
+            <tbody>
+              {ids.map((id) => {
+                const w = wsMap[id] || {};
+                const sv = (surveyMap || {})[id] || {};
+                const nDone = ["pre", "post"].filter((p) => svDone(sv[p])).length;
+                return (
+                  <tr key={id} style={sel[id] ? { background: "var(--seal-bg)" } : {}}>
+                    <td style={{ textAlign: "center" }}>
+                      <input type="checkbox" checked={!!sel[id]} disabled={busy} onChange={() => toggle(id)} aria-label={id + " 고르기"} />
+                    </td>
+                    <td className="mono">{id}</td>
+                    <td>{(roster[id] || {}).nick || ""}</td>
+                    <td className="mono">{pctOf(id)}%</td>
+                    <td className="mono">{mediaCount(w)}</td>
+                    <td className="mono">{nDone}/2</td>
+                    <td className="mono" style={{ fontSize: 11 }}>{w._updatedAt ? fmtTime(w._updatedAt) : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
+          <button className="btn" disabled={busy || sampleMode || !chosen.length}
+            style={chosen.length ? { background: "var(--seal)", borderColor: "var(--seal)" } : {}}
+            onClick={del}>
+            {busy ? "지우는 중…" : "고른 " + chosen.length + "명 지우기"}
+          </button>
+          {sampleMode && <span className="hint">표본 학급에서는 지울 수 없습니다.</span>}
+        </div>
+        <p className="hint" style={{ marginTop: 10 }}>
+          <b>로그인 계정은 여기서 지워지지 않습니다.</b> 학번@museum.class 계정은 Firebase 콘솔의 Authentication 목록에서 지워야 하며,
+          지우지 않아도 같은 학번으로 다시 들어오면 빈 기록지로 새로 시작합니다.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function TeacherApp({ onExit, onGallery }) {
   useContent();
   useEffect(() => watchContent(), []);
@@ -8026,6 +8204,7 @@ function TeacherApp({ onExit, onGallery }) {
   const [openMap, setOpenMap] = useState(DEFAULT_OPEN);
   const [svCfg, setSvCfg] = useState(DEFAULT_SURVEY);
   const [anCfg, setAnCfg] = useState(DEFAULT_ANCHOR);
+  const [cfgAll, setCfgAll] = useState(null);   // 설정 문서 전체 — 붙여넣기 출처 묻기 토글을 읽는다
   const [sampleMode, setSampleMode] = useState(true);
   const [npin, setNpin] = useState("");
 
@@ -8073,6 +8252,19 @@ function TeacherApp({ onExit, onGallery }) {
     const ok = await store.set("config", { ...cfg, open: next, openUpdated: now() });
     if (ok) { setOpenMap(next); setMsg(val ? "모든 차시를 열었습니다." : "모든 차시를 닫았습니다."); }
   };
+  /* 붙여넣은 뒤 출처를 물을지 — 학생 화면에 15초 안에 반영된다 */
+  const togglePasteAsk = async () => {
+    const cfg = (await store.get("config")) || {};
+    const next = !pasteAskOn(cfg);
+    const ok = await store.set("config", { ...cfg, pasteAsk: next, pasteAskUpdated: now() });
+    if (ok) {
+      setCfgAll({ ...cfg, pasteAsk: next });
+      setMsg(next
+        ? "출처 묻기를 켰습니다. 이제 학생이 붙여넣으면 어디서 가져왔는지 고르는 줄이 뜹니다."
+        : "출처 묻기를 껐습니다. 학생 화면에는 아무 반응도 나타나지 않고 기록만 쌓입니다.");
+    } else setMsg("설정 저장에 실패했습니다.");
+  };
+
   const toggleSurvey = async (phase) => {
     const cfg = (await store.get("config")) || {};
     const cur = cfg.survey || DEFAULT_SURVEY;
@@ -8100,7 +8292,7 @@ function TeacherApp({ onExit, onGallery }) {
     const un2 = fbStore.watchWorksheets((w) => {
       if (Object.keys(w).length) setWsMap((p) => ({ ...p, ...w }));
     });
-    const un3 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); if (cfg) setAnCfg(cfg.anchor || DEFAULT_ANCHOR); });
+    const un3 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); if (cfg) setCfgAll(cfg); if (cfg) setAnCfg(cfg.anchor || DEFAULT_ANCHOR); });
     const un4 = fbStore.watchSurveys((s) => {
       if (Object.keys(s).length) setSurveyMap((p) => ({ ...p, ...s }));
     });
@@ -8301,6 +8493,44 @@ function TeacherApp({ onExit, onGallery }) {
                     <p className="hint" style={{ marginTop: 10 }}>같은 문항을 두 번 실시해 변화를 잽니다. 학생에게는 성적과 무관함을 반드시 미리 알립니다. 성향 설문은 <b>반드시 1차시에</b> 받습니다 — 8차시 상호평가 직전에 AI 태도를 물으면 그 질문이 판정 기준을 흔듭니다.</p>
                   </div>
                 </div>
+                <div className="card">
+                  <div className="card-head"><span className="card-code">붙여넣기</span><span className="card-title">붙여넣은 뒤 출처를 묻기</span></div>
+                  <div className="card-body">
+                    <p style={{ fontSize: 13, marginBottom: 12 }}>
+                      켜면 학생이 20자 이상을 붙여넣은 직후 화면 아래에 한 줄이 떠 <b>어디에서 가져왔는지 스스로 고르게</b> 합니다.
+                      고른 값은 연구 자료의 <span className="mono">src_selfreport</span> 열에 남습니다.
+                      끄면 학생 화면에 아무 반응도 나타나지 않고 기록만 조용히 쌓입니다.
+                    </p>
+                    <table className="roster">
+                      <thead><tr><th>설정</th><th>학생이 보는 것</th><th style={{ width: 110 }}>상태</th></tr></thead>
+                      <tbody>
+                        <tr>
+                          <td>출처 묻기</td>
+                          <td style={{ fontSize: 12 }}>
+                            {PASTE_SRC.map((s) => s.label).join(" · ")} 가운데 하나를 고릅니다. 「닫기」로 넘어갈 수도 있습니다.
+                          </td>
+                          <td>
+                            <div className="seg">
+                              <button className={pasteAskOn(cfgAll) ? "on-ok" : ""} onClick={() => { if (!pasteAskOn(cfgAll)) togglePasteAsk(); }}>켬</button>
+                              <button className={!pasteAskOn(cfgAll) ? "on-no" : ""} onClick={() => { if (pasteAskOn(cfgAll)) togglePasteAsk(); }}>끔</button>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <p className="hint" style={{ marginTop: 10 }}>
+                      학생은 서로의 글을 볼 수 없으므로 보기에 「친구」를 두지 않았습니다. 실제로 가능한 출처는
+                      생성형 도구, 인터넷·자료, 자기가 앞 차시에 쓴 글입니다.
+                    </p>
+                    <p className="hint" style={{ marginTop: 6 }}>
+                      <b>자기보고이므로 미응답이 섞입니다.</b> 빈칸을 AI로 간주하지 마십시오. 끈 동안 일어난 붙여넣기는 출처가 영원히 비며,
+                      나중에 켜도 소급되지 않습니다 — 수집 시작 전에 정해 두십시오.
+                    </p>
+                    <p className="hint" style={{ marginTop: 6 }}>
+                      끄고 쓰실 때는 학생 화면에 수집의 단서가 전혀 없으므로, 동의 절차와 사전 안내가 고지의 전부가 됩니다.
+                    </p>
+                  </div>
+                </div>
                 <AnchorPanel ids={ids} roster={roster} surveyMap={surveyMap} cfg={anCfg} sampleMode={sampleMode}
                   onSave={async (next) => {
                     const cfg = (await store.get("config")) || {};
@@ -8415,6 +8645,8 @@ function TeacherApp({ onExit, onGallery }) {
                     <p className="hint" style={{ marginTop: 10 }}>학생이 한 명도 입장하지 않은 동안에는 화면 구조를 살펴보도록 표본 학급 8명이 표시됩니다. 실제 학생이 입장하면 표본은 사라집니다.</p>
                   </div>
                 </div>
+                <RosterAdmin ids={ids} roster={roster} wsMap={wsMap} surveyMap={surveyMap}
+                  sampleMode={sampleMode} onDone={loadAll} />
               </div>
             )}
           </div>
@@ -8740,6 +8972,9 @@ function Gallery({ onBack }) {
     Object.keys(all).forEach((id) => {
       const w = all[id] || {};
       if (w["s7x.show"] !== "공개") return;
+      // 표본 학급의 출품작 가운데 자료집 예시와 제목이 같은 것은 걸지 않는다 —
+      // 위의 예시 벽면에 완성된 형태로 이미 걸려 있어, 명제표가 빈 채로 겹쳐 걸리면 혼란만 준다.
+      if (w._sample && EXHIBIT_SAMPLES.some((s) => s.title === w["s6b.title"])) return;
       list.push({
         owner: id,
         no: (w["s7x.no"] || "무번호").slice(0, 20),
