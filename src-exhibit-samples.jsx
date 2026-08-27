@@ -182,6 +182,7 @@ export function ExhibitSamples({ showPlate }) {
 .exs-head h2{font-family:var(--serif);font-size:19px;font-weight:700;margin:8px 0 6px}
 .exs-head p{color:var(--sub);font-size:12.5px;max-width:620px;margin:0 auto}
 .work.exs-work{border-top:3px solid var(--seal)}
+.work.exs-work .work-img{aspect-ratio:1024/559}
 .exs-mark{background:var(--seal);color:#fff;font-size:12.5px;font-weight:700;text-align:center;padding:7px 10px;letter-spacing:.05em}
 .exs-meta{margin:0 14px 10px;font-size:11.5px;color:var(--sub);font-family:var(--mono)}
 .exs-tail{margin:22px auto 0;border-top:1px dashed var(--line);max-width:620px;padding-top:10px;text-align:center;color:var(--sub);font-size:12px}
