@@ -43,6 +43,21 @@ export const ANCHOR_QUESTION =
 export const ANCHOR_MIN_SEC = 5;   // 이보다 빨리 고르면 한 번 더 보게 한다
 export const ANCHOR_MIN_WHY = 15;  // 이유 문장의 최소 길이
 
+/* 명제표의 「AI 활용 범위」를 견줄 수 있게 만드는 4단계 (평가자_성향_설문_설계.md §2.1).
+   자유 서술은 그대로 두고 이 값을 함께 받는다. 학생 자신의 선언이므로
+   작품의 실제 AI 개입도가 아니라 **고지된 개입도**다 — 논문에서 이 구분을 흐리지 않는다. */
+export const AI_LEVELS = [
+  "촬영·수집한 이미지가 중심, AI는 손질만",
+  "일부 요소를 AI로 생성해 합쳤다",
+  "AI로 생성한 이미지를 여러 번 고쳐 썼다",
+  "AI가 생성한 이미지를 거의 그대로 썼다",
+];
+/* 0~3의 수치로. 답하지 않았으면 null */
+export const aiLevelNum = (v) => {
+  const i = AI_LEVELS.indexOf(v);
+  return i >= 0 ? i : null;
+};
+
 /* 기본 네 쌍 — 교사가 「상호평가」 화면에서 이미지 경로와 문안을 고칠 수 있다.
    img는 public/ 아래 상대 경로("img/anchor/a1.jpg")나 절대 주소를 쓴다.
    이미지가 하나라도 비어 있으면 학생에게 열 수 없다(비교가 성립하지 않는다). */
@@ -112,7 +127,6 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
   const pairs = conf.pairs || [];
   const sv = block || {};
   const items = sv.items || [];
-  const [idx, setIdx] = useState(Math.min(items.length, pairs.length - 1));
   const [win, setWin] = useState(null);
   const [why, setWhy] = useState("");
   const [tag, setTag] = useState(null);
@@ -120,7 +134,8 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
   const [warn, setWarn] = useState("");
   const startRef = useRef(Date.now());
 
-  useEffect(() => { startRef.current = Date.now(); setOpenPlate(false); setWarn(""); }, [idx]);
+  /* 쌍이 넘어갈 때마다 판정 시간을 다시 재고 명제표를 도로 접는다 */
+  useEffect(() => { startRef.current = Date.now(); setOpenPlate(false); setWarn(""); }, [items.length]);
 
   if (anchorDone(sv)) {
     return <div className="ok-note">예시 유물 판정을 마쳤습니다 — 네 쌍 모두 기록되었습니다. 고맙습니다.</div>;
@@ -144,10 +159,11 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
     onChange(next);
     setWin(null); setWhy(""); setTag(null); setWarn("");
     if (doneN + 1 >= pairs.length) onSubmit(next);
-    else setIdx(doneN + 1);
   };
 
-  const Work = ({ side }) => {
+  /* 컴포넌트가 아니라 조각을 돌려주는 함수다 — 컴포넌트로 두면 이유를 한 글자 칠 때마다
+     새 타입이 되어 두 작품이 통째로 다시 붙고 이미지가 깜빡인다 */
+  const work = (side) => {
     const w = cur[side];
     return (
       <div className={"an-work" + (win === side ? " on" : "")}>
@@ -185,7 +201,7 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
       <div className="card-body">
         <div className="an-q">{ANCHOR_QUESTION}</div>
         <div className="an-pair">
-          <Work side="a" /><Work side="b" />
+          {work("a")}{work("b")}
         </div>
         <div className="an-tools">
           <button type="button" className="btn small ghost" onClick={() => setOpenPlate((v) => !v)}>

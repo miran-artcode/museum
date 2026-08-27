@@ -5,7 +5,14 @@ import {
   useContent, watchContent, onContentChange, mergeLessons, mergeSchema,
   ContentEditor, ContentStyle, LessonImages, LessonAsks, LessonNotice, WorkLinks,
 } from "./src-content.jsx";
-import { StanceCard, StanceStyle, StanceMini, stanceDone, STANCE_VER } from "./src-stance.jsx";
+import {
+  StanceCard, StanceStyle, StanceMini, stanceDone, STANCE_VER,
+  stanceScores, stanceFlatCols, stanceFlatRow, STANCE_DERIVED,
+} from "./src-stance.jsx";
+import {
+  AnchorCard, AnchorPanel, AnchorStyle, DEFAULT_ANCHOR, ANCHOR_VER, AI_LEVELS,
+  anchorOpen, anchorDone, anchorScore, anchorPlateRate,
+} from "./src-anchor.jsx";
 import { SurveyStyle, SurveyScaleBar, LikertRow } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
@@ -866,6 +873,9 @@ const SCHEMA_DEF = [
       { k: "size", t: "text", label: "크기" }, { k: "context", t: "area", label: "출토 맥락" },
       { k: "coll", t: "text", label: "소장 (학급 가상 컬렉션으로 표기)" },
       { k: "aiScope", t: "text", label: "AI 활용 범위" },
+      /* 자유 서술(aiScope)은 그대로 두고, 연구용으로 견줄 수 있는 4단계를 함께 받는다.
+         전시 명제표에는 나오지 않는다 - 작품의 파라텍스트를 연구 편의로 바꾸지 않기 위해서다. */
+      { k: "aiLevel", t: "select", opts: AI_LEVELS, label: "AI 활용 정도 (연구용 표시 — 전시 명제표에는 나오지 않습니다)" },
       { k: "notice", t: "text", label: "허구 고지", def: "이 이미지는 생성형 AI로 제작한, 실재한 적 없는 유물입니다." },
     ],
   },
@@ -1673,6 +1683,11 @@ const CONSENT_ITEMS = [
 ];
 const CONSENT_KEYS = CONSENT_ITEMS.map((x) => x.k);
 
+/* 동의 대장을 화면에서 감춘다 (2026-08-27, 교사 요청). true로 되돌리면 항목별 표가 다시 나온다.
+   꺼 두면 동의 여부로 자료를 거르지 않는다 — 표가 없는데 미표시를 미동의로 보면 분석 대상이 0명이 된다.
+   대신 논문 자동 서술에서 동의 문단을 빼고, 실제 동의를 따로 받아야 한다고 적는다. */
+const CONSENT_ON = false;
+
 /* 옛 표기("동의"/"제외" 문자열 하나)를 항목별 표로 바꾼다 */
 function consentOf(raw) {
   if (raw && typeof raw === "object") return raw;
@@ -1683,10 +1698,10 @@ function consentOf(raw) {
   CONSENT_KEYS.forEach((k) => { m[k] = all; });
   return m;
 }
-const consentAgreed = (raw, k) => consentOf(raw)[k] === true;
+const consentAgreed = (raw, k) => (CONSENT_ON ? consentOf(raw)[k] === true : true);
 /* 아무 항목에도 동의하지 않았으면 분석 대상이 아니다 */
-const consentAny = (raw) => CONSENT_KEYS.some((k) => consentOf(raw)[k] === true);
-const consentCount = (raw) => CONSENT_KEYS.filter((k) => consentOf(raw)[k] === true).length;
+const consentAny = (raw) => (CONSENT_ON ? CONSENT_KEYS.some((k) => consentOf(raw)[k] === true) : true);
+const consentCount = (raw) => (CONSENT_ON ? CONSENT_KEYS.filter((k) => consentOf(raw)[k] === true).length : CONSENT_KEYS.length);
 
 const PASTE_SRC = ["AI", "내가 앞서 쓴 글", "자료", "친구"];
 const PASTE_MIN = 20; // 낱말 몇 개짜리 붙여넣기는 기록하지 않는다
@@ -4861,6 +4876,7 @@ function StudentApp({ me, onExit, onGallery }) {
   const [grade, setGrade] = useState(null);
   const [survey, setSurvey] = useState(null); // surveys/{학번} 문서 — 사전·사후 창의성 설문
   const [svCfg, setSvCfg] = useState(DEFAULT_SURVEY);
+  const [anCfg, setAnCfg] = useState(DEFAULT_ANCHOR);
   const [svBusy, setSvBusy] = useState(false);
   const svTimer = useRef(null);
   const surveyRef = useRef(null);
@@ -4944,6 +4960,7 @@ function StudentApp({ me, onExit, onGallery }) {
       const om = (cfg && cfg.open) || DEFAULT_OPEN;
       setOpenMap(om);
       setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
+    setAnCfg((cfg && cfg.anchor) || DEFAULT_ANCHOR);
       // 지난번에 보던 차시로 이어서 연다. 없으면 열린 차시 중 가장 뒤의 것
       let t0 = SESSIONS[0];
       if (saved && saved._lastTab && isOpen(om, saved._lastTab)) t0 = saved._lastTab;
@@ -4956,7 +4973,7 @@ function StudentApp({ me, onExit, onGallery }) {
 
   // 차시 공개 설정과 교사 피드백을 실시간으로 받음
   useEffect(() => {
-    const un1 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); });
+    const un1 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); if (cfg) setAnCfg(cfg.anchor || DEFAULT_ANCHOR); });
     const un2 = fbStore.watchDoc("grade:" + me.sid, (g) => { if (g) setGrade(g); });
     return () => { un1(); un2(); };
   }, []);
@@ -5139,6 +5156,32 @@ function StudentApp({ me, onExit, onGallery }) {
     if (!ok) { alert("제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요."); setSurvey(cur); }
   };
 
+  /* 앵커 판정 — 같은 surveys/{학번} 문서의 anchor 블록.
+     상호평가(assess 컬렉션)가 아직 없어 임시로 여기 얹는다. */
+  const anChange = (blk) => {
+    const cur = surveyRef.current || {};
+    const next = { ...cur, anchor: { ...blk, ver: ANCHOR_VER } };
+    setSurvey(next);
+    if (svTimer.current) clearTimeout(svTimer.current);
+    svTimer.current = setTimeout(() => { store.set("survey:" + me.sid, surveyRef.current); }, 500);
+  };
+  const anSubmit = async (blk) => {
+    const cur = surveyRef.current || {};
+    const started = (blk && blk.startedAt) || now();
+    const at = now();
+    const next = {
+      ...cur,
+      anchor: { ...blk, ver: ANCHOR_VER, startedAt: started, submittedAt: at,
+        durSec: Math.max(0, Math.round((new Date(at) - new Date(started)) / 1000)) },
+    };
+    setSvBusy(true);
+    if (svTimer.current) clearTimeout(svTimer.current);
+    setSurvey(next);
+    const ok = await store.set("survey:" + me.sid, next);
+    setSvBusy(false);
+    if (!ok) alert("판정을 저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
+  };
+
   const switchTab = (s) => {
     if (s === tab) return;
     wsRef.current = { ...wsRef.current, _lastTab: s }; // 다음 입장 때 이 차시로 이어서 연다
@@ -5216,6 +5259,10 @@ function StudentApp({ me, onExit, onGallery }) {
         {loaded && survey && surveyOpen(svCfg, "sPost") && (
           <StanceCard phase="post" block={(survey.stance || {}).post} busy={svBusy}
             onChange={(b) => stChange("post", b)} onSubmit={() => stSubmit("post")} />
+        )}
+        {loaded && survey && anchorOpen(anCfg) && (
+          <AnchorCard me={me} cfg={anCfg} block={survey.anchor} busy={svBusy}
+            onChange={anChange} onSubmit={anSubmit} />
         )}
 
         {!isOpen(openMap, tab) ? (
@@ -6240,6 +6287,49 @@ function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
     URL.revokeObjectURL(url);
   };
 
+  /* 평가자 성향 설문(s1) 원자료 — 문항 원점수 · 파생 점수 · 앵커 판정을 한 줄에 잇는다.
+     분석은 이 파일 하나로 돈다: 성향 점수로 앵커 감점을 예측하는 것이 설계의 주 가설이다. */
+  const exportStanceCSV = () => {
+    const cols = stanceFlatCols();
+    const head = ["학번", "별명",
+      "사전 제출 시각", "사전 소요(초)", "사후 제출 시각", "사후 소요(초)",
+      ...cols.map((c) => "사전:" + c),
+      ...cols.map((c) => "사후:" + c),
+      ...STANCE_DERIVED.map((k) => "사전점수:" + k),
+      ...STANCE_DERIVED.map((k) => "사후점수:" + k),
+      "앵커:조건", "앵커:제출시각", "앵커:AI전면선택(0~4)", "앵커:명제표펼침비율"];
+    const rws = rows.map((r) => {
+      const st = (r.sv || {}).stance || {};
+      const pre = st.pre || {}, post = st.post || {};
+      const sp = stanceDone(pre) ? stanceScores(pre.ans) : {};
+      const so = stanceDone(post) ? stanceScores(post.ans) : {};
+      const an = (r.sv || {}).anchor || null;
+      const num = (v) => (v == null ? "" : round2(v));
+      return [r.id, r.nick,
+        stanceDone(pre) ? pre.submittedAt : "", pre.durSec != null ? pre.durSec : "",
+        stanceDone(post) ? post.submittedAt : "", post.durSec != null ? post.durSec : "",
+        ...stanceFlatRow(pre.ans),
+        ...stanceFlatRow(post.ans),
+        ...STANCE_DERIVED.map((k) => num(sp[k])),
+        ...STANCE_DERIVED.map((k) => num(so[k])),
+        an && an.cond != null ? an.cond : "",
+        an && an.submittedAt ? an.submittedAt : "",
+        an && anchorScore(an) != null ? anchorScore(an) : "",
+        an && anchorPlateRate(an) != null ? num(anchorPlateRate(an)) : ""];
+    });
+    const esc = (c) => {
+      let v = String(c == null ? "" : c);
+      if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+      return '"' + v.replace(/"/g, '""') + '"';
+    };
+    const csv = "\uFEFF" + [head, ...rws].map((r) => r.map(esc).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+    a.href = url; a.download = "허구의아카이브_성향설문" + (sampleMode ? "_표본" : "") + "_" + stamp + ".csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const fmtMS = (st, which) => st == null ? "-" :
     round2(which === "pre" ? st.mPre : st.mPost) + " (" + round2(which === "pre" ? st.sdPre : st.sdPost) + ")";
 
@@ -6369,7 +6459,8 @@ function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
             <button className="btn" onClick={exportSurveyCSV}>설문 원자료 CSV 내려받기</button>
-            <span className="hint">문항 응답은 역채점 전 원자료(1~5), 척도 점수는 역채점 반영값입니다. 논문 분석용 데이터는 이 파일을 씁니다.</span>
+            <button className="btn" onClick={exportStanceCSV}>성향 설문 CSV 내려받기</button>
+            <span className="hint">문항 응답은 역채점 전 원자료(1~5), 척도 점수는 역채점 반영값입니다. 성향 설문 파일에는 앵커 판정 결과가 학번으로 이어 붙어 있습니다.</span>
           </div>
         </div>
       </div>
@@ -7573,7 +7664,11 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 관찰 사진·현장 소리·스케치·전시 영상 등 멀티모달 자료의 건수");
     L.push("- 창의성 인식 설문(사전·사후, 5점 리커트)과 루브릭 등급");
     L.push("");
-    {
+    if (!CONSENT_ON) {
+      L.push("");
+      L.push("[동의 절차 — 채워 넣을 것] 이 산출물은 동의 대장을 끈 상태에서 만들었으므로 참여자 전원의 자료가 들어 있다. 실제 논문에는 학교장·보호자·학생의 사전 동의 절차, 항목별 분리 동의(개인정보보호법 제22조 제1항), 미동의 자료의 처리 방식을 직접 기술해야 한다.");
+      L.push("");
+    } else {
       const full = cases.filter((c) => consentCount(c.consent) === CONSENT_KEYS.length).length;
       const some = cases.filter((c) => { const n = consentCount(c.consent); return n > 0 && n < CONSENT_KEYS.length; }).length;
       L.push("");
@@ -7835,10 +7930,12 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
             <table className="stat-tbl">
               <thead><tr>
                 <th style={{ width: 56 }}>익명</th><th style={{ width: 66 }}>학번</th><th style={{ width: 96 }}>별명</th>
+                {CONSENT_ON && (<>
                 {CONSENT_ITEMS.map((it) => (
                   <th key={it.k} style={{ width: 74, textAlign: "center" }} title={it.desc + " — " + it.need}>{it.label}</th>
                 ))}
                 <th style={{ width: 74, textAlign: "center" }}>모두</th>
+                </>)}
               </tr></thead>
               <tbody>
                 {ids.map((id) => {
@@ -7849,6 +7946,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
                     <tr key={id} style={n === 0 ? { opacity: 0.55 } : {}}>
                       <td className="mono">{pid || "—"}</td><td className="mono">{id}</td>
                       <td style={{ textAlign: "left" }}>{(roster[id] || {}).nick || ""}</td>
+                      {CONSENT_ON && (<>
                       {CONSENT_ITEMS.map((it) => {
                         const on = consentAgreed(raw, it.k);
                         return (
@@ -7867,12 +7965,14 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
                           <button disabled={sampleMode || consentBusy} onClick={() => setAllConsent(id, false)}>해제</button>
                         </div>
                       </td>
+                      </>)}
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          {CONSENT_ON ? (<>
           {N === 0 && dropExcluded && (
             <div className="warn-note" style={{ marginTop: 10 }}>
               <b>아직 동의를 표시한 학생이 없어 분석 대상이 0명입니다.</b> 표시하지 않은 것은 동의하지 않은 것으로 봅니다 —
@@ -7901,6 +8001,13 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
             전유율 중앙값이 모두 분석 대상 {N}명으로만 계산되므로, 남은 학생의 값이 빠진 학생의 글에 좌우되지 않습니다.
             익명 번호도 분석 대상에게만 붙으며, 표시를 바꾸면 번호가 다시 매겨집니다.
           </p>
+          </>) : (
+            <p className="hint" style={{ marginTop: 8 }}>
+              <b>연구 참여 동의 대장은 지금 감춰 두었습니다.</b> 그래서 분석 대상은 전원 {N}명이고, 내려받는 자료의 어느 열도 비워지지 않습니다.
+              논문에 쓰려면 학교장·보호자·학생의 사전 동의를 종이로 받아 두고 다시 켜서 옮겨 적으세요
+              (<code>src-app.jsx</code>의 <code>CONSENT_ON</code>을 true로).
+            </p>
+          )}
         </div>
       </div>
 
@@ -7997,6 +8104,7 @@ function TeacherApp({ onExit, onGallery }) {
   const [msg, setMsg] = useState("");
   const [openMap, setOpenMap] = useState(DEFAULT_OPEN);
   const [svCfg, setSvCfg] = useState(DEFAULT_SURVEY);
+  const [anCfg, setAnCfg] = useState(DEFAULT_ANCHOR);
   const [sampleMode, setSampleMode] = useState(true);
   const [npin, setNpin] = useState("");
 
@@ -8022,6 +8130,7 @@ function TeacherApp({ onExit, onGallery }) {
     const cfg = await store.get("config");
     setOpenMap((cfg && cfg.open) || DEFAULT_OPEN);
     setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
+    setAnCfg((cfg && cfg.anchor) || DEFAULT_ANCHOR);
     setRoster(r);
     setWsMap(wsMapNew);
     setGradeMap(gMapNew);
@@ -8070,7 +8179,7 @@ function TeacherApp({ onExit, onGallery }) {
     const un2 = fbStore.watchWorksheets((w) => {
       if (Object.keys(w).length) setWsMap((p) => ({ ...p, ...w }));
     });
-    const un3 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); });
+    const un3 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); if (cfg) setAnCfg(cfg.anchor || DEFAULT_ANCHOR); });
     const un4 = fbStore.watchSurveys((s) => {
       if (Object.keys(s).length) setSurveyMap((p) => ({ ...p, ...s }));
     });
@@ -8271,6 +8380,12 @@ function TeacherApp({ onExit, onGallery }) {
                     <p className="hint" style={{ marginTop: 10 }}>같은 문항을 두 번 실시해 변화를 잽니다. 학생에게는 성적과 무관함을 반드시 미리 알립니다. 성향 설문은 <b>반드시 1차시에</b> 받습니다 — 8차시 상호평가 직전에 AI 태도를 물으면 그 질문이 판정 기준을 흔듭니다.</p>
                   </div>
                 </div>
+                <AnchorPanel ids={ids} roster={roster} surveyMap={surveyMap} cfg={anCfg} sampleMode={sampleMode}
+                  onSave={async (next) => {
+                    const cfg = (await store.get("config")) || {};
+                    const ok = await store.set("config", { ...cfg, anchor: next, anchorUpdated: now() });
+                    if (ok) setAnCfg(next); else setMsg("앵커 설정을 저장하지 못했습니다.");
+                  }} />
               </div>
             ) : tab === "수업 안내" ? (
               <TeacherGuide />
@@ -9038,6 +9153,7 @@ function App() {
       <ContentStyle />
       <SurveyStyle />
       <StanceStyle />
+      <AnchorStyle />
       <ThemeStyle />
       {view === "gate" && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
