@@ -9,6 +9,7 @@ import { StanceCard, StanceStyle, StanceMini, stanceDone, STANCE_VER } from "./s
 import { SurveyStyle, SurveyScaleBar, LikertRow } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
+import { ThemeStyle } from "./src-theme.jsx";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -9037,6 +9038,7 @@ function App() {
       <ContentStyle />
       <SurveyStyle />
       <StanceStyle />
+      <ThemeStyle />
       {view === "gate" && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
         onTeacher={() => setView("teacher")}
