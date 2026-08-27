@@ -17,6 +17,7 @@ import { SurveyStyle, SurveyScaleBar, LikertRow } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
+import { ExhibitSamples } from "./src-exhibit-samples.jsx";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -8791,6 +8792,7 @@ function Gallery({ onBack }) {
             <button className={showPlate ? "on" : ""} onClick={() => setShowPlate(true)}>2차 관람 — 명제표 공개</button>
           </div>
         </div>
+        <ExhibitSamples showPlate={showPlate} />
         {works === null ? (
           <p style={{ textAlign: "center", color: "var(--sub)" }}>전시 작품을 불러오는 중…</p>
         ) : works.length === 0 ? (
