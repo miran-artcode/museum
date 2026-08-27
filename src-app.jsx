@@ -8,6 +8,7 @@ import {
 import { StanceCard, StanceStyle, StanceMini, stanceDone, STANCE_VER } from "./src-stance.jsx";
 import { SurveyStyle, SurveyScaleBar, LikertRow } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
+import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -4746,14 +4747,25 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
     onTeacher();
   };
 
+  const scrollTo = (id) => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); };
+
   return (
-    <div className="gate">
-      <div className="gate-head">
-        <div className="acc">FICTIVE ARCHIVE · CLASS COLLECTION</div>
-        <h1>허구의 아카이브<br />창작 과정 기록실</h1>
-        <p>실재한 적 없는 유물 이미지로 구성한 허구의 아카이브 전시</p>
-      </div>
-      <div className="ticket">
+    <div className="g4">
+      <GateStyle />
+      <GateHeader
+        onEnter={() => { setMode("student"); setErr(""); scrollTo("g4-enter"); }}
+        onUnits={() => scrollTo("g4-units")}
+        onTeacher={() => { setMode("teacher"); setErr(""); scrollTo("g4-enter"); }}
+        onGallery={onGallery}
+        onDemo={onDemo} />
+      <GateSections onEnter={() => scrollTo("g4-enter")} />
+      <section className="g4-enter" id="g4-enter">
+        <div className="g4-enter-head">
+          <div className="g4-kicker">ENTRANCE</div>
+          <h2>기록실 입장</h2>
+          <p>학번과 별명으로 입장해 여덟 차시의 창작 과정을 이어서 기록합니다.</p>
+        </div>
+        <div className="ticket">
         <div className="tab-switch" role="tablist">
           <button className={mode === "student" ? "on" : ""} onClick={() => { setMode("student"); setErr(""); }}>학생</button>
           <button className={mode === "teacher" ? "on" : ""} onClick={() => { setMode("teacher"); setErr(""); }}>교사</button>
@@ -4788,11 +4800,17 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
             <button className="btn full" onClick={onDemo}>예시 기록지 「오른손」</button>
           </div>
         )}
-      </div>
-      <div className="gate-foot">
-        기록은 학급 서버에 자동 저장되어 어느 기기에서 접속해도 이어서 작성할 수 있습니다.<br />
-        실명·얼굴 사진·개인정보는 어디에도 입력하지 않습니다.
-      </div>
+        </div>
+      </section>
+      <footer className="g4-foot">
+        <div className="g4-foot-in">
+          <div className="g4-foot-logo">FICTIVE ARCHIVE</div>
+          <div className="g4-foot-note">
+            기록은 학급 서버에 자동 저장되어 어느 기기에서 접속해도 이어서 작성할 수 있습니다.<br />
+            실명·얼굴 사진·개인정보는 어디에도 입력하지 않습니다.
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
