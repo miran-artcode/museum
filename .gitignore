@@ -2,3 +2,8 @@ node_modules/
 .firebase/
 *.log
 .DS_Store
+.tmpbuild/
+probe*.js
+probe*.jsx
+probe*.mjs
+drive*.mjs
