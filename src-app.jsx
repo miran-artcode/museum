@@ -4759,14 +4759,10 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
         onTeacher={() => { setMode("teacher"); setErr(""); scrollTo("g4-enter"); }}
         onGallery={onGallery}
         onDemo={onDemo} />
-      <GateSections onEnter={() => scrollTo("g4-enter")} />
-      <section className="g4-enter" id="g4-enter">
-        <div className="g4-enter-head">
-          <div className="g4-kicker">ENTRANCE</div>
-          <h2>기록실 입장</h2>
-          <p>학번과 별명으로 입장해 여덟 차시의 창작 과정을 이어서 기록합니다.</p>
-        </div>
-        <div className="ticket">
+      <div className="g4-main">
+        <GateSections onEnter={() => scrollTo("g4-enter")} />
+        <aside className="g4-enter" id="g4-enter">
+          <div className="ticket">
         <div className="tab-switch" role="tablist">
           <button className={mode === "student" ? "on" : ""} onClick={() => { setMode("student"); setErr(""); }}>학생</button>
           <button className={mode === "teacher" ? "on" : ""} onClick={() => { setMode("teacher"); setErr(""); }}>교사</button>
@@ -4796,13 +4792,14 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
         ) : (
           <div>
             <p style={{ fontSize: 13, color: "var(--sub)", marginBottom: 14 }}>
-              자료집의 예시 작품 「오른손」으로 채운 기록지 전체를 로그인 없이 볼 수 있습니다. 학급 전시장은 학생과 교사가 입장한 뒤에 열립니다.
+              예시 작품 「오른손」의 기록지를 로그인 없이 볼 수 있습니다.
             </p>
             <button className="btn full" onClick={onDemo}>예시 기록지 「오른손」</button>
           </div>
         )}
-        </div>
-      </section>
+          </div>
+        </aside>
+      </div>
       <footer className="g4-foot">
         <div className="g4-foot-in">
           <div className="g4-foot-logo">FICTIVE ARCHIVE</div>

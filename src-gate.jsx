@@ -14,7 +14,7 @@ export const GATE_SECTIONS = [
     sess: "1–2차시",
     en: "QUESTION",
     title: "무엇이 미술이 되는가",
-    body: "레디메이드에서 개념미술까지 — 변기와 자전거 바퀴가 미술이 된 사건을 따라가며, 나만의 미술 정의문을 세웁니다.",
+    body: "레디메이드·개념미술·극사실주의 감상, 나의 미술 정의문 쓰기",
     img: "/img/lessons/L1_s14_1.jpg",
     alt: "솔 르윗의 흑백 줄무늬 벽화가 걸린 전시장",
   },
@@ -23,7 +23,7 @@ export const GATE_SECTIONS = [
     sess: "3–4차시",
     en: "DESIGN",
     title: "관찰에서 유물로",
-    body: "사회참여 미술을 감상하고 우리 둘레의 문제를 관찰한 뒤, 실재한 적 없는 유물의 세계관과 화면을 설계합니다.",
+    body: "사회참여 미술 감상과 문제 관찰, 허구 유물의 세계관·화면 설계",
     img: "/img/lessons/L4_s27_4.jpg",
     alt: "학 무늬가 상감된 청자 매병",
   },
@@ -32,7 +32,7 @@ export const GATE_SECTIONS = [
     sess: "5–6차시",
     en: "GENERATE",
     title: "생성과 다듬기",
-    body: "설계도를 프롬프트로 옮겨 AI 이미지를 생성·선별하고, 오류를 다듬으며 유물의 명제표 문안을 씁니다.",
+    body: "프롬프트 작성과 AI 이미지 생성·선별, 다듬기와 명제표 문안",
     img: "/img/lessons/L6_s30_3.jpg",
     alt: "금으로 이어 붙인 킨츠기 찻사발",
   },
@@ -41,7 +41,7 @@ export const GATE_SECTIONS = [
     sess: "7–8차시",
     en: "EXHIBIT",
     title: "전시와 비평",
-    body: "유물을 작품화해 허구의 아카이브 전시를 열고, 서로의 전시를 관람·비평하며 단원을 성찰로 닫습니다.",
+    body: "작품화와 전시 구성, 두 번의 관람과 상호 비평, 단원 성찰",
     img: "/img/lessons/L3_s19_3.jpg",
     alt: "어두운 전시장 바닥에서 빛을 받은 검은 인쇄물 더미",
   },
@@ -138,14 +138,19 @@ export const GATE_CSS = `
   font-size:15px;font-weight:500;letter-spacing:.01em;padding:2px 0;border-bottom:2px solid transparent}
 .g4-mainnav button:hover{border-bottom-color:#000}
 
+/* 본문 2단 — 왼쪽 네 개의 장, 오른쪽 입장 패널 (데스크톱) */
+.g4-main{max-width:1280px;margin:0 auto;padding:0 20px;
+  display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:0 34px;align-items:start}
+@media(max-width:1100px){.g4-main{grid-template-columns:1fr}}
+
 /* 장 구분 캡션 줄 */
-.g4-units-cap{max-width:1280px;margin:0 auto;padding:10px 20px;
+.g4-units-cap{padding:10px 0;
   display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
   border-top:1px solid #e6e6e6;border-bottom:1px solid #e6e6e6;
   font-family:'Archivo','Noto Sans KR',sans-serif;font-size:10px;font-weight:500;letter-spacing:.16em;color:#888}
 
 /* 4열 그리드 */
-.g4-grid{max-width:1280px;margin:0 auto;padding:22px 20px 10px;
+.g4-grid{padding:22px 0 10px;
   display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
 .g4-col-img{aspect-ratio:3/4.4;overflow:hidden;background:#f2f2f2}
 .g4-col-img img{width:100%;height:100%;object-fit:cover;display:block;
@@ -161,15 +166,14 @@ export const GATE_CSS = `
 .g4-arrow{position:absolute;right:0;bottom:0;background:none;border:none;cursor:pointer;
   font-size:22px;line-height:1;color:#111;padding:4px 2px;transition:transform .25s ease}
 .g4-arrow:hover{transform:translateX(5px)}
+@media(max-width:1240px){.g4-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:1100px){.g4-grid{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:960px){.g4-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:540px){.g4-grid{grid-template-columns:1fr}.g4-col-img{aspect-ratio:4/3}}
 
-/* 입장 구역 — 기존 .ticket 폼을 흰 배경에 맞춰 다시 입힘 */
-.g4-enter{max-width:460px;margin:0 auto;padding:56px 16px 40px;scroll-margin-top:24px}
-.g4-enter-head{text-align:center;margin-bottom:22px}
-.g4-kicker{font-family:'Archivo',sans-serif;font-size:10px;font-weight:700;letter-spacing:.24em;color:#999;margin-bottom:10px}
-.g4-enter-head h2{font-size:24px;font-weight:900;letter-spacing:-.01em}
-.g4-enter-head p{font-size:12.5px;color:#777;margin-top:8px;line-height:1.7}
+/* 입장 패널 — 데스크톱에서는 오른쪽에 붙박이, 좁은 화면에서는 그리드 아래 */
+.g4-enter{position:sticky;top:18px;padding:22px 0 30px;scroll-margin-top:24px}
+@media(max-width:1100px){.g4-enter{position:static;max-width:460px;margin:0 auto;padding:20px 0 30px}}
 .g4 .ticket{background:#fff;border:1px solid #ddd;border-top:3px solid #111}
 .g4 .tab-switch{border-color:#ddd}
 .g4 .tab-switch button{background:#f6f6f6;color:#666}
