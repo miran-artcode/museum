@@ -4804,12 +4804,11 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
         <div className="g4-foot-in">
           <div>
             <div className="g4-foot-logo">FICTIVE ARCHIVE</div>
-            <div className="g4-foot-copy">© 2026 허구의 아카이브 · 고2 미술 수업</div>
+            <div className="g4-foot-copy">© 2026 카피라이터 황미란 (sooremond@gmail.com). All rights reserved.</div>
           </div>
           <div className="g4-foot-note">
             기록은 학급 서버에 자동 저장되어 어느 기기에서 접속해도 이어서 작성할 수 있습니다.<br />
-            실명·얼굴 사진·개인정보는 어디에도 입력하지 않습니다.<br />
-            문의: 카피라이터 황미란 (sooremond@gmail.com)
+            실명·얼굴 사진·개인정보는 어디에도 입력하지 않습니다.
           </div>
         </div>
       </footer>
