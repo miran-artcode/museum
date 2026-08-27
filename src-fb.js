@@ -6,7 +6,7 @@
 
 import { initializeApp } from "firebase/app";
 import {
-  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, getDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc,
 } from "firebase/firestore";
 import {
@@ -32,8 +32,10 @@ try {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   });
 } catch (e) {
-  // 사파리 사생활 보호 모드 등 IndexedDB가 막힌 환경 — 메모리 캐시로 계속
-  db = initializeFirestore(app, {});
+  // 초기화가 동기적으로 실패한 환경 — 기본 인스턴스로 계속.
+  // initializeFirestore를 다른 옵션으로 두 번 부르면 그 자체가 throw하므로 getFirestore를 쓴다.
+  // (사파리 사생활 보호 모드의 IndexedDB 차단은 여기로 오지 않고 SDK가 내부에서 메모리로 물러난다.)
+  db = getFirestore(app);
 }
 const auth = getAuth(app);
 
@@ -133,7 +135,10 @@ export const fbStore = {
 
   /* get과 같으나 "없음"과 "읽기 실패"를 구분해 돌려준다.
      실패를 없음으로 오인해 빈 문서로 덮어쓰는 사고를 막는 용도 —
-     학생 기록 최초 로드처럼 실패 시 쓰기를 잠가야 하는 곳에서 쓴다. */
+     학생 기록 최초 로드처럼 실패 시 쓰기를 잠가야 하는 곳에서 쓴다.
+     fromCache: 오프라인 지속 캐시가 켜진 뒤로는 서버에 못 닿아도 getDoc이
+     IndexedDB 사본으로 조용히 성공한다 — 그 사본은 다른 기기에서 쓴 최신 기록보다
+     오래됐을 수 있으므로, 호출한 쪽이 이 표시를 보고 경고를 띄운다. */
   async getSafe(key) {
     try {
       const r = route(key);
@@ -141,16 +146,20 @@ export const fbStore = {
         const snap = await getDocs(collection(db, "students"));
         const out = {};
         snap.forEach((d) => { out[d.id] = d.data(); });
-        return { ok: true, data: Object.keys(out).length ? out : null };
+        return { ok: true, data: Object.keys(out).length ? out : null, fromCache: !!(snap.metadata && snap.metadata.fromCache) };
       }
       const s = await getDoc(doc(db, r.path[0], r.path[1]));
-      if (!s.exists()) return { ok: true, data: null };
+      const fromCache = !!(s.metadata && s.metadata.fromCache);
+      if (!s.exists()) return { ok: true, data: null, fromCache };
       const data = s.data();
-      return { ok: true, data: data && data.v !== undefined ? data.v : data };
-    } catch (e) { console.error("read fail", key, e); return { ok: false, data: null }; }
+      return { ok: true, data: data && data.v !== undefined ? data.v : data, fromCache };
+    } catch (e) { console.error("read fail", key, e); return { ok: false, data: null, fromCache: false }; }
   },
 
-  async set(key, value) {
+  /* opts.merge — v의 준 필드만 깊은 병합으로 갱신한다 (안 준 필드는 서버 값 유지).
+     설정 문서처럼 여러 화면·세션이 서로 다른 필드를 고치는 문서에서,
+     읽기 실패 후의 전체 덮어쓰기와 동시 편집의 상호 삭제를 함께 막는다. */
+  async set(key, value, opts) {
     try {
       const r = route(key);
       if (r.kind === "roster") {
@@ -163,9 +172,21 @@ export const fbStore = {
         await setDoc(doc(db, "students", sid), { nick: mine.nick || "", updatedAt: Date.now() }, { merge: true });
         return true;
       }
-      await setDoc(doc(db, r.path[0], r.path[1]), { v: value, updatedAt: Date.now() }, { merge: false });
+      await setDoc(doc(db, r.path[0], r.path[1]), { v: value, updatedAt: Date.now() }, { merge: !!(opts && opts.merge) });
       return true;
     } catch (e) { console.error("write fail", key, e); return false; }
+  },
+
+  /* set과 같으나 제한 시간 안에 서버 확인이 없으면 false로 끝낸다.
+     오프라인이면 setDoc이 거부되지 않고 영원히 미해결로 남아 await가 안 풀리기 때문 —
+     저장·제출처럼 결과를 사용자에게 알려야 하는 모든 경로는 이것을 쓴다.
+     (시간 초과 뒤 원래 쓰기가 늦게 큐에서 성공해도 같은 내용이라 무해하다.) */
+  setT(key, value, opts) {
+    const ms = (opts && opts.timeout) || 8000;
+    return Promise.race([
+      this.set(key, value, opts),
+      new Promise((res) => setTimeout(() => res(false), ms)),
+    ]);
   },
 
   async remove(key) {

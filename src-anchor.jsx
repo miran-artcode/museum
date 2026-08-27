@@ -263,22 +263,45 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
   const plateRate = flat.length ? flat.filter((x) => x.plateOpened).length / flat.length : null;
   const tagN = ANCHOR_TAGS.map((t) => ({ t, n: flat.filter((x) => x.tag === t.k).length }));
 
+  const pendingRef = useRef(null); // 아직 서버로 나가지 않은 pairs — 언마운트·열림 토글 때 잃지 않기 위해
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
   const setPair = (i, side, key, val) => {
-    const next = JSON.parse(JSON.stringify(livePairs));
-    next[i][side][key] = val;
+    const next = livePairs.map((p, j) => (j === i ? { ...p, [side]: { ...p[side], [key]: val } } : p));
     setDraft(next);
+    pendingRef.current = next;
     setSaveSt("saving");
     if (saveT.current) clearTimeout(saveT.current);
     saveT.current = setTimeout(async () => {
-      const ok = await onSave({ ...DEFAULT_ANCHOR, ...conf, pairs: next });
+      saveT.current = null;
+      pendingRef.current = null;
+      // pairs만 부분 저장한다 — 열림 상태(open)까지 함께 보내면 키 입력 시점에 캡처된
+      // 옛 open이 0.8초 뒤 도착해, 그 사이 누른 열림/잠김을 도로 뒤집는다.
+      const ok = await onSaveRef.current({ ver: ANCHOR_VER, pairs: next });
       setSaveSt(ok === false ? "err" : "saved");
+      // 더 새 편집이 없으면 draft를 접어 서버 상태(cfg)를 다시 따라간다 —
+      // 계속 들고 있으면 다른 세션이 고친 쌍이 이 화면에 영영 나타나지 않는다.
+      if (ok !== false && !saveT.current) setDraft(null);
     }, 800);
   };
-  useEffect(() => () => { if (saveT.current) clearTimeout(saveT.current); }, []);
+  // 언마운트가 예약된 저장을 버리면 배지가 "저장 중…"이라 말한 편집이 조용히 사라진다 — 즉시 밀어 보낸다
+  useEffect(() => () => {
+    if (saveT.current) clearTimeout(saveT.current);
+    if (pendingRef.current) onSaveRef.current({ ver: ANCHOR_VER, pairs: pendingRef.current });
+  }, []);
   const toggleOpen = async () => {
     if (!ready && !conf.open) return;
     setBusy(true);
-    await onSave({ ...DEFAULT_ANCHOR, ...conf, pairs, open: !conf.open });
+    // 예약된 쌍 저장이 있으면 함께 실어 보낸다 — 방금 채운 이미지 없이 열리는 일이 없도록
+    const hadPending = !!pendingRef.current;
+    if (saveT.current) { clearTimeout(saveT.current); saveT.current = null; }
+    pendingRef.current = null;
+    const patch = hadPending
+      ? { ver: ANCHOR_VER, open: !conf.open, pairs: livePairs }
+      : { ver: ANCHOR_VER, open: !conf.open };
+    const ok = await onSave(patch);
+    if (hadPending) setSaveSt(ok === false ? "err" : "saved");
+    if (ok !== false && !saveT.current) setDraft(null);
     setBusy(false);
   };
 

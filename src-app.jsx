@@ -13,7 +13,7 @@ import {
   AnchorCard, AnchorPanel, AnchorStyle, DEFAULT_ANCHOR, ANCHOR_VER, AI_LEVELS,
   anchorOpen, anchorDone, anchorScore, anchorPlateRate,
 } from "./src-anchor.jsx";
-import { SurveyStyle, SurveyScaleBar, LikertRow, useTopbarHeight } from "./src-survey-ui.jsx";
+import { SurveyStyle, SurveyScaleBar, LikertRow, useTopbarHeight, prefersReducedMotion } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
@@ -30,14 +30,17 @@ import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 const store = {
   get: (k) => fbStore.get(k),
   getSafe: (k) => fbStore.getSafe(k), // "없음"과 "읽기 실패"를 구분 — 실패를 빈 문서로 오인해 덮어쓰지 않기 위함
-  set: (k, v) => fbStore.set(k, v),
+  set: (k, v, opts) => fbStore.set(k, v, opts),     // opts.merge — 준 필드만 갱신 (config처럼 나눠 쓰는 문서용)
+  setT: (k, v, opts) => fbStore.setT(k, v, opts),   // 8초 안에 서버 확인이 없으면 false — 오프라인 무한 대기 방지
 };
 
 /* 미디어(사진·음성·스케치·영상) 저장 계층 — Firestore media 컬렉션.
    문서 이름은 {소유자}_{필드키} 형식이어야 보안 규칙이 앞부분으로 소유자를 판별한다. */
 const mediaStore = {
   get: (owner, ref) => fbStore.get("media:" + owner + "_" + ref),
+  getSafe: (owner, ref) => fbStore.getSafe("media:" + owner + "_" + ref), // 실패와 없음을 구분 — 학번 이전처럼 원본 삭제가 뒤따르는 곳용
   put: (owner, ref, data) => fbStore.set("media:" + owner + "_" + ref, data),
+  putT: (owner, ref, data) => fbStore.setT("media:" + owner + "_" + ref, data), // 오프라인이면 8초 뒤 false
   remove: (owner, ref) => fbStore.remove("media:" + owner + "_" + ref),
 };
 
@@ -2664,13 +2667,13 @@ body{background:var(--bg)}
 
 /* 저장 상태 */
 .save-pill{font-family:var(--mono);font-size:11px;padding:3px 9px;border:1px solid var(--line);background:var(--card2);color:var(--sub)}
-.save-pill.dirty{border-color:var(--amber);color:#6F5527}
+.save-pill.dirty{border-color:var(--amber);color:var(--amber)}
 .save-pill.err{border-color:var(--seal);color:var(--seal)}
 .dot-check{font-size:11px;color:var(--patina);font-weight:700;line-height:1}
 .tbl-scroll{overflow-x:auto}
 .tbl-scroll .tbl{min-width:640px}
 .tbl-scroll .roster{min-width:720px}
-.sample-banner{border:1px solid var(--amber);background:#F5EFE2;color:#6F5527;padding:10px 14px;font-size:13px;margin-top:18px}
+.sample-banner{border:1px solid var(--amber);background:#F5EFE2;color:var(--amber);padding:10px 14px;font-size:13px;margin-top:18px}
 
 /* 교사 대시보드 */
 .t-tabs{display:flex;gap:6px;margin:18px 0;flex-wrap:wrap}
@@ -2929,7 +2932,7 @@ body{background:var(--bg)}
 .funnel .fr .lb small{font-family:var(--mono);color:var(--sub);font-size:10px;margin-right:5px}
 .funnel .fr .tr{flex:1;height:14px;background:var(--line2);position:relative}
 .funnel .fr .tr i{position:absolute;left:0;top:0;bottom:0;background:var(--patina)}
-.funnel .fr .tr i.part{background:repeating-linear-gradient(135deg,var(--amber) 0 4px,transparent 4px 7px)}
+.funnel .fr .tr i.part{background:repeating-linear-gradient(135deg,var(--amber-fill,var(--amber)) 0 4px,transparent 4px 7px)}
 .funnel .fr .v{width:78px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--sub)}
 .slope{width:100%;height:250px;display:block}
 .slope text{font-family:var(--mono);font-size:11px;fill:var(--sub)}
@@ -3028,9 +3031,14 @@ function LessonPanel({ L, teacher, onReading }) {
   const total = L.flow.reduce((a, r) => a + r[1], 0);
   const [seen, setSeen] = useState({}); // 한 번이라도 펼쳐 본 읽기 자료 — 어디까지 읽었는지 표시
   const bodyRef = useRef(null);
+  // 「모두 펼치기」로 열린 개수 — 이만큼의 toggle은 열람 횟수(opens)로 세지 않는다.
+  // 버튼 한 번이 자료 5개를 직접 5번 연 것과 같은 연구 지표를 만들면 안 되기 때문.
+  const bulkRef = useRef(0);
   const expandAll = () => {
     if (!bodyRef.current) return;
-    bodyRef.current.querySelectorAll("details.reading").forEach((d) => { d.open = true; });
+    const closed = [...bodyRef.current.querySelectorAll("details.reading")].filter((d) => !d.open);
+    bulkRef.current += closed.length;
+    closed.forEach((d) => { d.open = true; });
   };
   return (
     <div className="lesson">
@@ -3072,7 +3080,12 @@ function LessonPanel({ L, teacher, onReading }) {
         )}
         {L.readings.map((rd, i) => (
           <details className="reading" key={i}
-            onToggle={(e) => { if (e.target.open) setSeen((p) => (p[i] ? p : { ...p, [i]: true })); onReading && onReading(e.target.open); }}>
+            onToggle={(e) => {
+              if (e.target.open) setSeen((p) => (p[i] ? p : { ...p, [i]: true }));
+              const bulk = e.target.open && bulkRef.current > 0;
+              if (bulk) bulkRef.current -= 1;
+              onReading && onReading(e.target.open, bulk);
+            }}>
             <summary>
               <span className="stage-tag">{rd.stage}</span>
               <span className="rd-i">{i + 1}/{L.readings.length}</span>{rd.h}
@@ -3220,7 +3233,7 @@ function LadderRail({ sec, ws }) {
             /* 계단은 현위치 표시만 하던 장식이었는데, 누르면 그 계단의 카드로 이동한다 */
             <button type="button" key={st.key} className={"ld-step " + (here.includes(st.key) ? "now " : "") + (done ? "done" : "")}
               title={st.full + " — " + st.ask}
-              onClick={() => { const el = document.getElementById("sec-" + st.sec); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+              onClick={() => { const el = document.getElementById("sec-" + st.sec); if (el) el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" }); }}>
               <div className="k">{st.key}{done ? " ✓" : ""}</div>
               <div className="nm">{st.name}</div>
               <div className="bar"><i style={{ width: Math.round(s.ratio * 100) + "%" }} /></div>
@@ -4402,11 +4415,14 @@ function AudioField({ f, fieldKey, v, setField }) {
         if (blob.size > 900000) { setErr("녹음 파일이 저장 한도(약 0.9MB)를 넘어 담지 못했습니다. 조금 더 짧게 나눠 녹음해 주세요."); setRec(null); setSec(0); return; }
         const fr = new FileReader();
         fr.onload = async () => {
-          if (cur) await mediaStore.remove(OWNER, cur.ref); // 다시 녹음하면 이전 녹음 문서를 지운다 (서버에 잔존물이 쌓이지 않게)
+          // 새 녹음을 먼저 저장하고, 성공한 뒤에만 이전 녹음을 지운다 —
+          // 지우기부터 하면 저장이 실패했을 때 이전 녹음까지 사라진다.
           const ref = fieldKey + "." + Date.now();
-          const ok = await mediaStore.put(OWNER, ref, fr.result);
-          if (ok) setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) });
-          else setErr("녹음 저장에 실패했습니다.");
+          const ok = await mediaStore.putT(OWNER, ref, fr.result);
+          if (ok) {
+            setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) });
+            if (cur) mediaStore.remove(OWNER, cur.ref); // 잔존물 정리 — 실패해도 새 녹음에는 지장 없음
+          } else setErr("녹음 저장에 실패했습니다. 연결을 확인하고 다시 녹음해 주세요 — 이전 녹음은 그대로 있습니다.");
           setRec(null); setSec(0);
         };
         fr.readAsDataURL(blob);
@@ -4858,8 +4874,9 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
     setBusy(false);
     if (!r.ok) return setErr(msgOf(r.reason));
     if (r.isNew) {
+      // 병합 쓰기 — 계정만 다시 만든 경우나 읽기 실패 때 기존 설정 문서를 덮어쓰지 않는다
       const cfg = (await store.get("config")) || {};
-      await store.set("config", { ...cfg, open: cfg.open || DEFAULT_OPEN, created: now() });
+      await store.set("config", { open: cfg.open || DEFAULT_OPEN, created: now() }, { merge: true });
     }
     onTeacher();
   };
@@ -4867,7 +4884,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
   const scrollTo = (id, focus) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
     // 키보드 사용자가 스크롤 뒤에도 헤더에 남지 않도록 입장 패널로 포커스를 옮긴다
     if (focus) setTimeout(() => { try { el.focus({ preventScroll: true }); } catch (e) {} }, 400);
   };
@@ -4980,6 +4997,7 @@ function StudentApp({ me, onExit, onGallery }) {
   const [ws, setWs] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [readErr, setReadErr] = useState(false); // 최초 로드 실패 — 덮어쓰기를 막으려 학습지를 잠근다
+  const [staleWarn, setStaleWarn] = useState(false); // 서버 대신 이 기기의 캐시 사본으로 열림 — 다른 기기 기록을 덮어쓸 수 있다는 경고
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [closeNote, setCloseNote] = useState(null); // 쓰던 차시를 선생님이 닫았을 때의 안내
   const [openMap, setOpenMap] = useState(DEFAULT_OPEN);
@@ -5004,6 +5022,8 @@ function StudentApp({ me, onExit, onGallery }) {
   const [svBusy, setSvBusy] = useState(false);
   const [svSave, setSvSave] = useState(null); // 설문 자동 저장 상태: null | saving | saved | err
   const svTimer = useRef(null);
+  const svSeq = useRef(0);        // 겹쳐 나간 자동 저장 가운데 마지막 것만 배지를 정하게 한다
+  const svSaveRef = useRef(null); // 연결이 돌아왔을 때 실패한 설문 저장을 다시 밀어 넣기 위한 미러
   const surveyRef = useRef(null);
   surveyRef.current = survey;
   const timer = useRef(null);
@@ -5070,9 +5090,10 @@ function StudentApp({ me, onExit, onGallery }) {
     };
   }, []);
 
-  const onReading = (open) => {
+  const onReading = (open, bulk) => {
     openReadingsRef.current = Math.max(0, openReadingsRef.current + (open ? 1 : -1));
-    if (open) accAct(tabRef.current, { opens: 1 });
+    // bulk(「모두 펼치기」)로 열린 것은 열람 시간에는 잡히되 열람 횟수(opens)에는 세지 않는다
+    if (open && !bulk) accAct(tabRef.current, { opens: 1 });
   };
 
   const loadAll = async () => {
@@ -5080,13 +5101,23 @@ function StudentApp({ me, onExit, onGallery }) {
     setReadErr(false);
     // 읽기 실패를 "기록 없음"으로 오인하면 빈 학습지가 뜨고, 한 글자만 쳐도
     // 서버의 기존 기록 전체를 빈 문서로 덮어쓴다. 실패면 잠그고 다시 시도하게 한다.
-    const res = await store.getSafe(WSKEY);
-    if (!res.ok) { setReadErr(true); return; }
+    // 설문 문서도 같은 사고가 난다(응답 자동 저장이 문서 전체를 다시 쓴다) — 함께 지킨다.
+    // 네 문서는 서로 독립이므로 나란히 읽는다: 학교 와이파이에서 첫 화면이 왕복 1번 만에 열린다.
+    const [res, svRes, gRes, cfgRes] = await Promise.all([
+      store.getSafe(WSKEY),
+      store.getSafe("survey:" + me.sid),
+      store.getSafe("grade:" + me.sid),
+      store.getSafe("config"),
+    ]);
+    if (!res.ok || !svRes.ok) { setReadErr(true); return; }
+    // 서버가 아니라 이 기기의 캐시 사본으로 열렸으면 경고만 띄운다 (입력은 막지 않는다 —
+    // 오프라인에서도 이어 쓰게 하는 것이 지속 캐시를 켠 이유다. 다른 기기를 오간 학생만 위험하다).
+    setStaleWarn(!!(res.fromCache || svRes.fromCache));
     const saved = res.data;
     if (saved) { setWs(saved); wsRef.current = saved; setSavedAt(saved._updatedAt || null); }
-    setGrade(await store.get("grade:" + me.sid));
-    setSurvey((await store.get("survey:" + me.sid)) || {});
-    const cfg = await store.get("config");
+    setSurvey(svRes.data || {});
+    if (gRes.ok) setGrade(gRes.data);
+    const cfg = cfgRes.ok ? cfgRes.data : null;
       const om = (cfg && cfg.open) || DEFAULT_OPEN;
       setOpenMap(om);
       setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
@@ -5118,10 +5149,7 @@ function StudentApp({ me, onExit, onGallery }) {
     const data = pruneTrace({ ...drainAct(), _updatedAt: now() });
     // 오프라인이면 setDoc이 거부되지 않고 미해결로 남아 "저장 중…"에 영원히 갇힌다.
     // 8초 안에 답이 없으면 실패로 치고 재시도 루프에 태운다 (늦게 성공해도 같은 내용이라 무해).
-    const ok = await Promise.race([
-      store.set(WSKEY, data),
-      new Promise((res) => setTimeout(() => res(false), 8000)),
-    ]);
+    const ok = await store.setT(WSKEY, data);
     savingRef.current = false;
     if (ok) {
       // 덜어 낸 것이 있으면 화면의 기록도 저장된 것과 같게 맞춘다
@@ -5134,9 +5162,16 @@ function StudentApp({ me, onExit, onGallery }) {
       else setSaveState("saved");
     } else {
       dirtyRef.current = true;
-      setSaveState("err");
-      if (retryTimer.current) clearTimeout(retryTimer.current);
-      retryTimer.current = setTimeout(doSave, 5000); // 실패 시 5초 뒤 자동 재시도
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        // 오프라인 시간 초과는 실패가 아니라 대기다 — 내용은 이 기기 큐에 담겨 있고
+        // 연결이 돌아오면 online 핸들러가 저장한다. 여기서 5초 재시도를 돌리면
+        // 끊긴 내내 전체 문서 사본이 큐에 계속 쌓이고, 배지는 오프라인 안내문과 달리 겁을 준다.
+        setSaveState("queued");
+      } else {
+        setSaveState("err");
+        if (retryTimer.current) clearTimeout(retryTimer.current);
+        retryTimer.current = setTimeout(doSave, 5000); // 실패 시 5초 뒤 자동 재시도
+      }
     }
   };
 
@@ -5245,7 +5280,11 @@ function StudentApp({ me, onExit, onGallery }) {
     const onBefore = (e) => {
       if (dirtyRef.current || savingRef.current || sketchDirty.current) { e.preventDefault(); e.returnValue = ""; }
     };
-    const onOn = () => { setOnline(true); if (dirtyRef.current) doSave(); };
+    const onOn = () => {
+      setOnline(true);
+      if (dirtyRef.current) doSave();
+      if (svSaveRef.current === "err") svPersist(); // 끊긴 사이 실패로 남은 설문 응답도 다시 밀어 넣는다
+    };
     const onOff = () => setOnline(false);
     window.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", flush);
@@ -5270,11 +5309,14 @@ function StudentApp({ me, onExit, onGallery }) {
   const svPersist = () => {
     // 응답 자동 저장 — 결과를 배지로 보여 준다. "자동 저장됩니다"라고 말해 놓고
     // 실패를 침묵하면 학생이 24문항을 잃고도 모른다.
-    setSvSave("saving");
-    Promise.race([
-      store.set("survey:" + me.sid, surveyRef.current),
-      new Promise((res) => setTimeout(() => res(false), 8000)),
-    ]).then((ok) => setSvSave(ok ? "saved" : "err"));
+    const seq = ++svSeq.current;
+    setSvSave("saving"); svSaveRef.current = "saving";
+    store.setT("survey:" + me.sid, surveyRef.current).then((ok) => {
+      // 뒤 저장이 "저장됨"을 띄운 다음에 앞 저장의 시간 초과가 늦게 도착해
+      // "실패"로 도로 뒤집는 일이 없도록, 마지막으로 나간 저장만 배지를 정한다
+      if (seq !== svSeq.current) return;
+      setSvSave(ok ? "saved" : "err"); svSaveRef.current = ok ? "saved" : "err";
+    });
   };
   const svChange = (phase, block) => {
     const next = { ...(surveyRef.current || {}), ver: SURVEY_VER, [phase]: block };
@@ -5282,8 +5324,9 @@ function StudentApp({ me, onExit, onGallery }) {
     if (svTimer.current) clearTimeout(svTimer.current);
     svTimer.current = setTimeout(svPersist, 800);
   };
+  const confirmSubmit = () => window.confirm("제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?");
   const svSubmit = async (phase) => {
-    if (!window.confirm("제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?")) return;
+    if (!confirmSubmit()) return;
     const cur = surveyRef.current || {};
     const block = cur[phase] || {};
     const started = block.startedAt || now();
@@ -5295,7 +5338,7 @@ function StudentApp({ me, onExit, onGallery }) {
     setSvBusy(true);
     if (svTimer.current) clearTimeout(svTimer.current);
     setSurvey(next);
-    const ok = await store.set("survey:" + me.sid, next);
+    const ok = await store.setT("survey:" + me.sid, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
     setSvBusy(false);
     if (!ok) { alert("제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요."); setSurvey(cur); }
   };
@@ -5309,7 +5352,7 @@ function StudentApp({ me, onExit, onGallery }) {
     svTimer.current = setTimeout(svPersist, 800);
   };
   const stSubmit = async (phase) => {
-    if (!window.confirm("제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?")) return;
+    if (!confirmSubmit()) return;
     const cur = surveyRef.current || {};
     const st = cur.stance || {};
     const block = st[phase] || {};
@@ -5325,7 +5368,7 @@ function StudentApp({ me, onExit, onGallery }) {
     setSvBusy(true);
     if (svTimer.current) clearTimeout(svTimer.current);
     setSurvey(next);
-    const ok = await store.set("survey:" + me.sid, next);
+    const ok = await store.setT("survey:" + me.sid, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
     setSvBusy(false);
     if (!ok) { alert("제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요."); setSurvey(cur); }
   };
@@ -5351,7 +5394,7 @@ function StudentApp({ me, onExit, onGallery }) {
     setSvBusy(true);
     if (svTimer.current) clearTimeout(svTimer.current);
     setSurvey(next);
-    const ok = await store.set("survey:" + me.sid, next);
+    const ok = await store.setT("survey:" + me.sid, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
     setSvBusy(false);
     if (!ok) alert("판정을 저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
   };
@@ -5381,8 +5424,8 @@ function StudentApp({ me, onExit, onGallery }) {
           <div className="top-right">
             <span>{me.nick}</span>
             <span role={saveState === "err" ? "alert" : "status"} aria-live="polite"
-              className={"save-pill " + (saveState === "dirty" || saveState === "saving" ? "dirty" : saveState === "err" ? "err" : "")}>
-              {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "err" ? "저장 실패 — 5초 뒤 재시도" : "저장됨 " + fmtTime(savedAt)}
+              className={"save-pill " + (saveState === "dirty" || saveState === "saving" || saveState === "queued" ? "dirty" : saveState === "err" ? "err" : "")}>
+              {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "queued" ? "연결 대기 — 기기에 담아 둠" : saveState === "err" ? "저장 실패 — 5초 뒤 재시도" : "저장됨 " + fmtTime(savedAt)}
             </span>
             {saveState === "err" && <button className="btn small" onClick={doSave}>지금 저장</button>}
             <button className="btn small ghost" onClick={onGallery}>전시장</button>
@@ -5405,6 +5448,15 @@ function StudentApp({ me, onExit, onGallery }) {
         {readErr && (
           <div className="warn-note" role="alert" style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ flex: 1, minWidth: 200 }}>기록을 불러오지 못했습니다. 저장된 기록을 지키기 위해 학습지를 잠갔습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.</span>
+            <button className="btn small" onClick={loadAll}>다시 불러오기</button>
+          </div>
+        )}
+        {staleWarn && !readErr && (
+          <div className="warn-note" role="alert" style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ flex: 1, minWidth: 200 }}>
+              서버와 연결되지 않아 <b>이 기기에 저장된 사본</b>을 열었습니다. 다른 기기에서도 작업한 적이 있다면,
+              인터넷이 연결된 뒤 「다시 불러오기」로 최신 기록인지 확인하고 이어 쓰세요 — 옛 사본 위에 쓰면 최신 기록을 덮을 수 있습니다.
+            </span>
             <button className="btn small" onClick={loadAll}>다시 불러오기</button>
           </div>
         )}
@@ -5537,6 +5589,8 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
   const gradeRef = useRef(grade);
   gradeRef.current = grade;
 
+  const [loadErr, setLoadErr] = useState(false); // 읽기 실패 — 빈 화면을 진짜 기록처럼 보여 주면 채점 덮어쓰기·학번 이전 사고로 이어진다
+  const [loadTry, setLoadTry] = useState(0);
   // key={sid}로 학생마다 리마운트되지만, 늦게 도착한 응답이 상태를 덮지 않게 이중으로 막는다
   useEffect(() => {
     let alive = true;
@@ -5547,23 +5601,27 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
         setSurvey(surveyData || null);
       } else {
         const k = isPreview ? "preview" : sid;
-        const w = (await store.get("ws:" + k)) || wsData || {};
-        const g = (await store.get("grade:" + k)) || {};
-        const sv = (await store.get("survey:" + k)) || surveyData || null;
+        // 실패를 "빈 기록"으로 오인하면: 빈 루브릭 위에 저장해 기존 채점을 지우고,
+        // 학번 이전이 빈 기록지를 새 학번에 복사한 뒤 원본을 지운다. 실패면 잠근다.
+        const [wRes, gRes, svRes] = await Promise.all([
+          store.getSafe("ws:" + k), store.getSafe("grade:" + k), store.getSafe("survey:" + k),
+        ]);
         if (!alive) return;
-        setWs(w);
-        setGrade(g);
-        setSurvey(sv);
+        if (!wRes.ok || !gRes.ok || !svRes.ok) { setLoadErr(true); return; }
+        setLoadErr(false);
+        setWs(wRes.data || wsData || {});
+        setGrade(gRes.data || {});
+        setSurvey(svRes.data || surveyData || null);
       }
     })();
     return () => { alive = false; };
-  }, [sid]);
+  }, [sid, loadTry]);
 
   const saveGrade = async () => {
     if (isSample) return setSaveMsg("표본 학급 자료라 채점을 저장하지 않습니다.");
     setSaveMsg("저장 중…");
     const snap = grade;
-    const ok = await store.set("grade:" + (isPreview ? "preview" : sid), { ...snap, _updatedAt: now() });
+    const ok = await store.setT("grade:" + (isPreview ? "preview" : sid), { ...snap, _updatedAt: now() }); // 오프라인이면 8초 뒤 실패로 알린다 — 「저장하고 다음 학생」이 영원히 멎지 않게
     // 저장하는 사이에 또 고쳤다면 dirty를 풀지 않는다
     if (ok && gradeRef.current === snap) setGradeDirty(false);
     setSaveMsg(ok ? "저장됨 " + fmtTime(now()) : "저장 실패 — 다시 시도하세요");
@@ -5575,6 +5633,13 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
     const t = setTimeout(() => setSaveMsg(""), 6000);
     return () => clearTimeout(t);
   }, [saveMsg]);
+  // 화면 안 이동은 guarded()가 확인을 받지만, 브라우저 창을 닫는 길은 여기서만 막을 수 있다
+  useEffect(() => {
+    if (!gradeDirty) return;
+    const onBefore = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", onBefore);
+    return () => window.removeEventListener("beforeunload", onBefore);
+  }, [gradeDirty]);
 
   /* ---------- 학생 관리 (별명·학번 변경, 기록 초기화, 작품·계정 정리) ---------- */
   const [mgmtMsg, setMgmtMsg] = useState("");
@@ -5596,7 +5661,10 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
     if (!/^\d{3,6}$/.test(target)) return setMgmtMsg("새 학번은 숫자 3~6자리입니다.");
     if (target === sid) return setMgmtMsg("현재 학번과 같습니다.");
     setBusyMgmt(true);
-    const [tWs, allRoster] = await Promise.all([store.get("ws:" + target), store.get("roster")]);
+    // 읽기 실패를 "비어 있음"으로 치면 사용 중인 학번을 빈 학번으로 오판해 그 학생의 기록을 덮어쓴다
+    const [tRes, rosterRes] = await Promise.all([store.getSafe("ws:" + target), store.getSafe("roster")]);
+    if (!tRes.ok || !rosterRes.ok) { setBusyMgmt(false); return setMgmtMsg("학번 확인 읽기에 실패했습니다. 연결을 확인하고 다시 시도하세요."); }
+    const tWs = tRes.data, allRoster = rosterRes.data;
     if ((allRoster && allRoster[target]) || tWs) { setBusyMgmt(false); return setMgmtMsg("학번 " + target + "은(는) 이미 사용 중입니다. 먼저 그 학번을 정리하세요."); }
     if (!window.confirm(sid + " → " + target + " 학번을 바꿉니다.\n기록·미디어·채점이 새 학번으로 옮겨집니다. 학생이 지금 접속 중이 아닐 때 실행하세요.\n진행할까요?")) { setBusyMgmt(false); return; }
     setMgmtMsg("옮기는 중… 창을 닫지 마세요.");
@@ -5604,11 +5672,14 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
       if (!(await store.set("ws:" + target, ws))) throw new Error("기록지 복사 실패");
       const refs = collectMediaRefs(ws);
       for (const ref of refs) {
-        const v = await mediaStore.get(sid, ref);
-        if (v && !(await mediaStore.put(target, ref, v))) throw new Error("미디어 복사 실패");
+        // 읽기 실패를 "미디어 없음"으로 치면 복사를 건너뛴 채 아래에서 원본을 지운다 — 사진·녹음이 영영 사라진다
+        const r = await mediaStore.getSafe(sid, ref);
+        if (!r.ok) throw new Error("미디어 읽기 실패");
+        if (r.data && !(await mediaStore.put(target, ref, r.data))) throw new Error("미디어 복사 실패");
       }
-      const g = await store.get("grade:" + sid);
-      if (g && !(await store.set("grade:" + target, g))) throw new Error("채점 복사 실패");
+      const gRes = await store.getSafe("grade:" + sid);
+      if (!gRes.ok) throw new Error("채점 읽기 실패");
+      if (gRes.data && !(await store.set("grade:" + target, gRes.data))) throw new Error("채점 복사 실패");
       await fbStore.setStudent(target, { nick: rec.nick || "" });
       // 복사가 모두 성공한 뒤에만 원본을 지운다
       for (const ref of refs) await mediaStore.remove(sid, ref);
@@ -5667,6 +5738,15 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
     setMgmtMsg("대표 이미지를 지웠습니다.");
   };
 
+  if (loadErr) return (
+    <div className="card"><div className="card-body" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <span style={{ flex: 1, minWidth: 220, color: "var(--seal)", fontSize: 13 }}>
+        학생 {sid}의 기록을 불러오지 못했습니다. 빈 화면을 진짜 기록처럼 열면 그 위의 채점·관리가 기존 자료를 덮어쓸 수 있어 잠갔습니다. 연결을 확인한 뒤 다시 시도하세요.
+      </span>
+      <button className="btn small" onClick={() => setLoadTry((n) => n + 1)}>다시 불러오기</button>
+      <button className="back-link" onClick={onBack}>← 학생 목록으로</button>
+    </div></div>
+  );
   if (!ws) return <div style={{ padding: 30, color: "var(--sub)" }}>불러오는 중…</div>;
   const rec = roster[sid] || {};
   const pct = overallProgress(ws);
@@ -7488,17 +7568,26 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
      누가 연구에서 빠졌는지가 학생 사이에 드러나면 안 되기 때문이다. */
   const [consentMap, setConsentMap] = useState({});
   const [consentBusy, setConsentBusy] = useState(false);
+  const [consentErr, setConsentErr] = useState(false); // 대장 읽기 실패 — 빈 표 위에서 체크하게 두면 안 되므로 표시해 둔다
+  const [consentTry, setConsentTry] = useState(0);
   useEffect(() => {
     if (sampleMode) return;
     let alive = true;
-    store.get("research:consent").then((v) => { if (alive && v && typeof v === "object") setConsentMap(v); });
+    store.getSafe("research:consent").then((r) => {
+      if (!alive) return;
+      setConsentErr(!r.ok);
+      if (r.ok && r.data && typeof r.data === "object") setConsentMap(r.data);
+    });
     return () => { alive = false; };
-  }, [sampleMode]);
-  const saveConsent = async (next) => {
+  }, [sampleMode, consentTry]);
+  /* 바뀐 학생 칸만 병합으로 쓴다 — 대장 전체를 다시 쓰면, 읽기가 실패해 빈 표로
+     시작한 상태에서 체크 한 번에 나머지 모든 학생의 동의 기록이 지워진다 */
+  const saveConsent = async (sid, entry) => {
+    if (consentErr) { alert("동의 대장을 불러오지 못한 상태입니다. 「다시 불러오기」로 대장을 먼저 확인해 주세요."); return; }
     const prev = consentMap;
-    setConsentMap(next);
+    setConsentMap({ ...consentMap, [sid]: entry });
     setConsentBusy(true);
-    const ok = await store.set("research:consent", next);
+    const ok = await store.setT("research:consent", { [sid]: entry }, { merge: true });
     setConsentBusy(false);
     if (!ok) { setConsentMap(prev); alert("동의 표시를 저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요."); }
   };
@@ -7506,15 +7595,14 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
   const toggleConsent = (sid, k) => {
     if (sampleMode) return;
     const cur = consentOf(consentMap[sid]);
-    const next = { ...consentMap, [sid]: { ...cur, [k]: !cur[k] } };
-    saveConsent(next);
+    saveConsent(sid, { ...cur, [k]: !cur[k] });
   };
   /* 한 학생의 여섯 항목을 한꺼번에 */
   const setAllConsent = (sid, on) => {
     if (sampleMode) return;
     const m = {};
     CONSENT_KEYS.forEach((k) => { m[k] = on; });
-    saveConsent({ ...consentMap, [sid]: m });
+    saveConsent(sid, m);
   };
   const [dropExcluded, setDropExcluded] = useState(true);
 
@@ -8157,6 +8245,12 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
             학번을 정렬해 P01부터 익명 번호를 붙입니다. 내려받는 파일에는 학번·별명·계정 정보가 들어가지 않습니다.
             아래 대응표는 이 화면에서만 보이며 파일로 나가지 않으므로, 필요하면 교사가 따로 안전한 곳에 보관하세요.
           </p>
+          {CONSENT_ON && consentErr && !sampleMode && (
+            <div className="warn-note" style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ flex: 1, minWidth: 200 }}>동의 대장을 불러오지 못했습니다. 지금 보이는 빈 표 위에서 체크하면 기존 표시와 어긋날 수 있어 저장을 잠갔습니다.</span>
+              <button className="btn small" onClick={() => setConsentTry((n) => n + 1)}>다시 불러오기</button>
+            </div>
+          )}
           <div className="tbl-scroll" style={{ maxHeight: 240, overflow: "auto" }}>
             <table className="stat-tbl">
               <thead><tr>
@@ -8459,9 +8553,12 @@ function TeacherApp({ onExit, onGallery }) {
   const [npin, setNpin] = useState("");
   // 수업 편집 원고가 저장 전이면 탭 이동 한 번으로 통째로 사라진다 — 편집기가 dirty를 올려 주면 이동을 막는다
   const [edDirty, setEdDirty] = useState(false);
+  // 탭 이동만이 아니라 새로고침(편집기 언마운트)·전시장·나가기도 미저장 원고를 지운다 — 같은 확인을 거친다
+  const confirmLoseEdit = () =>
+    !(tab === "수업 편집" && edDirty) ||
+    window.confirm("저장하지 않은 수업 편집 원고가 있습니다. 이동하면 사라집니다. 이동할까요?");
   const switchTab = (t) => {
-    if (t !== tab && tab === "수업 편집" && edDirty &&
-      !window.confirm("저장하지 않은 수업 편집 원고가 있습니다. 이동하면 사라집니다. 이동할까요?")) return;
+    if (t !== tab && !confirmLoseEdit()) return;
     setTab(t);
   };
 
@@ -8495,10 +8592,15 @@ function TeacherApp({ onExit, onGallery }) {
     setLoading(false);
   };
 
+  /* config 문서는 차시 공개·설문·붙여넣기·앵커가 나눠 쓴다. 통째로 읽어 통째로 다시 쓰면
+     읽기가 한 번 실패한 순간(null 반환) 문서 전체가 이 필드 하나로 갈려 나간다 —
+     수업 중에 학생 화면의 학습지·설문·앵커가 한꺼번에 사라진다. 그래서 읽지 않고,
+     실시간 구독(watchDoc)이 유지하는 로컬 상태를 기준으로 바꾸는 필드만 병합해 쓴다. */
   const toggleSession = async (s) => {
-    const cfg = (await store.get("config")) || {};
-    const next = { ...((cfg.open) || DEFAULT_OPEN), [s]: !isOpen(cfg.open, s) };
-    const ok = await store.set("config", { ...cfg, open: next, openUpdated: now() });
+    const next = {};
+    SESSIONS.forEach((x) => { next[x] = isOpen(openMap, x); });
+    next[s] = !isOpen(openMap, s);
+    const ok = await store.setT("config", { open: next, openUpdated: now() }, { merge: true });
     if (ok) { setOpenMap(next); setMsg(s + "를 " + (next[s] ? "열었습니다." : "닫았습니다.") + " 학생 화면에 15초 안에 반영됩니다."); }
     else setMsg("설정 저장에 실패했습니다.");
   };
@@ -8508,19 +8610,18 @@ function TeacherApp({ onExit, onGallery }) {
       const openCnt = SESSIONS.filter((s) => isOpen(openMap, s)).length;
       if (!window.confirm("지금 열린 " + openCnt + "개 차시를 모두 닫습니다. 학생 화면에서 학습지가 사라집니다. 계속할까요?")) return;
     }
-    const cfg = (await store.get("config")) || {};
     const next = {};
     SESSIONS.forEach((s) => { next[s] = val; });
-    const ok = await store.set("config", { ...cfg, open: next, openUpdated: now() });
+    const ok = await store.setT("config", { open: next, openUpdated: now() }, { merge: true });
     if (ok) { setOpenMap(next); setMsg(val ? "모든 차시를 열었습니다." : "모든 차시를 닫았습니다."); }
+    else setMsg("설정 저장에 실패했습니다.");
   };
   /* 붙여넣은 뒤 출처를 물을지 — 학생 화면에 15초 안에 반영된다 */
   const togglePasteAsk = async () => {
-    const cfg = (await store.get("config")) || {};
-    const next = !pasteAskOn(cfg);
-    const ok = await store.set("config", { ...cfg, pasteAsk: next, pasteAskUpdated: now() });
+    const next = !pasteAskOn(cfgAll);
+    const ok = await store.setT("config", { pasteAsk: next, pasteAskUpdated: now() }, { merge: true });
     if (ok) {
-      setCfgAll({ ...cfg, pasteAsk: next });
+      setCfgAll({ ...(cfgAll || {}), pasteAsk: next });
       setMsg(next
         ? "출처 묻기를 켰습니다. 이제 학생이 붙여넣으면 어디서 가져왔는지 고르는 줄이 뜹니다."
         : "출처 묻기를 껐습니다. 학생 화면에는 아무 반응도 나타나지 않고 기록만 쌓입니다.");
@@ -8528,10 +8629,9 @@ function TeacherApp({ onExit, onGallery }) {
   };
 
   const toggleSurvey = async (phase) => {
-    const cfg = (await store.get("config")) || {};
-    const cur = cfg.survey || DEFAULT_SURVEY;
+    const cur = svCfg || DEFAULT_SURVEY;
     const next = { ...cur, [phase]: !surveyOpen(cur, phase) };
-    const ok = await store.set("config", { ...cfg, survey: next, surveyUpdated: now() });
+    const ok = await store.setT("config", { survey: next, surveyUpdated: now() }, { merge: true });
     if (ok) {
       setSvCfg(next);
       const nm = (SURVEY_PHASES.find((x) => x.ph === phase) || {}).nm || "설문";
@@ -8619,9 +8719,9 @@ function TeacherApp({ onExit, onGallery }) {
         <div className="topbar-in">
           <div className="brand">허구의 아카이브 — 교사 대시보드<small>TEACHER CONSOLE</small></div>
           <div className="top-right">
-            <button className="btn small ghost" onClick={onGallery}>전시장</button>
-            <button className="btn small ghost" onClick={loadAll}>새로고침</button>
-            <button className="btn small ghost" onClick={async () => { await authApi.leave(); onExit(); }}>나가기</button>
+            <button className="btn small ghost" onClick={() => { if (confirmLoseEdit()) onGallery(); }}>전시장</button>
+            <button className="btn small ghost" onClick={() => { if (confirmLoseEdit()) loadAll(); }}>새로고침</button>
+            <button className="btn small ghost" onClick={async () => { if (!confirmLoseEdit()) return; await authApi.leave(); onExit(); }}>나가기</button>
           </div>
         </div>
       </div>
@@ -8866,7 +8966,7 @@ function TeacherApp({ onExit, onGallery }) {
                           <span className="lb"><span className="mono" style={{ fontSize: 10, color: "var(--seal)" }}>{r.std}</span></span>
                           <span className="tr" style={{ display: "flex", background: "var(--line2)" }}>
                             {tot > 0 && <i style={{ position: "static", width: (cnt.상 / tot) * 100 + "%", background: "var(--patina)" }} />}
-                            {tot > 0 && <i style={{ position: "static", width: (cnt.중 / tot) * 100 + "%", background: "var(--amber)" }} />}
+                            {tot > 0 && <i style={{ position: "static", width: (cnt.중 / tot) * 100 + "%", background: "var(--amber-fill, var(--amber))" }} />}
                             {tot > 0 && <i style={{ position: "static", width: (cnt.하 / tot) * 100 + "%", background: "var(--seal)" }} />}
                           </span>
                           <span className="v" style={{ width: "auto", minWidth: 78 }}>상 {cnt.상} · 중 {cnt.중} · 하 {cnt.하}</span>
@@ -8881,12 +8981,15 @@ function TeacherApp({ onExit, onGallery }) {
               <TranslationPanel ids={ids} roster={roster} wsMap={wsMap} onSel={openStudent} />
             ) : tab === "연구" ? (
               <div>
+                {msg && <div className="ok-note">{msg}</div>}
                 <ResearchPanel ids={ids} roster={roster} wsMap={wsMap} gradeMap={gradeMap} surveyMap={surveyMap} sampleMode={sampleMode} openMap={openMap} />
                 <AnchorPanel ids={ids} roster={roster} surveyMap={surveyMap} cfg={anCfg} sampleMode={sampleMode}
-                  onSave={async (next) => {
-                    const cfg = (await store.get("config")) || {};
-                    const ok = await store.set("config", { ...cfg, anchor: next, anchorUpdated: now() });
-                    if (ok) setAnCfg(next); else setMsg("앵커 설정을 저장하지 못했습니다.");
+                  onSave={async (patch) => {
+                    // 패널이 준 필드(pairs 또는 open)만 병합해 쓴다 — config를 읽어 와 통째로
+                    // 다시 쓰면 읽기 실패 때 문서가 갈리고, 0.8초 디바운스 저장과 열림 토글이
+                    // 서로의 필드를 옛값으로 되돌리는 경쟁도 생긴다.
+                    const ok = await store.setT("config", { anchor: patch, anchorUpdated: now() }, { merge: true });
+                    if (ok) setAnCfg((prev) => ({ ...DEFAULT_ANCHOR, ...prev, ...patch })); else setMsg("앵커 설정을 저장하지 못했습니다.");
                     return ok; // 패널이 저장 성공 여부를 배지로 보여 준다
                   }} />
               </div>

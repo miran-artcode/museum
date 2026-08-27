@@ -59,7 +59,7 @@ export function scrollToSurveyItem(key) {
   setTimeout(() => el.classList.remove("sv-hit"), 1400);
 }
 
-function prefersReducedMotion() {
+export function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia
     ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
     : false;
