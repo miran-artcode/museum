@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
-import { fbStore, authApi } from "./src-fb.js";
+import { fbStore, authApi } from "./probe-fb.js";
 import {
   useContent, watchContent, onContentChange, mergeLessons, mergeSchema,
   ContentEditor, ContentStyle, LessonImages, LessonAsks, LessonNotice, WorkLinks,
