@@ -32,7 +32,7 @@ export const GATE_SECTIONS = [
     sess: "5–6차시",
     en: "GENERATE",
     title: "생성과 다듬기",
-    body: "프롬프트 작성과 AI 이미지 생성·선별, 다듬기와 명제표 문안",
+    body: "프롬프트 작성과 AI 이미지 생성·선별, 다듬기와 작품 캡션 문안",
     img: "/img/lessons/L6_s30_3.jpg",
     alt: "금으로 이어 붙인 킨츠기 찻사발",
   },

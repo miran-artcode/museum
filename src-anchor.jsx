@@ -23,9 +23,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 
-export const ANCHOR_VER = "a1";
+export const ANCHOR_VER = "a2";
 
-/* 두 문구만 다르다. 이미지·제목·명제표는 두 조건이 완전히 같다 */
+/* 두 문구만 다르다. 이미지·제목·작품 캡션은 두 조건이 완전히 같다 */
 export const LABEL_HI = "이미지 전체를 생성형 AI로 제작";
 export const LABEL_LO = "직접 촬영·합성, AI는 배경 보정에만 사용";
 
@@ -33,7 +33,7 @@ export const LABEL_LO = "직접 촬영·합성, AI는 배경 보정에만 사용
 export const ANCHOR_TAGS = [
   { k: "veri", label: "핍진성", desc: "기록 사진의 형식이 성립하는가" },
   { k: "cause", label: "흔적의 인과", desc: "닳고 부서진 자리가 쓰임과 이어지는가" },
-  { k: "plate", label: "명제표", desc: "읽고 나서 이미지가 달라 보이는가" },
+  { k: "plate", label: "작품 캡션", desc: "읽고 나서 이미지가 달라 보이는가" },
   { k: "voice", label: "문제의 전달", desc: "어떤 문제가 어떤 태도로 읽히는가" },
 ];
 
@@ -43,7 +43,7 @@ export const ANCHOR_QUESTION =
 export const ANCHOR_MIN_SEC = 5;   // 이보다 빨리 고르면 한 번 더 보게 한다
 export const ANCHOR_MIN_WHY = 15;  // 이유 문장의 최소 길이
 
-/* 명제표의 「AI 활용 범위」를 견줄 수 있게 만드는 4단계 (평가자_성향_설문_설계.md §2.1).
+/* 작품 캡션의 「AI 활용 범위」를 견줄 수 있게 만드는 4단계 (평가자_성향_설문_설계.md §2.1).
    자유 서술은 그대로 두고 이 값을 함께 받는다. 학생 자신의 선언이므로
    작품의 실제 AI 개입도가 아니라 **고지된 개입도**다 — 논문에서 이 구분을 흐리지 않는다. */
 export const AI_LEVELS = [
@@ -109,7 +109,7 @@ export function anchorScore(block) {
   if (!items.length) return null;
   return items.filter((x) => x && x.win && x.win === x.hi).length;
 }
-/* 명제표를 펼쳐 본 비율 — 무엇을 보고 판단했는가 */
+/* 작품 캡션을 펼쳐 본 비율 — 무엇을 보고 판단했는가 */
 export function anchorPlateRate(block) {
   const items = (block && block.items) || [];
   if (!items.length) return null;
@@ -134,7 +134,7 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
   const [warn, setWarn] = useState("");
   const startRef = useRef(Date.now());
 
-  /* 쌍이 넘어갈 때마다 판정 시간을 다시 재고 명제표를 도로 접는다 */
+  /* 쌍이 넘어갈 때마다 판정 시간을 다시 재고 작품 캡션을 도로 접는다 */
   useEffect(() => { startRef.current = Date.now(); setOpenPlate(false); setWarn(""); }, [items.length]);
 
   if (anchorDone(sv)) {
@@ -179,7 +179,7 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
             <dt>출토 맥락</dt><dd>{w.ctx}</dd>
             <dt>AI 활용 범위</dt><dd className="an-ai">{labelOf(side)}</dd>
           </dl>
-        ) : <div className="an-plate-hidden">명제표 접힘</div>}
+        ) : <div className="an-plate-hidden">작품 캡션 접힘</div>}
         <button type="button" className={"btn small " + (win === side ? "" : "ghost")} onClick={() => { setWin(side); setWarn(""); }}>
           {win === side ? "고름" : "이쪽"}
         </button>
@@ -205,9 +205,9 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
         </div>
         <div className="an-tools">
           <button type="button" className="btn small ghost" onClick={() => setOpenPlate((v) => !v)}>
-            {openPlate ? "명제표 접기" : "명제표 보기"}
+            {openPlate ? "작품 캡션 접기" : "작품 캡션 보기"}
           </button>
-          <span className="hint">먼저 이미지만 보고 판단해도 되고, 명제표를 펼쳐 보고 판단해도 됩니다.</span>
+          <span className="hint">먼저 이미지만 보고 판단해도 되고, 작품 캡션을 펼쳐 보고 판단해도 됩니다.</span>
         </div>
 
         <div className="field">
@@ -306,7 +306,7 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
   };
 
   const exportCSV = () => {
-    const head = ["학번", "별명", "조건", "제출시각", "anchorScore(0~4)", "명제표펼침비율"];
+    const head = ["학번", "별명", "조건", "제출시각", "anchorScore(0~4)", "작품 캡션 펼침 비율"];
     pairs.forEach((p, i) => head.push(p.id + ":고지높은쪽", p.id + ":선택", p.id + ":AI전면고름", p.id + ":축", p.id + ":초", p.id + ":이유"));
     const rows = ids.map((id) => {
       const an = (surveyMap[id] || {}).anchor;
@@ -384,7 +384,7 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
           <div className="kpi"><b>{doneRows.length}</b><span>제출 (총 {ids.length}명)</span></div>
           <div className="kpi"><b>{pct(rate)}</b><span>「AI 전면」 쪽을 고른 비율</span></div>
           <div className="kpi"><b>{mean == null ? "-" : Math.round(mean * 100) / 100}</b><span>1인 평균 (0~4)</span></div>
-          <div className="kpi"><b>{pct(plateRate)}</b><span>명제표를 펼쳐 본 비율</span></div>
+          <div className="kpi"><b>{pct(plateRate)}</b><span>작품 캡션을 펼쳐 본 비율</span></div>
         </div>
         <p className="hint" style={{ marginTop: 8 }}>
           「AI 전면」 선택률이 <b>50%보다 낮을수록</b> 학급이 고지를 깎은 것입니다. 정확히 50%면 라벨이 판정을 바꾸지 않았다는 뜻입니다.
