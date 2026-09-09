@@ -18,6 +18,7 @@ import { LESSONS_DEF } from "./src-lessons.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
+import { LabelCompare } from "./src-label-compare.jsx";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -62,25 +63,25 @@ const ATTITUDES = ["고발", "경고", "공감", "기록", "질문"];
 const FIX_OPTS = ["재생성", "부분 수정", "화면 편집", "작품 캡션 조정"];
 const DISPLAY_OPTS = ["단독", "계열", "파편", "오분류", "복원 표시"];
 const INSPECT_ITEMS = [
-  { k: "structure", label: "구조의 성립", hint: "부품이 이어져 있고 떠 있는 부분이 없는가" },
-  { k: "cause", label: "흔적의 인과", hint: "닳고 부서진 자리가 물건의 쓰임과 연결되는가" },
-  { k: "light", label: "빛과 그림자", hint: "광원의 방향이 하나로 정리되어 있는가" },
-  { k: "scale", label: "스케일", hint: "크기를 짐작할 근거가 화면에 있는가" },
-  { k: "text", label: "글자와 표식", hint: "뭉개진 글자나 뜻 없는 문자가 없는가" },
-  { k: "label", label: "작품 캡션과의 관계", hint: "작품 캡션 문안과 화면 내용이 서로 맞는가" },
-  { k: "misread", label: "오독의 여지", hint: "의도하지 않은 다른 물건으로 읽히지 않는가" },
-  { k: "exhibit", label: "진열과 화면", hint: "전시 벽면에 놓았을 때 성립하는 화면인가" },
+  { k: "structure", label: "구조가 맞는가", hint: "부품이 서로 이어져 있고, 허공에 떠 있는 부분은 없는가" },
+  { k: "cause", label: "흔적과 쓰임이 맞는가", hint: "닳고 부서진 자리가 그 물건을 쓰던 방식과 이어지는가" },
+  { k: "light", label: "빛과 그림자", hint: "빛이 들어오는 방향이 하나로 맞춰져 있는가" },
+  { k: "scale", label: "크기 짐작", hint: "크기를 가늠할 만한 것이 화면 안에 있는가" },
+  { k: "text", label: "글자와 표시", hint: "뭉개진 글자나 뜻 없는 문자가 섞여 있지 않은가" },
+  { k: "label", label: "작품 캡션과 화면", hint: "작품 캡션에 쓴 내용과 화면에 보이는 것이 서로 맞는가" },
+  { k: "misread", label: "엉뚱하게 읽힐 여지", hint: "내가 뜻하지 않은 다른 물건으로 보이지는 않는가" },
+  { k: "exhibit", label: "전시했을 때의 화면", hint: "전시 벽에 걸어 놓아도 무리 없는 화면인가" },
 ];
 const PEER_VIEWS = [
-  { k: "blind", label: "작품 캡션을 가린 상태의 읽힘", hint: "이미지만 보고 무엇을 하는 물건, 어느 시대의 물건으로 보이는지 말할 수 있는가. 그렇게 읽게 한 증거 두 곳을 지목" },
-  { k: "cause", label: "흔적의 인과", hint: "닳고 부서지고 수리된 자리가 쓰임과 연결되는가. 실물 같은 부분과 의심되는 부분을 하나씩" },
-  { k: "labelwork", label: "작품 캡션의 작동", hint: "작품 캡션을 읽은 뒤 이미지의 읽기가 달라지는가. 달라진 부분을 지목" },
-  { k: "problem", label: "읽히는 문제와 말하는 태도", hint: "어떤 사회문제로 읽히는가. 고발·경고·공감·기록·질문 중 어느 태도인지" },
-  { k: "artness", label: "미술로 만드는 것", hint: "이미지·제목·명칭·작품 캡션·고지·의도·진열·해석 중 의미를 구성하는 요소와 근거" },
+  { k: "blind", label: "작품 캡션을 가리고 봤을 때", hint: "이미지만 보고 무엇에 쓰는 물건인지, 어느 시대 물건인지 말할 수 있는가. 그렇게 보이게 한 곳 두 군데를 짚어 주세요" },
+  { k: "cause", label: "흔적과 쓰임이 맞는가", hint: "닳고 부서지고 고친 자리가 쓰던 방식과 이어지는가. 진짜 같은 부분과 의심스러운 부분을 하나씩 적어 주세요" },
+  { k: "labelwork", label: "작품 캡션을 읽은 뒤", hint: "작품 캡션을 읽고 나니 이미지가 다르게 보이는가. 달라진 부분을 짚어 주세요" },
+  { k: "problem", label: "어떤 문제로 읽히는가", hint: "어떤 사회문제로 보이는가. 고발·경고·공감·기록·질문 가운데 어떤 태도로 말하고 있는지" },
+  { k: "artness", label: "무엇이 이것을 미술로 만드는가", hint: "이미지·제목·이름·작품 캡션·고지·의도·진열·해석 가운데 뜻을 만들어 내는 것은 무엇이고, 그렇게 본 근거는 무엇인지" },
 ];
 const OBS_ITEMS = [
-  "설계와 화면의 연결", "도구와 프롬프트의 근거", "선별과 제외의 근거",
-  "점검의 물리적 근거", "작품 캡션을 전제한 판단", "짝의 읽기 처리",
+  "설계와 화면이 이어지는가", "도구와 프롬프트를 고른 이유", "고른 이유와 뺀 이유",
+  "점검할 때 든 물리적 근거", "작품 캡션까지 생각한 판단", "짝이 읽어 준 내용을 다룬 방식",
 ];
 /* ============================================================
    관찰 → 사물: 보이지 않는 것을 드러내는 아홉 계단
@@ -419,7 +420,7 @@ const SCHEMA_DEF = [
       {
         k: "concept", t: "area", qtype: "개념", label: "작품 캡션의 어떤 정보가 이미지의 읽기를 가장 크게 바꾸는가",
         steps: [
-          "보기 — 작품 캡션 두 장 비교 자료에서 두 읽기가 갈라진 지점 찾기",
+          "보기 — 바로 아래 「작품 캡션(명제표) 두 장 비교」 자료에서 캡션 A와 B의 읽기가 갈라진 지점 찾기",
           "좁히기 — 작품 캡션의 정보(제목 · 연대 · 재질 · 용도 · 출처) 가운데 읽기를 가장 크게 바꾼 한 가지 고르기",
           "정리 — 그 정보가 왜 힘이 센지 근거와 함께 쓰기",
         ],
@@ -439,7 +440,7 @@ const SCHEMA_DEF = [
     id: "s12", session: "2차시", code: "A", title: "미술 개념 탐구",
     fields: [
       { k: "def", t: "text", label: "“이 작업이 미술이 되기 위해 필요한 것은 ______이다.” 빈칸을 자기 말로 완성하기" },
-      { k: "labelCmp", t: "area", label: "같은 이미지에 작품 캡션 두 장을 붙였을 때 읽기가 어떻게 달라졌는지 한 줄로 쓰기" },
+      { k: "labelCmp", t: "area", label: "같은 이미지에 작품 캡션 두 장(아래 자료의 A · B)을 붙였을 때 읽기가 어떻게 달라졌는지 한 줄로 쓰기" },
     ],
   },
   {
@@ -3094,6 +3095,8 @@ function LessonPanel({ L, teacher, onReading }) {
             <div className="reading-in">
               {rd.p.map((para, j) => <p key={j}>{para}</p>)}
               <LessonImages images={rd.images} />
+              {/* 2차시 도입의 "캡션 두 장" 실험 — 강의 노트에서도 실제 자료를 보여 준다 */}
+              {L.n === 2 && rd.stage === "도입" && <LabelCompare />}
               <LessonAsks asks={rd.asks} />
               {rd.works && rd.works.length > 0 && (
                 <table className="works-tbl">
@@ -3287,6 +3290,10 @@ function StageEcho({ sec, f, ws }) {
   const mode = ENGAGE_MODES.find((c) => c.k === d["s3e.mode"]);
   const drop = ENGAGE_MODES.find((c) => c.k === d["s3e.dropMode"]);
   const key = sec.id + "." + f.k;
+
+  // 2차시 — "캡션 두 장 비교"가 무엇인지 묻는 학생이 많아, 자료를 질문 바로 옆에 붙인다
+  if (key === "q2.concept") return <LabelCompare />;
+  if (key === "s12.labelCmp") return <LabelCompare compact />;
 
   if (key === "s3o.methodWhy" && obs) return (
     <div className="obs-echo"><b>고른 방법 — {obs.label}</b>
