@@ -20,6 +20,9 @@ import { ThemeStyle } from "./src-theme.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { LabelCompare } from "./src-label-compare.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
+import { AssessTab, AssessStyle } from "./src-assess.jsx";
+import { AssessPanel, AssessTeacherStyle } from "./src-assess-teacher.jsx";
+import { peerCfg } from "./src-assess-core.mjs";
 import { startDwell } from "./src-dwell.js";
 
 /* ============================================================
@@ -5056,6 +5059,10 @@ function StudentApp({ me, onExit, onGallery }) {
   const [svCfg, setSvCfg] = useState(DEFAULT_SURVEY);
   const [anCfg, setAnCfg] = useState(DEFAULT_ANCHOR);
   const [cfgAll, setCfgAll] = useState(null);   // 설정 문서 전체 — 붙여넣기 출처 묻기 같은 토글을 읽는다
+  /* 「최종 평가」 — 차시 탭과 별개의 화면(src-assess.jsx). 교사가 단계를 닫으면 차시 화면으로 돌아간다 */
+  const [assessOn, setAssessOn] = useState(false);
+  const peerStage = peerCfg(cfgAll).stage;
+  useEffect(() => { if (peerStage === "closed") setAssessOn(false); }, [peerStage]);
   const [svBusy, setSvBusy] = useState(false);
   const [svSave, setSvSave] = useState(null); // 설문 자동 저장 상태: null | saving | saved | err
   const svTimer = useRef(null);
@@ -5433,6 +5440,7 @@ function StudentApp({ me, onExit, onGallery }) {
   };
 
   const switchTab = (s) => {
+    if (assessOn) setAssessOn(false);   // 최종 평가 화면에서 차시 탭을 누르면 그 차시로 돌아간다
     if (s === tab) return;
     // 스케치의 미저장 획은 컴포넌트 안에만 있어 탭이 바뀌면(언마운트) 사라진다
     if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
@@ -5512,12 +5520,18 @@ function StudentApp({ me, onExit, onGallery }) {
           {SESSIONS.map((s) => {
             const open = isOpen(openMap, s);
             return (
-              <button key={s} role="tab" aria-selected={tab === s} className={"sess-tab " + (tab === s ? "on" : "") + (open ? "" : " locked")}
+              <button key={s} role="tab" aria-selected={tab === s && !assessOn} className={"sess-tab " + (tab === s && !assessOn ? "on" : "") + (open ? "" : " locked")}
                 onClick={() => open && switchTab(s)} disabled={!open} title={open ? s : s + " 잠김"}>
                 {open ? <SessionDot ratio={sessionProgress(s, ws)} /> : <span className="lock">잠김</span>}{s}
               </button>
             );
           })}
+          {peerStage !== "closed" && (
+            <button role="tab" aria-selected={assessOn} className={"sess-tab as-tab " + (assessOn ? "on" : "")} title="최종 평가 — 제출·자기평가·동료 비교"
+              onClick={() => { if (!assessOn) { flush(); setAssessOn(true); window.scrollTo({ top: 0 }); } }}>
+              <span className="dot part" />최종 평가
+            </button>
+          )}
         </div>}
 
         {grade && (filled(grade.fbForm) || filled(grade.fbConcept)) && (
@@ -5560,12 +5574,13 @@ function StudentApp({ me, onExit, onGallery }) {
             onChange={anChange} onSubmit={anSubmit} />
         )}
 
-        {loaded && !isOpen(openMap, tab) ? (
+        {loaded && assessOn && <AssessTab me={me} ws={ws} cfgAll={cfgAll} />}
+        {loaded && !assessOn && !isOpen(openMap, tab) ? (
           <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
             이 차시는 아직 열리지 않았습니다. 선생님이 수업 시간에 열어 주면 강의 노트와 학습지가 나타납니다.
           </div></div>
         ) : null}
-        {loaded && isOpen(openMap, tab) && LESSONS.filter((L) => L.session === tab).map((L) => {
+        {loaded && !assessOn && isOpen(openMap, tab) && LESSONS.filter((L) => L.session === tab).map((L) => {
           const confirmSec = secs.find((s) => s.id === "l" + L.n);
           const inquirySec = secs.find((s) => s.id === "q" + L.n);
           return (
@@ -5576,7 +5591,7 @@ function StudentApp({ me, onExit, onGallery }) {
             </React.Fragment>
           );
         })}
-        {loaded && isOpen(openMap, tab) && secs.filter((s) => s.kind !== "learn" && s.kind !== "inquiry").map((sec) => (
+        {loaded && !assessOn && isOpen(openMap, tab) && secs.filter((s) => s.kind !== "learn" && s.kind !== "inquiry").map((sec) => (
           <SectionCard key={sec.id} sec={sec} ws={ws} setField={setField} />
         ))}
       </div>
@@ -8775,7 +8790,7 @@ function TeacherApp({ onExit, onGallery }) {
               </div>
             )}
             <div className="t-tabs">
-              {["현황", "차시 공개", "수업 안내", "수업 편집", "기록 현황", "사고 과정", "창의성", "설문", "연구", "설정"].map((t) => (
+              {["현황", "차시 공개", "수업 안내", "수업 편집", "기록 현황", "사고 과정", "창의성", "설문", "상호평가", "연구", "설정"].map((t) => (
                 <button key={t} className={"btn small " + (tab === t ? "" : "ghost")} onClick={() => switchTab(t)}>
                   {t}{t === "수업 편집" && edDirty ? " ●" : ""}
                 </button>
@@ -9015,6 +9030,20 @@ function TeacherApp({ onExit, onGallery }) {
               </div>
             ) : tab === "사고 과정" ? (
               <TranslationPanel ids={ids} roster={roster} wsMap={wsMap} onSel={openStudent} />
+            ) : tab === "상호평가" ? (
+              <div>
+                {msg && <div className="ok-note">{msg}</div>}
+                <AssessPanel ids={ids} roster={roster} wsMap={wsMap} cfgAll={cfgAll} sampleMode={sampleMode} onSel={openStudent}
+                  onSaveCfg={async (patch) => {
+                    // 패널이 준 필드만 peer 아래에 병합해 쓴다 — config를 읽어 통째로 다시 쓰면 읽기 실패 때
+                    // 문서가 갈리고, 다른 세션이 방금 바꾼 단계를 옛값으로 되돌리는 경쟁도 생긴다.
+                    const part = { ...patch, updatedAt: now() };
+                    const ok = await store.setT("config", { peer: part, peerUpdated: now() }, { merge: true });
+                    if (ok) setCfgAll((prev) => ({ ...(prev || {}), peer: { ...peerCfg(prev), ...part } }));
+                    else setMsg("상호평가 설정을 저장하지 못했습니다.");
+                    return ok;
+                  }} />
+              </div>
             ) : tab === "연구" ? (
               <div>
                 {msg && <div className="ok-note">{msg}</div>}
@@ -9758,6 +9787,8 @@ function App() {
       <SurveyStyle />
       <StanceStyle />
       <AnchorStyle />
+      <AssessStyle />
+      <AssessTeacherStyle />
       <ThemeStyle />
       {view === "gate" && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
