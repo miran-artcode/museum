@@ -31,14 +31,14 @@ export const LABEL_LO = "직접 촬영·합성, AI는 배경 보정에만 사용
 
 /* 판정 뒤에 고르는 결정적 축 — 상호평가 설계서의 4축과 같은 말을 쓴다 */
 export const ANCHOR_TAGS = [
-  { k: "veri", label: "핍진성", desc: "기록 사진의 형식이 성립하는가" },
-  { k: "cause", label: "흔적의 인과", desc: "닳고 부서진 자리가 쓰임과 이어지는가" },
+  { k: "veri", label: "핍진성", desc: "진짜 기록 사진처럼 보이는가" },
+  { k: "cause", label: "흔적과 쓰임", desc: "닳고 부서진 자리가 쓰던 방식과 이어지는가" },
   { k: "plate", label: "작품 캡션", desc: "읽고 나서 이미지가 달라 보이는가" },
-  { k: "voice", label: "문제의 전달", desc: "어떤 문제가 어떤 태도로 읽히는가" },
+  { k: "voice", label: "문제가 전해지는가", desc: "어떤 문제가 어떤 태도로 읽히는가" },
 ];
 
 export const ANCHOR_QUESTION =
-  "두 작품 가운데 실재한 적 없는 유물을 더 설득력 있게 성립시킨 쪽은 어디인가요?";
+  "두 작품 가운데, 실재한 적 없는 유물을 더 그럴듯하게 만들어 낸 쪽은 어느 쪽인가요?";
 
 export const ANCHOR_MIN_SEC = 5;   // 이보다 빨리 고르면 한 번 더 보게 한다
 export const ANCHOR_MIN_WHY = 15;  // 이유 문장의 최소 길이
@@ -150,7 +150,7 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
 
   const save = () => {
     const ms = Date.now() - startRef.current;
-    if (!win) { setWarn("어느 쪽이 더 성립하는지 먼저 고르세요."); return; }
+    if (!win) { setWarn("어느 쪽이 더 그럴듯한지 먼저 고르세요."); return; }
     if (why.trim().length < ANCHOR_MIN_WHY) { setWarn("고른 이유를 " + ANCHOR_MIN_WHY + "자 이상 써 주세요."); return; }
     if (!tag) { setWarn("무엇이 결정적이었는지 하나 고르세요."); return; }
     if (ms < ANCHOR_MIN_SEC * 1000) { setWarn("두 작품을 한 번 더 보고 골라 주세요."); startRef.current = Date.now() - ANCHOR_MIN_SEC * 1000; return; }
@@ -396,7 +396,7 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
         </div>
         <div className="warn-note" style={{ marginTop: 12 }}>
           <b>판정이 끝나면 반드시 알려 주세요.</b> 같은 이미지에 서로 다른 고지 문구를 붙였다는 사실을 밝히고,
-          누가 어느 쪽을 골랐는지 견주는 것이 8차시 윤리 토의의 재료입니다. 밝히지 않고 끝내면 속인 것이 됩니다.
+          누가 어느 쪽을 골랐는지 비교하는 것이 8차시 윤리 토의의 재료입니다. 밝히지 않고 끝내면 속인 것이 됩니다.
         </div>
       </div>
     </div>

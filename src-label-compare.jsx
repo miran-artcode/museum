@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 /* ============================================================
-   작품 캡션(명제표) 두 장 비교 자료 — 2차시 탐구 질문 안에 붙는 예시
+   작품 캡션 두 장 비교 자료 — 2차시 탐구 질문 안에 붙는 예시
    2차시 도입 활동(같은 사진에 캡션만 바꿔 다는 실험)을 학생 화면에서
    다시 볼 수 있게 만든 카드. 수업에 결석했거나 도입을 놓친 학생이
    "두 장 비교가 뭐냐"고 묻지 않도록, 질문 바로 위에 자료를 둔다.
@@ -111,13 +111,13 @@ export function LabelCompare({ compact }) {
       `}</style>
       <div className="lcmp-head">
         <span className="lcmp-acc">LABEL A / LABEL B</span>
-        <h4>자료 — 작품 캡션(명제표) 두 장 비교</h4>
+        <h4>자료 — 작품 캡션 두 장 비교</h4>
         <button type="button" className="lcmp-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? "접기" : "펼치기"}
         </button>
       </div>
       <div className="lcmp-lead">
-        작품 캡션(명제표)은 전시장에서 작품 옆 벽에 붙는 작은 설명 카드입니다.
+        작품 캡션은 전시장에서 작품 옆 벽에 붙는 작은 설명 카드입니다.
         아래 사진은 <b>한 장뿐</b>입니다. 사진은 그대로 두고 옆에 붙인 캡션만 A에서 B로 바꿔 달았습니다.
         {compact ? " 2차시 도입에서 함께 본 자료입니다." : ""}
       </div>
