@@ -20,6 +20,7 @@ import { ThemeStyle } from "./src-theme.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { LabelCompare } from "./src-label-compare.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
+import { startDwell } from "./src-dwell.js";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -5070,15 +5071,15 @@ function StudentApp({ me, onExit, onGallery }) {
   const loadedRef = useRef(false); // 로드 완료 전에는 어떤 경로로도 저장하지 않는다 (빈 문서 덮어쓰기 방지)
   wsRef.current = ws;
 
-  /* 살펴본 시간 기록 — 마우스·키보드·스크롤이 움직인 시간만 차시별로 센다 */
+  /* 살펴본 시간 기록 — 조작이 있는 동안만 차시별로 센다. 판정 규칙은 src-dwell.js 참고.
+     켜 둔 채 비활동 시간(idleSec)도 따로 쌓아 「켜놓기만 한」 학생을 가려낼 수 있게 한다 */
   const tabRef = useRef(tab);
   tabRef.current = tab;
-  const lastEventRef = useRef(Date.now());
   const openReadingsRef = useRef(0);
   const actAccRef = useRef({}); // { 차시: {sec, readSec, opens, visits} } — 저장 전까지 쌓아 두는 통
 
   const accAct = (s, patch) => {
-    const a = actAccRef.current[s] || { sec: 0, readSec: 0, opens: 0, visits: 0 };
+    const a = actAccRef.current[s] || { sec: 0, readSec: 0, idleSec: 0, opens: 0, visits: 0 };
     for (const k in patch) a[k] = (a[k] || 0) + patch[k];
     actAccRef.current[s] = a;
   };
@@ -5094,6 +5095,7 @@ function StudentApp({ me, onExit, onGallery }) {
       a[s] = {
         sec: (cur.sec || 0) + (acc[s].sec || 0),
         readSec: (cur.readSec || 0) + (acc[s].readSec || 0),
+        idleSec: (cur.idleSec || 0) + (acc[s].idleSec || 0),
         opens: (cur.opens || 0) + (acc[s].opens || 0),
         visits: (cur.visits || 0) + (acc[s].visits || 0),
         last: now(),
@@ -5106,22 +5108,17 @@ function StudentApp({ me, onExit, onGallery }) {
   };
 
   useEffect(() => {
-    const mark = () => { lastEventRef.current = Date.now(); };
-    const evs = ["pointermove", "pointerdown", "keydown", "scroll", "touchstart"];
-    evs.forEach((e) => window.addEventListener(e, mark, { passive: true }));
-    const tick = setInterval(() => {
-      // 화면이 보이는 상태에서 최근 45초 안에 움직임이 있었을 때만 10초를 더함
-      if (document.visibilityState !== "visible") return;
-      if (Date.now() - lastEventRef.current > 45000) return;
-      accAct(tabRef.current, { sec: 10, readSec: openReadingsRef.current > 0 ? 10 : 0 });
-    }, 10000);
+    // 보이는 창에 초점이 있고 최근 조작이 있을 때만 살펴본 시간에 더하고, 켜 둔 채 가만히 있으면 idleSec에 더한다
+    const stopDwell = startDwell((active, sec) => {
+      if (active) accAct(tabRef.current, { sec, readSec: openReadingsRef.current > 0 ? sec : 0 });
+      else accAct(tabRef.current, { idleSec: sec });
+    });
     // 활동 시간만 쌓였을 때도 2분 30초마다 조용히 저장
     const persist = setInterval(() => {
       if (Object.keys(actAccRef.current).length && !dirtyRef.current && !savingRef.current) doSave();
     }, 150000);
     return () => {
-      evs.forEach((e) => window.removeEventListener(e, mark));
-      clearInterval(tick);
+      stopDwell();
       clearInterval(persist);
     };
   }, []);
@@ -5945,10 +5942,10 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
           <div className="card-body">
             <details>
               <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>
-                차시별 살펴본 시간 — 총 {fmtDur(Object.values(ws._act).reduce((a, x) => a + (x.sec || 0), 0))} (읽기 자료 {fmtDur(Object.values(ws._act).reduce((a, x) => a + (x.readSec || 0), 0))})
+                차시별 살펴본 시간 — 총 {fmtDur(Object.values(ws._act).reduce((a, x) => a + (x.sec || 0), 0))} (읽기 자료 {fmtDur(Object.values(ws._act).reduce((a, x) => a + (x.readSec || 0), 0))}, 켜 둔 채 비활동 {fmtDur(Object.values(ws._act).reduce((a, x) => a + (x.idleSec || 0), 0))})
               </summary>
               <table className="tbl" style={{ marginTop: 10 }}>
-                <thead><tr><th>차시</th><th>화면에 머문 시간</th><th>읽기 자료를 열어 둔 시간</th><th>자료 연 횟수</th><th>다녀간 횟수</th></tr></thead>
+                <thead><tr><th>차시</th><th>살펴본 시간</th><th>읽기 자료를 열어 둔 시간</th><th>켜 둔 채 비활동</th><th>자료 연 횟수</th><th>다녀간 횟수</th></tr></thead>
                 <tbody>
                   {SESSIONS.map((s) => {
                     const a = ws._act[s];
@@ -5958,6 +5955,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
                         <td className="mono">{s}</td>
                         <td className="mono">{fmtDur(a.sec)}</td>
                         <td className="mono">{fmtDur(a.readSec)}</td>
+                        <td className="mono">{fmtDur(a.idleSec)}</td>
                         <td className="mono">{a.opens || 0}회</td>
                         <td className="mono">{a.visits || 0}회</td>
                       </tr>
@@ -5965,7 +5963,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
                   })}
                 </tbody>
               </table>
-              <p className="hint" style={{ marginTop: 8 }}>마우스·키보드·스크롤이 움직인 시간만 셉니다. 화면을 켜 두고 자리를 비운 시간은 들어가지 않습니다. 읽는 시간이 짧은데 답이 길면 다른 곳에서 옮겨 왔을 가능성도 함께 살핍니다.</p>
+              <p className="hint" style={{ marginTop: 8 }}>살펴본 시간은 창에 초점이 있고 30초 안에 움직임, 2분 안에 클릭·키 입력·스크롤이 있던 5초 단위만 셉니다. 마우스만 흔들거나 화면을 켜 두고 자리를 비운 시간은 「켜 둔 채 비활동」으로 따로 세고, 다른 창을 앞에 둔 시간은 어디에도 넣지 않습니다. 읽는 시간이 짧은데 답이 길면 다른 곳에서 옮겨 왔을 가능성도 함께 살핍니다.</p>
             </details>
           </div>
         </div>
@@ -7469,8 +7467,9 @@ const RESEARCH_VARS = [
   { k: "cr_multimodal", name: "창의성:모으기의 폭", unit: "0–100", def: "사진·소리·스케치·영상·링크의 고른 사용", get: (c) => c.ax.multimodal },
   { k: "media_n", name: "멀티모달 자료 수", unit: "건", def: "기록지에 올린 사진·음성·스케치·영상의 총 건수", get: (c) => mediaCount(c.ws) },
   { k: "edit_n", name: "고쳐 쓴 횟수", unit: "회", def: "자동 저장이 남긴 수정 이력의 건수", get: (c) => (c.ws._log || []).length },
-  { k: "dwell_min", name: "머문 시간", unit: "분", def: "화면이 보이고 조작이 있던 시간의 합", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60) },
-  { k: "read_min", name: "읽기 자료 열람", unit: "분", def: "강의 노트를 펼쳐 둔 채 머문 시간", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.readSec || 0), 0) / 60) },
+  { k: "dwell_min", name: "머문 시간", unit: "분", def: "창에 초점이 있고 30초 안에 움직임·2분 안에 클릭·키·스크롤이 있던 5초 단위의 합", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60) },
+  { k: "read_min", name: "읽기 자료 열람", unit: "분", def: "강의 노트를 펼쳐 둔 채 머문 시간(같은 판정)", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.readSec || 0), 0) / 60) },
+  { k: "idle_min", name: "켜 둔 채 비활동", unit: "분", def: "창은 보이고 초점도 있으나 조작 조건에 못 미친 5초 단위의 합 — 머문 시간에서 걸러 낸 양", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.idleSec || 0), 0) / 60) },
   { k: "rubric_mean", name: "루브릭 평균", unit: "1–3", def: "성취기준 4개 등급(상3·중2·하1)의 평균", get: (c) => {
     const vs = [0, 1, 2, 3].map((i) => GRADE_NUM[(c.g || {})["r" + i]]).filter((x) => x != null);
     return vs.length ? Math.round((vs.reduce((a, b) => a + b, 0) / vs.length) * 100) / 100 : null;
@@ -7563,7 +7562,7 @@ const VAR_NEED = {
   src_ratio: "paste", byte_ratio: "paste", approp: "paste", paste_settle: "paste", ai_type: "paste",
   src_named_n: "paste", src_ai_n: "paste", src_net_n: "paste", ai_byte_ratio: "paste",
   prompt_n: "prompt", prompt_growth: "prompt", prompt_step: "prompt", prompt_even: "prompt", plan_gap: "prompt",
-  edit_n: "log", dwell_min: "log", read_min: "log",
+  edit_n: "log", dwell_min: "log", read_min: "log", idle_min: "log",
   rewrite_depth: "log", rewrite_deep_n: "log", trace_pruned: "log",
   survey_pre: "survey", survey_post: "survey",
   media_n: "media", cr_multimodal: "media",
@@ -8010,7 +8009,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 붙여넣기 기록 (기록 칸에 20자 이상이 붙여넣어진 시각·칸·글자 수·UTF-8 바이트 수·붙이기 직전 그 칸의 길이·앞 120자. 클립보드 전문은 저장하지 않으며, 출처는 수집하지 않는다)");
     L.push("- 생성 회차마다 실제로 사용한 프롬프트 전문");
     L.push("- 항목별 최초·최종 입력 시각과 편집 횟수");
-    L.push("- 차시별 머문 시간과 강의 노트 열람 시간 (조작이 있는 동안만 누적)");
+    L.push("- 차시별 머문 시간과 강의 노트 열람 시간 (창에 초점이 있고 30초 안에 움직임, 2분 안에 클릭·키 입력·스크롤이 있던 5초 단위만 누적. 조건에 못 미친 시간은 「켜 둔 채 비활동」으로 따로 누적)");
     L.push("- 관찰 사진·현장 소리·스케치·전시 영상 등 멀티모달 자료의 건수");
     L.push("- 창의성 인식 설문(사전·사후, 5점 리커트)과 루브릭 등급");
     L.push("");
@@ -8206,7 +8205,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("- 한 학급 " + N + "명의 단일 집단 자료이므로 결과를 다른 학교·학년으로 일반화할 수 없다.");
     L.push("- 구체성 지수는 어휘 사전에 기반한 간이 지표이며 형태소 분석이나 문맥 판단을 하지 않는다.");
-    L.push("- 머문 시간은 조작이 있는 동안만 누적하므로 화면을 보며 생각한 시간은 과소 집계될 수 있다.");
+    L.push("- 머문 시간은 조작이 있는 동안만 누적하므로 화면을 보며 생각한 시간은 과소 집계될 수 있다. 화면을 켜 둔 채 자리를 비우는 일이 잦아 부풀리는 쪽보다 줄이는 쪽을 택했으며, 걸러 낸 양은 「켜 둔 채 비활동」으로 함께 보고한다.");
     L.push("- 계단의 완료 판정은 항목이 채워졌는지만 보고 내용의 질을 보지 않는다.");
     L.push("- 관찰 절차와 드러내는 방법의 선택 분포는 교사가 제시한 다섯·여덟 갈래 안에서만 나온 것이므로, 갈래를 달리 짜면 분포도 달라진다.");
     L.push("- 사전·사후 비교의 t 값과 효과크기는 참고 계산이며 유의확률을 산출하지 않았다.");
@@ -8704,7 +8703,7 @@ function TeacherApp({ onExit, onGallery }) {
   const exportCSV = () => {
     const axesAll = creativityAxesAll(Object.fromEntries(ids.map((id) => [id, wsMap[id] || {}])));
     const head = ["학번", "별명", "진행률(%)", ...SESSIONS.map((s) => s + "(%)"),
-      "변화 쌍", "생성 회차", "고친 요소", "불성립 발견", "근거 있는 불성립", "제외 근거", "동료에게 준 문장", "받은 의견 처리", "반대 근거 쓴 논쟁", "③까지 채운 논쟁", "미디어(사진·음성·스케치·영상)", "고쳐 쓴 횟수", "머문 시간(분)", "읽기 자료 열람(분)",
+      "변화 쌍", "생성 회차", "고친 요소", "불성립 발견", "근거 있는 불성립", "제외 근거", "동료에게 준 문장", "받은 의견 처리", "반대 근거 쓴 논쟁", "③까지 채운 논쟁", "미디어(사진·음성·스케치·영상)", "고쳐 쓴 횟수", "머문 시간(분)", "읽기 자료 열람(분)", "켜 둔 채 비활동(분)",
       ...CREATIVITY_AXES.map((a) => "창의성:" + a.name),
       ...SURVEY_SCALES.map((sc) => "설문사전:" + sc.name), "설문사전:전체",
       ...SURVEY_SCALES.map((sc) => "설문사후:" + sc.name), "설문사후:전체", "설문Δ:전체",
@@ -8723,6 +8722,7 @@ function TeacherApp({ onExit, onGallery }) {
         cv("changed"), cv("rounds"), cv("revised"), cv("notPassed"), cv("ground"), cv("exclude"), cv("peerSent"), cv("peerBack"), cv("counter"), cv("debate"), mediaCount(w), (w._log || []).length,
         Math.round(Object.values(w._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60),
         Math.round(Object.values(w._act || {}).reduce((a, x) => a + (x.readSec || 0), 0) / 60),
+        Math.round(Object.values(w._act || {}).reduce((a, x) => a + (x.idleSec || 0), 0) / 60),
         ...CREATIVITY_AXES.map((a) => (ax[a.key] == null ? "" : ax[a.key])),
         ...SURVEY_SCALES.map((sc) => (sp && sp[sc.k] != null ? round2(sp[sc.k]) : "")),
         sp && sp.total != null ? round2(sp.total) : "",
@@ -9288,6 +9288,7 @@ function buildSampleClass() {
       w._act[sess] = {
         sec: 600 + ((i * 7 + j * 13) % 9) * 240,
         readSec: 180 + ((i * 5 + j) % 6) * 120,
+        idleSec: ((i * 3 + j * 11) % 7) * 150,
         opens: 2 + ((i + j) % 4),
         visits: 1 + ((i + j) % 3),
       };

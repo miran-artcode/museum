@@ -143,6 +143,7 @@ public/img/lessons/    차시 읽기 자료 그림 (학생용 PPT에서 옮겨 �
 src-app.jsx            앱 소스
 src-lessons.jsx        차시별 수업 자료 원본 LESSONS_DEF (읽기 자료·발문·그림·작품 표)
 src-content.jsx        수업 내용 편집 계층 (발문·이론·그림·링크)
+src-dwell.js           살펴본 시간 판정기 (초점·움직임·분명한 조작 조건, 켜 둔 채 비활동 분리)
 src-fb.js              Firebase 연결 계층
 firebase.json          호스팅·규칙 설정
 firestore.rules        접근 권한 규칙
@@ -162,7 +163,7 @@ npx esbuild src-app.jsx --bundle --jsx=automatic --loader:.jsx=jsx --minify --fo
 |---|---|---|---|
 | `meta` | `config` | 차시 공개 설정 | 읽기: 로그인 사용자 / 쓰기: 교사 |
 | `students` | 학번 | 별명 | 읽기: 로그인 사용자 / 쓰기: 본인·교사 |
-| `worksheets` | 학번 | 기록지 전체, 수정 이력 | 본인과 교사만 |
+| `worksheets` | 학번 | 기록지 전체, 수정 이력, 차시별 활동 시간 `_act` (`sec` 살펴본 시간, `readSec` 읽기 자료 열람, `idleSec` 켜 둔 채 비활동, `opens`·`visits`) | 본인과 교사만 |
 | `grades` | 학번 | 루브릭·관찰·피드백 | 읽기: 본인·교사 / 쓰기: 교사 |
 | `surveys` | 학번 | 사전·사후 창의성 설문 (응답·제출 시각·소요 시간) | 본인과 교사만 읽기 / 쓰기: 본인 |
 | `media` | 학번_필드_시각 | 사진·음성·스케치·짧은 영상 (base64, 문서당 1MB 한도) | 쓰기: 본인만 |
