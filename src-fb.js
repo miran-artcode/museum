@@ -111,6 +111,10 @@ function route(key) {
   if (key.startsWith("media:")) return { kind: "doc", path: ["media", safe(key.slice(6))] };
   // 연구 참여 동의 대장 — 교사만 읽고 쓴다 (학생 화면에서는 존재를 알 수 없음)
   if (key.startsWith("research:")) return { kind: "doc", path: ["research", safe(key.slice(9))] };
+  // 상호평가(쌍대비교) — 작품 스냅샷은 학급이 읽고, 평가 기록은 본인·교사만 읽는다 (src-assess-core.js 계약)
+  if (key === "peerRoster") return { kind: "doc", path: ["meta", "peerRoster"] };
+  if (key.startsWith("sub:")) return { kind: "doc", path: ["submissions", safe(key.slice(4))] };
+  if (key.startsWith("assess:")) return { kind: "doc", path: ["assess", safe(key.slice(7))] };
   return { kind: "doc", path: ["misc", safe(key)] };
 }
 
@@ -244,6 +248,25 @@ export const fbStore = {
 
   watchSurveys(cb) {
     return onSnapshot(collection(db, "surveys"), (snap) => {
+      const out = {};
+      snap.forEach((d) => { const x = d.data(); out[d.id] = x && x.v !== undefined ? x.v : x; });
+      cb(out);
+    }, () => {});
+  },
+
+  /* 컬렉션 전체 읽기·구독 — 상호평가의 제출(submissions)과 평가 기록(assess)에 쓴다.
+     읽기 권한이 없는 문서가 섞이면 쿼리 전체가 거부되므로, 학생은 submissions만 부를 수 있다. */
+  async allOf(name) {
+    try {
+      const snap = await getDocs(collection(db, safe(name)));
+      const out = {};
+      snap.forEach((d) => { const x = d.data(); out[d.id] = x && x.v !== undefined ? x.v : x; });
+      return out;
+    } catch (e) { console.error("allOf fail", name, e); return {}; }
+  },
+
+  watchCollection(name, cb) {
+    return onSnapshot(collection(db, safe(name)), (snap) => {
       const out = {};
       snap.forEach((d) => { const x = d.data(); out[d.id] = x && x.v !== undefined ? x.v : x; });
       cb(out);

@@ -64,6 +64,22 @@ service cloud.firestore {
       allow delete: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher());
     }
 
+    // 상호평가(쌍대비교) — 최종 작품 스냅샷. 비교와 결과 화면을 위해 학급 전체가 읽는다.
+    // 문서 id가 학번이라 표시상 익명·저장상 준익명이다 (설계서 §4.6). 교사 쓰기는 잠금 해제용.
+    match /submissions/{sid} {
+      allow read: if signedIn();
+      allow create, update: if (isOwner(sid) || isTeacher()) && sizeOk();
+      allow delete: if isTeacher();
+    }
+
+    // 상호평가 — 자기평가·판정·집계 결과. 본인과 교사만 읽는다.
+    // 학생은 자기 문서만 쓰고(자기평가·판정), 교사는 집계 결과(result)를 써 넣는다.
+    match /assess/{sid} {
+      allow read: if isOwner(sid) || isTeacher();
+      allow create, update: if (isOwner(sid) || isTeacher()) && sizeOk();
+      allow delete: if isTeacher();
+    }
+
     // 연구 참여 동의 대장: 교사만 읽고 쓴다.
     // 명부(students)에 두지 않는 이유 — 명부는 로그인한 학생 모두가 읽으므로
     // 누가 연구에서 빠졌는지가 학생끼리 보이게 된다. 동의 여부는 학생 사이에 드러나서는 안 된다.
