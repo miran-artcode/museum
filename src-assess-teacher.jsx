@@ -22,6 +22,7 @@ import {
   peerCfg, subReady, makePlan, aggregate, judgeBlockOf, myPairs,
   csvSubmissions, csvJudgements, csvSelf, csvScores, csvJudges, buildSampleAssess, fmtNum,
 } from "./src-assess-core.mjs";
+import { AssessPreviewPage } from "./src-assess-preview.jsx";
 
 const SPLIT_REPS = 25;          // 반분 신뢰도 반복 수 — 교사 브라우저에서 몇 초 안에 끝나는 크기
 /* 두 층의 기준을 구분해 보여 준다 — 공개 보류 권고(QUALITY_MIN, core가 ok/reasons를 만든다)와
@@ -188,6 +189,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
   /* ---- 단계 스위치 ---- */
   const [stageBusy, setStageBusy] = useState(false);
   const [note, setNote] = useState(null);       // { kind: "ok" | "warn", text }
+  const [preview, setPreview] = useState(false); // 학생 화면 미리 보기 페이지가 열려 있는가
   const [agg, setAgg] = useState(null);
   const [aggAt, setAggAt] = useState(null);
   const shownAgg = sampleMode ? sampleAgg : agg;
@@ -379,17 +381,24 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     </div></div>;
   }
 
+  /* 학생 화면 미리 보기 — 같은 컴포넌트 안에서 바꿔 끼우므로 구독과 예약된 설정 저장이 끊기지 않는다 */
+  if (preview) return <AssessPreviewPage cfg={live} onBack={() => setPreview(false)} />;
+
   return (
     <div className="at-panel">
       {subErr && <div className="warn-note">{subErr}</div>}
       {note && <div className={note.kind === "warn" ? "warn-note" : "ok-note"}>{note.text}</div>}
+      <div className="at-row at-preview">
+        <button type="button" className="btn small ghost" onClick={() => setPreview(true)}>학생 화면 미리 보기</button>
+        <span className="hint">단계를 열기 전에 학생이 무엇을 보게 되는지 표본 자료로 확인합니다. 아래 설정값이 그대로 반영되고, 저장되지 않습니다.</span>
+      </div>
 
       {/* ---------------- 카드 1 · 단계 ---------------- */}
       <div className="card at-card">
         <div className="card-head"><span className="card-code">상호평가 1</span><span className="card-title">단계: 학급 전체를 한 스위치로</span>
           <span className="card-sess">{cfg.stage}</span></div>
         <div className="card-note">
-          단계는 학급 전체에 한꺼번에 적용됩니다. 앞 단계로 되돌리는 것도 막지 않지만, 학생이 이미 굳힌 제출·판정은 되돌아가지 않습니다.
+          단계는 학급 전체에 한꺼번에 적용됩니다. 앞 단계로 되돌리는 것도 막지 않지만, 학생이 이미 확정한 제출·판정은 되돌아가지 않습니다.
         </div>
         <div className="card-body">
           <div className="seg at-stage">
@@ -440,7 +449,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
             <textarea rows={2} value={live.question || ""} maxLength={300} disabled={sampleMode} onChange={(e) => edit("question", e.target.value)} />
           </div>
           <p className="hint">
-            k와 반복 수는 <b>명단을 확정하는 순간</b> 배정표에 굳습니다. 확정 뒤에 바꾸면 다음 확정부터 적용됩니다.
+            k와 반복 수는 <b>명단을 확정하는 순간</b> 배정표에 고정됩니다. 확정 뒤에 바꾸면 다음 확정부터 적용됩니다.
             작품 n점·판정자 n명이면 작품당 약 2k회 노출됩니다. k=12·24명이면 작품당 24회입니다.
           </p>
         </div>
@@ -702,6 +711,7 @@ const ASSESS_TEACHER_CSS = `
 .at-settings .seg{margin-top:2px}
 .at-q textarea{resize:vertical;min-height:52px}
 .at-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.at-preview{margin-bottom:14px}
 .at-errs{margin:6px 0 0 18px;padding:0}
 .at-errs li{margin:2px 0}
 .at-yes{color:var(--patina);font-weight:500}

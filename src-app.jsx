@@ -643,7 +643,7 @@ const SCHEMA_DEF = [
   },
   {
     id: "s3b", session: "3차시", code: "C", title: "번역 표 (사다리 요약)",
-    note: "아홉 계단의 결론을 세 칸으로 줄여 둡니다. 4차시 유물 설계부터는 이 세 칸을 재료로 씁니다. 사다리를 채웠다면 아래 단추로 가져온 뒤 손봅니다.",
+    note: "아홉 계단의 결론을 세 칸으로 줄여 둡니다. 4차시 유물 설계부터는 이 세 칸을 재료로 씁니다. 사다리를 채웠다면 아래 버튼으로 가져온 뒤 손봅니다.",
     fields: [
       { k: "invisible", t: "text", label: "이 문제에서 겉으로 드러나지 않는 것 (예: 반복된 노동의 시간, 사라진 가게의 기억)", carry: "invisible" },
       { k: "object", t: "text", label: "그 문제의 자리에 실제로 놓여 있는 물건 (예: 손수레 손잡이, 가게 셔터, 방한 장갑)", carry: "object" },
@@ -4792,7 +4792,7 @@ function SurveyCard({ phase, block, onChange, onSubmit, busy, saveInfo }) {
           <button className="btn" disabled={done < total || !extraDone || busy} onClick={onSubmit}>
             {busy ? "제출 중…" : done < total ? "남은 문항 " + (total - done) + "개" : !extraDone ? "돌아보기 문항이 남았습니다" : "제출하기"}
           </button>
-          <span className="hint">모든 문항에 답하면 제출 단추가 켜집니다. 제출한 뒤에는 고칠 수 없습니다.</span>
+          <span className="hint">모든 문항에 답하면 제출 버튼이 활성화됩니다. 제출한 뒤에는 고칠 수 없습니다.</span>
         </div>
       </div>
     </div>
@@ -5960,7 +5960,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
                 차시별 살펴본 시간: 총 {fmtDur(Object.values(ws._act).reduce((a, x) => a + (x.sec || 0), 0))} (읽기 자료 {fmtDur(Object.values(ws._act).reduce((a, x) => a + (x.readSec || 0), 0))}, 켜 둔 채 비활동 {fmtDur(Object.values(ws._act).reduce((a, x) => a + (x.idleSec || 0), 0))})
               </summary>
               <table className="tbl" style={{ marginTop: 10 }}>
-                <thead><tr><th>차시</th><th>살펴본 시간</th><th>읽기 자료를 열어 둔 시간</th><th>켜 둔 채 비활동</th><th>자료 연 횟수</th><th>다녀간 횟수</th></tr></thead>
+                <thead><tr><th>차시</th><th>살펴본 시간</th><th>읽기 자료를 열어 둔 시간</th><th>켜 둔 채 비활동</th><th>자료 연 횟수</th><th>방문 횟수</th></tr></thead>
                 <tbody>
                   {SESSIONS.map((s) => {
                     const a = ws._act[s];
@@ -6110,7 +6110,7 @@ function ApproprScatter({ rows, apMed, srMed, hoverId, setHoverId, onSel }) {
     <div>
       <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", height: "auto" }} role="img" aria-label="가져온 양과 전유율의 학급 분포">
         {/* SVG title은 자식이 문자열 하나여야 한다 — 여러 조각으로 넘기면 React가 그리지 않아
-            마우스 설명과 화면 낭독기 라벨이 통째로 빈다 */}
+            마우스 설명과 스크린리더 라벨이 통째로 빈다 */}
         <title>{"가로: 가져온 글의 비중(%) · 세로: 전유율(%). 점 하나가 학생 한 명. 붙여넣기 기록이 있는 " + pts.length + "명만 나타납니다."}</title>
         <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="var(--line)" strokeWidth={1} />
         <line x1={PAD} y1={PAD} x2={PAD} y2={H - PAD} stroke="var(--line)" strokeWidth={1} />
@@ -6870,7 +6870,7 @@ function TeacherGuide() {
             <div style={{ fontSize: 13, lineHeight: 1.8, marginTop: 10 }}>
               <p style={{ marginBottom: 10 }}>
                 3차시의 기록 B1~B7이 「번역 사다리」입니다. 사회문제를 관찰한 뒤 보이지 않는 대상을 사물의 흔적으로 드러내기까지를 아홉 계단으로 나눈 것으로,
-                각 계단은 앞 계단의 결과물을 재료로 삼습니다. 학생 화면에는 계단 띠가 늘 떠 있어 지금 어느 자리인지, 앞에서 무엇을 가져왔는지 보입니다.
+                각 계단은 앞 계단의 결과물을 재료로 삼습니다. 학생 화면에는 계단 표시줄이 늘 떠 있어 지금 어느 자리인지, 앞에서 무엇을 가져왔는지 보입니다.
               </p>
               <table className="match-tbl">
                 <thead><tr><th style={{ width: 46 }}>계단</th><th style={{ width: 110 }}>하는 일</th><th>수업에서 이끄는 말</th><th style={{ width: 190 }}>교사가 보는 곳</th></tr></thead>
@@ -6947,7 +6947,7 @@ function TeacherGuide() {
                 되돌림이 한 번도 없는 학생에게는 짝을 바꾸어 한 번 더 읽혀 봅니다.
               </p>
               <p>
-                <b>진술은 확정 단추로 남깁니다.</b> 학생이 문장을 고쳐 쓴 뒤 「이 문장으로 확정」을 누르면 그때의 문장이 따로 저장됩니다.
+                <b>진술은 확정 버튼으로 남깁니다.</b> 학생이 문장을 고쳐 쓴 뒤 「이 문장으로 확정」을 누르면 그때의 문장이 따로 저장됩니다.
                 T7의 처음 문장과 T9의 확정 문장을 나란히 놓은 것이 이 단원의 사전·사후 자료가 되고, 그 사이의 버전들이 사고의 이동 경로가 됩니다.
                 수업 중에 “지금 문장으로 한 번 확정해 두세요”라고 한 번만 말해 주면 자료가 훨씬 두꺼워집니다.
               </p>
@@ -9227,7 +9227,7 @@ const SAMPLE_STYLES = [
   [
     "첫째, {R}은 오래 사용된 물건이다. 둘째, 특정 부위에만 마모가 집중되어 있다. 따라서 사용자의 동작을 추정할 수 있다.",
     "첫째, 배경은 중립적이어야 한다. 둘째, 빛은 균일해야 한다. 마지막으로 시점은 눈높이여야 한다. 따라서 발굴 기록 사진의 형식을 그대로 따랐다.",
-    "결론적으로 이 유물은 {P}을 증언한다. 이러한 증언은 물리적 흔적에 근거하기 때문에 설득력을 가진다.",
+    "결론적으로 이 유물은 {P}을 증언한다. 이러한 증언은 물리적 흔적에 근거하기 때문에 설득력이 있다.",
   ],
   [
     "{P}을 겪는 사람의 손이 {R}에 닿는 자리를 먼저 찾았다. 몸이 닿지 않으면 흔적도 생기지 않는다.",
