@@ -304,8 +304,9 @@ function balanceSides(raw, seed, n, ds) {
 }
 
 /* 판정자 한 사람의 화면 순서 — 회차 순서를 seed로 섞고, 반복은 맨 뒤에 붙인다.
-   반복의 원본은 앞쪽 k−3개 가운데서 고른다(사이에 화면이 3개 이상 들어가야 한다). 여러 후보 가운데
-   좌우를 뒤집었을 때 학급 전체의 작품별 좌우 편차 제곱합이 가장 줄어드는 것을 택한다(sideCount는 학급 누적). */
+   반복의 원본은 화면 0~k−3(k−2개) 가운데서 고른다(사이에 화면이 3개 이상 들어가야 한다). 여러 후보 가운데
+   좌우를 뒤집었을 때 학급 전체의 작품별 좌우 편차 제곱합이 가장 줄어드는 것을 택한다(sideCount는 학급 누적).
+   판정자를 차례로 처리하므로 뒤 판정자가 앞 판정자의 선택을 되돌릴 수 없다 — makePlan이 뒤에 재선택 패스를 돈다. */
 function finishJudge(items, sid, seed, repeat, sideCount) {
   const rnd = mulberry32(stableHash(seed + "::order::" + sid));
   const ordered = shuffled(items, rnd).map((it, i) => ({ i, a: it.a, b: it.b, left: it.left, rep: null }));
@@ -402,6 +403,37 @@ export function makePlan({ works, judges, k, repeat = 1, seed }) {
   judgeIds.forEach((sid) => {
     plan[sid] = finishJudge(raw.filter((it) => it.judge === sid), sid, seed, repeat, sideCount);
   });
+  // 반복 원본 재선택 패스 — 판정자 순서 때문에 남은 좌우 편차를 줄인다 (작품 좌우 균형은 반복만 바꾸므로 유지)
+  for (let pass = 0; pass < 10; pass += 1) {
+    let changed = false;
+    judgeIds.forEach((sid) => {
+      const items = plan[sid];
+      const reps = items.filter((it) => it.rep != null);
+      if (!reps.length) return;
+      const k = items.length - reps.length;
+      reps.forEach((rp) => {
+        const L0 = rp.left === "a" ? rp.a : rp.b, R0 = rp.left === "a" ? rp.b : rp.a;
+        sideCount.l[L0] -= 1; sideCount.r[R0] -= 1;
+        let best = rp.rep, bestCost = Infinity;
+        for (let c = 0; c <= k - 3; c += 1) {
+          if (reps.some((o) => o !== rp && o.rep === c)) continue;
+          const o = items[c];
+          const L = o.left === "a" ? o.b : o.a, R = o.left === "a" ? o.a : o.b;
+          const g = (m, key) => m[key] || 0;
+          const cost = (g(sideCount.l, L) + 1 - g(sideCount.r, L)) ** 2 + (g(sideCount.r, R) + 1 - g(sideCount.l, R)) ** 2 + (c === rp.rep ? 0 : 1e-6);
+          if (cost < bestCost) { bestCost = cost; best = c; }
+        }
+        if (best !== rp.rep) {
+          const o = items[best];
+          rp.rep = best; rp.a = o.a; rp.b = o.b; rp.left = o.left === "a" ? "b" : "a";
+          changed = true;
+        }
+        const L1 = rp.left === "a" ? rp.a : rp.b, R1 = rp.left === "a" ? rp.b : rp.a;
+        sideCount.l[L1] = (sideCount.l[L1] || 0) + 1; sideCount.r[R1] = (sideCount.r[R1] || 0) + 1;
+      });
+    });
+    if (!changed) break;
+  }
 
   const stats = planStats(plan, nos, judgeIds);
   const hash = planHash(plan);
@@ -501,10 +533,12 @@ export function pairsForLateJudge({ works, sid, k, repeat = 1, seed }) {
   const nos = list.map((w) => w.no);
   const ds = dSequence(n, kEff, seed);
   if (!ds) return [];
+  const own = (list.find((w) => w.sid === trimStr(sid)) || {}).no || null;
   const j = stableHash(seed + "::late::" + sid) % n;
   const raw = [];
   for (let r = 1; r <= kEff; r += 1) {
     const a = nos[(j + r) % n], b = nos[(j + r + ds[r - 1]) % n];
+    if (a === own || b === own) continue;   // 배정표에 빠진 채 작품은 있는 드문 경우 — 자기 작품은 어떤 경로로도 나오지 않는다
     raw.push({ judge: sid, a, b, r, left: (r + (stableHash(seed + "::lside::" + sid) % 2)) % 2 === 0 ? "a" : "b" });
   }
   return finishJudge(raw, sid, seed, repeat);
@@ -526,7 +560,7 @@ export function judgeBlockOf(doc, roster) {
   const ver = (roster && roster.fixedAt) || null, hash = (roster && roster.hash) || null;
   const matches = (b) => !!b && (b.rosterVer || null) === ver && (b.planHash || null) === hash;
   if (matches(judge.p1)) return { key: "p1", block: judge.p1 };
-  const alt = "r_" + (hash || ver || "0");
+  const alt = "r_" + (hash || "0") + "_" + stableHash(String(ver || "")).toString(16);   // 해시가 우연히 같아도(작품 4점 학급) 옛 블록을 덮지 않도록 명단 시각을 섞는다
   if (matches(judge[alt])) return { key: alt, block: judge[alt] };
   const other = Object.keys(judge).find((k) => k !== "p1" && matches(judge[k]));
   if (other) return { key: other, block: judge[other] };
@@ -541,17 +575,20 @@ export function collectJudgements(assessMap, roster, opts) {
   const stats = (opts && opts.stats) || {};
   stats.dropped = 0; stats.droppedJudges = [];
   if (!roster) return out;
+  const ownNo = {};
+  (roster.works || []).forEach((w) => { if (w && w.sid) ownNo[trimStr(w.sid)] = trimStr(w.no); });
   Object.keys(assessMap || {}).sort(cmp).forEach((sid) => {
     const { block: p } = judgeBlockOf(assessMap[sid], roster);
     if (!p || !Array.isArray(p.items)) return;
     const expected = myPairs(roster, sid);
+    const mine = ownNo[trimStr(sid)] || null;
     const seenI = new Set();
     let dropped = 0;
     p.items.forEach((it) => {
       if (!it || (it.win !== "a" && it.win !== "b") || !it.a || !it.b) { dropped += 1; return; }
       const e = Number.isInteger(it.i) ? expected[it.i] : null;
       const repOk = e && ((e.rep == null && it.rep == null) || (e.rep != null && it.rep != null && e.rep === it.rep));
-      if (!e || seenI.has(it.i) || e.a !== it.a || e.b !== it.b || e.left !== it.left || !repOk) { dropped += 1; return; }
+      if (!e || seenI.has(it.i) || e.a !== it.a || e.b !== it.b || e.left !== it.left || !repOk || (mine && (it.a === mine || it.b === mine))) { dropped += 1; return; }
       seenI.add(it.i);
       const winNo = it.win === "a" ? it.a : it.b;
       out.push({
@@ -632,7 +669,7 @@ export function scaleSeparation(theta, se) {
   const mu = mean(t);
   const varObs = t.reduce((a, x) => a + (x - mu) ** 2, 0) / (t.length - 1);
   const mse = mean(nos.map((no) => se[no] ** 2));
-  if (!(varObs > 0)) return 0;
+  if (!(varObs > 0)) return null;   // 판정이 없거나 모두 같은 값 — 계산되지 않은 것이지 0이 아니다
   return Math.max(0, Math.min(1, (varObs - mse) / varObs));
 }
 
@@ -810,12 +847,13 @@ export function repeatAgreement(judgements) {
 /* 순위·백분위·밴드. 동점은 공동 순위(1 + 자기보다 확실히 높은 작품 수)로 같은 밴드를 받고,
    비교가 한 번도 없었던 작품은 순위를 매기지 않는다(null) — 판정 중간에 집계해도 「하」가 붙지 않도록 */
 export function ranksAndBands(theta, plays) {
-  const nos = Object.keys(theta || {}).filter((no) => Number.isFinite(theta[no]));
+  const all = Object.keys(theta || {}).filter((no) => Number.isFinite(theta[no]));
+  const nos = plays ? all.filter((no) => plays[no] > 0) : all;   // 비교된 적 없는 작품은 분모에서도 뺀다
   const n = nos.length;
   const rank = {}, pct = {}, band = {};
   const top = Math.ceil(n / 3), bottomFrom = n - Math.floor(n / 3);
+  all.forEach((no) => { if (plays && !(plays[no] > 0)) { rank[no] = null; pct[no] = null; band[no] = null; } });
   nos.forEach((no) => {
-    if (plays && !(plays[no] > 0)) { rank[no] = null; pct[no] = null; band[no] = null; return; }
     const above = nos.filter((o) => theta[o] > theta[no] + 1e-9).length;
     const r = above + 1;
     rank[no] = r;
@@ -896,7 +934,7 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
     works.push(row);
     results[sid] = { ...row, aggAt, rosterVer: roster.fixedAt || "", reveal: conf.reveal };
   });
-  works.sort((x, y) => x.rank - y.rank);
+  works.sort((x, y) => (x.rank == null) - (y.rank == null) || (x.rank - y.rank) || cmp(x.no, y.no));
 
   const cautions = [];
   if (!main.length) reasons.push("판정이 아직 없습니다.");
@@ -909,7 +947,8 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
   if (quality.splitHalf.median == null && main.length) cautions.push("반분 신뢰도를 계산할 만큼 판정자가 모이지 않았습니다.");
   if (quality.knowRate != null && quality.knowRate >= 0.2) cautions.push("판정의 " + Math.round(quality.knowRate * 100) + "%에서 「누구 작품인지 알 것 같다」가 표시됐습니다 — 익명성 민감도 분석이 필요합니다.");
   const caution = reasons.length === 0 && cautions.length > 0;
-  Object.keys(results).forEach((sid) => { results[sid].caution = caution; results[sid].ssr = quality.ssr; });
+  // 학생 화면의 주의 문구는 보류 사유가 있는데도 교사가 알고 공개한 경우에도 켜져야 한다
+  Object.keys(results).forEach((sid) => { results[sid].caution = cautions.length > 0 || reasons.length > 0; results[sid].ssr = quality.ssr; });
   return { works, quality, results, ok: reasons.length === 0, caution, reasons, cautions, aggAt };
 }
 
@@ -937,18 +976,28 @@ export function csvJudgements({ roster, assessMap, pidOf }) {
   const head = ["pid", "roster_ver", "valid", "screen_i", "work_a", "work_b", "left", "rep_of", "win", "win_no", "chosen_first", "axis", "vw", "conf", "hard", "know_author", "tag", "ms", "fast_override", "plate_opened", "why_len", "why", "at"];
   const rows = [];
   const J = collectJudgements(assessMap, roster);
-  const cur = new Set(J.map((x) => x.judge + "#" + x.i));
   J.forEach((x) => rows.push([pid(x.judge), roster && roster.fixedAt, 1, x.i, x.a, x.b, x.left, x.rep == null ? "" : x.rep, x.win, x.winNo, x.chosenLeft ? 1 : 0,
     x.axis || "", x.vw, x.conf, x.hard ? 1 : 0, x.knowAuthor ? 1 : 0, x.tag, x.ms, x.fastOverride ? 1 : 0, x.plateOpened ? 1 : 0, x.why.length, x.why, x.at].map(cell)));
+  const ownNo = {};
+  ((roster && roster.works) || []).forEach((w) => { if (w && w.sid) ownNo[trimStr(w.sid)] = trimStr(w.no); });
   Object.keys(assessMap || {}).sort(cmp).forEach((sid) => {
     const judge = (assessMap[sid] && assessMap[sid].judge) || {};
+    const expected = roster ? myPairs(roster, sid) : [];
+    const mine = ownNo[trimStr(sid)] || null;
     Object.keys(judge).sort(cmp).forEach((key) => {
       const b = judge[key];
       if (!b || !Array.isArray(b.items)) return;
       const isCur = roster && (b.rosterVer || null) === (roster.fixedAt || null) && (b.planHash || null) === (roster.hash || null);
+      const seenI = new Set();
       b.items.forEach((it) => {
         if (!it || (it.win !== "a" && it.win !== "b")) return;
-        if (isCur && cur.has(sid + "#" + it.i)) return;   // 위에서 이미 내보낸 유효 판정
+        if (isCur) {
+          // collectJudgements와 같은 규칙으로 "받아들여진 첫 항목"만 건너뛴다 — 같은 i의 중복·변조는 valid=0으로 남긴다
+          const e = Number.isInteger(it.i) ? expected[it.i] : null;
+          const repOk = e && ((e.rep == null && it.rep == null) || (e.rep != null && it.rep != null && e.rep === it.rep));
+          const accepted = !!(e && !seenI.has(it.i) && e.a === it.a && e.b === it.b && e.left === it.left && repOk && !(mine && (it.a === mine || it.b === mine)));
+          if (accepted) { seenI.add(it.i); return; }
+        }
         rows.push([pid(sid), b.rosterVer || "", 0, it.i, it.a, it.b, it.left, it.rep == null ? "" : it.rep, it.win, it.win === "a" ? it.a : it.b, it.win === it.left ? 1 : 0,
           it.axis || "", it.vw, it.conf, it.hard ? 1 : 0, it.knowAuthor ? 1 : 0, it.tag, it.ms, it.fastOverride ? 1 : 0, it.plateOpened ? 1 : 0, trimStr(it.why).length, trimStr(it.why), it.at].map(cell));
       });
@@ -1019,6 +1068,7 @@ export function buildSampleAssess(ids) {
   const fixedAt = "2026-04-02T05:20:00.000Z";
   const cfg = { ...DEFAULT_PEER, stage: "result", k: Math.min(12, Math.max(3, works.length - 1)) };
   const made = makePlan({ works, judges: sids, k: cfg.k, repeat: cfg.repeat, seed: fixedAt });
+  if (made.errors.length) return { roster: null, subMap, assessMap: {}, cfg };   // 표본이 4명 미만이면 명단을 만들 수 없다
   const roster = { ver: ROSTER_VER, fixedAt, seed: fixedAt, k: made.kEff, repeat: cfg.repeat, works, judges: sids, plan: made.plan, hash: made.hash, stats: made.stats };
   const truth = {};
   works.forEach((w, i) => { truth[w.no] = ((stableHash(seed + w.no) % 1000) / 1000 - 0.5) * 3; });

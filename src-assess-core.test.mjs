@@ -386,9 +386,12 @@ test("명단을 다시 확정하면 판정 블록이 새 자리에 쌓이고 옛
   const r2 = { ...r1, fixedAt: "r2", seed: "r2", plan: m2.plan, hash: m2.hash };
   const jb2 = judgeBlockOf(doc, r2);
   assert.equal(jb2.block, null);
-  assert.equal(jb2.key, "r_" + m2.hash);
+  assert.ok(jb2.key.startsWith("r_" + m2.hash + "_"));
   doc.judge[jb2.key] = { rosterVer: "r2", planHash: m2.hash, items: m2.plan[ids[0]].slice(0, 2).map((it) => ({ ...it, win: "b" })), submittedAt: null };
-  assert.equal(judgeBlockOf(doc, r2).key, "r_" + m2.hash);
+  assert.equal(judgeBlockOf(doc, r2).key, jb2.key);
+  // 해시가 같은 다른 명단(작품 4점 학급에서 드물게)도 다른 키를 받는다
+  const r3 = { ...r2, fixedAt: "r3" };
+  assert.notEqual(judgeBlockOf(doc, r3).key, jb2.key);
   assert.equal(collectJudgements({ [ids[0]]: doc }, r2).length, 2);
   assert.equal(collectJudgements({ [ids[0]]: doc }, r1).length, 6);
   const csv = csvJudgements({ roster: r2, assessMap: { [ids[0]]: doc }, pidOf: new Map([[ids[0], "P01"]]) });
@@ -433,4 +436,43 @@ test("문헌 결정 반영 — 태그 다섯 보기, 판단 어려움·작성자
   assert.ok(cj.head.includes("flag") && cj.head.includes("hard_n"));
   const j = csvJudgements({ roster, assessMap, pidOf: (x) => "P" });
   assert.ok(j.head.includes("hard") && j.head.includes("know_author"));
+});
+
+test("전 범위 배정 점검 — n=4~40 · k=10·12 · 20 seed: 오류 없음·연결·노출 2k·좌우 ≤1(반복 포함 ≤2)", () => {
+  for (let n = 4; n <= 40; n += 1) {
+    for (const k0 of [10, 12]) {
+      for (let t = 0; t < 20; t += 1) {
+        const ids = sids(n);
+        const made = makePlan({ works: worksOf(ids), judges: ids, k: k0, repeat: 1, seed: "sweep-" + n + "-" + k0 + "-" + t });
+        assert.deepEqual(made.errors, [], "n=" + n + " k=" + k0 + " t=" + t);
+        assert.equal(made.stats.connected, true);
+        assert.equal(made.stats.exposureMin, 2 * made.kEff);
+        assert.equal(made.stats.exposureMax, 2 * made.kEff);
+        assert.ok(made.stats.sideDevMax <= 1, "sideDev n=" + n + " k=" + k0 + " t=" + t + " = " + made.stats.sideDevMax);
+        assert.ok(made.stats.sideDevMaxRep <= 2, "sideDevRep n=" + n + " k=" + k0 + " t=" + t + " = " + made.stats.sideDevMaxRep);
+      }
+    }
+  }
+});
+
+test("비교 0회 작품은 순위 분모에서 빠지고 표 맨 뒤로, SSR은 판정이 없으면 null, 자기 작품 판정은 어느 경로로도 안 들어온다", () => {
+  const rb = ranksAndBands({ A: 0.5, B: 1, C: 0.2, D: -1 }, { A: 0, B: 3, C: 3, D: 3 });
+  assert.equal(rb.rank.A, null); assert.equal(rb.rank.B, 1); assert.equal(rb.rank.C, 2); assert.equal(rb.pct.C, 0.5);
+  assert.equal(scaleSeparation({ a: 0, b: 0, c: 0 }, { a: 2, b: 2, c: 2 }), null);
+  const { roster, assessMap } = simulate({ n: 8, k: 6 });
+  const empty = aggregate({ roster, assessMap: {}, subMap: {}, cfg: DEFAULT_PEER, splitReps: 3 });
+  assert.equal(empty.quality.ssr, null);
+  assert.equal(empty.reasons.some((r) => r.includes("SSR")), false);
+  // 작품은 있는데 배정표에 없는 학생 — 늦은 판정자 경로에서도 자기 작품은 나오지 않는다
+  const r2 = { ...roster, plan: Object.fromEntries(Object.entries(roster.plan).filter(([sid]) => sid !== roster.works[0].sid)) };
+  const late = myPairs(r2, roster.works[0].sid);
+  assert.ok(late.length > 0);
+  late.forEach((it) => { assert.notEqual(it.a, roster.works[0].no); assert.notEqual(it.b, roster.works[0].no); });
+  // 표는 순위 없는 작품을 맨 뒤에 둔다
+  const one = { [roster.judges[1]]: assessMap[roster.judges[1]] };
+  const agg = aggregate({ roster, assessMap: one, subMap: {}, cfg: DEFAULT_PEER, splitReps: 2 });
+  const ranks = agg.works.map((w) => w.rank);
+  const firstNull = ranks.indexOf(null);
+  assert.ok(firstNull === -1 || ranks.slice(firstNull).every((r) => r == null));
+  assert.equal(buildSampleAssess(sids(3)).roster, null);
 });

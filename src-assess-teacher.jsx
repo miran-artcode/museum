@@ -19,7 +19,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
 import {
   STAGES, STAGE_ORDER, TAG_OPTIONS, ROSTER_VER, FAST_MS, INFIT_BAND, QUALITY_MIN, K_FLOOR,
-  peerCfg, subReady, makePlan, aggregate, judgeBlockOf,
+  peerCfg, subReady, makePlan, aggregate, judgeBlockOf, myPairs,
   csvSubmissions, csvJudgements, csvSelf, csvScores, csvJudges, buildSampleAssess, fmtNum,
 } from "./src-assess-core.mjs";
 
@@ -158,12 +158,13 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     if (saveT.current) { clearTimeout(saveT.current); saveT.current = null; }
     const p = pendingRef.current;
     pendingRef.current = null;
-    if (!p) return null;
+    if (!p) return { pending: false, ok: true, clean: null };
     const clean = sanitize(p, { ...cfgRef.current, ...lastPatchRef.current });
     const ok = await onSaveRef.current(clean);
     setSaveSt(ok === false ? "err" : "saved");
     if (ok !== false) { lastPatchRef.current = { ...lastPatchRef.current, ...clean }; if (!saveT.current) setDraft(null); }
-    return ok !== false ? clean : null;
+    else pendingRef.current = { ...p, ...(pendingRef.current || {}) };   // 실패한 편집은 다시 보낼 수 있게 남긴다
+    return { pending: true, ok: ok !== false, clean };
   };
   // 서버 값이 마지막 패치를 따라잡으면 기억을 비운다
   useEffect(() => {
@@ -241,9 +242,13 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
       "다시 확정하면 새 fixedAt과 해시로 배정이 통째로 바뀝니다. 이미 저장된 판정은 지워지지 않고 그대로 남지만 옛 명단 기준이라 새 집계에 섞이지 않습니다. " +
       "판정을 시작한 학생이 있으면 되도록 하지 마세요.\n\n계속할까요?")) return;
     setFixBusy(true); setFixErrors([]); setNote(null);
-    const saved = await flushPending();
+    const flushed = await flushPending();
+    if (flushed.pending && !flushed.ok) {
+      setFixErrors(["설정(k·반복 등) 저장에 실패해 명단을 확정하지 않았습니다 — 연결을 확인하고 설정이 「저장됨」이 된 뒤 다시 누르세요."]);
+      setFixBusy(false); return;
+    }
     // 화면이 아직 다시 그려지기 전이면 cfgRef가 옛값이다 — 방금 보낸 설정을 얹어 쓴다
-    const c = { ...cfgRef.current, ...lastPatchRef.current, ...(saved || {}) };
+    const c = { ...cfgRef.current, ...lastPatchRef.current, ...(flushed.clean || {}) };
     const fixedAt = new Date().toISOString();
     let res;
     try { res = makePlan({ works, judges: (ids || []).slice(), k: c.k, repeat: c.repeat, seed: fixedAt }); }
@@ -283,7 +288,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     const s1 = a.self && a.self.s1, s2 = a.self && a.self.s2;
     const j = (peer ? judgeBlockOf(a, peer).block : (a.judge && a.judge.p1)) || {};
     const items = j.items || [];
-    const total = peer && peer.plan && Array.isArray(peer.plan[id]) ? peer.plan[id].length : (cfg.k + cfg.repeat);
+    const total = peer ? myPairs(peer, id).length : (cfg.k + cfg.repeat);
     return { id, nick: nickOf(id), s1: !!(s1 && s1.submittedAt), s2: !!(s2 && s2.submittedAt), jDone: !!j.submittedAt, n: items.length, total };
   }), [idsKey, assessMap, peer, cfg.k, cfg.repeat, roster]);
   const nS1 = prog.filter((p) => p.s1).length;
@@ -457,7 +462,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
               <span className="hint">
                 확정 {fmtT(peer.fixedAt)} · 작품 {(peer.works || []).length}점 · 판정자 {(peer.judges || []).length}명 · k {peer.k}+{peer.repeat} · <span className="mono">{peer.hash}</span>
                 {peer.stats ? " · 노출 " + peer.stats.exposureMin + "~" + peer.stats.exposureMax + "회 · 쌍 " + peer.stats.distinctPairs + " · " + (peer.stats.connected ? "연결됨" : "연결되지 않음")
-                  + (peer.stats.sideDevMax != null ? " · 좌우 편차 ≤ " + peer.stats.sideDevMax : "") : ""}
+                  + (peer.stats.sideDevMax != null ? " · 좌우 편차 ≤ " + peer.stats.sideDevMax + (peer.stats.sideDevMaxRep != null ? "(반복 포함 " + peer.stats.sideDevMaxRep + ")" : "") : "") : ""}
               </span>
             ) : <span className="hint">아직 확정된 명단이 없습니다. 제출 마감 뒤 한 번 누릅니다.</span>}
           </div>
@@ -536,7 +541,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
         <div className="card-note">
           승률만 쓰면 센 상대와 붙어 진 작품이 밀립니다. 브래들리–테리 θ 옆에 승/노출을 함께 두어 모형을 몰라도 읽히게 했습니다.
           공개 보류 권고: SSR &lt; {QUALITY_MIN.ssr}, 작품당 비교 &lt; {QUALITY_MIN.perWork}회, 그래프 단절, 배정 밖 판정. SSR {QUALITY_MIN.ssr}~{SSR_ADOPT}는 주의 문구와 함께 공개됩니다.
-          판정자 반분 신뢰도는 반쪽 자료라 낮게 나오는 것이 보통이므로 보고 지표입니다(논문 기준 SSR ≥ {SSR_ADOPT}, 반분 ≥ {SPLIT_ADOPT} — 쌍대비교_구현_근거.md).
+          판정자 반분 신뢰도는 반쪽 자료라 낮게 나오는 것이 보통이므로 합격 기준이 아니라 보고 지표입니다(논문 채택 기준은 SSR ≥ {SSR_ADOPT} — 쌍대비교_구현_근거.md §4).
         </div>
         <div className="card-body">
           <div className="at-row">
@@ -661,7 +666,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
 
       {/* ---------------- 카드 5 · CSV ---------------- */}
       <div className="card at-card">
-        <div className="card-head"><span className="card-code">상호평가 5</span><span className="card-title">CSV — 연구 자료 네 파일</span></div>
+        <div className="card-head"><span className="card-code">상호평가 5</span><span className="card-title">CSV — 연구 자료 다섯 파일</span></div>
         <div className="card-note">
           제출(작품 단위) · 판정(판정 단위, 옛 명단의 판정은 valid=0) · 자기평가(학생×단계) · 집계(작품 점수) · 판정자(적합도·위치·시간). 학번 대신 <b>「연구」 탭과 같은 규칙의 익명 번호</b>(학번 정렬 순 P01…)를 씁니다.
         </div>
@@ -675,7 +680,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
           </div>
           <p className="hint">
             파일 이름은 <span className="mono">상호평가_&lt;종류&gt;_&lt;yymmdd&gt;.csv</span>. 셀 앞의 <span className="mono">'</span>는 수식 주입을 막는 표시이니 그대로 두세요.
-            네 파일에는 학급 전원이 들어갑니다 — 논문용 집계에서는 「연구」 탭의 동의 대장을 기준으로 동의하지 않은 학생의 P 번호를 빼고 쓰세요.
+            다섯 파일에는 학급 전원이 들어갑니다 — 논문용 집계에서는 「연구」 탭의 동의 대장을 기준으로 동의하지 않은 학생의 P 번호를 빼고 쓰세요.
             집계 CSV는 이 화면에서 마지막으로 실행한 집계를 내려받습니다.
           </p>
         </div>

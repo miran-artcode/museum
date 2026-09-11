@@ -153,11 +153,11 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
 
   /* 학급 제출 지도 — 명단이 확정·재확정될 때마다 다시 읽는다(확정 직전에 들어온 제출이 빠지지 않도록).
      실패(null)는 기억하지 않아 다음 호출이 다시 읽고, 이미 있는 지도는 다시 읽는 동안 지우지 않는다 */
-  const [subFail, setSubFail] = useState(false);
+  const [subFail, setSubFail] = useState(0);   // 연속 실패 횟수 — 0이면 정상. 실패마다 늘어 재시도 효과가 다시 돈다
   const subVer = useRef(null);
   const fetchSubs = () => {
     subReq.current = allSubs().then((m) => {
-      if (m) { setSubMap(m); setSubFail(false); } else { setSubFail(true); subReq.current = null; }
+      if (m) { setSubMap(m); setSubFail(0); } else { setSubFail((n) => n + 1); subReq.current = null; }
       return m;
     });
     return subReq.current;
@@ -177,7 +177,7 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
     if (!subFail) return undefined;
     const again = () => { if (sid && stageAtLeast(stage, "self1")) reloadSubs(); };
     window.addEventListener("online", again);
-    const t = setTimeout(again, 6000);
+    const t = setTimeout(again, Math.min(60000, 6000 * 2 ** (subFail - 1)));   // 6초, 12초, 24초… 최대 1분
     return () => { window.removeEventListener("online", again); clearTimeout(t); };
   }, [subFail]); // eslint-disable-line
 
@@ -233,12 +233,12 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
   } else if (cur === "submit" || (stage === "submit" && subDone)) {
     screen = <SubmitScreen sid={sid} ws={ws} sub={sub} roster={roster} stage={stage} sampleMode={sampleMode} onSkip={() => setSkipSub(true)} />;
   } else if (cur === "self1") {
-    screen = <SelfScreen key="s1" sid={sid} phase="s1" block={self.s1} prev={null} n={n} subFail={subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
+    screen = <SelfScreen key="s1" sid={sid} phase="s1" block={self.s1} prev={null} n={n} subFail={!!subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
   } else if (cur === "peer") {
     screen = <PeerScreen key={"p-" + (roster.fixedAt || "") + "-" + (roster.hash || "")} sid={sid} cfg={cfg} roster={roster} jkey={jkey}
-      pairs={pairs} block={p1} subMap={subMap} subFail={subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
+      pairs={pairs} block={p1} subMap={subMap} subFail={!!subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
   } else if (cur === "self2") {
-    screen = <SelfScreen key="s2" sid={sid} phase="s2" block={self.s2} prev={self.s1 || null} n={n} subFail={subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
+    screen = <SelfScreen key="s2" sid={sid} phase="s2" block={self.s2} prev={self.s1 || null} n={n} subFail={!!subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
   } else if (cur === "result") {
     screen = <ResultScreen cfg={cfg} result={assess.result} self={self} />;
   } else {
@@ -611,6 +611,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
   const everOpened = useRef(false);               // 이 쌍에서 작품 캡션을 한 번이라도 펼쳤는가 (도로 접어도 남는다)
   const [seen, setSeen] = useState({ a: false, b: false });
   const [imgs, setImgs] = useState({});           // 작품 번호 → dataURL | null(없음) | undefined(읽는 중)
+  const [reloadTick, setReloadTick] = useState(0); // 「작품 다시 불러오기」를 누른 횟수 — 이미지 읽기를 다시 돌린다
   const startRef = useRef(Date.now());
   const loadedRef = useRef({ a: false, b: false });
   const boxA = useRef(null), boxB = useRef(null);
@@ -650,7 +651,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
       });
     });
     return () => { live = false; };
-  }, [subMap, curKey]); // eslint-disable-line
+  }, [subMap, curKey, reloadTick]); // eslint-disable-line
 
   /* 배정된 작품이 지도에 없으면(확정 직전 제출 등) 한 번 다시 읽는다 */
   const missing = !!(subMap && cur) && (!workOf(cur.a).sub || !workOf(cur.b).sub);
@@ -749,7 +750,8 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
   const pct = N ? Math.round((doneN / N) * 100) : 0;
   const whyLen = why.trim().length;
   const order = cur && cur.left === "b" ? ["b", "a"] : ["a", "b"];
-  const imgMissing = !!cur && (imgs[cur.a] === null || imgs[cur.b] === null);
+  // 이미지가 없다고 확인됐거나, 다시 불러오기를 눌렀는데도 아직 둘 다 뜨지 않았으면 다시 시도 단추를 둔다
+  const imgMissing = !!cur && (imgs[cur.a] === null || imgs[cur.b] === null || (reloadTick > 0 && !bothShown));
 
   /* 컴포넌트가 아니라 조각을 돌려주는 함수다 — 컴포넌트로 두면 이유를 한 글자 칠 때마다
      새 타입이 되어 두 작품이 통째로 다시 붙고 이미지가 깜빡인다 */
@@ -812,7 +814,9 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
           </div>
         )}
         {finished ? (
-          <div className="ok-note" role="status">동료 비교를 마쳤습니다 — {N}쌍 모두 기록되었습니다. 고맙습니다.</div>
+          saveErr
+            ? <div className="warn-note" role="alert">판정은 모두 골랐지만 마지막 판정이 아직 저장되지 않았습니다 — 위의 「다시 저장」을 눌러 주세요.</div>
+            : <div className="ok-note" role="status">동료 비교를 마쳤습니다 — {N}쌍 모두 기록되었습니다. 고맙습니다.</div>
         ) : (
           <>
             <div className="as-q">{cfg.question}</div>
@@ -821,7 +825,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
               <button type="button" className="btn small ghost" aria-expanded={openPlate} onClick={() => setOpenPlate((v) => { if (!v) everOpened.current = true; return !v; })}>
                 {openPlate ? "작품 캡션 접기" : "작품 캡션 보기"}
               </button>
-              {(missing || imgMissing) && <button type="button" className="btn small ghost" onClick={() => { setImgs((m) => { const c = { ...m }; delete c[cur.a]; delete c[cur.b]; return c; }); reloadSubs(); }}>작품 다시 불러오기</button>}
+              {(missing || imgMissing) && <button type="button" className="btn small ghost" onClick={() => { setImgs((m) => { const c = { ...m }; delete c[cur.a]; delete c[cur.b]; return c; }); reloadSubs().finally(() => setReloadTick((t) => t + 1)); }}>작품 다시 불러오기</button>}
               <span className="hint">{canPick || busy ? "먼저 이미지만 보고 판단해도 되고, 작품 캡션을 펼쳐 보고 판단해도 됩니다."
                 : (missing || imgMissing) ? "작품 이미지를 불러오지 못했습니다. 이미지가 없으면 비교할 수 없습니다 — 다시 불러온 뒤에도 안 보이면 선생님께 알려 주세요."
                   : "두 작품을 모두 본 뒤에 고를 수 있습니다."}</span>
@@ -935,7 +939,7 @@ function ResultScreen({ cfg, result, self }) {
         ) : (
           <div>
             {pos ? <div className="as-pos">{pos}</div> : <div className="hint" style={{ marginBottom: 8 }}>이 작품은 아직 비교된 적이 없어 자리를 말할 수 없습니다.</div>}
-            {reveal !== "band" && (
+            {pos && reveal !== "band" && (
               <p className="as-plays">
                 이 작품은 {typeof r.plays === "number" ? r.plays + "번" : "여러 번"} 비교되었고,
                 {typeof r.wins === "number" ? " 그 가운데 " + r.wins + "번" : " 그 가운데 몇 번"} 더 성립하는 쪽으로 골라졌습니다.
