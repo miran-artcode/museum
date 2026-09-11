@@ -265,6 +265,17 @@ export const fbStore = {
     } catch (e) { console.error("allOf fail", name, e); return {}; }
   },
 
+  /* allOf와 같으나 "비어 있음"과 "읽기 실패"를 구분한다 — 학생의 등수 예측 분모처럼
+     실패를 0으로 오인하면 되돌릴 수 없는 곳에서 쓴다 (getSafe와 같은 취지) */
+  async allOfSafe(name) {
+    try {
+      const snap = await getDocs(collection(db, safe(name)));
+      const out = {};
+      snap.forEach((d) => { const x = d.data(); out[d.id] = x && x.v !== undefined ? x.v : x; });
+      return { ok: true, data: out, fromCache: !!(snap.metadata && snap.metadata.fromCache) };
+    } catch (e) { console.error("allOf fail", name, e); return { ok: false, data: null, fromCache: false }; }
+  },
+
   watchCollection(name, cb) {
     return onSnapshot(collection(db, safe(name)), (snap) => {
       const out = {};

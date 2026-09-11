@@ -23,7 +23,7 @@ import { LikertRow } from "./src-survey-ui.jsx";
 import {
   ASSESS_VER, CRITERIA, SELF_ITEMS, SELF_LABELS, CONF_LABELS, CHANGE_CODES,
   stageAtLeast, peerCfg, MIN_WHY_CHANGE, REASON_MAX, DUP_SIM,
-  submissionFromWs, myPairs, simText, predPctOf,
+  submissionFromWs, myPairs, simText, predPctOf, judgeBlockOf,
 } from "./src-assess-core.mjs";
 
 /* ---------- 잔가지 ---------- */
@@ -41,6 +41,8 @@ const SELF_MIN_WHY = 15;        // 자기평가 근거 최소 글자 수 (계약
 const SELF_WHY_MAX = 300;
 const SUB_MAX_PX = 1000;        // 제출 사본의 긴 변
 const SUB_MAX_CHARS = 300000;   // dataURL 글자 수 상한 — 규칙의 문서 크기 상한 안에 넉넉히
+const RANK_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);   // 슬라이더를 실제로 움직이는 키만
+const PAIR_STACK_PX = 640;      // 이 폭 이하에서는 두 작품이 위아래로 놓인다 (CSS의 640px와 같아야 한다)
 
 const STEPS = [
   { k: "submit", label: "제출" }, { k: "self1", label: "자기평가 ①" }, { k: "peer", label: "동료 비교" },
@@ -67,9 +69,15 @@ function loadImg(owner, ref) {
   return imgCache.get(key);
 }
 
-/* 학급 제출 전체 — fbStore.allOf는 메인 세션이 src-fb.js에 붙인다. 아직 없으면 빈 지도 */
-const allSubs = () => (typeof fbStore.allOf === "function" ? fbStore.allOf("submissions") : Promise.resolve({}))
-  .then((m) => (m && typeof m === "object" ? m : {})).catch(() => ({}));
+/* 학급 제출 전체. 읽기 실패는 빈 지도가 아니라 null로 돌려준다 — 빈 지도로 오인하면
+   등수 예측의 분모가 0이 되어 그 문항이 조용히 사라지고, 제출 뒤에는 되돌릴 수 없다 */
+const allSubs = () => {
+  if (typeof fbStore.allOfSafe === "function") {
+    return fbStore.allOfSafe("submissions").then((r) => (r && r.ok && r.data && typeof r.data === "object" ? r.data : null)).catch(() => null);
+  }
+  if (typeof fbStore.allOf === "function") return fbStore.allOf("submissions").then((m) => (m && typeof m === "object" ? m : null)).catch(() => null);
+  return Promise.resolve(null);
+};
 
 /* 제출 사본 만들기 — 긴 변 SUB_MAX_PX, JPEG 품질을 낮춰 가며 SUB_MAX_CHARS 안에 넣는다.
    그래도 크면 한 단계 작은 변으로 다시 시도한다. 비교가 도는 동안 원본이 바뀌어도
@@ -101,16 +109,16 @@ function reencode(dataURL) {
 }
 
 /* 지금 할 일이 없을 때의 안내 — 교사 단계별로 무엇을 기다리는지 말해 준다 */
-function waitNote({ stage, roster, pairs, s2Done }) {
+function waitNote({ stage, roster, pairs, s2Done, noWork }) {
   if (stage === "submit") return "제출을 마쳤습니다. 자기평가는 선생님이 열면 이 자리에 나타납니다.";
-  if (stage === "self1") return "자기평가 ①을 제출했습니다. 동료 비교는 선생님이 열면 이 자리에 나타납니다.";
+  if (stage === "self1") return noWork ? "제출을 건너뛰었습니다. 동료 비교는 선생님이 열면 이 자리에 나타납니다." : "자기평가 ①을 제출했습니다. 동료 비교는 선생님이 열면 이 자리에 나타납니다.";
   if (stage === "peer") {
     if (!roster) return "비교 명단이 아직 확정되지 않았습니다. 선생님이 명단을 확정하면 비교할 쌍이 여기에 나타납니다.";
     if (!pairs.length) return "이번 회차에 배정된 비교 쌍이 없습니다. 선생님께 알려 주세요.";
-    return "동료 비교를 마쳤습니다. 자기평가 ②는 선생님이 열면 이 자리에 나타납니다.";
+    return noWork ? "동료 비교를 마쳤습니다. 제출한 작품이 없어 자기평가와 내 작품 결과는 없습니다." : "동료 비교를 마쳤습니다. 자기평가 ②는 선생님이 열면 이 자리에 나타납니다.";
   }
-  if (stage === "self2") return s2Done ? "자기평가 ②를 제출했습니다. 결과는 선생님이 공개하면 이 자리에 나타납니다." : "지금 할 일이 없습니다.";
-  if (stage === "result") return "공개된 결과가 아직 없습니다. 선생님이 집계를 마치고 공개하면 이 자리에 나타납니다.";
+  if (stage === "self2") return noWork ? "동료 비교를 마쳤습니다. 제출한 작품이 없어 자기평가와 내 작품 결과는 없습니다." : s2Done ? "자기평가 ②를 제출했습니다. 결과는 선생님이 공개하면 이 자리에 나타납니다." : "지금 할 일이 없습니다.";
+  if (stage === "result") return noWork ? "제출한 작품이 없어 내 작품 결과는 없습니다. 판정에 참여해 주어 고맙습니다." : "공개된 결과가 아직 없습니다. 선생님이 집계를 마치고 공개하면 이 자리에 나타납니다.";
   return "지금 할 일이 없습니다. 다음 단계는 선생님이 열면 나타납니다.";
 }
 
@@ -127,7 +135,9 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
   const [sub, setSub] = useState(null);
   const [got, setGot] = useState({ assess: false, sub: false });
   const [slow, setSlow] = useState(false);
-  const [skipSub, setSkipSub] = useState(false);   // 제출 없이 판정에만 참여 — 이 세션에서만 기억
+  /* 제출 없이 판정에만 참여 — 이 브라우저 탭이 살아 있는 동안 기억한다 (아무것도 저장하지 않는다) */
+  const [skipSub, setSkipSubState] = useState(() => { try { return sessionStorage.getItem("as-skip:" + sid) === "1"; } catch (e) { return false; } });
+  const setSkipSub = (v) => { setSkipSubState(v); try { if (v) sessionStorage.setItem("as-skip:" + sid, "1"); else sessionStorage.removeItem("as-skip:" + sid); } catch (e) {} };
   const [subMap, setSubMap] = useState(null);
   const subReq = useRef(null);
 
@@ -141,15 +151,35 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
     return () => { u1(); u2(); u3(); clearTimeout(t); };
   }, [sid, sampleMode]);
 
-  const loadSubs = () => {
-    if (sampleMode) return Promise.resolve({});
-    if (!subReq.current) subReq.current = allSubs().then((m) => { setSubMap(m); return m; });
+  /* 학급 제출 지도 — 명단이 확정·재확정될 때마다 다시 읽는다(확정 직전에 들어온 제출이 빠지지 않도록).
+     실패(null)는 기억하지 않아 다음 호출이 다시 읽고, 이미 있는 지도는 다시 읽는 동안 지우지 않는다 */
+  const [subFail, setSubFail] = useState(false);
+  const subVer = useRef(null);
+  const fetchSubs = () => {
+    subReq.current = allSubs().then((m) => {
+      if (m) { setSubMap(m); setSubFail(false); } else { setSubFail(true); subReq.current = null; }
+      return m;
+    });
     return subReq.current;
   };
-  const reloadSubs = () => { subReq.current = null; setSubMap(null); return loadSubs(); };
-
-  /* 자기평가 단계부터 학급 제출을 한 번 읽는다 — 등수 예측의 n과 비교 화면의 작품 자료 */
-  useEffect(() => { if (sid && stageAtLeast(stage, "self1")) loadSubs(); }, [sid, stage]); // eslint-disable-line
+  const loadSubs = () => {
+    if (sampleMode) return Promise.resolve({});
+    const ver = (roster && roster.fixedAt) || "";
+    if (subReq.current && subVer.current === ver) return subReq.current;
+    subVer.current = ver;
+    return fetchSubs();
+  };
+  const reloadSubs = () => (sampleMode ? Promise.resolve({}) : fetchSubs());
+  const rosterVer = (roster && roster.fixedAt) || "";
+  useEffect(() => { if (sid && stageAtLeast(stage, "self1")) loadSubs(); }, [sid, stage, rosterVer]); // eslint-disable-line
+  // 연결이 돌아오면 실패한 읽기를 다시 시도한다
+  useEffect(() => {
+    if (!subFail) return undefined;
+    const again = () => { if (sid && stageAtLeast(stage, "self1")) reloadSubs(); };
+    window.addEventListener("online", again);
+    const t = setTimeout(again, 6000);
+    return () => { window.removeEventListener("online", again); clearTimeout(t); };
+  }, [subFail]); // eslint-disable-line
 
   const pairs = useMemo(() => {
     if (!roster || !sid) return [];
@@ -159,20 +189,23 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
   if (!sid || stage === "closed") return null;
 
   const self = (assess && assess.self) || {};
-  const p1raw = assess && assess.judge && assess.judge.p1;
-  /* 명단이 다시 확정되면 옛 판정 블록은 이 명단의 것이 아니다 — 처음부터 다시 */
-  const p1 = p1raw && roster && p1raw.rosterVer === (roster.fixedAt || null) && p1raw.planHash === (roster.hash || null) ? p1raw : null;
+  /* 판정 블록은 명단(회차)마다 따로다 — 명단이 다시 확정되면 새 자리에 쌓고 옛 판정은 그대로 남긴다 */
+  const jb = roster ? judgeBlockOf(assess, roster) : { key: "p1", block: null };
+  const p1 = jb.block, jkey = jb.key;
   const subDone = !!(sub && sub.locked);
+  const noWork = skipSub && !subDone;      // 제출하지 않고 판정에만 참여하는 학생
   const s1Done = !!(self.s1 && self.s1.submittedAt);
   const p1Done = !!(p1 && p1.submittedAt);
   const s2Done = !!(self.s2 && self.s2.submittedAt);
-  const hasResult = stage === "result" && !!(assess && assess.result) && cfg.reveal !== "none";
+  const resultOk = !!(assess && assess.result) && (!roster || !assess.result.rosterVer || assess.result.rosterVer === roster.fixedAt);
+  const hasResult = stage === "result" && resultOk && cfg.reveal !== "none";
 
+  /* 자기평가는 제출한 작품이 있어야 한다 — 없는 작품에 점수를 매기게 하면 지어낸 값이 자료에 섞인다 */
   const avail = {
     submit: true,
-    self1: stageAtLeast(stage, "self1"),
+    self1: stageAtLeast(stage, "self1") && subDone,
     peer: stageAtLeast(stage, "peer") && !!roster && pairs.length > 0,
-    self2: stageAtLeast(stage, "self2"),
+    self2: stageAtLeast(stage, "self2") && subDone,
     result: hasResult,
   };
   const done = { submit: subDone || skipSub, self1: s1Done, peer: p1Done, self2: s2Done, result: false };
@@ -182,6 +215,12 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
   const n = roster && roster.fixedAt
     ? (roster.works || []).length
     : subMap ? Object.keys(subMap).filter((k) => subMap[k] && subMap[k].locked).length : null;
+  const subsNote = subFail && !subMap ? (
+    <div className="warn-note" role="alert" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <span style={{ flex: 1, minWidth: 200 }}>우리 반 작품 목록을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요 — 연결되면 다시 시도합니다.</span>
+      <button type="button" className="btn small" onClick={reloadSubs}>다시 불러오기</button>
+    </div>
+  ) : null;
 
   let screen;
   if (!got.assess || !got.sub) {
@@ -194,23 +233,24 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
   } else if (cur === "submit" || (stage === "submit" && subDone)) {
     screen = <SubmitScreen sid={sid} ws={ws} sub={sub} roster={roster} stage={stage} sampleMode={sampleMode} onSkip={() => setSkipSub(true)} />;
   } else if (cur === "self1") {
-    screen = <SelfScreen key="s1" sid={sid} phase="s1" block={self.s1} prev={null} n={n} sampleMode={sampleMode} />;
+    screen = <SelfScreen key="s1" sid={sid} phase="s1" block={self.s1} prev={null} n={n} subFail={subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
   } else if (cur === "peer") {
-    screen = <PeerScreen key={"p-" + (roster.fixedAt || "") + "-" + (roster.hash || "")} sid={sid} cfg={cfg} roster={roster}
-      pairs={pairs} block={p1} subMap={subMap} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
+    screen = <PeerScreen key={"p-" + (roster.fixedAt || "") + "-" + (roster.hash || "")} sid={sid} cfg={cfg} roster={roster} jkey={jkey}
+      pairs={pairs} block={p1} subMap={subMap} subFail={subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
   } else if (cur === "self2") {
-    screen = <SelfScreen key="s2" sid={sid} phase="s2" block={self.s2} prev={self.s1 || null} n={n} sampleMode={sampleMode} />;
+    screen = <SelfScreen key="s2" sid={sid} phase="s2" block={self.s2} prev={self.s1 || null} n={n} subFail={subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
   } else if (cur === "result") {
     screen = <ResultScreen cfg={cfg} result={assess.result} self={self} />;
   } else {
-    screen = <div className="card as-card"><div className="card-body"><div className="ok-note" role="status">{waitNote({ stage, roster, pairs, s2Done })}</div></div></div>;
+    screen = <div className="card as-card"><div className="card-body"><div className="ok-note" role="status">{waitNote({ stage, roster, pairs, s2Done, noWork })}</div></div></div>;
   }
 
   return (
     <div className="as-tab">
       <ol className="as-strip" aria-label="최종 평가 진행">
         {STEPS.map((s) => {
-          const st = s.k === cur ? "cur" : done[s.k] ? (s.k === "submit" && !subDone ? "skip" : "done") : avail[s.k] ? "open" : "lock";
+          const skipped = noWork && (s.k === "submit" || s.k === "self1" || s.k === "self2");
+          const st = s.k === cur ? "cur" : skipped ? "skip" : done[s.k] ? "done" : avail[s.k] ? "open" : "lock";
           const mark = st === "done" ? "✓" : st === "cur" ? "●" : st === "skip" ? "–" : "○";
           const say = st === "done" ? " (마침)" : st === "cur" ? " (지금)" : st === "skip" ? " (건너뜀)" : st === "lock" ? " (아직 열리지 않음)" : "";
           return (
@@ -221,6 +261,7 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
         })}
       </ol>
       {sampleMode && <div className="warn-note">예시 화면입니다 — 여기서는 아무것도 저장되지 않습니다.</div>}
+      {subsNote}
       {screen}
     </div>
   );
@@ -366,7 +407,7 @@ function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }) {
    ②는 ①을 보지 않고 답한 뒤 「현재 점수 확정」으로 굳히고, 그다음에야 ①과 나란히 본다
    ============================================================ */
 
-function SelfScreen({ sid, phase, block, prev, n, sampleMode }) {
+function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMode }) {
   const isS2 = phase === "s2";
   const b = block || {};
   const locked = isS2 && !!b.lockedAt;
@@ -386,7 +427,7 @@ function SelfScreen({ sid, phase, block, prev, n, sampleMode }) {
     if (sampleMode) return "예시 화면에서는 저장되지 않습니다.";
     if (!answered) return "다섯 문항에 모두 답해 주세요.";
     if (why.trim().length < SELF_MIN_WHY) return "근거를 " + SELF_MIN_WHY + "자 이상 적어 주세요.";
-    if (n == null) return "우리 반 작품 수를 세는 중입니다. 잠시 뒤 다시 눌러 주세요.";
+    if (n == null) return subFail ? "우리 반 작품 목록을 불러오지 못해 등수 예측을 받을 수 없습니다. 「다시 불러오기」를 눌러 주세요." : "우리 반 작품 수를 세는 중입니다. 잠시 뒤 다시 눌러 주세요.";
     if (nOk && rank == null) return "등수 예측 손잡이를 움직여 자리를 정해 주세요.";
     return "";
   };
@@ -508,7 +549,11 @@ function SelfScreen({ sid, phase, block, prev, n, sampleMode }) {
             placeholder="예: 손잡이 안쪽만 닳아 있어서 쥐고 쓴 방향이 읽힌다" />
           <span className={"as-count" + (why.trim().length < SELF_MIN_WHY ? " low" : "")}>{why.trim().length} / {SELF_WHY_MAX}</span>
         </div>
-        {n == null ? <p className="hint">우리 반 작품 수를 세는 중…</p> : nOk && (
+        {n == null ? (
+          <p className="hint">{subFail ? "우리 반 작품 목록을 불러오지 못했습니다. " : "우리 반 작품 수를 세는 중… "}
+            {subFail && reloadSubs && <button type="button" className="btn small ghost" onClick={reloadSubs}>다시 불러오기</button>}
+          </p>
+        ) : nOk && (
           <div className="field">
             <label>우리 반 {n}점 가운데 내 작품은 몇 번째쯤일까요? <span className="hint">— 1이 가장 앞</span></label>
             <div className="as-range">
@@ -516,7 +561,7 @@ function SelfScreen({ sid, phase, block, prev, n, sampleMode }) {
               <input type="range" min={1} max={n} step={1} value={rankShown} aria-label="등수 예측" aria-valuetext={rankShown + "번째쯤"}
                 onChange={(e) => { setRank(Number(e.target.value)); setWarn(""); }}
                 onPointerUp={() => setRank((r) => (r == null ? rankShown : r))}
-                onKeyUp={() => setRank((r) => (r == null ? rankShown : r))} />
+                onKeyUp={(e) => { if (!RANK_KEYS.has(e.key)) return; setRank((r) => (r == null ? rankShown : r)); }} />
               <span className="as-rv">{n}</span>
             </div>
             <div className={"as-rank-txt" + (rank == null ? " dim" : "")} aria-live="polite">
@@ -540,7 +585,7 @@ function SelfScreen({ sid, phase, block, prev, n, sampleMode }) {
    3. 동료 비교 — 배정된 쌍을 차례로 판정한다
    ============================================================ */
 
-function PeerScreen({ sid, cfg, roster, pairs, block, subMap, reloadSubs, sampleMode }) {
+function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, reloadSubs, sampleMode }) {
   const N = pairs.length;
   const [items, setItems] = useState(() => (block && Array.isArray(block.items) ? block.items : []));
   const itemsRef = useRef(items);
@@ -560,6 +605,8 @@ function PeerScreen({ sid, cfg, roster, pairs, block, subMap, reloadSubs, sample
   const [busy, setBusy] = useState(false);
   const [saveErr, setSaveErr] = useState(false);
   const [dupOk, setDupOk] = useState(false);      // 중복 이유 경고를 한 번 봤다
+  const [fastOk, setFastOk] = useState(false);    // 「한 번 더 보고」 경고를 한 번 봤다 — 시간은 그대로 재고 표시만 남긴다
+  const everOpened = useRef(false);               // 이 쌍에서 작품 캡션을 한 번이라도 펼쳤는가 (도로 접어도 남는다)
   const [seen, setSeen] = useState({ a: false, b: false });
   const [imgs, setImgs] = useState({});           // 작품 번호 → dataURL | null(없음) | undefined(읽는 중)
   const startRef = useRef(Date.now());
@@ -582,7 +629,8 @@ function PeerScreen({ sid, cfg, roster, pairs, block, subMap, reloadSubs, sample
     startRef.current = Date.now();
     loadedRef.current = { a: false, b: false };
     setWin(null); setConf(null); setWhy(""); setTag(null); setOpenPlate(false);
-    setWarn(""); setDupOk(false); setSeen({ a: false, b: false });
+    setWarn(""); setDupOk(false); setFastOk(false); setSeen({ a: false, b: false });
+    everOpened.current = false;
   }, [curKey]);
 
   /* 지금 쌍과 다음 쌍의 이미지를 미리 읽는다 */
@@ -602,10 +650,18 @@ function PeerScreen({ sid, cfg, roster, pairs, block, subMap, reloadSubs, sample
     return () => { live = false; };
   }, [subMap, curKey]); // eslint-disable-line
 
-  /* 두 작품을 모두 본 뒤에야 고를 수 있다 — 세로 배치(모바일)에서 아래 작품을 안 보고 고르는 일을 막는다.
-     이미지 칸의 60%가 화면에 들어오면 본 것으로 친다. 칸이 화면보다 크면 걸치기만 해도 인정 */
+  /* 배정된 작품이 지도에 없으면(확정 직전 제출 등) 한 번 다시 읽는다 */
+  const missing = !!(subMap && cur) && (!workOf(cur.a).sub || !workOf(cur.b).sub);
+  const reloadedRef = useRef("");
   useEffect(() => {
-    if (!cur) return undefined;
+    if (missing && reloadedRef.current !== curKey) { reloadedRef.current = curKey; reloadSubs(); }
+  }, [missing, curKey]); // eslint-disable-line
+
+  /* 두 작품을 모두 본 뒤에야 고를 수 있다 — 세로 배치(모바일)에서 아래 작품을 안 보고 고르는 일을 막는다.
+     이미지 칸의 60%가 화면에 들어오면 본 것으로 친다. 칸이 화면보다 크면 걸치기만 해도 인정.
+     subMap이 늦게 도착하면 칸이 그때 생기므로 그때 다시 붙인다 */
+  useEffect(() => {
+    if (!cur || !subMap) return undefined;
     if (typeof IntersectionObserver === "undefined") { setSeen({ a: true, b: true }); return undefined; }
     const io = new IntersectionObserver((ents) => {
       ents.forEach((e) => {
@@ -619,7 +675,7 @@ function PeerScreen({ sid, cfg, roster, pairs, block, subMap, reloadSubs, sample
     if (boxA.current) io.observe(boxA.current);
     if (boxB.current) io.observe(boxB.current);
     return () => io.disconnect();
-  }, [curKey]); // eslint-disable-line
+  }, [curKey, !!subMap]); // eslint-disable-line
 
   /* 판정 시간은 두 이미지가 다 뜬 순간부터 잰다. 하나라도 없으면 화면이 뜬 시각이 기준 */
   const onImgLoad = (side) => {
@@ -627,13 +683,14 @@ function PeerScreen({ sid, cfg, roster, pairs, block, subMap, reloadSubs, sample
     if (loadedRef.current.a && loadedRef.current.b) startRef.current = Date.now();
   };
 
-  /* 쌍마다 judge.p1 블록을 통째로 merge — items는 매번 전체를 다시 쓴다.
-     submittedAt은 끝나기 전엔 null로 명시한다: merge라서 안 보내면 옛 명단의 값이 남는다 */
+  /* 쌍마다 이 명단의 판정 블록(judge[jkey])을 통째로 merge — items는 매번 전체를 다시 쓴다.
+     첫 명단은 p1, 명단이 다시 확정되면 다른 키에 쌓여 옛 판정이 남는다.
+     submittedAt은 끝나기 전엔 null로 명시한다: merge라서 안 보내면 이어 쓰기 전 값이 남는다 */
   const persist = async (list, last) => {
     if (sampleMode) return false;
     const payload = {
       ver: ASSESS_VER,
-      judge: { p1: {
+      judge: { [jkey || "p1"]: {
         rosterVer: roster.fixedAt || null, planHash: roster.hash || null,
         k: roster.k != null ? roster.k : cfg.k, repeat: roster.repeat != null ? roster.repeat : cfg.repeat,
         items: list, startedAt: startedAtRef.current, submittedAt: last ? nowISO() : null,
@@ -651,15 +708,21 @@ function PeerScreen({ sid, cfg, roster, pairs, block, subMap, reloadSubs, sample
     if (cfg.askConf && !conf) { setWarn("이 판단을 얼마나 확신하는지 골라 주세요."); return; }
     if (w.length < cfg.minWhy) { setWarn("고른 이유를 " + cfg.minWhy + "자 이상 써 주세요."); return; }
     if (!tag) { setWarn("무엇이 결정적이었는지 하나 고르세요."); return; }
-    if (ms < cfg.minSec * 1000) { setWarn("두 작품을 한 번 더 보고 골라 주세요."); startRef.current = Date.now() - cfg.minSec * 1000; return; }
+    if (!fastOk && ms < cfg.minSec * 1000) { setWarn("두 작품을 한 번 더 보고 골라 주세요. 충분히 봤다면 한 번 더 누르세요."); setFastOk(true); return; }
+    if (!bothShown) { setWarn("두 작품의 이미지가 모두 보여야 고를 수 있습니다. 「작품 다시 불러오기」를 눌러 주세요."); return; }
     const prev3 = items.slice(-3).map((x) => (x && x.why) || "").filter(Boolean);
     if (!dupOk && prev3.some((p) => simText(p, w) >= DUP_SIM)) {
       setWarn("직전에 쓴 이유와 거의 같은 문장입니다. 이 쌍에서 본 것을 적어 주세요. 그래도 넘기려면 한 번 더 누르세요.");
       setDupOk(true); return;
     }
+    /* 실제 배치 축 — 좌우(x)였는지 위아래(y)였는지. 좁은 화면에서는 「왼쪽」이 곧 「위」다 */
+    const ra = boxA.current && boxA.current.getBoundingClientRect(), rb = boxB.current && boxB.current.getBoundingClientRect();
+    const axis = ra && rb && ra.width > 0 ? (Math.abs(ra.left - rb.left) < 2 ? "y" : "x")
+      : (typeof window !== "undefined" && window.innerWidth <= PAIR_STACK_PX ? "y" : "x");
     const rec = {
       i: cur.i != null ? cur.i : doneN, a: cur.a, b: cur.b, left: cur.left || "a", rep: cur.rep == null ? null : cur.rep,
-      win, conf: cfg.askConf ? conf : null, why: w, tag, ms, plateOpened: openPlate, at: nowISO(),
+      win, conf: cfg.askConf ? conf : null, why: w, tag, ms, fastOverride: fastOk && ms < cfg.minSec * 1000,
+      plateOpened: everOpened.current || openPlate, axis, vw: typeof window !== "undefined" ? window.innerWidth : null, at: nowISO(),
     };
     const list = items.concat(rec);
     setItems(list); setBusy(true); setWarn("");
@@ -679,11 +742,12 @@ function PeerScreen({ sid, cfg, roster, pairs, block, subMap, reloadSubs, sample
     );
   }
 
-  const canPick = seen.a && seen.b && !busy;
+  const bothShown = !!cur && !!imgs[cur.a] && !!imgs[cur.b];
+  const canPick = seen.a && seen.b && bothShown && !busy;
   const pct = N ? Math.round((doneN / N) * 100) : 0;
   const whyLen = why.trim().length;
   const order = cur && cur.left === "b" ? ["b", "a"] : ["a", "b"];
-  const missing = cur && (!workOf(cur.a).sub || !workOf(cur.b).sub);
+  const imgMissing = !!cur && (imgs[cur.a] === null || imgs[cur.b] === null);
 
   /* 컴포넌트가 아니라 조각을 돌려주는 함수다 — 컴포넌트로 두면 이유를 한 글자 칠 때마다
      새 타입이 되어 두 작품이 통째로 다시 붙고 이미지가 깜빡인다 */
@@ -751,11 +815,13 @@ function PeerScreen({ sid, cfg, roster, pairs, block, subMap, reloadSubs, sample
             <div className="as-q">{cfg.question}</div>
             <div className="as-pair" role="radiogroup" aria-label="더 성립하는 작품 고르기">{order.map(work)}</div>
             <div className="as-tools">
-              <button type="button" className="btn small ghost" aria-expanded={openPlate} onClick={() => setOpenPlate((v) => !v)}>
+              <button type="button" className="btn small ghost" aria-expanded={openPlate} onClick={() => setOpenPlate((v) => { if (!v) everOpened.current = true; return !v; })}>
                 {openPlate ? "작품 캡션 접기" : "작품 캡션 보기"}
               </button>
-              {missing && <button type="button" className="btn small ghost" onClick={reloadSubs}>작품 다시 불러오기</button>}
-              <span className="hint">{canPick || busy ? "먼저 이미지만 보고 판단해도 되고, 작품 캡션을 펼쳐 보고 판단해도 됩니다." : "두 작품을 모두 본 뒤에 고를 수 있습니다."}</span>
+              {(missing || imgMissing) && <button type="button" className="btn small ghost" onClick={() => { setImgs((m) => { const c = { ...m }; delete c[cur.a]; delete c[cur.b]; return c; }); reloadSubs(); }}>작품 다시 불러오기</button>}
+              <span className="hint">{canPick || busy ? "먼저 이미지만 보고 판단해도 되고, 작품 캡션을 펼쳐 보고 판단해도 됩니다."
+                : (missing || imgMissing) ? "작품 이미지를 불러오지 못했습니다. 이미지가 없으면 비교할 수 없습니다 — 다시 불러온 뒤에도 안 보이면 선생님께 알려 주세요."
+                  : "두 작품을 모두 본 뒤에 고를 수 있습니다."}</span>
             </div>
 
             {cfg.askConf && (
@@ -808,7 +874,9 @@ function ResultScreen({ cfg, result, self }) {
   const reveal = cfg.reveal;
   const n = r.n || 0;
   let pos = null;
-  if (reveal === "band") {
+  if (r.rank == null || r.band == null) {
+    pos = null;   // 비교된 적이 없는 작품 — 자리를 말할 수 없다
+  } else if (reveal === "band") {
     pos = r.band === "상" ? "우리 반에서 위쪽 1/3에 놓였습니다."
       : r.band === "하" ? "우리 반에서 아래쪽 1/3에 놓였습니다."
         : "우리 반에서 가운데에 놓였습니다.";
@@ -844,7 +912,7 @@ function ResultScreen({ cfg, result, self }) {
         <span className="card-sess">{fmtT(r.aggAt)} 집계</span></div>
       <div className="card-note">같은 반 친구들이 두 작품씩 견주며 남긴 판단을 모은 것입니다. 누가 어떻게 판정했는지는 나오지 않습니다.</div>
       <div className="card-body">
-        {pos && <div className="as-pos">{pos}</div>}
+        {pos ? <div className="as-pos">{pos}</div> : <div className="hint" style={{ marginBottom: 8 }}>이 작품은 아직 비교된 적이 없어 자리를 말할 수 없습니다.</div>}
         <p className="as-plays">
           이 작품은 {typeof r.plays === "number" ? r.plays + "번" : "여러 번"} 비교되었고,
           {typeof r.wins === "number" ? " 그 가운데 " + r.wins + "번" : " 그 가운데 몇 번"} 더 성립하는 쪽으로 골라졌습니다.

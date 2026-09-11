@@ -65,19 +65,35 @@ service cloud.firestore {
     }
 
     // 상호평가(쌍대비교) — 최종 작품 스냅샷. 비교와 결과 화면을 위해 학급 전체가 읽는다.
-    // 문서 id가 학번이라 표시상 익명·저장상 준익명이다 (설계서 §4.6). 교사 쓰기는 잠금 해제용.
+    // 문서 id가 학번이라 표시상 익명·저장상 준익명이다 (설계서 §4.6).
+    // 확정(locked)된 제출은 학생이 고칠 수 없다 — 비교 도중 작품이 바뀌면 판정자마다 다른 작품을 본 것이 된다.
+    // 해제는 교사만 한다 (locked:false를 써 넣으면 학생이 다시 고쳐 제출할 수 있다).
     match /submissions/{sid} {
       allow read: if signedIn();
-      allow create, update: if (isOwner(sid) || isTeacher()) && sizeOk();
+      allow create: if (isOwner(sid) || isTeacher()) && sizeOk();
+      allow update: if sizeOk() && (isTeacher() || (isOwner(sid) && resource.data.get('v', {}).get('locked', false) != true));
       allow delete: if isTeacher();
     }
 
     // 상호평가 — 자기평가·판정·집계 결과. 본인과 교사만 읽는다.
-    // 학생은 자기 문서만 쓰고(자기평가·판정), 교사는 집계 결과(result)를 써 넣는다.
+    // 교사는 무엇이든 쓴다(집계 결과 result 포함). 학생은 자기 문서의 self·judge만 쓰고,
+    // result는 만들지도 바꾸지도 못하며, 제출을 마친 자기평가 ①은 다시 고칠 수 없다(사전·사후 동일성).
+    function assessV(res) {
+      return res.data.get('v', {});
+    }
+    function s1Kept() {
+      let before = assessV(resource).get('self', {}).get('s1', {});
+      let after = assessV(request.resource).get('self', {}).get('s1', {});
+      return before.get('submittedAt', null) == null || after == before;
+    }
     match /assess/{sid} {
       allow read: if isOwner(sid) || isTeacher();
-      allow create, update: if (isOwner(sid) || isTeacher()) && sizeOk();
       allow delete: if isTeacher();
+      allow create, update: if isTeacher() && sizeOk();
+      allow create: if isOwner(sid) && sizeOk() && !('result' in assessV(request.resource));
+      allow update: if isOwner(sid) && sizeOk()
+                    && !assessV(request.resource).diff(assessV(resource)).affectedKeys().hasAny(['result'])
+                    && s1Kept();
     }
 
     // 연구 참여 동의 대장: 교사만 읽고 쓴다.

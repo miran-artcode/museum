@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   makePlan, validatePlan, pairsForLateJudge, myPairs, planHash, dSequence,
   bradleyTerry, scaleSeparation, splitHalf, judgeFit, positionBias, connectivity, repeatAgreement, ranksAndBands,
-  collectJudgements, aggregate, csvJudgements, csvScores, csvSelf, csvSubmissions, buildSampleAssess,
+  collectJudgements, aggregate, csvJudgements, csvScores, csvSelf, csvSubmissions, csvJudges, buildSampleAssess, judgeBlockOf,
   wilson, predPctOf, simText, submissionFromWs, subReady, stableHash, peerCfg, DEFAULT_PEER,
 } from "./src-assess-core.mjs";
 
@@ -40,9 +40,9 @@ test("24명·24작품·k=12 — 자기 작품 없음, 판정자 안 중복 쌍 �
       if (it.rep == null) { assert.equal(keys.has(pairKey(it.a, it.b)), false); keys.add(pairKey(it.a, it.b)); }
     });
     const rep = items[12];
-    assert.equal(rep.rep, 0);
-    assert.equal(pairKey(rep.a, rep.b), pairKey(items[0].a, items[0].b));
-    assert.notEqual(rep.left, items[0].left);
+    assert.ok(rep.rep >= 0 && rep.rep <= 9, "반복 원본은 앞쪽 k-3개 안에서 고른다");   // 사이에 3화면 이상
+    assert.equal(pairKey(rep.a, rep.b), pairKey(items[rep.rep].a, items[rep.rep].b));
+    assert.notEqual(rep.left, items[rep.rep].left);
   });
   const ex = exposures(made.plan);
   works.forEach((w) => assert.equal(ex[w.no], 24));
@@ -51,6 +51,7 @@ test("24명·24작품·k=12 — 자기 작품 없음, 판정자 안 중복 쌍 �
   assert.equal(made.stats.exposureMax, 24);
   assert.ok(made.stats.distinctPairs >= 24 * 12 / 2, "쌍의 종류가 충분히 다양해야 한다");
   assert.ok(made.stats.sideDevMax <= 1, "작품별 좌우 차이 " + made.stats.sideDevMax);
+  assert.ok(made.stats.sideDevMaxRep <= 2, "반복 포함 작품별 좌우 차이 " + made.stats.sideDevMaxRep);
   assert.ok(made.stats.judgeSideDevMax <= 2, "판정자별 좌우 차이 " + made.stats.judgeSideDevMax);
   assert.match(made.hash, /^[0-9a-f]{8}$/);
 });
@@ -165,7 +166,7 @@ function simulate({ n = 24, k = 12, seed = "sim", noise = 1.0, judgeNoise = 0.6 
       const P = 1 / (1 + Math.exp(-((truth[it.a] - truth[it.b]) / noise + jn * 0)));
       return { ...it, win: rnd() < P ? "a" : "b", conf: 3, why: "이유 " + it.i + " 손잡이 마모가 쓰임과 이어져서", tag: "cause", ms: 12000, plateOpened: false, at: "t" };
     });
-    assessMap[sid] = { self: {}, judge: { p1: { rosterVer: seed, items, submittedAt: "t" } } };
+    assessMap[sid] = { self: {}, judge: { p1: { rosterVer: seed, planHash: made.hash, items, submittedAt: "t" } } };
   });
   const roster = { fixedAt: seed, seed, k, repeat: 1, works, judges: ids, plan: made.plan, hash: made.hash };
   return { ids, works, roster, assessMap, truth };
@@ -326,4 +327,86 @@ test("제출 초안과 준비 판정, 설정 기본값", () => {
   assert.equal(peerCfg(null).k, 12);
   assert.equal(peerCfg({ peer: { k: 8 } }).k, 8);
   assert.equal(peerCfg({ peer: { k: 8 } }).stage, "closed");
+});
+
+test("작은 학급(4점·k=3)과 최소 k=4에서도 200개 seed 모두 배정이 만들어지고 그래프가 이어진다", () => {
+  for (let t = 0; t < 200; t += 1) {
+    const seed = "2026-09-10T0" + (t % 10) + ":" + String(t).padStart(2, "0") + ":00.000Z";
+    const ids4 = sids(4);
+    const m4 = makePlan({ works: worksOf(ids4), judges: ids4, k: 3, repeat: 1, seed });
+    assert.deepEqual(m4.errors, [], "n=4 seed " + seed);
+    assert.equal(m4.stats.connected, true);
+    const ids30 = sids(30);
+    const m30 = makePlan({ works: worksOf(ids30), judges: ids30, k: 4, repeat: 1, seed });
+    assert.deepEqual(m30.errors, [], "n=30 k=4 seed " + seed);
+    assert.equal(m30.stats.connected, true);
+  }
+});
+
+test("배정표와 맞지 않는 판정(자기 작품 끼워 넣기 등)은 집계에서 걸러진다", () => {
+  const { works, roster, assessMap } = simulate({ noise: 0.5 });
+  const worst = works[0];                              // 진짜 최하위
+  const honest = aggregate({ roster, assessMap, subMap: {}, cfg: DEFAULT_PEER, splitReps: 3 });
+  const forged = structuredClone(assessMap);
+  const others = works.slice(1).map((w) => w.no);
+  const fake = Array.from({ length: 60 }, (_, i) => ({ i: 100 + i, a: worst.no, b: others[i % others.length], left: "a", rep: null, win: "a", conf: 5, why: "내 작품이 최고다 정말로 그렇다", tag: "veri", ms: 9000, plateOpened: false, at: "t" }));
+  forged[worst.sid].judge.p1.items = forged[worst.sid].judge.p1.items.concat(fake);
+  const stats = {};
+  const J = collectJudgements(forged, roster, { stats });
+  assert.equal(stats.dropped, 60);
+  assert.deepEqual(stats.droppedJudges, [worst.sid]);
+  assert.equal(J.filter((x) => x.judge === worst.sid).length, 13);
+  const agg = aggregate({ roster, assessMap: forged, subMap: {}, cfg: DEFAULT_PEER, splitReps: 3 });
+  assert.equal(agg.results[worst.sid].rank, honest.results[worst.sid].rank);
+  assert.equal(agg.quality.droppedN, 60);
+  assert.ok(agg.reasons.some((r) => r.includes("배정표와 맞지 않는")));
+  // 명단 해시가 없는 블록도 이 명단의 것이 아니다
+  const noHash = structuredClone(assessMap);
+  delete noHash[works[1].sid].judge.p1.planHash;
+  assert.equal(collectJudgements(noHash, roster).filter((x) => x.judge === works[1].sid).length, 0);
+});
+
+test("동점은 공동 순위·같은 밴드, 비교 0회는 순위 없음", () => {
+  const rb = ranksAndBands({ A: 1, B: 1, C: 0.2, D: -0.5, E: -0.5, F: -1 }, { A: 3, B: 3, C: 3, D: 3, E: 3, F: 0 });
+  assert.equal(rb.rank.A, 1); assert.equal(rb.rank.B, 1); assert.equal(rb.rank.C, 3);
+  assert.equal(rb.band.A, rb.band.B);
+  assert.equal(rb.rank.D, rb.rank.E); assert.equal(rb.band.D, rb.band.E);
+  assert.equal(rb.rank.F, null); assert.equal(rb.band.F, null); assert.equal(rb.pct.F, null);
+});
+
+test("명단을 다시 확정하면 판정 블록이 새 자리에 쌓이고 옛 블록은 남는다", () => {
+  const ids = sids(8);
+  const works = worksOf(ids);
+  const m1 = makePlan({ works, judges: ids, k: 5, repeat: 1, seed: "r1" });
+  const r1 = { fixedAt: "r1", seed: "r1", k: 5, repeat: 1, works, judges: ids, plan: m1.plan, hash: m1.hash };
+  const doc = { judge: { p1: { rosterVer: "r1", planHash: m1.hash, items: m1.plan[ids[0]].map((it) => ({ ...it, win: "a" })), submittedAt: "t" } } };
+  assert.equal(judgeBlockOf(doc, r1).key, "p1");
+  assert.ok(judgeBlockOf(doc, r1).block);
+  const m2 = makePlan({ works, judges: ids, k: 5, repeat: 1, seed: "r2" });
+  const r2 = { ...r1, fixedAt: "r2", seed: "r2", plan: m2.plan, hash: m2.hash };
+  const jb2 = judgeBlockOf(doc, r2);
+  assert.equal(jb2.block, null);
+  assert.equal(jb2.key, "r_" + m2.hash);
+  doc.judge[jb2.key] = { rosterVer: "r2", planHash: m2.hash, items: m2.plan[ids[0]].slice(0, 2).map((it) => ({ ...it, win: "b" })), submittedAt: null };
+  assert.equal(judgeBlockOf(doc, r2).key, "r_" + m2.hash);
+  assert.equal(collectJudgements({ [ids[0]]: doc }, r2).length, 2);
+  assert.equal(collectJudgements({ [ids[0]]: doc }, r1).length, 6);
+  const csv = csvJudgements({ roster: r2, assessMap: { [ids[0]]: doc }, pidOf: new Map([[ids[0], "P01"]]) });
+  assert.equal(csv.rows.filter((r) => r[2] === 1).length, 2);   // valid=1 은 새 명단의 것
+  assert.equal(csv.rows.filter((r) => r[2] === 0).length, 6);   // 옛 명단의 것은 valid=0으로 남는다
+  assert.equal(new Set(csv.rows.map((r) => r[1])).size, 2);
+});
+
+test("위치 편향은 축(좌우·위아래)별로 나뉘고 판정자 CSV가 만들어진다", () => {
+  const { roster, assessMap } = simulate({ n: 8, k: 6 });
+  const sid = Object.keys(assessMap)[0];
+  assessMap[sid].judge.p1.items = assessMap[sid].judge.p1.items.map((it, i) => ({ ...it, axis: i % 2 ? "y" : "x", vw: 390 }));
+  const J = collectJudgements(assessMap, roster);
+  const pb = positionBias(J);
+  assert.equal(pb.byAxis.x.n + pb.byAxis.y.n + pb.byAxis.unknown.n, pb.n);
+  assert.ok(pb.byAxis.y.n >= 3);
+  const agg = aggregate({ roster, assessMap, subMap: {}, cfg: DEFAULT_PEER, splitReps: 3 });
+  const cj = csvJudges({ agg, pidOf: new Map(Object.keys(assessMap).map((s, i) => [s, "P" + (i + 1)])) });
+  assert.equal(cj.rows.length, 8);
+  assert.equal(cj.head[0], "pid");
 });

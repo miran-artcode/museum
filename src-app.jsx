@@ -5042,12 +5042,15 @@ function StudentApp({ me, onExit, onGallery }) {
   const [closeNote, setCloseNote] = useState(null); // 쓰던 차시를 선생님이 닫았을 때의 안내
   const [openMap, setOpenMap] = useState(DEFAULT_OPEN);
   const [tab, setTab] = useState(SESSIONS[0]);
+  /* 「최종 평가」 — 차시 탭과 별개의 화면(src-assess.jsx). 교사가 단계를 닫으면 차시 화면으로 돌아간다 */
+  const [assessOn, setAssessOn] = useState(false);
   useEffect(() => {
     if (loaded && !isOpen(openMap, tab)) {
       flush(); // 닫히기 직전까지 쓴 내용부터 저장
       const first = SESSIONS.find((s) => isOpen(openMap, s));
       if (first) {
-        setCloseNote("선생님이 「" + tab + "」를 닫아 「" + first + "」로 이동했습니다. 쓰던 내용은 저장되어 있습니다.");
+        // 최종 평가 화면을 보는 중이면 차시만 조용히 옮긴다 — 화면은 그대로인데 「이동했습니다」라고 말하면 헷갈린다
+        if (!assessOn) setCloseNote("선생님이 「" + tab + "」를 닫아 「" + first + "」로 이동했습니다. 쓰던 내용은 저장되어 있습니다.");
         setTab(first);
       }
     }
@@ -5059,8 +5062,6 @@ function StudentApp({ me, onExit, onGallery }) {
   const [svCfg, setSvCfg] = useState(DEFAULT_SURVEY);
   const [anCfg, setAnCfg] = useState(DEFAULT_ANCHOR);
   const [cfgAll, setCfgAll] = useState(null);   // 설정 문서 전체 — 붙여넣기 출처 묻기 같은 토글을 읽는다
-  /* 「최종 평가」 — 차시 탭과 별개의 화면(src-assess.jsx). 교사가 단계를 닫으면 차시 화면으로 돌아간다 */
-  const [assessOn, setAssessOn] = useState(false);
   const peerStage = peerCfg(cfgAll).stage;
   useEffect(() => { if (peerStage === "closed") setAssessOn(false); }, [peerStage]);
   const [svBusy, setSvBusy] = useState(false);
@@ -5528,7 +5529,11 @@ function StudentApp({ me, onExit, onGallery }) {
           })}
           {peerStage !== "closed" && (
             <button role="tab" aria-selected={assessOn} className={"sess-tab as-tab " + (assessOn ? "on" : "")} title="최종 평가 — 제출·자기평가·동료 비교"
-              onClick={() => { if (!assessOn) { flush(); setAssessOn(true); window.scrollTo({ top: 0 }); } }}>
+              onClick={() => {
+                if (assessOn) return;
+                if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
+                flush(); setAssessOn(true); window.scrollTo({ top: 0 });
+              }}>
               <span className="dot part" />최종 평가
             </button>
           )}

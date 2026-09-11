@@ -174,25 +174,34 @@ export const subReady = (sub) => !!(sub && sub.locked && trimStr(sub.no) && sub.
 export function dSequence(n, k, seed) {
   const rnd = mulberry32(stableHash(seed + "::d"));
   const cands = shuffled(Array.from({ length: n - 1 }, (_, i) => i + 1), rnd);
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
   const ds = [];
-  const usedClass = new Set();
-  for (let r = 1; r <= k; r += 1) {
-    const ok = (d, strict) => {
-      if ((r + d) % n === 0) return false;
-      for (let q = 1; q < r; q += 1) {
-        const dq = ds[q - 1];
-        if ((d + dq) % n === 0 && ((r - q) % n + n) % n === dq % n) return false;
-      }
-      if (strict && usedClass.has(Math.min(d, n - d))) return false;
-      return true;
-    };
-    let pick = cands.find((d) => ok(d, true));
-    if (pick == null) pick = cands.find((d) => ok(d, false));
-    if (pick == null) pick = cands.find((d) => (r + d) % n !== 0) || 1;
-    ds.push(pick);
-    usedClass.add(Math.min(pick, n - pick));
-  }
-  return ds;
+  const usedClass = new Map();   // 거리 급 → 쓴 횟수
+  const okAt = (r, d) => {
+    if ((r + d) % n === 0) return false;
+    for (let q = 1; q < r; q += 1) {
+      const dq = ds[q - 1];
+      if ((d + dq) % n === 0 && ((r - q) % n + n) % n === dq % n) return false;
+    }
+    return true;
+  };
+  // 깊이 우선 탐색 — 안 쓴 거리 급을 먼저 시도하고, 다 채운 뒤에는 n과 d들의 최대공약수가 1이어야
+  // (순환 그래프가 하나로 이어지는 조건) 받아들인다. 실패하면 되돌아가 다른 d를 시도한다.
+  let budget = 200000;
+  const dfs = (r, g) => {
+    if (budget-- <= 0) return false;
+    if (r > k) return g === 1;
+    const order = [...cands].sort((x, y) => (usedClass.get(Math.min(x, n - x)) || 0) - (usedClass.get(Math.min(y, n - y)) || 0));
+    for (const d of order) {
+      if (!okAt(r, d)) continue;
+      const cls = Math.min(d, n - d);
+      ds.push(d); usedClass.set(cls, (usedClass.get(cls) || 0) + 1);
+      if (dfs(r + 1, gcd(g, d))) return true;
+      ds.pop(); usedClass.set(cls, usedClass.get(cls) - 1);
+    }
+    return false;
+  };
+  return dfs(1, n) ? ds : null;
 }
 
 function normalizeWorks(works) {
@@ -252,8 +261,8 @@ function balanceSides(raw, seed, n, ds) {
       comps.push(present);
     }
     items.filter((it) => it.x == null).forEach((it, idx) => {
-      const costA = Math.abs(g(jl, it.judge) + 1 - g(jr, it.judge)) * 2 + Math.abs(g(wl, it.a) + 1 - g(wr, it.a)) + Math.abs(g(wr, it.b) + 1 - g(wl, it.b));
-      const costB = Math.abs(g(jr, it.judge) + 1 - g(jl, it.judge)) * 2 + Math.abs(g(wr, it.a) + 1 - g(wl, it.a)) + Math.abs(g(wl, it.b) + 1 - g(wr, it.b));
+      const costA = Math.abs(g(jl, it.judge) + 1 - g(jr, it.judge)) + 2 * (Math.abs(g(wl, it.a) + 1 - g(wr, it.a)) + Math.abs(g(wr, it.b) + 1 - g(wl, it.b)));
+      const costB = Math.abs(g(jr, it.judge) + 1 - g(jl, it.judge)) + 2 * (Math.abs(g(wr, it.a) + 1 - g(wl, it.a)) + Math.abs(g(wl, it.b) + 1 - g(wr, it.b)));
       it.left = costA < costB ? "a" : costB < costA ? "b" : stableHash(seed + "::side::" + r + "::" + idx) % 2 === 0 ? "a" : "b";
       noteSide(it);
     });
@@ -283,14 +292,33 @@ function balanceSides(raw, seed, n, ds) {
 }
 
 /* 판정자 한 사람의 화면 순서 — 회차 순서를 seed로 섞고, 반복은 맨 뒤에 붙인다.
-   반복은 첫 화면의 쌍을 좌우만 바꾼 것이라 사이에 k−1개 화면이 들어간다(최소 3개 조건 충족). */
-function finishJudge(items, sid, seed, repeat) {
+   반복의 원본은 앞쪽 k−3개 가운데서 고른다(사이에 화면이 3개 이상 들어가야 한다). 여러 후보 가운데
+   좌우를 뒤집었을 때 학급 전체의 작품별 좌우 편차 제곱합이 가장 줄어드는 것을 택한다(sideCount는 학급 누적). */
+function finishJudge(items, sid, seed, repeat, sideCount) {
   const rnd = mulberry32(stableHash(seed + "::order::" + sid));
   const ordered = shuffled(items, rnd).map((it, i) => ({ i, a: it.a, b: it.b, left: it.left, rep: null }));
   const reps = Math.max(0, Math.min(2, repeat | 0));
-  for (let q = 0; q < reps && ordered.length >= 4 && q < ordered.length; q += 1) {
-    const o = ordered[q];
-    ordered.push({ i: ordered.length, a: o.a, b: o.b, left: o.left === "a" ? "b" : "a", rep: o.i });
+  const k = ordered.length;
+  const sc = sideCount || { l: {}, r: {} };
+  const g = (m, key) => m[key] || 0;
+  const used = new Set();
+  for (let q = 0; q < reps && k >= 4; q += 1) {
+    let best = null, bestCost = Infinity;
+    for (let c = 0; c <= k - 3; c += 1) {
+      if (used.has(c)) continue;
+      const o = ordered[c];
+      const L = o.left === "a" ? o.b : o.a, R = o.left === "a" ? o.a : o.b;   // 뒤집은 뒤의 왼쪽·오른쪽
+      const cost = (g(sc.l, L) + 1 - g(sc.r, L)) ** 2 + (g(sc.r, R) + 1 - g(sc.l, R)) ** 2
+        + (stableHash(seed + "::rep::" + sid + "::" + c) % 97) / 1e5;
+      if (cost < bestCost) { bestCost = cost; best = c; }
+    }
+    if (best == null) break;
+    used.add(best);
+    const o = ordered[best];
+    const rep = { i: ordered.length, a: o.a, b: o.b, left: o.left === "a" ? "b" : "a", rep: o.i };
+    ordered.push(rep);
+    const L = rep.left === "a" ? rep.a : rep.b, R = rep.left === "a" ? rep.b : rep.a;
+    sc.l[L] = g(sc.l, L) + 1; sc.r[R] = g(sc.r, R) + 1;
   }
   return ordered;
 }
@@ -307,6 +335,10 @@ export function makePlan({ works, judges, k, repeat = 1, seed }) {
   const idxOfSid = {};
   list.forEach((w, i) => { idxOfSid[w.sid] = i; });
   const ds = dSequence(n, kEff, seed);
+  if (!ds) {
+    errors.push("배정을 만들지 못했습니다 (작품 " + n + "점 · k " + kEff + "). 판정 수 k를 바꾸거나 다시 확정하세요.");
+    return { plan: {}, hash: "", stats: { n, nJudges: judgeIds.length }, errors, kEff };
+  }
   const raw = [];                 // { judge, a, b, r }
   const exposure = {};
   const pairUse = {};
@@ -348,26 +380,37 @@ export function makePlan({ works, judges, k, repeat = 1, seed }) {
   raw.sort((x, y) => x.r - y.r || cmp(x.judge, y.judge));
   balanceSides(raw, seed, n, ds);
 
-  // 4) 판정자별 순서와 반복
+  // 4) 판정자별 순서와 반복 — 반복의 좌우가 학급 전체 작품 균형을 해치지 않도록 누적을 넘긴다
+  const sideCount = { l: {}, r: {} };
+  raw.forEach((it) => {
+    const L = it.left === "a" ? it.a : it.b, R = it.left === "a" ? it.b : it.a;
+    sideCount.l[L] = (sideCount.l[L] || 0) + 1; sideCount.r[R] = (sideCount.r[R] || 0) + 1;
+  });
   const plan = {};
   judgeIds.forEach((sid) => {
-    plan[sid] = finishJudge(raw.filter((it) => it.judge === sid), sid, seed, repeat);
+    plan[sid] = finishJudge(raw.filter((it) => it.judge === sid), sid, seed, repeat, sideCount);
   });
 
   const stats = planStats(plan, nos, judgeIds);
   const hash = planHash(plan);
   const errs = validatePlan({ plan, works: list, judges: judgeIds, k: kEff, repeat });
+  if (!stats.connected) errs.push("비교 그래프가 하나로 이어지지 않습니다 — k를 올리거나 다시 확정하세요.");
   return { plan, hash, stats: { ...stats, kEff, ds }, errors: errs, kEff };
 }
 
 function planStats(plan, nos, judgeIds) {
   const exposure = {}, leftN = {}, pairs = new Set();
   const adj = {};
-  nos.forEach((no) => { exposure[no] = 0; leftN[no] = 0; adj[no] = new Set(); });
+  const leftAll = {}, expAll = {};
+  nos.forEach((no) => { exposure[no] = 0; leftN[no] = 0; leftAll[no] = 0; expAll[no] = 0; adj[no] = new Set(); });
   let judgeDev = 0;
   judgeIds.forEach((sid) => {
     let l = 0, r = 0;
     (plan[sid] || []).forEach((it) => {
+      const Lx = it.left === "a" ? it.a : it.b;
+      if (leftAll[Lx] != null) leftAll[Lx] += 1;
+      if (expAll[it.a] != null) expAll[it.a] += 1;
+      if (expAll[it.b] != null) expAll[it.b] += 1;
       if (it.rep != null) return;
       exposure[it.a] = (exposure[it.a] || 0) + 1; exposure[it.b] = (exposure[it.b] || 0) + 1;
       const L = it.left === "a" ? it.a : it.b;
@@ -380,6 +423,7 @@ function planStats(plan, nos, judgeIds) {
   });
   const ex = nos.map((no) => exposure[no]);
   const sideDev = Math.max(0, ...nos.map((no) => Math.abs(2 * leftN[no] - exposure[no])));
+  const sideDevRep = Math.max(0, ...nos.map((no) => Math.abs(2 * leftAll[no] - expAll[no])));
   // 연결성 — 비교 그래프가 하나로 이어져야 능력값을 한 척도에 놓을 수 있다 (Ford 1957)
   const seen = new Set();
   const stack = nos.length ? [nos[0]] : [];
@@ -393,7 +437,7 @@ function planStats(plan, nos, judgeIds) {
     n: nos.length, nJudges: judgeIds.length,
     exposureMin: ex.length ? Math.min(...ex) : 0, exposureMax: ex.length ? Math.max(...ex) : 0,
     distinctPairs: pairs.size, connected: seen.size === nos.length,
-    sideDevMax: sideDev, judgeSideDevMax: judgeDev,
+    sideDevMax: sideDev, sideDevMaxRep: sideDevRep, judgeSideDevMax: judgeDev,
   };
 }
 
@@ -444,6 +488,7 @@ export function pairsForLateJudge({ works, sid, k, repeat = 1, seed }) {
   const kEff = Math.max(1, Math.min(k | 0 || 1, n - 1));
   const nos = list.map((w) => w.no);
   const ds = dSequence(n, kEff, seed);
+  if (!ds) return [];
   const j = stableHash(seed + "::late::" + sid) % n;
   const raw = [];
   for (let r = 1; r <= kEff; r += 1) {
@@ -461,25 +506,52 @@ export function myPairs(roster, sid) {
 
 /* ---------- 판정 자료 펼치기 ---------- */
 
-export function collectJudgements(assessMap, roster) {
+/* 명단(회차)에 맞는 판정 블록. 첫 명단은 judge.p1, 명단을 다시 확정하면 judge["r_<해시>"]에 새로 쌓는다 —
+   옛 판정을 덮어쓰지 않기 위해서다(설계 §5 「명단 재확정」). rosterVer와 planHash가 모두 맞아야 이 명단의 것이다.
+   돌려주는 key는 학생 화면이 쓸 자리, block은 이미 쌓인 기록(없으면 null). */
+export function judgeBlockOf(doc, roster) {
+  const judge = (doc && doc.judge) || {};
+  const ver = (roster && roster.fixedAt) || null, hash = (roster && roster.hash) || null;
+  const matches = (b) => !!b && (b.rosterVer || null) === ver && (b.planHash || null) === hash;
+  if (matches(judge.p1)) return { key: "p1", block: judge.p1 };
+  const alt = "r_" + (hash || ver || "0");
+  if (matches(judge[alt])) return { key: alt, block: judge[alt] };
+  const other = Object.keys(judge).find((k) => k !== "p1" && matches(judge[k]));
+  if (other) return { key: other, block: judge[other] };
+  return { key: judge.p1 && (judge.p1.rosterVer || judge.p1.planHash) ? alt : "p1", block: null };
+}
+
+/* 이 명단의 판정만 펼친다. 배정표(myPairs)와 자리·쌍·좌우·반복이 정확히 맞는 항목만 받는다 —
+   학생이 자기 문서에 쓸 수 있으므로 배정에 없는 판정(자기 작품을 넣은 것 등)이 점수를 움직이면 안 된다.
+   opts.stats에 걸러 낸 수(dropped)를 적어 준다. */
+export function collectJudgements(assessMap, roster, opts) {
   const out = [];
-  const ver = roster && roster.fixedAt;
+  const stats = (opts && opts.stats) || {};
+  stats.dropped = 0; stats.droppedJudges = [];
+  if (!roster) return out;
   Object.keys(assessMap || {}).sort(cmp).forEach((sid) => {
-    const doc = assessMap[sid];
-    const p = doc && doc.judge && doc.judge.p1;
+    const { block: p } = judgeBlockOf(assessMap[sid], roster);
     if (!p || !Array.isArray(p.items)) return;
-    if (ver && p.rosterVer && p.rosterVer !== ver) return;   // 옛 명단에서 한 판정은 섞지 않는다
+    const expected = myPairs(roster, sid);
+    const seenI = new Set();
+    let dropped = 0;
     p.items.forEach((it) => {
-      if (!it || (it.win !== "a" && it.win !== "b") || !it.a || !it.b) return;
+      if (!it || (it.win !== "a" && it.win !== "b") || !it.a || !it.b) { dropped += 1; return; }
+      const e = Number.isInteger(it.i) ? expected[it.i] : null;
+      const repOk = e && ((e.rep == null && it.rep == null) || (e.rep != null && it.rep != null && e.rep === it.rep));
+      if (!e || seenI.has(it.i) || e.a !== it.a || e.b !== it.b || e.left !== it.left || !repOk) { dropped += 1; return; }
+      seenI.add(it.i);
       const winNo = it.win === "a" ? it.a : it.b;
       out.push({
         judge: sid, i: it.i, a: it.a, b: it.b, left: it.left, win: it.win, winNo, loseNo: it.win === "a" ? it.b : it.a,
         chosenLeft: it.win === it.left,
         conf: Number.isFinite(it.conf) ? it.conf : null, why: trimStr(it.why), tag: it.tag || "",
-        ms: Number.isFinite(it.ms) ? it.ms : null, plateOpened: !!it.plateOpened,
+        ms: Number.isFinite(it.ms) ? it.ms : null, plateOpened: !!it.plateOpened, fastOverride: !!it.fastOverride,
+        axis: it.axis === "y" ? "y" : it.axis === "x" ? "x" : null, vw: Number.isFinite(it.vw) ? it.vw : null,
         rep: it.rep == null ? null : it.rep, at: it.at || "",
       });
     });
+    if (dropped) { stats.dropped += dropped; stats.droppedJudges.push(sid); }
   });
   return out;
 }
@@ -636,10 +708,23 @@ export function judgeFit(judgements, theta) {
   return out;
 }
 
+/* 위치 편향 — 화면이 좌우(x)였는지 위아래(y, 좁은 화면)였는지를 나눠 센다.
+   전체 값은 축을 모르는 옛 기록까지 포함한 「먼저 놓인 쪽(왼쪽·위)」 선택률이다 */
 export function positionBias(judgements) {
   const main = (judgements || []).filter((J) => J.rep == null && (J.left === "a" || J.left === "b"));
-  const left = main.filter((J) => J.chosenLeft).length;
-  return { n: main.length, left, leftRate: main.length ? left / main.length : null, wilson: wilson(left, main.length) };
+  const one = (arr) => {
+    const first = arr.filter((J) => J.chosenLeft).length;
+    return { n: arr.length, left: first, first, leftRate: arr.length ? first / arr.length : null, rate: arr.length ? first / arr.length : null, wilson: wilson(first, arr.length) };
+  };
+  const all = one(main);
+  return {
+    ...all,
+    byAxis: {
+      x: one(main.filter((J) => J.axis === "x")),
+      y: one(main.filter((J) => J.axis === "y")),
+      unknown: one(main.filter((J) => !J.axis)),
+    },
+  };
 }
 
 /* 연결성 — 무방향 그래프가 하나로 이어지는가, 승→패 방향 그래프가 강하게 이어지는가(전승·전패가 없는가) */
@@ -698,15 +783,20 @@ export function repeatAgreement(judgements) {
   return { n, agree, rate: n ? agree / n : null, wilson: wilson(agree, n) };
 }
 
-export function ranksAndBands(theta) {
-  const nos = Object.keys(theta || {}).sort((x, y) => (theta[y] - theta[x]) || cmp(x, y));
+/* 순위·백분위·밴드. 동점은 공동 순위(1 + 자기보다 확실히 높은 작품 수)로 같은 밴드를 받고,
+   비교가 한 번도 없었던 작품은 순위를 매기지 않는다(null) — 판정 중간에 집계해도 「하」가 붙지 않도록 */
+export function ranksAndBands(theta, plays) {
+  const nos = Object.keys(theta || {}).filter((no) => Number.isFinite(theta[no]));
   const n = nos.length;
   const rank = {}, pct = {}, band = {};
   const top = Math.ceil(n / 3), bottomFrom = n - Math.floor(n / 3);
-  nos.forEach((no, i) => {
-    rank[no] = i + 1;
-    pct[no] = n > 1 ? (n - (i + 1)) / (n - 1) : 0.5;
-    band[no] = i + 1 <= top ? "상" : i + 1 > bottomFrom ? "하" : "중";
+  nos.forEach((no) => {
+    if (plays && !(plays[no] > 0)) { rank[no] = null; pct[no] = null; band[no] = null; return; }
+    const above = nos.filter((o) => theta[o] > theta[no] + 1e-9).length;
+    const r = above + 1;
+    rank[no] = r;
+    pct[no] = n > 1 ? (n - r) / (n - 1) : 0.5;
+    band[no] = r <= top ? "상" : r > bottomFrom ? "하" : "중";
   });
   return { rank, pct, band };
 }
@@ -722,13 +812,14 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
   const workNos = roster.works.map((w) => w.no);
   const sidByNo = {};
   roster.works.forEach((w) => { sidByNo[w.no] = w.sid; });
-  const J = collectJudgements(assessMap, roster);
+  const cstats = {};
+  const J = collectJudgements(assessMap, roster, { stats: cstats });
   const main = J.filter((x) => x.rep == null);
   const bt = bradleyTerry(main, workNos);
-  const rb = ranksAndBands(bt.theta);
+  const rb = ranksAndBands(bt.theta, bt.plays);
   const judgesDone = Object.keys(assessMap || {}).filter((sid) => {
-    const p = assessMap[sid] && assessMap[sid].judge && assessMap[sid].judge.p1;
-    return p && p.submittedAt && (!p.rosterVer || p.rosterVer === roster.fixedAt);
+    const { block: p } = judgeBlockOf(assessMap[sid], roster);
+    return !!(p && p.submittedAt);
   }).length;
   const n = workNos.length;
   const quality = {
@@ -744,6 +835,8 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
     judges: judgeFit(main, bt.theta),
     medianMs: median(main.map((x) => x.ms)),
     fastN: main.filter((x) => Number.isFinite(x.ms) && x.ms < FAST_MS).length,
+    fastOverrideN: main.filter((x) => x.fastOverride).length,
+    droppedN: cstats.dropped || 0, droppedJudges: cstats.droppedJudges || [],
     dupWhyN: 0,
     tagDist: {}, plateOpenRate: main.length ? main.filter((x) => x.plateOpened).length / main.length : null,
     confMean: mean(main.map((x) => x.conf)),
@@ -759,10 +852,12 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
     const doc = (assessMap || {})[sid] || {};
     const s1 = doc.self && doc.self.s1, s2 = doc.self && doc.self.s2;
     const pctA = rb.pct[no];
-    const pp = (s) => (s && s.submittedAt ? (Number.isFinite(s.predPct) ? s.predPct : predPctOf(s.predRank, s.n)) : null);
-    const predPct1 = pp(s1), predPct2 = pp(s2);
-    const bias1 = predPct1 == null ? null : predPct1 - pctA;
-    const bias2 = predPct2 == null ? null : predPct2 - pctA;
+    // ②는 「현재 점수 확정」(lockedAt) 시점의 값이 확정 자료다 — 변화 사유 제출 전이라도 예측은 굳었다
+    const pp = (s, key) => (s && s[key] ? (Number.isFinite(s.predPct) ? s.predPct : predPctOf(s.predRank, s.n)) : null);
+    const predPct1 = pp(s1, "submittedAt");
+    const predPct2 = pp(s2, "lockedAt") != null ? pp(s2, "lockedAt") : pp(s2, "submittedAt");
+    const bias1 = predPct1 == null || pctA == null ? null : predPct1 - pctA;
+    const bias2 = predPct2 == null || pctA == null ? null : predPct2 - pctA;
     const calib = bias1 == null || bias2 == null ? null : Math.abs(bias1) - Math.abs(bias2);
     const mine = main.filter((x) => x.a === no || x.b === no);
     const shownLeft = mine.filter((x) => (x.left === "a" ? x.a : x.b) === no).length;
@@ -779,7 +874,8 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
 
   if (!main.length) reasons.push("판정이 아직 없습니다.");
   if (quality.perWorkMean < QUALITY_MIN.perWork) reasons.push("작품당 평균 비교 수가 " + fmtNum(quality.perWorkMean, 1) + "회로 " + QUALITY_MIN.perWork + "회에 못 미칩니다.");
-  if (!quality.connectivity.connected) reasons.push("비교 그래프가 하나로 이어지지 않습니다 — 판정을 더 받아야 합니다.");
+  if (!quality.connectivity.connected) reasons.push("비교 그래프가 하나로 이어지지 않습니다 — 아직 판정하지 않은 학생이 있으면 기다리고, 모두 마쳤는데도 그렇다면 명단을 다시 확정해야 합니다.");
+  if (quality.droppedN) reasons.push("배정표와 맞지 않는 판정 " + quality.droppedN + "건을 제외했습니다 (" + quality.droppedJudges.join(", ") + ").");
   if (quality.ssr != null && quality.ssr < QUALITY_MIN.ssr) reasons.push("척도분리신뢰도(SSR)가 " + fmtNum(quality.ssr) + "로 " + QUALITY_MIN.ssr + " 아래입니다.");
   if (quality.splitHalf.median != null && quality.splitHalf.median < QUALITY_MIN.splitHalf) reasons.push("판정자 반분 신뢰도 중앙값이 " + fmtNum(quality.splitHalf.median) + "로 " + QUALITY_MIN.splitHalf + " 아래입니다.");
   if (quality.splitHalf.median == null && main.length) reasons.push("반분 신뢰도를 계산할 만큼 판정자가 모이지 않았습니다.");
@@ -804,12 +900,41 @@ export function csvSubmissions({ roster, subMap, pidOf }) {
   return { head, rows };
 }
 
+/* 판정 단위 CSV — 이 명단의 판정은 배정표 대조를 거친 것(valid=1)만, 옛 명단·대조 탈락 항목은 valid=0으로 함께 */
 export function csvJudgements({ roster, assessMap, pidOf }) {
   const pid = pidFn(pidOf);
+  const head = ["pid", "roster_ver", "valid", "screen_i", "work_a", "work_b", "left", "rep_of", "win", "win_no", "chosen_first", "axis", "vw", "conf", "tag", "ms", "fast_override", "plate_opened", "why_len", "why", "at"];
+  const rows = [];
   const J = collectJudgements(assessMap, roster);
-  const head = ["pid", "screen_i", "work_a", "work_b", "left", "rep_of", "win", "win_no", "chosen_left", "conf", "tag", "ms", "plate_opened", "why_len", "why", "at", "roster_ver"];
-  const rows = J.map((x) => [pid(x.judge), x.i, x.a, x.b, x.left, x.rep == null ? "" : x.rep, x.win, x.winNo, x.chosenLeft ? 1 : 0,
-    x.conf, x.tag, x.ms, x.plateOpened ? 1 : 0, x.why.length, x.why, x.at, roster && roster.fixedAt].map(cell));
+  const cur = new Set(J.map((x) => x.judge + "#" + x.i));
+  J.forEach((x) => rows.push([pid(x.judge), roster && roster.fixedAt, 1, x.i, x.a, x.b, x.left, x.rep == null ? "" : x.rep, x.win, x.winNo, x.chosenLeft ? 1 : 0,
+    x.axis || "", x.vw, x.conf, x.tag, x.ms, x.fastOverride ? 1 : 0, x.plateOpened ? 1 : 0, x.why.length, x.why, x.at].map(cell)));
+  Object.keys(assessMap || {}).sort(cmp).forEach((sid) => {
+    const judge = (assessMap[sid] && assessMap[sid].judge) || {};
+    Object.keys(judge).sort(cmp).forEach((key) => {
+      const b = judge[key];
+      if (!b || !Array.isArray(b.items)) return;
+      const isCur = roster && (b.rosterVer || null) === (roster.fixedAt || null) && (b.planHash || null) === (roster.hash || null);
+      b.items.forEach((it) => {
+        if (!it || (it.win !== "a" && it.win !== "b")) return;
+        if (isCur && cur.has(sid + "#" + it.i)) return;   // 위에서 이미 내보낸 유효 판정
+        rows.push([pid(sid), b.rosterVer || "", 0, it.i, it.a, it.b, it.left, it.rep == null ? "" : it.rep, it.win, it.win === "a" ? it.a : it.b, it.win === it.left ? 1 : 0,
+          it.axis || "", it.vw, it.conf, it.tag, it.ms, it.fastOverride ? 1 : 0, it.plateOpened ? 1 : 0, trimStr(it.why).length, trimStr(it.why), it.at].map(cell));
+      });
+    });
+  });
+  return { head, rows };
+}
+
+/* 판정자 단위 CSV — 적합도·역방향률·위치·시간·이유 품질 (설계 §7 judgeFit) */
+export function csvJudges({ agg, pidOf }) {
+  const pid = pidFn(pidOf);
+  const head = ["pid", "n", "infit", "outfit", "against", "n_gap", "against_rate", "left_rate", "median_ms", "fast_n", "dup_why_n", "short_why_n", "conf_mean", "plate_open_rate"];
+  const judges = (agg && agg.quality && agg.quality.judges) || {};
+  const rows = Object.keys(judges).sort(cmp).map((sid) => {
+    const f = judges[sid];
+    return [pid(sid), f.n, r3(f.infit), r3(f.outfit), f.against, f.nGap, r3(f.againstRate), r3(f.leftRate), f.medianMs, f.fastN, f.dupWhyN, f.shortWhyN, r3(f.confMean), r3(f.plateOpenRate)].map(cell);
+  });
   return { head, rows };
 }
 
@@ -821,7 +946,7 @@ export function csvSelf({ roster, assessMap, pidOf }) {
     const self = (assessMap[sid] && assessMap[sid].self) || {};
     ["s1", "s2"].forEach((ph) => {
       const s = self[ph];
-      if (!s || !s.submittedAt) return;
+      if (!s || !(s.submittedAt || (ph === "s2" && s.lockedAt))) return;
       const sc = s.scores || {};
       rows.push([pid(sid), ph, sc.overall, sc.veri, sc.cause, sc.plate, sc.voice, s.why, s.predRank, s.n,
         r3(Number.isFinite(s.predPct) ? s.predPct : predPctOf(s.predRank, s.n)), s.startedAt, s.submittedAt, s.durSec, s.lockedAt, s.changeCode, s.changeWhy].map(cell));

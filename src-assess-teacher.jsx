@@ -19,8 +19,8 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
 import {
   STAGES, STAGE_ORDER, CRITERIA, ROSTER_VER, FAST_MS, INFIT_FLAG, QUALITY_MIN,
-  peerCfg, subReady, makePlan, aggregate,
-  csvSubmissions, csvJudgements, csvSelf, csvScores, buildSampleAssess, fmtNum,
+  peerCfg, subReady, makePlan, aggregate, judgeBlockOf,
+  csvSubmissions, csvJudgements, csvSelf, csvScores, csvJudges, buildSampleAssess, fmtNum,
 } from "./src-assess-core.mjs";
 
 const SPLIT_REPS = 25;          // 반분 신뢰도 반복 수 — 교사 브라우저에서 몇 초 안에 끝나는 크기
@@ -81,6 +81,7 @@ function sanitize(patch, base) {
    (엑셀에서 =·+·-·@ 로 시작하는 셀이 수식으로 실행되는 것을 막는다) */
 function downloadCsv(name, head, rows) {
   const esc = (c) => {
+    if (typeof c === "number" && Number.isFinite(c)) return String(c);   // 숫자 열(θ·SE·bias·calib…)은 그대로 — 음수를 문자열로 만들면 안 된다
     let s = String(c == null ? "" : c);
     if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
     return '"' + s.replace(/"/g, '""') + '"';
@@ -152,16 +153,23 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
   cfgRef.current = cfg;
   const live = draft ? { ...cfg, ...draft } : cfg;
 
+  const lastPatchRef = useRef({});               // 서버가 돌려주기 전까지 마지막으로 보낸 설정값
   const flushPending = async () => {
     if (saveT.current) { clearTimeout(saveT.current); saveT.current = null; }
     const p = pendingRef.current;
     pendingRef.current = null;
-    if (!p) return true;
-    const ok = await onSaveRef.current(sanitize(p, cfgRef.current));
+    if (!p) return null;
+    const clean = sanitize(p, { ...cfgRef.current, ...lastPatchRef.current });
+    const ok = await onSaveRef.current(clean);
     setSaveSt(ok === false ? "err" : "saved");
-    if (ok !== false && !saveT.current) setDraft(null);
-    return ok !== false;
+    if (ok !== false) { lastPatchRef.current = { ...lastPatchRef.current, ...clean }; if (!saveT.current) setDraft(null); }
+    return ok !== false ? clean : null;
   };
+  // 서버 값이 마지막 패치를 따라잡으면 기억을 비운다
+  useEffect(() => {
+    const lp = lastPatchRef.current;
+    if (Object.keys(lp).every((k) => cfg[k] === lp[k])) lastPatchRef.current = {};
+  }, [cfg]);
   const edit = (key, val) => {
     if (sampleMode) return;
     setDraft((d) => ({ ...(d || {}), [key]: val }));
@@ -233,8 +241,9 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
       "다시 확정하면 새 fixedAt과 해시로 배정이 통째로 바뀝니다. 이미 저장된 판정은 지워지지 않고 그대로 남지만 옛 명단 기준이라 새 집계에 섞이지 않습니다. " +
       "판정을 시작한 학생이 있으면 되도록 하지 마세요.\n\n계속할까요?")) return;
     setFixBusy(true); setFixErrors([]); setNote(null);
-    await flushPending();
-    const c = cfgRef.current;
+    const saved = await flushPending();
+    // 화면이 아직 다시 그려지기 전이면 cfgRef가 옛값이다 — 방금 보낸 설정을 얹어 쓴다
+    const c = { ...cfgRef.current, ...lastPatchRef.current, ...(saved || {}) };
     const fixedAt = new Date().toISOString();
     let res;
     try { res = makePlan({ works, judges: (ids || []).slice(), k: c.k, repeat: c.repeat, seed: fixedAt }); }
@@ -249,15 +258,30 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     const ok = await fbStore.setT("peerRoster", docv);
     setFixBusy(false);
     if (!ok) { setFixErrors(["명단을 저장하지 못했습니다 — 연결을 확인하고 다시 누르세요."]); return; }
+    // 옛 명단으로 낸 집계는 이 명단의 것이 아니다 — 지워서 「결과 공개」가 옛 결과를 내보내지 않게 한다
+    setAgg(null); setAggAt(null); setAggProg(null); setOverride(false);
     const st = res.stats || {};
     setNote({ kind: "ok", text: "비교 명단을 확정했습니다 — 작품 " + st.n + "점 · 판정자 " + st.nJudges + "명 · 1인당 " + kEff + "쌍" + (kEff < c.k ? "(설정 " + c.k + "을 작품 수에 맞춰 줄임)" : "") + " · 노출 " + st.exposureMin + "~" + st.exposureMax + "회 · 서로 다른 쌍 " + st.distinctPairs + " · " + (st.connected ? "연결됨" : "연결되지 않음") });
+  };
+
+  /* 제출 잠금 해제 — 잘못된 번호·이미지로 확정한 학생이 다시 제출할 수 있게. 명단에 든 작품은 풀지 않는다
+     (비교 도중 스냅샷이 바뀌면 판정자마다 다른 작품을 본 것이 된다) */
+  const [unlockBusy, setUnlockBusy] = useState("");
+  const doUnlock = async (id) => {
+    if (sampleMode || unlockBusy) return;
+    if (inRoster[id]) { setNote({ kind: "warn", text: id + "의 작품은 확정된 명단에 들어 있어 잠금을 풀 수 없습니다. 명단을 다시 확정한 뒤에 푸세요." }); return; }
+    if (!window.confirm(id + "의 제출 잠금을 풉니다. 학생은 내용을 고쳐 다시 「제출 확정」을 눌러야 합니다. 계속할까요?")) return;
+    setUnlockBusy(id);
+    const ok = await fbStore.setT("sub:" + id, { locked: false, unlockedAt: new Date().toISOString() }, { merge: true });
+    setUnlockBusy("");
+    setNote(ok ? { kind: "ok", text: id + "의 제출 잠금을 풀었습니다." } : { kind: "warn", text: "잠금을 풀지 못했습니다 — 연결을 확인하세요." });
   };
 
   /* ---- 진행 ---- */
   const prog = useMemo(() => (ids || []).map((id) => {
     const a = assessMap[id] || {};
     const s1 = a.self && a.self.s1, s2 = a.self && a.self.s2;
-    const j = (a.judge && a.judge.p1) || {};
+    const j = (peer ? judgeBlockOf(a, peer).block : (a.judge && a.judge.p1)) || {};
     const items = j.items || [];
     const total = peer && peer.plan && Array.isArray(peer.plan[id]) ? peer.plan[id].length : (cfg.k + cfg.repeat);
     return { id, nick: nickOf(id), s1: !!(s1 && s1.submittedAt), s2: !!(s2 && s2.submittedAt), jDone: !!j.submittedAt, n: items.length, total };
@@ -272,6 +296,8 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
   const [aggBusy, setAggBusy] = useState(false);
   const [aggProg, setAggProg] = useState(null);   // { done, total, fail }
   const [override, setOverride] = useState(false);
+  const peerHash = peer && peer.hash;
+  useEffect(() => { setAgg(null); setAggAt(null); setAggProg(null); setOverride(false); }, [peerHash]);
   const runAgg = async () => {
     if (sampleMode || aggBusy) return;
     if (!peer) { setNote({ kind: "warn", text: "비교 명단이 없어 집계할 수 없습니다. 먼저 「비교 명단 확정」을 누르세요." }); return; }
@@ -316,6 +342,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
       out = kind === "submissions" ? csvSubmissions({ roster: peer, subMap, pidOf })
         : kind === "judgements" ? csvJudgements({ roster: peer, assessMap, pidOf })
           : kind === "self" ? csvSelf({ roster: peer, assessMap, pidOf })
+          : kind === "judges" ? csvJudges({ agg: shownAgg, pidOf })
             : csvScores({ agg: shownAgg, pidOf });
     } catch (e) { setNote({ kind: "warn", text: "CSV를 만들지 못했습니다: " + ((e && e.message) || e) }); return; }
     if (!out || !out.head) { setNote({ kind: "warn", text: "내려받을 행이 없습니다." }); return; }
@@ -448,7 +475,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
           )}
           <div className="tbl-scroll">
             <table className="roster at-click">
-              <thead><tr><th>학번</th><th>별명</th><th>작품 번호</th><th>이미지</th><th>제출 시각</th><th>잠금</th><th>명단</th></tr></thead>
+              <thead><tr><th>학번</th><th>별명</th><th>작품 번호</th><th>이미지</th><th>제출 시각</th><th>잠금</th><th>명단</th><th>해제</th></tr></thead>
               <tbody>
                 {subRows.map((r) => (
                   <tr key={r.id} onClick={() => onSel && onSel(r.id)}>
@@ -460,6 +487,13 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
                     <td className="mono">{r.sub && r.sub.submittedAt ? fmtT(r.sub.submittedAt) : "-"}</td>
                     <td>{r.sub && r.sub.locked ? <span className="at-yes">잠김</span> : "-"}</td>
                     <td>{peer ? (inRoster[r.id] ? <span className="at-yes">포함</span> : r.ready ? <span className="at-no">밖</span> : "-") : "-"}</td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      {r.sub && r.sub.locked && !inRoster[r.id] ? (
+                        <button type="button" className="btn small ghost" disabled={sampleMode || !!unlockBusy} title={wr} onClick={() => doUnlock(r.id)}>
+                          {unlockBusy === r.id ? "푸는 중…" : "잠금 해제"}
+                        </button>
+                      ) : "-"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -540,14 +574,17 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
                   ok={tri(q && q.splitHalf && q.splitHalf.median, SPLIT_ADOPT, QUALITY_MIN.splitHalf)} />
                 <QTile n={num(q && q.perWorkMean, 1)} l="작품당 평균 비교 수" s={"본 판정 " + (q ? q.nJudgements : "-") + "건 · 보류 < " + QUALITY_MIN.perWork + " · 보수적 목표 20"} ok={tri(q && q.perWorkMean, 20, QUALITY_MIN.perWork)} />
                 <QTile n={(q ? q.nJudgesDone : "-") + " / " + (q ? q.nJudges : "-")} l="판정자 (완료 / 전체)" />
-                <QTile n={pct(q && q.position && q.position.leftRate)} l="왼쪽 선택률 (위치 편향)" s={q && q.position ? "Wilson 95% " + ci(q.position.wilson) + " · n " + q.position.n : ""}
+                <QTile n={pct(q && q.position && q.position.leftRate)} l="먼저 놓인 쪽(왼쪽·위) 선택률 — 위치 편향"
+                  s={q && q.position ? "Wilson 95% " + ci(q.position.wilson) + " · n " + q.position.n
+                    + (q.position.byAxis ? " · 좌우 " + pct(q.position.byAxis.x.rate) + "(" + q.position.byAxis.x.n + ") · 위아래 " + pct(q.position.byAxis.y.rate) + "(" + q.position.byAxis.y.n + ")" : "") : ""}
                   ok={q && q.position && q.position.wilson ? (q.position.wilson[0] <= 0.5 && q.position.wilson[1] >= 0.5) : null} />
                 <QTile n={pct(q && q.repeat && q.repeat.rate)} l="역순 반복 일치율" s={q && q.repeat ? "Wilson 95% " + ci(q.repeat.wilson) + " · " + q.repeat.agree + "/" + q.repeat.n : ""} />
                 <QTile n={q && q.connectivity ? (q.connectivity.strongly ? "강연결" : q.connectivity.connected ? "약연결" : "끊김") : "-"} l="비교 그래프 연결성"
                   s={q && q.connectivity && q.connectivity.components != null ? "성분 " + q.connectivity.components : ""}
                   ok={q && q.connectivity ? !!q.connectivity.connected : null} />
                 <QTile n={sec(q && q.medianMs)} l="중앙 판정 시간" />
-                <QTile n={q && q.fastN != null ? q.fastN : "-"} l={FAST_SEC + "초 미만 판정"} ok={q && q.fastN != null ? q.fastN === 0 : null} />
+                <QTile n={q && q.fastN != null ? q.fastN : "-"} l={FAST_SEC + "초 미만 판정"} s={q && q.fastOverrideN != null ? "경고 뒤 그대로 넘긴 판정 " + q.fastOverrideN : ""} ok={q && q.fastN != null ? q.fastN === 0 : null} />
+                <QTile n={q && q.droppedN != null ? q.droppedN : "-"} l="배정표와 맞지 않아 제외한 판정" s={q && q.droppedJudges && q.droppedJudges.length ? q.droppedJudges.join(", ") : "학생 문서에 배정에 없는 판정이 있으면 집계에서 뺀다"} ok={q && q.droppedN != null ? q.droppedN === 0 : null} />
                 <QTile n={q && q.dupWhyN != null ? q.dupWhyN : "-"} l="겹치는 이유 문장" />
                 <QTile n={pct(q && q.plateOpenRate)} l="작품 캡션 펼침률" />
                 <QTile n={num(q && q.confMean, 1)} l="확신도 평균 (1~5)" />
@@ -617,7 +654,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
       <div className="card at-card">
         <div className="card-head"><span className="card-code">상호평가 5</span><span className="card-title">CSV — 연구 자료 네 파일</span></div>
         <div className="card-note">
-          제출(작품 단위) · 판정(판정 단위) · 자기평가(학생×단계) · 집계(작품 점수). 학번 대신 <b>「연구」 탭과 같은 규칙의 익명 번호</b>(학번 정렬 순 P01…)를 씁니다.
+          제출(작품 단위) · 판정(판정 단위, 옛 명단의 판정은 valid=0) · 자기평가(학생×단계) · 집계(작품 점수) · 판정자(적합도·위치·시간). 학번 대신 <b>「연구」 탭과 같은 규칙의 익명 번호</b>(학번 정렬 순 P01…)를 씁니다.
         </div>
         <div className="card-body">
           <div className="at-row">
@@ -625,6 +662,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
             <button className="btn small ghost" disabled={!peer} onClick={() => exportKind("judgements")}>판정 CSV</button>
             <button className="btn small ghost" disabled={!peer} onClick={() => exportKind("self")}>자기평가 CSV</button>
             <button className="btn small ghost" disabled={!shownAgg} onClick={() => exportKind("scores")}>집계 CSV</button>
+            <button className="btn small ghost" disabled={!shownAgg} onClick={() => exportKind("judges")}>판정자 CSV</button>
           </div>
           <p className="hint">
             파일 이름은 <span className="mono">상호평가_&lt;종류&gt;_&lt;yymmdd&gt;.csv</span>. 셀 앞의 <span className="mono">'</span>는 수식 주입을 막는 표시이니 그대로 두세요.
