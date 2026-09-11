@@ -20,6 +20,7 @@ import { ThemeStyle } from "./src-theme.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { LabelCompare } from "./src-label-compare.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
+import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, InquiryStyle, inquiryTraceRows } from "./src-inquiry.jsx";
 import { AssessTab, AssessStyle } from "./src-assess.jsx";
 import { AssessPanel, AssessTeacherStyle } from "./src-assess-teacher.jsx";
 import { peerCfg } from "./src-assess-core.mjs";
@@ -367,29 +368,7 @@ const SCHEMA_DEF = [
       },
     ],
   },
-  {
-    id: "q1", session: "1차시", code: "1", kind: "inquiry", title: "탐구 질문",
-    note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
-    fields: [
-      {
-        k: "concept", t: "area", qtype: "개념", label: "작가가 만들지 않은 사물이 작품이 되려면 그 전에 무슨 일이 있어야 하는가",
-        steps: [
-          "고르기: 위 자료의 작품 가운데 ‘작가가 만들지 않은 사물’이 등장한 작품 두 점 고르기",
-          "찾기: 각 작품에서 사물이 작품이 되기 전에 일어난 일(선택 · 명명 · 전시 등)을 하나씩 짚기",
-          "정리: 두 작품의 공통점을 묶어 ‘그 앞에 있어야 하는 일’을 내 말로 쓰기",
-        ],
-      },
-      {
-        k: "design", t: "area", qtype: "설계", pair: true, label: "오늘 본 작품 중 하나를 내가 골라 우리 교실에 놓는다면 어디에 어떻게 놓겠는가",
-        steps: [
-          "고르기: 위 자료의 작품 중 우리 교실에 놓아 보고 싶은 한 점 정하기",
-          "정하기: 교실 어디에(자리), 어떻게(높이 · 방향 · 관람 거리) 놓을지 구체적으로 정하기",
-          "정리: 그 자리와 방식이 작품의 읽기를 어떻게 바꾸는지 이유 쓰기",
-        ],
-      },
-      { k: "debate", t: "debate", qtype: "논쟁", label: "미술인지 아닌지를 정하는 권한은 작가·미술계·관람자에게 각각 얼마씩 있는가" },
-    ],
-  },
+  INQUIRY_SECTIONS.q1,
   {
     id: "l2", session: "2차시", code: "2", kind: "learn", title: "제도비평·아카이브·파라픽션",
     note: "2차시 강의 노트를 읽고 작성합니다.",
@@ -419,29 +398,7 @@ const SCHEMA_DEF = [
       },
     ],
   },
-  {
-    id: "q2", session: "2차시", code: "2", kind: "inquiry", title: "탐구 질문",
-    note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
-    fields: [
-      {
-        k: "concept", t: "area", qtype: "개념", label: "작품 캡션의 어떤 정보가 이미지의 읽기를 가장 크게 바꾸는가",
-        steps: [
-          "보기: 바로 아래 「작품 캡션 두 장 비교」 자료에서 캡션 A와 B의 읽기가 갈라진 지점 찾기",
-          "좁히기: 작품 캡션의 정보(제목 · 연대 · 재질 · 용도 · 출처) 가운데 읽기를 가장 크게 바꾼 한 가지 고르기",
-          "정리: 그 정보가 왜 힘이 센지 근거와 함께 쓰기",
-        ],
-      },
-      {
-        k: "design", t: "area", qtype: "설계", pair: true, label: "내가 만들 유물의 작품 캡션에서 관람자가 첫 줄로 읽었으면 하는 정보는 무엇인가",
-        steps: [
-          "떠올리기: 내 유물 이미지를 처음 보는 관람자가 무엇부터 궁금해할지 상상하기",
-          "정하기: 작품 캡션 첫 줄에 놓을 정보 한 가지 정하기",
-          "정리: 그 정보를 첫 줄에 놓는 이유 쓰기",
-        ],
-      },
-      { k: "debate", t: "debate", qtype: "논쟁", label: "허구임을 미리 밝히면 파라픽션의 효과는 커지는가, 줄어드는가" },
-    ],
-  },
+  INQUIRY_SECTIONS.q2,
   {
     id: "s12", session: "2차시", code: "A", title: "미술 개념 탐구",
     fields: [
@@ -479,29 +436,7 @@ const SCHEMA_DEF = [
       },
     ],
   },
-  {
-    id: "q3", session: "3차시", code: "3", kind: "inquiry", title: "탐구 질문",
-    note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
-    fields: [
-      {
-        k: "concept", t: "area", qtype: "개념", label: "사물의 흔적이 사람에 대해 말할 수 있는 것과 말할 수 없는 것은 무엇인가",
-        steps: [
-          "고르기: 위 자료의 작품에서 사물이나 흔적이 사람 대신 말한 예 찾기",
-          "나누기: 그 흔적이 말해 준 것과 끝내 말하지 못한 것을 하나씩 쓰기",
-          "정리: 흔적의 힘과 한계를 한 줄씩 정리하기",
-        ],
-      },
-      {
-        k: "design", t: "area", qtype: "설계", pair: true, label: "내가 고른 문제에서 사진으로 찍을 수 있는 것과 찍을 수 없는 것을 나누면 어떻게 되는가",
-        steps: [
-          "펼치기: 내가 고른 문제의 장면들을 떠올리기",
-          "나누기: 카메라에 담을 수 있는 것과 담을 수 없는 것(마음 · 반복된 시간 · 사라진 것)을 나누어 쓰기",
-          "좁히기: 담을 수 없는 것 가운데 내 유물이 대신 말해 줄 것 하나 고르기",
-        ],
-      },
-      { k: "debate", t: "debate", qtype: "논쟁", label: "당사자가 아닌 사람이 그 문제를 작품으로 다루는 일은 어디까지 정당한가" },
-    ],
-  },
+  INQUIRY_SECTIONS.q3,
   {
     id: "s3o", session: "3차시", code: "B1", title: "번역 사다리 ① 관찰 방법 정하기 (T1)", ladder: true,
     note: "사회참여 미술은 자료 조사가 아니라 내 몸이 지나간 자리의 관찰에서 시작합니다. 다만 ‘잘 살펴보라’는 말만으로는 아무것도 모이지 않습니다. 다섯 가지 관찰 방법 가운데 하나를 골라 그 절차대로 모읍니다. 방법마다 잘 잡히는 것과 놓치는 것이 다릅니다.",
@@ -688,29 +623,7 @@ const SCHEMA_DEF = [
       },
     ],
   },
-  {
-    id: "q4", session: "4차시", code: "4", kind: "inquiry", title: "탐구 질문",
-    note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
-    fields: [
-      {
-        k: "concept", t: "area", qtype: "개념", label: "흔적이 그 자리에 생기려면 어떤 사용이 얼마나 반복되어야 하는가",
-        steps: [
-          "고르기: 내 유물의 흔적 하나 정하기 (예: 손잡이 한쪽만 닳음)",
-          "따지기: 그 흔적이 생기려면 어떤 동작이 하루 몇 번, 몇 년쯤 반복되어야 할지 짐작해 보기",
-          "정리: 그렇게 짐작한 근거(누가 · 어떤 일로 · 어떤 자세로 썼는지)를 함께 쓰기",
-        ],
-      },
-      {
-        k: "design", t: "area", qtype: "설계", pair: true, label: "내 유물에서 관람자가 가장 먼저 볼 곳은 어디이며, 그렇게 만들려면 화면을 어떻게 짜야 하는가",
-        steps: [
-          "정하기: 관람자의 시선이 처음 닿았으면 하는 곳 한 군데",
-          "짜기: 그곳으로 시선을 모으는 방법(빛 · 초점 · 여백 · 구도) 가운데 무엇을 쓸지 정하기",
-          "정리: 그렇게 짜는 이유를 표현 의도와 이어 쓰기",
-        ],
-      },
-      { k: "debate", t: "debate", qtype: "논쟁", label: "유물이 말하는 것은 만든 사람의 뜻인가, 쓴 사람의 습관인가, 발굴한 사람의 해석인가" },
-    ],
-  },
+  INQUIRY_SECTIONS.q4,
   {
     id: "s4a", session: "4차시", code: "E", title: "유물 개념 설계", note: "각 항목이 서로 연결되도록 작성합니다.",
     fields: [
@@ -764,30 +677,7 @@ const SCHEMA_DEF = [
       { k: "q3", t: "area", label: "프롬프트 네 요소(무엇인가 / 어떤 상태인가 / 어떻게 놓였는가 / 어떤 사진인가)를 내 유물로 각각 한 구절씩 채우기" },
     ],
   },
-  {
-    id: "q5", session: "5차시", code: "5", kind: "inquiry", title: "탐구 질문",
-    note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
-    fields: [
-      {
-        k: "concept", t: "area", qtype: "개념", label: "사진처럼 보이게 만드는 요소 가운데 우리 눈이 가장 먼저 믿는 것은 무엇인가",
-        steps: [
-          "보기: 위에 놓인 내 생성 화면 가운데 한 장을 골라 구석구석 다시 보기",
-          "고르기: ‘사진 같다’고 느끼게 한 요소 하나 고르기 (빛 · 초점 · 질감 · 구도 · 얕은 심도 등)",
-          "정리: 눈이 그 요소를 왜 먼저 믿는지 근거와 함께 쓰기",
-        ],
-      },
-      {
-        k: "design", t: "area", qtype: "설계", pair: true, label: "내가 고른 한 점과 버린 것들의 차이를 조형 용어로 설명하면 무엇이 남는가",
-        steps: [
-          "나란히 놓기: 위에 놓인 회차 화면에서 고른 한 점과 버린 것을 나란히 보기",
-          "비교하기: 차이를 조형 용어(구조 · 시점 · 빛 · 질감 · 흔적의 위치)로 하나씩 짚기",
-          "정리: 비교하고 나서 남는 결정적 차이 한 가지 쓰기",
-        ],
-      },
-      { k: "debate", t: "debate", qtype: "논쟁", label: "도구가 만든 우연한 결과를 내 의도로 받아들이는 것은 발견인가, 자기합리화인가" },
-      { k: "reflect", t: "reflect", qtype: "성찰", label: "왜 우리는 어떤 이미지를 증거처럼 믿는가. 지금 시점의 내 답을 쓰기 (8차시에 이 답을 다시 봅니다)" },
-    ],
-  },
+  INQUIRY_SECTIONS.q5,
   {
     id: "s5a", session: "5차시", code: "H", title: "AI 역할과 도구 선택",
     fields: [
@@ -843,28 +733,7 @@ const SCHEMA_DEF = [
       },
     ],
   },
-  {
-    id: "q6", session: "6차시", code: "6", kind: "inquiry", title: "탐구 질문",
-    note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
-    fields: [
-      {
-        k: "concept", t: "area", qtype: "개념", label: "낡음을 늘렸는데 오히려 의심이 커지는 화면에는 무엇이 빠져 있는가",
-        steps: [
-          "떠올리기: 긁힘과 때를 잔뜩 넣었는데도 가짜처럼 보이는 화면 상상하기",
-          "찾기: 그 화면에 빠져 있는 것 찾기 (닳을 이유, 쓰임의 방향, 시간의 순서)",
-          "정리: ‘낡음’과 ‘낡을 이유’의 차이로 정리하기",
-        ],
-      },
-      {
-        k: "design", t: "area", qtype: "설계", pair: true, label: "내 화면에서 고치지 않기로 한 부분은 무엇이며 왜 그대로 두는가",
-        steps: [
-          "고르기: 내 화면에서 손대지 않기로 한 부분 하나",
-          "정리: 그대로 두는 이유를 표현 의도와 이어 쓰기 (고치면 무엇이 사라지는지)",
-        ],
-      },
-      { k: "debate", t: "debate", qtype: "논쟁", label: "결함을 남기는 작업과 지우는 작업 가운데 어느 쪽이 더 정직한가" },
-    ],
-  },
+  INQUIRY_SECTIONS.q6,
   {
     id: "s6a", session: "6차시", code: "M", title: "다듬기 기록",
     fields: [
@@ -913,28 +782,7 @@ const SCHEMA_DEF = [
       },
     ],
   },
-  {
-    id: "q7", session: "7차시", code: "7", kind: "inquiry", title: "탐구 질문",
-    note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
-    fields: [
-      {
-        k: "concept", t: "area", qtype: "개념", label: "같은 작품을 교실 벽과 미술관 벽에 걸었을 때 무엇이 달라지는가",
-        steps: [
-          "상상하기: 같은 작품이 교실 벽에 걸린 장면과 미술관 벽에 걸린 장면을 나란히 그려 보기",
-          "비교하기: 관람자의 기대, 머무는 시간, 말투가 각각 어떻게 달라질지 짚기",
-          "정리: 달라지게 만드는 것의 정체를 내 말로 쓰기",
-        ],
-      },
-      {
-        k: "design", t: "area", qtype: "설계", pair: true, label: "내 작품 옆에 놓일 다른 작품 한 점을 내가 고른다면 무엇이며 왜인가",
-        steps: [
-          "고르기: 내 작품 옆에 놓고 싶은 한 점 (위 「전시장 열기」의 우리 반 작품이든, 수업에서 본 작품이든)",
-          "정리: 나란히 놓였을 때 두 작품의 읽기가 서로 어떻게 달라지는지 이유 쓰기",
-        ],
-      },
-      { k: "debate", t: "debate", qtype: "논쟁", label: "배치를 정한 사람도 그 작품의 작가에 포함되는가" },
-    ],
-  },
+  INQUIRY_SECTIONS.q7,
   {
     id: "s7", session: "7차시", code: "O", title: "전시 구성과 작가 노트",
     fields: [
@@ -985,30 +833,7 @@ const SCHEMA_DEF = [
       },
     ],
   },
-  {
-    id: "q8", session: "8차시", code: "8", kind: "inquiry", title: "탐구 질문",
-    note: "정해진 답이 없는 질문입니다. 어느 입장을 골랐는지는 평가하지 않고, 근거가 구체적인지만 봅니다.",
-    fields: [
-      {
-        k: "concept", t: "area", qtype: "개념", label: "이미지·명칭·작품 캡션·진열 가운데 이 학급의 작품들이 의미를 만든 방법은 어느 쪽에 몰려 있는가",
-        steps: [
-          "고르기: 관람에서 본 작품 두 점 고르기 (위 「전시장 열기」로 다시 볼 수 있습니다)",
-          "살피기: 각 작품에서 의미를 만든 힘이 이미지 · 명칭 · 작품 캡션 · 진열 중 어디서 왔는지 짚기",
-          "정리: 학급 전체의 경향을 두 작품을 근거로 쓰기",
-        ],
-      },
-      {
-        k: "design", t: "area", qtype: "설계", pair: true, label: "관람자가 내 의도와 다르게 읽었을 때 나는 무엇을 고치고 무엇을 그대로 두겠는가",
-        steps: [
-          "떠올리기: 관람자가 내 의도와 다르게 읽은 지점",
-          "나누기: 고칠 것(오해를 만든 원인)과 그대로 둘 것(다르게 읽혀도 괜찮은 부분) 나누기",
-          "정리: 나눈 기준을 쓰기",
-        ],
-      },
-      { k: "debate", t: "debate", qtype: "논쟁", label: "허구를 밝힌 이미지와 밝히지 않은 이미지를 나누는 기준은 고지인가, 의도인가, 결과인가" },
-      { k: "reflect", t: "reflect", qtype: "성찰", label: "5차시의 내 답과 지금의 답 사이에서 무엇이 달라졌으며, 무엇 때문에 달라졌는가", showPrev: "q5.reflect.pos" },
-    ],
-  },
+  INQUIRY_SECTIONS.q8,
   {
     id: "s8a", session: "8차시", code: "P", title: "비평과 성찰",
     fields: [
@@ -3765,7 +3590,7 @@ function CardPick({ f, fieldKey, v, setField, ws }) {
   );
 }
 
-function FieldEditor({ sec, f, ws, setField }) {
+function FieldEditor({ sec, f, ws, setField, inq }) {
   const key = sec.id + "." + f.k;
   const v = ws[key];
   // 사진 처리 오류를 alert 대신 그 칸 안에 보여 준다 — 모바일에서 alert은 맥락을 가린다
@@ -3776,6 +3601,14 @@ function FieldEditor({ sec, f, ws, setField }) {
     return n >= max * 0.8 ? <span className="hint" style={{ color: n >= max ? "var(--seal)" : "var(--sub)" }}> {n.toLocaleString()} / {max.toLocaleString()}자</span> : null;
   };
 
+  /* 탐구 질문의 개념·설계는 먼저 쓰고 되묻는 흐름(src-inquiry.jsx)으로 그린다 —
+     생각 계단과 문장 수 계기판은 배움 확인에만 남긴다. 답의 형태를 미리 정해 주던 것이 답을 닮게 만든 원인이었다. */
+  if (sec.kind === "inquiry" && f.t === "area") {
+    return (
+      <InquiryField sec={sec} f={f} ws={ws} setField={setField} sid={inq && inq.sid} cfg={inq && inq.cfg}
+        echo={<StageEcho sec={sec} f={f} ws={ws} />} />
+    );
+  }
   if (f.t === "text" || f.t === "area") {
     const meter = f.t === "area" && (f.steps || sec.kind === "learn" || sec.kind === "inquiry");
     // data-fk는 SectionCard가 칸마다 감싸며 한 곳에서 달아 준다
@@ -4132,6 +3965,7 @@ function FieldReader({ sec, f, ws, owner }) {
       <div className="read-block">
         <div className="rl">{f.label}</div>
         {filled(v) ? <div className="rv">{v}</div> : Empty}
+        {sec.kind === "inquiry" && f.t === "area" && <InquiryTrace sec={sec} f={f} ws={ws} />}
       </div>
     );
   }
@@ -4988,7 +4822,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
   );
 }
 
-function SectionCard({ sec, ws, setField, onGallery }) {
+function SectionCard({ sec, ws, setField, onGallery, inq }) {
   const sp = sectionProgress(sec, ws);
   const complete = sp.total > 0 && sp.done >= sp.total;
   return (
@@ -5014,7 +4848,7 @@ function SectionCard({ sec, ws, setField, onGallery }) {
               display:contents라 격자 배치에는 영향을 주지 않는다. */}
           {sec.fields.map((f) => (
             <div key={f.k} data-fk={sec.id + "." + f.k} style={{ display: "contents" }}>
-              <FieldEditor sec={sec} f={f} ws={ws} setField={setField} />
+              <FieldEditor sec={sec} f={f} ws={ws} setField={setField} inq={inq} />
             </div>
           ))}
         </div>
@@ -5220,6 +5054,8 @@ function StudentApp({ me, onExit, onGallery }) {
     if (!loaded) return;
     setWs((p) => {
       const next = { ...p, [k]: v };
+      // 밑줄 키(_inq 같은 보조 기록)는 고쳐 쓰기 이력·붙여넣기·차시 시각 장부를 건드리지 않는다
+      if (String(k).charAt(0) === "_") return next;
       // 사고 변화를 볼 자리는 고쳐 쓰기 전의 문장을 남겨 둠.
       // 길이 차만 보면 길이는 그대로인 채 내용만 갈아엎은 개작을 놓치므로 어휘 겹침도 함께 본다.
       if (TRACKED.includes(k) && typeof p[k] === "string" && typeof v === "string") {
@@ -5587,7 +5423,7 @@ function StudentApp({ me, onExit, onGallery }) {
             <React.Fragment key={L.n}>
               <LessonPanel L={L} onReading={onReading} />
               {confirmSec && <SectionCard sec={confirmSec} ws={ws} setField={setField} />}
-              {inquirySec && <SectionCard sec={inquirySec} ws={ws} setField={setField} onGallery={onGallery} />}
+              {inquirySec && <SectionCard sec={inquirySec} ws={ws} setField={setField} onGallery={onGallery} inq={{ sid: me.sid, cfg: cfgAll }} />}
             </React.Fragment>
           );
         })}
@@ -7482,6 +7318,10 @@ const RESEARCH_VARS = [
   { k: "cr_multimodal", name: "창의성:모으기의 폭", unit: "0–100", def: "사진·소리·스케치·영상·링크의 고른 사용", get: (c) => c.ax.multimodal },
   { k: "media_n", name: "멀티모달 자료 수", unit: "건", def: "기록지에 올린 사진·음성·스케치·영상의 총 건수", get: (c) => mediaCount(c.ws) },
   { k: "edit_n", name: "고쳐 쓴 횟수", unit: "회", def: "자동 저장이 남긴 수정 이력의 건수", get: (c) => (c.ws._log || []).length },
+  /* 탐구 질문의 되묻기 — 첫 답을 굳힌 뒤 답이 움직였는가 */
+  { k: "inq_frozen_n", name: "탐구 첫 답 굳힘 수", unit: "개", def: "탐구 질문(개념·설계 16칸) 가운데 첫 답을 굳혀 되묻기 단계에 들어간 칸의 수", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => r.v1).length },
+  { k: "inq_moved_n", name: "되묻기 뒤 움직인 수", unit: "개", def: "첫 답을 굳힌 칸 가운데 고친 답이 첫 답과 달라진 수 (글자 2그램 겹침 < .90 또는 길이 차 > 8자)", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => r.v1 && ((r.sim != null && r.sim < 0.9) || Math.abs(r.final.trim().length - r.v1.trim().length) > 8)).length },
+  { k: "inq_selfq_n", name: "스스로 쓴 물음 수", unit: "개", def: "되묻기 단계에서 학생이 자기 답에 던진 물음을 쓴 칸의 수", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => filled(r.selfQ)).length },
   { k: "dwell_min", name: "머문 시간", unit: "분", def: "창에 초점이 있고 30초 안에 움직임·2분 안에 클릭·키·스크롤이 있던 5초 단위의 합", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60) },
   { k: "read_min", name: "읽기 자료 열람", unit: "분", def: "강의 노트를 펼쳐 둔 채 머문 시간(같은 판정)", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.readSec || 0), 0) / 60) },
   { k: "idle_min", name: "켜 둔 채 비활동", unit: "분", def: "창은 보이고 초점도 있으나 조작 조건에 못 미친 5초 단위의 합. 머문 시간에서 걸러 낸 양", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.idleSec || 0), 0) / 60) },
@@ -7792,6 +7632,32 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       });
     });
     download("연구자료_사전사후쌍" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
+  };
+
+  /* ---------- 4-2. 탐구 되묻기 단위 ----------
+     탐구 질문(개념·설계)마다 첫 답과 고친 답, 받은 되묻기, 스스로 쓴 물음을 한 행에 담는다.
+     되묻기 뒤에 답이 움직였는지(changed)가 이 파일의 물음이다. */
+  const exportInquiry = () => {
+    const head = ["pid", "session", "field_key", "qtype", "question", "support_level", "route",
+      "v1_text", "final_text", "v1_chars", "final_chars", "char_overlap", "lexical_overlap",
+      "v1_concreteness", "final_concreteness", "changed", "probes_n", "probe_ids", "probe_texts", "self_q",
+      "v1_at", "rev_at", "sec_v1_to_rev"];
+    const rows = [];
+    cases.forEach((c) => {
+      inquiryTraceRows(c.ws, SCHEMA).forEach((r) => {
+        const a = concreteness(r.v1), b = concreteness(r.final);
+        const gap = r.v1At && r.revAt ? Math.round((new Date(r.revAt) - new Date(r.v1At)) / 1000) : "";
+        const changed = r.v1 ? ((r.sim != null && r.sim < 0.9) || Math.abs(r.final.trim().length - r.v1.trim().length) > 8 ? 1 : 0) : "";
+        rows.push([c.pid, r.session, r.key, r.qtype, r.label.slice(0, 80), r.level, r.route,
+          r.v1, r.final, r.v1.trim().length, r.final.trim().length,
+          r.sim == null ? "" : Math.round(r.sim * 100),
+          r.v1 && filled(r.final) ? Math.round(jaccard(tokSet(r.v1), tokSet(r.final)) * 100) : "",
+          a == null ? "" : a, b == null ? "" : b, changed,
+          r.probes.length, r.probes.map((p) => p.id).join(" "), r.probes.map((p) => p.t).join(" | "), r.selfQ,
+          r.v1At, r.revAt, gap]);
+      });
+    });
+    download("연구자료_탐구되묻기" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
   };
 
   /* ---------- 5. 기술통계 (Markdown) ---------- */
@@ -8245,6 +8111,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 연구자료_계단단위.csv: 참여자 × 계단이 1행. 계단별 도달·글자 수·구체성·편집 시각.");
     L.push("- 연구자료_코딩시트.csv: 참여자 × 항목 × 문장이 1행. code_1·code_2·memo 열은 연구자가 채우는 빈칸.");
     L.push("- 연구자료_사전사후쌍.csv: 같은 물음에 두 번 답한 자리의 텍스트 쌍과 지표 차이.");
+    L.push("- 연구자료_탐구되묻기.csv: 참여자 × 탐구 질문이 1행. 첫 답·고친 답·받은 되묻기·스스로 쓴 물음.");
     L.push("- 기술통계.md: 표 1~5.");
     L.push("- 변수사전.md: 전체 변수의 조작적 정의와 산출식.");
     L.push("");
@@ -8272,6 +8139,8 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       p: "참여자 × 항목 × 문장이 1행. 1차 자동 표지(계단·구체어 적중)를 붙여 두고 code_1·code_2·memo 열은 연구자가 채우도록 비워 둡니다.", go: exportCoding },
     { k: "pairs", h: "사전·사후 텍스트 쌍", fn: "연구자료_사전사후쌍" + tag + "_" + stamp + ".csv",
       p: "번역 진술의 초안과 확정, 진술 버전 사이의 이동, 단원 안의 사고 변화 쌍 " + CHANGE_PAIRS.length + "종을 텍스트와 지표 차이로 나란히 담습니다.", go: exportPairs },
+    { k: "inquiry", h: "탐구 되묻기 단위 자료", fn: "연구자료_탐구되묻기" + tag + "_" + stamp + ".csv",
+      p: "참여자 × 탐구 질문(개념·설계)이 1행. 출발점, 첫 답과 고친 답, 겹침·구체성 차이, 받은 되묻기와 스스로 쓴 물음, 굳힌 뒤 고친 시간을 담습니다. 되묻기 뒤에 답이 움직였는지가 이 파일의 물음입니다.", go: exportInquiry },
     { k: "desc", h: "기술통계 표", fn: "기술통계" + tag + "_" + stamp + ".md",
       p: "표 1 기술통계, 표 2 계단 도달, 표 3 유형 분포, 표 4 사전·사후 비교, 표 5 상관. 마크다운 표라 논문 편집기에 그대로 붙습니다.", go: () => download("기술통계" + tag + "_" + stamp + ".md", descriptivesMD(), "text/markdown") },
     { k: "codebook", h: "변수 사전", fn: "변수사전" + tag + "_" + stamp + ".md",
@@ -8957,6 +8826,7 @@ function TeacherApp({ onExit, onGallery }) {
                     </p>
                   </div>
                 </div>
+                <InquiryAidConfig cfgAll={cfgAll} setCfgAll={setCfgAll} setMsg={setMsg} />
                 <p className="hint" style={{ marginTop: 8 }}>앵커 판정 실험 설정은 「연구」 탭 맨 아래로 옮겼습니다. 이 탭은 수업 중 급한 공개 조작만 담습니다.</p>
               </div>
             ) : tab === "수업 안내" ? (
@@ -9789,6 +9659,7 @@ function App() {
       <AnchorStyle />
       <AssessStyle />
       <AssessTeacherStyle />
+      <InquiryStyle />
       <ThemeStyle />
       {view === "gate" && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}

@@ -7,7 +7,7 @@
      · 120분 수업 흐름 (단계 · 시간 · 활동)
      · 읽기 자료(이론) — 소제목, 본문, 단계별 발문, 그림, 작품·자료 표
      · 작품·자료마다 붙는 설명 사이트 링크
-     · 학습지 발문 (배움 확인 · 탐구 질문의 물음과 생각 단계)
+     · 학습지 발문 (배움 확인의 물음과 생각 단계 · 탐구 질문의 물음과 되묻기)
      · 설계 근거(교사용)
 
    저장 방식
@@ -113,7 +113,9 @@ export function mergeSchema(defs) {
       if (!o) return f;
       touched = true;
       const steps = isArr(o.steps) ? (o.steps.length ? o.steps : undefined) : f.steps;
-      return { ...f, label: pick(o, "label", f.label), steps };
+      // 탐구 질문의 되묻기(src-inquiry.jsx) — 생각 단계와 같은 규칙으로 얹는다
+      const probes = isArr(o.probes) ? (o.probes.length ? o.probes : undefined) : f.probes;
+      return { ...f, label: pick(o, "label", f.label), steps, probes };
     });
     if (!touched) return sec;
     return { ...sec, title: pick(s, "title", sec.title), note: pick(s, "note", sec.note), fields };
@@ -596,7 +598,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
           </div>
 
           <div className="card">
-            <div className="card-head"><span className="card-code">학습지</span><span className="card-title">학생이 답할 발문과 생각 단계</span></div>
+            <div className="card-head"><span className="card-code">학습지</span><span className="card-title">학생이 답할 발문과 생각 단계·되묻기</span></div>
             <div className="card-body">
               {secs.length === 0 && <p className="hint">이 차시에는 학습지 항목이 없습니다.</p>}
               {secs.map((sec) => {
@@ -615,12 +617,21 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                         const fo = draft.fields[sec.id + "." + f.k] || {};
                         const label = fo.label != null ? fo.label : f.label;
                         const steps = isArr(fo.steps) ? fo.steps : (f.steps || []);
+                        const probes = isArr(fo.probes) ? fo.probes : (f.probes || []);
+                        const isInq = sec.kind === "inquiry" && f.t === "area";
                         return (
                           <div className="ed-fld" key={f.k}>
                             <div className="ed-fld-h"><span className="mono">{sec.id}.{f.k}</span>{f.qtype && <span className="ed-qtype">{f.qtype}</span>}</div>
                             <EdArea label="발문 (학생에게 보이는 물음)" min={2} max={8} value={label} onChange={(v) => setFld(sec.id, f.k, { label: v })} />
-                            <EdArea label="생각 단계 도우미" hint="한 줄에 하나씩. 비워 두면 도우미 상자가 사라집니다." min={2} max={10}
-                              value={arrToLines(steps)} onChange={(v) => setFld(sec.id, f.k, { steps: linesToArr(v) })} />
+                            {isInq ? (
+                              /* 탐구 질문은 생각 계단 대신 되묻기를 쓴다 — 첫 답을 굳힌 뒤 학생마다 다른 줄이 배정된다 */
+                              <EdArea label="되묻기 (첫 답을 확정한 뒤 배정되는 물음, 한 줄에 하나씩)"
+                                hint="답의 보기를 나열하지 말고, 학생이 쓴 것을 가리키는 한 문장으로 씁니다. 학생마다 다른 줄이 배정되므로 다섯 줄쯤 둡니다. 비워 두면 원본으로 돌아갑니다."
+                                min={3} max={10} value={arrToLines(probes)} onChange={(v) => setFld(sec.id, f.k, { probes: linesToArr(v) })} />
+                            ) : (
+                              <EdArea label="생각 단계 도우미" hint="한 줄에 하나씩. 비워 두면 도우미 상자가 사라집니다." min={2} max={10}
+                                value={arrToLines(steps)} onChange={(v) => setFld(sec.id, f.k, { steps: linesToArr(v) })} />
+                            )}
                           </div>
                         );
                       })}
