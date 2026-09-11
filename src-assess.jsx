@@ -44,7 +44,7 @@ const SUB_MAX_CHARS = 300000;   // dataURL 글자 수 상한 — 규칙의 문�
 const RANK_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);   // 슬라이더를 실제로 움직이는 키만
 const PAIR_STACK_PX = 640;      // 이 폭 이하에서는 두 작품이 위아래로 놓인다 (CSS의 640px와 같아야 한다)
 
-const STEPS = [
+export const STEPS = [
   { k: "submit", label: "제출" }, { k: "self1", label: "자기평가 ①" }, { k: "peer", label: "동료 비교" },
   { k: "self2", label: "자기평가 ②" }, { k: "result", label: "결과" },
 ];
@@ -68,6 +68,8 @@ function loadImg(owner, ref) {
   }
   return imgCache.get(key);
 }
+/* 미리 보기(src-assess-preview.jsx)가 서버를 읽지 않고 자리표시 그림을 쓰도록 캐시에 미리 넣는다 */
+export function seedImgCache(owner, ref, dataURL) { imgCache.set(owner + "_" + ref, Promise.resolve(dataURL)); }
 
 /* 학급 제출 전체. 읽기 실패는 빈 맵이 아니라 null로 돌려준다 — 빈 맵으로 오인하면
    등수 예측의 분모가 0이 되어 그 문항이 조용히 사라지고, 제출 뒤에는 되돌릴 수 없다 */
@@ -109,7 +111,7 @@ function reencode(dataURL) {
 }
 
 /* 지금 할 일이 없을 때의 안내 — 교사 단계별로 무엇을 기다리는지 말해 준다 */
-function waitNote({ stage, roster, pairs, s2Done, noWork }) {
+export function waitNote({ stage, roster, pairs, s2Done, noWork }) {
   if (stage === "submit") return "제출을 마쳤습니다. 자기평가는 선생님이 열면 이 자리에 나타납니다.";
   if (stage === "self1") return noWork ? "제출을 건너뛰었습니다. 동료 비교는 선생님이 열면 이 자리에 나타납니다." : "자기평가 ①을 제출했습니다. 동료 비교는 선생님이 열면 이 자리에 나타납니다.";
   if (stage === "peer") {
@@ -247,19 +249,7 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
 
   return (
     <div className="as-tab">
-      <ol className="as-strip" aria-label="최종 평가 진행">
-        {STEPS.map((s) => {
-          const skipped = noWork && (s.k === "submit" || s.k === "self1" || s.k === "self2");
-          const st = s.k === cur ? "cur" : skipped ? "skip" : done[s.k] ? "done" : avail[s.k] ? "open" : "lock";
-          const mark = st === "done" ? "✓" : st === "cur" ? "●" : st === "skip" ? "–" : "○";
-          const say = st === "done" ? " (마침)" : st === "cur" ? " (지금)" : st === "skip" ? " (건너뜀)" : st === "lock" ? " (아직 열리지 않음)" : "";
-          return (
-            <li key={s.k} className={"as-step " + st} aria-current={st === "cur" ? "step" : undefined}>
-              <i aria-hidden="true">{mark}</i>{s.label}<span className="as-sr">{say}</span>
-            </li>
-          );
-        })}
-      </ol>
+      <StepStrip cur={cur} done={done} avail={avail} noWork={noWork} />
       {sampleMode && <div className="warn-note">예시 화면입니다. 여기서는 아무것도 저장되지 않습니다.</div>}
       {subsNote}
       {screen}
@@ -267,11 +257,30 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
   );
 }
 
+/* 진행 띠 — 제출 · 자기평가① · 동료 비교 · 자기평가② · 결과. 미리 보기(src-assess-preview.jsx)도 같은 띠를 그린다 */
+export function StepStrip({ cur, done, avail, noWork }) {
+  return (
+    <ol className="as-strip" aria-label="최종 평가 진행">
+      {STEPS.map((s) => {
+        const skipped = noWork && (s.k === "submit" || s.k === "self1" || s.k === "self2");
+        const st = s.k === cur ? "cur" : skipped ? "skip" : done[s.k] ? "done" : avail[s.k] ? "open" : "lock";
+        const mark = st === "done" ? "✓" : st === "cur" ? "●" : st === "skip" ? "–" : "○";
+        const say = st === "done" ? " (마침)" : st === "cur" ? " (지금)" : st === "skip" ? " (건너뜀)" : st === "lock" ? " (아직 열리지 않음)" : "";
+        return (
+          <li key={s.k} className={"as-step " + st} aria-current={st === "cur" ? "step" : undefined}>
+            <i aria-hidden="true">{mark}</i>{s.label}<span className="as-sr">{say}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 /* ============================================================
    1. 제출 — 기록지의 초안을 확인·수정하고 확정한다
    ============================================================ */
 
-function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }) {
+export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }) {
   const draft = useMemo(() => { try { return submissionFromWs(ws || {}, sid) || {}; } catch (e) { return {}; } }, [ws, sid]);
   const [d, setD] = useState(() => ({ no: draft.no || "", title: draft.title || "", plate: { ...(draft.plate || {}) }, note: draft.note || "" }));
   const [img, setImg] = useState(undefined);   // undefined 읽는 중 · null 없음/실패 · 문자열 dataURL
@@ -407,7 +416,7 @@ function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }) {
    ②는 ①을 보지 않고 답한 뒤 「현재 점수 확정」으로 굳히고, 그다음에야 ①과 나란히 본다
    ============================================================ */
 
-function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMode }) {
+export function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMode }) {
   const isS2 = phase === "s2";
   const b = block || {};
   const locked = isS2 && !!b.lockedAt;
@@ -585,7 +594,7 @@ function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMod
    3. 동료 비교 — 배정된 쌍을 차례로 판정한다
    ============================================================ */
 
-function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, reloadSubs, sampleMode }) {
+export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, reloadSubs, sampleMode }) {
   const N = pairs.length;
   const [items, setItems] = useState(() => (block && Array.isArray(block.items) ? block.items : []));
   const itemsRef = useRef(items);
@@ -881,7 +890,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
    5. 결과 — reveal 범위만큼만, 숫자보다 말로
    ============================================================ */
 
-function ResultScreen({ cfg, result, self }) {
+export function ResultScreen({ cfg, result, self }) {
   const r = result || {};
   const reveal = cfg.reveal;
   const [showPos, setShowPos] = useState(false);   // 자리(밴드·백분위·등수)는 이유를 읽은 뒤 스스로 눌러야 보인다

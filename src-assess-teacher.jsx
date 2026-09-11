@@ -2,7 +2,8 @@
    상호평가(쌍대비교) — 교사 화면 「상호평가」 탭
 
    학급 전체를 한 라디오로 움직이는 단계 스위치, 비교 명단 확정, 진행 현황,
-   브래들리–테리 집계와 품질 지표, 연구용 CSV 네 가지를 다섯 장의 카드에 둔다.
+   브래들리–테리 집계와 품질 지표, 연구용 CSV 다섯 가지를 다섯 장의 카드에 두고,
+   여섯째 카드(src-assess-design.jsx)에 연구 설계의 구조·도구·근거를 논문 방법 절 순서로 적는다.
    (최종작품_상호평가_설계.md §3.4·§6·§7·§8, pairwise-research/research-design.md §4.5·§9)
 
    이 파일은 계산을 하지 않는다 — 배정·점수·신뢰도·CSV 행은 모두 src-assess-core.mjs가
@@ -22,6 +23,7 @@ import {
   peerCfg, subReady, makePlan, aggregate, judgeBlockOf, myPairs,
   csvSubmissions, csvJudgements, csvSelf, csvScores, csvJudges, buildSampleAssess, fmtNum,
 } from "./src-assess-core.mjs";
+import { AssessDesignCard } from "./src-assess-design.jsx";   // 카드 6 · 연구 설계(구조·도구·근거). 계산 없음, 문서를 화면에 옮긴 것
 import { AssessPreviewPage } from "./src-assess-preview.jsx";
 
 const SPLIT_REPS = 25;          // 반분 신뢰도 반복 수 — 교사 브라우저에서 몇 초 안에 끝나는 크기
@@ -694,6 +696,9 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
           </p>
         </div>
       </div>
+
+      {/* ---------------- 카드 6 · 연구 설계 (src-assess-design.jsx) ---------------- */}
+      <AssessDesignCard kMax={K_MAX} splitReps={SPLIT_REPS} />
     </div>
   );
 }
