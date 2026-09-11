@@ -24,6 +24,7 @@ import { AssessTab, AssessStyle } from "./src-assess.jsx";
 import { AssessPanel, AssessTeacherStyle } from "./src-assess-teacher.jsx";
 import { peerCfg } from "./src-assess-core.mjs";
 import { startDwell } from "./src-dwell.js";
+import { imgPresetOf, prepareImage, imgErrText, imgHintText, BLUR_CONFIRM } from "./src-media-img.js";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -3163,25 +3164,7 @@ function setMediaOwner(o) { OWNER = o; }
 /* 사진·녹음·스케치·영상은 다시 만들 수 없는 기록이라 지우기 전에 한 번 묻는다 */
 const confirmDel = () => window.confirm("이 기록을 지울까요? 지우면 되돌릴 수 없습니다.");
 
-function compress(file, maxPx, maxBytes) {
-  return new Promise((res, rej) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
-      const cv = document.createElement("canvas");
-      cv.width = Math.round(img.width * scale);
-      cv.height = Math.round(img.height * scale);
-      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
-      let q = 0.8, data = cv.toDataURL("image/jpeg", q);
-      while (data.length > maxBytes && q > 0.35) { q -= 0.1; data = cv.toDataURL("image/jpeg", q); }
-      URL.revokeObjectURL(url);
-      data.length > maxBytes ? rej(new Error("too big")) : res(data);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("read fail")); };
-    img.src = url;
-  });
-}
+/* 사진 파일의 검사·축소는 src-media-img.js(prepareImage)가 맡는다 — 항목별 하한·상한은 IMG_PRESETS */
 
 function MediaThumb({ owner, refId, alt, size = 90 }) {
   const [src, setSrc] = useState(null);
@@ -3875,19 +3858,23 @@ function FieldEditor({ sec, f, ws, setField }) {
   }
   if (f.t === "images") {
     const list = v || [];
+    const preset = imgPresetOf(key);
     const pick = async (e) => {
       const files = Array.from(e.target.files || []).slice(0, 3 - list.length);
       e.target.value = "";
       setImgErr("");
+      // 여러 장을 한 번에 고르면 렌더 때의 list가 낡아 앞 장을 덮어쓰므로 여기서 누적한다
+      let cur = list.slice();
       for (const file of files) {
-        if (!/^image\//.test(file.type)) { setImgErr("이미지 파일만 올릴 수 있습니다."); continue; }
         try {
-          const data = await compress(file, 800, 150000);
+          const r = await prepareImage(file, preset);
+          if (r.blurry && !window.confirm(BLUR_CONFIRM)) continue;
           const ref = key + "." + Date.now() + Math.floor(Math.random() * 100);
-          const ok = await mediaStore.put(OWNER, ref, data);
+          const ok = await mediaStore.put(OWNER, ref, r.data);
           if (!ok) { setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요."); continue; }
-          setField(key, [...(list || []), { ref, at: now() }].slice(0, 3));
-        } catch (err) { setImgErr("사진을 처리하지 못했습니다. 더 작은 파일로 시도하세요."); }
+          cur = [...cur, { ref, at: now(), w: r.w, h: r.h }].slice(0, 3);
+          setField(key, cur);
+        } catch (err) { setImgErr(imgErrText(err)); }
       }
     };
     return (
@@ -3903,7 +3890,7 @@ function FieldEditor({ sec, f, ws, setField }) {
             ))}
           </div>
           {list.length < 3 && <input type="file" accept="image/*" multiple onChange={pick} style={{ fontSize: 12 }} />}
-          <span className="hint">{list.length}/3장 · 가로세로 800px 이하로 줄여 저장합니다.</span>
+          <span className="hint">{list.length}/3장 · {imgHintText(preset)}</span>
           {imgErr && <span className="hint" role="alert" style={{ color: "var(--seal)", flex: "1 1 100%" }}>{imgErr}</span>}
         </div>
       </div>
@@ -3942,21 +3929,24 @@ function FieldEditor({ sec, f, ws, setField }) {
     );
   }
   if (f.t === "image") {
+    const cur = typeof v === "string" ? null : v;
+    const preset = imgPresetOf(key);
     const pick = async (e) => {
       const file = e.target.files && e.target.files[0];
       e.target.value = "";
       if (!file) return;
       setImgErr("");
-      if (!/^image\//.test(file.type)) return setImgErr("이미지 파일만 올릴 수 있습니다.");
       try {
-        const data = await compress(file, f.k === "img" ? 1000 : 800, f.k === "img" ? 400000 : 150000);
+        const r = await prepareImage(file, preset);
+        if (r.blurry && !window.confirm(BLUR_CONFIRM)) return;
         const ref = key + "." + Date.now();
-        const ok = await mediaStore.put(OWNER, ref, data);
+        const ok = await mediaStore.put(OWNER, ref, r.data);
         if (!ok) return setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요.");
-        setField(key, { ref, at: now() });
-      } catch (err) { setImgErr("사진을 처리하지 못했습니다. 더 작은 파일로 시도하세요."); }
+        // 바꿔 올리면 옛 문서는 아무도 가리키지 않으므로 지운다 (녹음·영상 칸과 같은 처리). 실패해도 새 사진에는 지장 없음
+        if (cur && cur.ref) mediaStore.remove(OWNER, cur.ref);
+        setField(key, { ref, at: now(), w: r.w, h: r.h });
+      } catch (err) { setImgErr(imgErrText(err)); }
     };
-    const cur = typeof v === "string" ? null : v;
     return (
       <div className="field">
         <label>{f.label}</label>
@@ -3968,6 +3958,7 @@ function FieldEditor({ sec, f, ws, setField }) {
             </div>
           ) : <span className="hint">사진 한 장을 올립니다.</span>}
           <input type="file" accept="image/*" onChange={pick} style={{ fontSize: 12 }} />
+          <span className="hint" style={{ flex: "1 1 100%" }}>{imgHintText(preset)}</span>
           {imgErr && <span className="hint" role="alert" style={{ color: "var(--seal)", flex: "1 1 100%" }}>{imgErr}</span>}
         </div>
       </div>
@@ -4017,11 +4008,14 @@ function FieldEditor({ sec, f, ws, setField }) {
                       const file = e.target.files && e.target.files[0];
                       e.target.value = "";
                       if (!file) return;
+                      setImgErr("");
                       try {
-                        const data = await compress(file, 700, 120000);
+                        const r = await prepareImage(file, imgPresetOf(key));
+                        if (r.blurry && !window.confirm(BLUR_CONFIRM)) return;
                         const ref = key + ".r" + i + "." + Date.now();
-                        if (await mediaStore.put(OWNER, ref, data)) up(i, "img", ref);
-                      } catch (err) { setImgErr("사진을 처리하지 못했습니다. 더 작은 파일로 시도하세요."); }
+                        if (await mediaStore.put(OWNER, ref, r.data)) up(i, "img", ref);
+                        else setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요.");
+                      } catch (err) { setImgErr(imgErrText(err)); }
                     }} />
                   )}
                 </td>
@@ -4029,6 +4023,7 @@ function FieldEditor({ sec, f, ws, setField }) {
             ))}
           </tbody>
         </table>
+        <span className="hint">결과 화면 — {imgHintText(imgPresetOf(key))}</span>
         {imgErr && <span className="hint" role="alert" style={{ color: "var(--seal)" }}>{imgErr}</span>}
       </div>
     );

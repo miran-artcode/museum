@@ -30,7 +30,8 @@ export function imgPresetOf(fieldKey) {
 const Q_START = 0.9;   // JPEG 품질 시작
 const Q_MIN = 0.6;     // 이 아래로는 내리지 않고 대신 변을 15%씩 줄인다 — 뭉개진 큰 그림보다 선명한 작은 그림
 const Q_STEP = 0.05;
-export const BLUR_VAR = 12;   // 라플라시안 분산이 이보다 작으면 흐림 경고 (하드 차단이 아니라 확인 질문)
+export const BLUR_VAR = 35;   // 라플라시안 분산이 이보다 작으면 흐림 경고 (하드 차단이 아니라 확인 질문)
+// 헤드리스 브라우저 하네스로 잰 값: 글씨·윤곽이 있는 사진 4000+, 그것을 14px 흐린 것 26, 단색 그러데이션 0.7
 
 /* 파일 → 이미지 요소. 브라우저가 EXIF 회전을 적용한 크기가 naturalWidth/Height로 온다 */
 function loadFile(file) {
@@ -126,6 +127,9 @@ export async function prepareImage(file, preset) {
   throw err("big", { srcW, srcH, preset: p });
 }
 
+/* 조사 이/가 — 마지막 글자의 받침 유무 */
+const ga = (w) => { const c = String(w || "").slice(-1).charCodeAt(0); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0 ? "이" : "가"; };
+
 /* 오류 → 학생에게 보이는 문장 */
 export function imgErrText(e) {
   const code = e && e.code;
@@ -138,7 +142,7 @@ export function imgErrText(e) {
   }
   if (code === "small") {
     const p = e.preset || IMG_PRESETS.photo;
-    return `${p.name}이 너무 작습니다 (${e.srcW}×${e.srcH}px). 긴 변 ${p.minLong}px 이상인 원본을 올려 주세요 — 미리보기·썸네일이나 메신저로 받아 줄어든 사본이 아닌지 확인하세요.`;
+    return `${p.name}${ga(p.name)} 너무 작습니다 (${e.srcW}×${e.srcH}px). 긴 변 ${p.minLong}px 이상인 원본을 올려 주세요 — 미리보기·썸네일이나 메신저로 받아 줄어든 사본이 아닌지 확인하세요.`;
   }
   if (code === "big") return "사진을 줄여도 저장 한도를 넘습니다. 다른 사진으로 시도해 주세요.";
   return "사진을 처리하지 못했습니다. 다른 파일로 다시 시도해 주세요.";
