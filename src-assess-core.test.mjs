@@ -5,7 +5,7 @@ import {
   makePlan, validatePlan, pairsForLateJudge, myPairs, planHash, dSequence,
   bradleyTerry, scaleSeparation, splitHalf, judgeFit, positionBias, connectivity, repeatAgreement, ranksAndBands,
   collectJudgements, aggregate, csvJudgements, csvScores, csvSelf, csvSubmissions, csvJudges, buildSampleAssess, judgeBlockOf,
-  wilson, predPctOf, simText, submissionFromWs, subReady, stableHash, peerCfg, DEFAULT_PEER,
+  wilson, predPctOf, simText, submissionFromWs, subReady, stableHash, peerCfg, DEFAULT_PEER, TAG_OPTIONS, QUALITY_MIN,
 } from "./src-assess-core.mjs";
 
 const sids = (n, from = 20301) => Array.from({ length: n }, (_, i) => String(from + i));
@@ -409,4 +409,28 @@ test("위치 편향은 축(좌우·위아래)별로 나뉘고 판정자 CSV가 �
   const cj = csvJudges({ agg, pidOf: new Map(Object.keys(assessMap).map((s, i) => [s, "P" + (i + 1)])) });
   assert.equal(cj.rows.length, 8);
   assert.equal(cj.head[0], "pid");
+});
+
+test("문헌 결정 반영 — 태그 다섯 보기, 판단 어려움·작성자 짐작 표시, SSR 주의 구간, 반분은 보고 지표", () => {
+  assert.equal(TAG_OPTIONS.length, 5);
+  assert.equal(TAG_OPTIONS[4].k, "whole");
+  assert.equal(DEFAULT_PEER.askConf, false);
+  assert.equal(DEFAULT_PEER.minWhy, 10);
+  assert.equal(QUALITY_MIN.ssrAdopt, 0.8);
+  const { roster, assessMap } = simulate({ n: 12, k: 8, noise: 0.5 });
+  const sid = Object.keys(assessMap)[0];
+  assessMap[sid].judge.p1.items = assessMap[sid].judge.p1.items.map((it, i) => ({ ...it, tag: "whole", hard: i % 2 === 0, knowAuthor: i === 0 }));
+  const agg = aggregate({ roster, assessMap, subMap: {}, cfg: DEFAULT_PEER, splitReps: 5 });
+  assert.ok(agg.quality.tagDist.whole >= 8);
+  assert.ok(agg.quality.hardRate > 0 && agg.quality.knowRate > 0);
+  assert.ok(Array.isArray(agg.cautions));
+  assert.equal(typeof agg.caution, "boolean");
+  assert.ok(agg.quality.splitHalf.medianRaw == null || agg.quality.splitHalf.medianRaw <= agg.quality.splitHalf.median + 1e-9);
+  // 반분 신뢰도가 낮아도 보류 사유(reasons)에는 들어가지 않는다
+  assert.equal(agg.reasons.some((r) => r.includes("반분")), false);
+  Object.values(agg.quality.judges).forEach((f) => assert.equal(typeof f.flag, "boolean"));
+  const cj = csvJudges({ agg, pidOf: (x) => "P" });
+  assert.ok(cj.head.includes("flag") && cj.head.includes("hard_n"));
+  const j = csvJudgements({ roster, assessMap, pidOf: (x) => "P" });
+  assert.ok(j.head.includes("hard") && j.head.includes("know_author"));
 });

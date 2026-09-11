@@ -21,7 +21,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
 import { LikertRow } from "./src-survey-ui.jsx";
 import {
-  ASSESS_VER, CRITERIA, SELF_ITEMS, SELF_LABELS, CONF_LABELS, CHANGE_CODES,
+  ASSESS_VER, CRITERIA, TAG_OPTIONS, SELF_ITEMS, SELF_LABELS, CONF_LABELS, CHANGE_CODES,
   stageAtLeast, peerCfg, MIN_WHY_CHANGE, REASON_MAX, DUP_SIM,
   submissionFromWs, myPairs, simText, predPctOf, judgeBlockOf,
 } from "./src-assess-core.mjs";
@@ -601,6 +601,8 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
   const [why, setWhy] = useState("");
   const [tag, setTag] = useState(null);
   const [openPlate, setOpenPlate] = useState(false);
+  const [hard, setHard] = useState(false);        // 판단이 어려웠다 — 동점 대신 두는 선택 표시 (점수 계산에는 쓰지 않는다)
+  const [know, setKnow] = useState(false);        // 누구 작품인지 알 것 같다 — 익명성 민감도 분석용
   const [warn, setWarn] = useState("");
   const [busy, setBusy] = useState(false);
   const [saveErr, setSaveErr] = useState(false);
@@ -628,7 +630,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
   useEffect(() => {
     startRef.current = Date.now();
     loadedRef.current = { a: false, b: false };
-    setWin(null); setConf(null); setWhy(""); setTag(null); setOpenPlate(false);
+    setWin(null); setConf(null); setWhy(""); setTag(null); setOpenPlate(false); setHard(false); setKnow(false);
     setWarn(""); setDupOk(false); setFastOk(false); setSeen({ a: false, b: false });
     everOpened.current = false;
   }, [curKey]);
@@ -721,7 +723,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
       : (typeof window !== "undefined" && window.innerWidth <= PAIR_STACK_PX ? "y" : "x");
     const rec = {
       i: cur.i != null ? cur.i : doneN, a: cur.a, b: cur.b, left: cur.left || "a", rep: cur.rep == null ? null : cur.rep,
-      win, conf: cfg.askConf ? conf : null, why: w, tag, ms, fastOverride: fastOk && ms < cfg.minSec * 1000,
+      win, conf: cfg.askConf ? conf : null, hard, knowAuthor: know, why: w, tag, ms, fastOverride: fastOk && ms < cfg.minSec * 1000,
       plateOpened: everOpened.current || openPlate, axis, vw: typeof window !== "undefined" ? window.innerWidth : null, at: nowISO(),
     };
     const list = items.concat(rec);
@@ -794,6 +796,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
       <div className="card-note">
         우리 반 작품을 두 점씩 견줍니다. 작품 번호만 보이고 누구의 작품인지는 나오지 않습니다.
         매번 한 쪽을 고르고 그 이유를 한 문장으로 써 주세요. 고른 것은 되돌릴 수 없습니다.
+        <div className="as-banner">이 반의 모든 작품은 AI 이미지 도구로 만들었고, 작품 캡션은 학생이 썼습니다. 각 작품의 AI 활용 범위는 비교가 끝난 뒤 전시장에서 공개됩니다.</div>
       </div>
       <div className="card-body">
         <div className="as-prog">
@@ -844,11 +847,16 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
             <div className="field">
               <label>무엇이 결정적이었나요?</label>
               <div className="as-opts" role="radiogroup" aria-label="결정적이었던 것">
-                {CRITERIA.map((t) => (
+                {TAG_OPTIONS.map((t) => (
                   <button type="button" key={t.k} role="radio" aria-checked={tag === t.k} className={tag === t.k ? "on" : ""} title={t.desc}
                     onClick={() => { setTag(t.k); setWarn(""); }}>{t.label}</button>
                 ))}
               </div>
+            </div>
+            <div className="as-checks">
+              <label><input type="checkbox" checked={hard} onChange={(e) => setHard(e.target.checked)} /> 판단이 어려웠다</label>
+              <label><input type="checkbox" checked={know} onChange={(e) => setKnow(e.target.checked)} /> 누구 작품인지 알 것 같다</label>
+              <span className="hint">둘 다 선택 사항입니다. 점수에는 쓰지 않고, 판정이 어떤 조건에서 이루어졌는지 기록하는 데만 씁니다.</span>
             </div>
 
             {warn && <div className="warn-note" role="alert">{warn}</div>}
@@ -872,6 +880,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
 function ResultScreen({ cfg, result, self }) {
   const r = result || {};
   const reveal = cfg.reveal;
+  const [showPos, setShowPos] = useState(false);   // 자리(밴드·백분위·등수)는 이유를 읽은 뒤 스스로 눌러야 보인다
   const n = r.n || 0;
   let pos = null;
   if (r.rank == null || r.band == null) {
@@ -888,7 +897,10 @@ function ResultScreen({ cfg, result, self }) {
   const received = Array.isArray(r.received) ? r.received : [];
   const won = received.filter((x) => x && x.won);
   const lost = received.filter((x) => x && !x.won);
-  const tagLabel = (k) => { const t = CRITERIA.find((c) => c.k === k); return t ? t.label : ""; };
+  const tagLabel = (k) => { const t = TAG_OPTIONS.find((c) => c.k === k); return t ? t.label : ""; };
+  const tagCount = {};
+  received.forEach((x) => { if (x && x.tag) tagCount[x.tag] = (tagCount[x.tag] || 0) + 1; });
+  const tagLine = TAG_OPTIONS.filter((t) => tagCount[t.k]).map((t) => t.label + " " + tagCount[t.k]).join(" · ");
   /* 예측과 실제의 차이는 방향만 말한다 — 숫자를 크게 보이면 등수표처럼 읽힌다 */
   const predWord = (pp) => {
     if (typeof pp !== "number" || typeof r.pct !== "number") return null;
@@ -910,24 +922,35 @@ function ResultScreen({ cfg, result, self }) {
     <div className="card as-card">
       <div className="card-head"><span className="card-code">결과</span><span className="card-title">내 작품 {r.no ? "(" + r.no + ")" : ""}이 놓인 자리</span>
         <span className="card-sess">{fmtT(r.aggAt)} 집계</span></div>
-      <div className="card-note">같은 반 친구들이 두 작품씩 견주며 남긴 판단을 모은 것입니다. 누가 어떻게 판정했는지는 나오지 않습니다.</div>
+      <div className="card-note">같은 반 친구들이 두 작품씩 견주며 남긴 판단을 모은 것입니다. 누가 어떻게 판정했는지는 나오지 않습니다. 이유를 먼저 읽고, 자리는 그 뒤에 봅니다.</div>
       <div className="card-body">
-        {pos ? <div className="as-pos">{pos}</div> : <div className="hint" style={{ marginBottom: 8 }}>이 작품은 아직 비교된 적이 없어 자리를 말할 수 없습니다.</div>}
-        <p className="as-plays">
-          이 작품은 {typeof r.plays === "number" ? r.plays + "번" : "여러 번"} 비교되었고,
-          {typeof r.wins === "number" ? " 그 가운데 " + r.wins + "번" : " 그 가운데 몇 번"} 더 성립하는 쪽으로 골라졌습니다.
-        </p>
-        {(w1 || w2) && (
-          <p className="as-plays">
-            내 예측과 견주면 {w1 ? "자기평가 ①의 " + w1 : ""}{w1 && w2 ? ", " : ""}{w2 ? "자기평가 ②의 " + w2 : ""}입니다.
-          </p>
-        )}
+        {tagLine && <p className="as-plays">심사자들이 결정적이었다고 고른 것 — {tagLine}</p>}
         <div className="as-h">이 작품을 고른 판정의 이유 ({won.length})</div>
         {won.length ? list(won) : <p className="hint">기록된 문장이 없습니다.</p>}
         <div className="as-h">다른 작품을 고른 판정의 이유 ({lost.length})</div>
         {lost.length ? list(lost) : <p className="hint">기록된 문장이 없습니다.</p>}
+        <div className="as-h">이 작품이 놓인 자리</div>
+        {!showPos ? (
+          <button type="button" className="btn small ghost" onClick={() => setShowPos(true)}>자리 보기</button>
+        ) : (
+          <div>
+            {pos ? <div className="as-pos">{pos}</div> : <div className="hint" style={{ marginBottom: 8 }}>이 작품은 아직 비교된 적이 없어 자리를 말할 수 없습니다.</div>}
+            {reveal !== "band" && (
+              <p className="as-plays">
+                이 작품은 {typeof r.plays === "number" ? r.plays + "번" : "여러 번"} 비교되었고,
+                {typeof r.wins === "number" ? " 그 가운데 " + r.wins + "번" : " 그 가운데 몇 번"} 더 성립하는 쪽으로 골라졌습니다.
+              </p>
+            )}
+            {(w1 || w2) && (
+              <p className="as-plays">
+                내 예측과 견주면 {w1 ? "자기평가 ①의 " + w1 : ""}{w1 && w2 ? ", " : ""}{w2 ? "자기평가 ②의 " + w2 : ""}입니다.
+              </p>
+            )}
+            {r.caution && <p className="hint">이번 심사는 판정 수가 넉넉하지 않아 자리의 폭이 넓습니다. 한 칸 위아래는 같은 자리로 읽어도 됩니다.</p>}
+          </div>
+        )}
         <div className="as-fixed">
-          이 결과는 성적이 아닙니다. 비교 횟수가 많지 않아 자리는 넉넉한 폭으로 읽어야 하고,
+          이 자리는 오늘 이 심사에서 작품이 놓인 위치이며 점수가 아닙니다. 비교 횟수가 많지 않아 자리는 넉넉한 폭으로 읽어야 하고,
           한 판정자의 문장보다 여러 문장이 겹치는 지점이 내 작품을 다시 보는 실마리입니다.
         </div>
       </div>
@@ -1011,6 +1034,10 @@ const ASSESS_CSS = `
 .as-work .btn{align-self:stretch;text-align:center}
 .as-work .btn:disabled{opacity:.45;cursor:not-allowed}
 .as-tools{display:flex;align-items:center;gap:10px;margin:12px 0;flex-wrap:wrap}
+.as-banner{margin-top:6px;padding:6px 8px;border:1px dashed var(--line);background:#fff;color:var(--ink);font-size:12px}
+.as-checks{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:4px 0 12px;font-size:13px}
+.as-checks label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.as-checks input{margin:0;width:16px;height:16px}
 
 /* 결과 */
 .as-pos{font-family:var(--serif);font-size:17px;font-weight:700;line-height:1.5;margin-bottom:8px}

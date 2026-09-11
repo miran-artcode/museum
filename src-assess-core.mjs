@@ -46,6 +46,10 @@ export const CHANGE_CODES = [
   { k: "other", label: "그 밖의 이유" },
 ];
 
+/* 결정적 축 태그 — 4축 + 「전체 인상」. 고른 뒤에 묻는 태그이므로 총체적 판단(Leech & Chambers 2022)을 억지로
+   한 축에 끼워 넣지 않게 다섯째 보기를 둔다. 「노력」은 두지 않는다(AI 고지 감점의 통로가 노력 지각이다 — Bellaiche 2023·Magni 2023) */
+export const TAG_OPTIONS = CRITERIA.concat([{ k: "whole", label: "전체 인상", desc: "어느 한 축이 아니라 전체가 그렇게 보였다" }]);
+
 export const PEER_QUESTION =
   "두 작품 가운데, 실재한 적 없는 유물을 더 설득력 있게 성립시킨 쪽은 어디인가요? (이미지 · 작품 캡션 · 허구 고지가 함께 작동해서)";
 
@@ -60,19 +64,27 @@ export const STAGES = [
 export const STAGE_ORDER = STAGES.map((s) => s.k);
 export const stageAtLeast = (stage, target) => STAGE_ORDER.indexOf(stage) >= STAGE_ORDER.indexOf(target);
 
-/* 기본 설정. k=12·반복 1은 24~30명 학급에서 작품당 24회 안팎의 노출을 만든다 —
-   비교판단 메타분석이 SSR .8 부근에 이르는 데 충분하다고 본 작품당 10~20회를 넘는다 */
+/* 기본 설정. k=12·반복 1은 24~30명 학급에서 작품당 24회 노출을 만든다 — 작품당 20회 이상이면 SSR .80이
+   일반적이라는 메타분석(Kinnear 외 2025; Verhavert 외 2019; Crompvoets 외 2020)에 맞춘 값이다. 교사는 10 아래로 내리지 않는다.
+   확신도 단추는 기본으로 끈다 — 강제선택에 등급 응답을 더하면 시간만 늘고 정확도는 늘지 않았다(Mantiuk 외 2012);
+   대신 「판단이 어려웠다」 표시 하나를 늘 둔다. 이유 문장의 하한 10자는 빈칸·자리표시를 막는 선이고, 15자 미만은 표시(flag)로만 센다. */
 export const DEFAULT_PEER = {
-  stage: "closed", k: 12, repeat: 1, minSec: 5, minWhy: 15, askConf: true, reveal: "band", question: PEER_QUESTION,
+  stage: "closed", k: 12, repeat: 1, minSec: 5, minWhy: 10, askConf: false, reveal: "band", question: PEER_QUESTION,
 };
+export const K_FLOOR = 10;             // 교사 화면의 k 하한 (작품이 그보다 적으면 n−1로 잘린다)
 export const peerCfg = (cfgAll) => ({ ...DEFAULT_PEER, ...((cfgAll && cfgAll.peer) || {}) });
 export const MIN_WHY_CHANGE = 8;
 export const REASON_MAX = 200;
 export const FAST_MS = 5000;           // 이보다 빠른 판정은 「빠른 판정」으로 센다 (삭제하지 않는다)
 export const DUP_SIM = 0.8;            // 이유 문장 2-gram 자카드가 이 이상이면 중복으로 본다
 export const AGAINST_GAP = 0.5;        // θ 차가 이 이상인 쌍에서 반대로 고르면 역방향 판정
-export const INFIT_FLAG = 1.3;         // Rasch 관행의 주의 기준 — 판정 12건이면 표준오차가 커서 참고만 한다
-export const QUALITY_MIN = { ssr: 0.7, splitHalf: 0.7, perWork: 10 };   // 이 아래면 결과 공개 보류 권고
+export const INFIT_BAND = [0.5, 1.5];  // Rasch 관행의 infit 허용 구간(Linacre) — 밖이면 표시. 판정 12건이면 표준오차가 커서 참고만 한다
+export const INFIT_FLAG = 1.5;         // (호환) 위 구간의 상한
+export const SHORT_WHY = 15;           // 이유 문장이 이보다 짧으면 표시(flag) — 문헌 근거가 없는 값이라 차단 기준으로는 쓰지 않는다
+/* 공개 기준. SSR .80 이상이면 밴드 공개, .70~.80은 주의 문구와 함께, .70 미만이면 보류 권고(Kinnear 외 2025: SSR .80일 때
+   판정자 반분 신뢰도가 .70을 넘는 자료가 9할). 반분 신뢰도는 반쪽 자료의 작품당 노출이 12회뿐이라 낮게 나오는 것이 정상이므로
+   합격 기준이 아니라 보고 지표다. 작품당 10회 미만은 어떤 기준으로도 부족하다. */
+export const QUALITY_MIN = { ssr: 0.7, ssrAdopt: 0.8, splitHalf: 0.7, perWork: 10 };
 
 /* ---------- 잡동사니 ---------- */
 
@@ -547,6 +559,7 @@ export function collectJudgements(assessMap, roster, opts) {
         chosenLeft: it.win === it.left,
         conf: Number.isFinite(it.conf) ? it.conf : null, why: trimStr(it.why), tag: it.tag || "",
         ms: Number.isFinite(it.ms) ? it.ms : null, plateOpened: !!it.plateOpened, fastOverride: !!it.fastOverride,
+        hard: !!it.hard, knowAuthor: !!it.knowAuthor,
         axis: it.axis === "y" ? "y" : it.axis === "x" ? "x" : null, vw: Number.isFinite(it.vw) ? it.vw : null,
         rep: it.rep == null ? null : it.rep, at: it.at || "",
       });
@@ -638,7 +651,7 @@ function pearson(xs, ys) {
 export function splitHalf(judgements, workNos, opts = {}) {
   const by = opts.by || "judges", reps = opts.reps || 25, seed = opts.seed || "split";
   const main = (judgements || []).filter((J) => J.rep == null);
-  const values = [];
+  const values = [], raw = [];
   let failed = 0;
   const fitPair = (h1, h2) => {
     const b1 = bradleyTerry(h1, workNos), b2 = bradleyTerry(h2, workNos);
@@ -646,11 +659,12 @@ export function splitHalf(judgements, workNos, opts = {}) {
     if (common.length < 3) return null;
     const r = pearson(common.map((no) => b1.theta[no]), common.map((no) => b2.theta[no]));
     if (r == null) return null;
+    raw.push(r);
     return (2 * r) / (1 + r);
   };
   if (by === "judges") {
     const judges = Array.from(new Set(main.map((J) => J.judge))).sort(cmp);
-    if (judges.length < 4) return { median: null, values, failed: reps, n: 0 };
+    if (judges.length < 4) return { median: null, medianRaw: null, values, raw, failed: reps, n: 0 };
     for (let rep = 0; rep < reps; rep += 1) {
       const order = shuffled(judges, mulberry32(stableHash(seed + "::" + rep)));
       const half = new Set(order.slice(0, Math.floor(order.length / 2)));
@@ -664,7 +678,8 @@ export function splitHalf(judgements, workNos, opts = {}) {
       if (v == null) failed += 1; else values.push(v);
     }
   }
-  return { median: median(values), values, failed, n: values.length };
+  // median: 스피어만–브라운 보정값(전체 길이 추정), medianRaw: 문헌이 보고하는 반쪽끼리의 상관 그대로
+  return { median: median(values), medianRaw: median(raw), values, raw, failed, n: values.length };
 }
 
 /* 판정자 적합도 — 성적이 아니라 수업 자료. 제외 근거로 쓰지 않는다 */
@@ -687,7 +702,7 @@ export function judgeFit(judgements, theta) {
         if (Math.abs(ta - tb) >= AGAINST_GAP) { nGap += 1; if ((ta > tb) !== (y === 1)) against += 1; }
       }
       if (J.why) {
-        if (J.why.length < 15) shortN += 1;
+        if (J.why.length < SHORT_WHY) shortN += 1;
         if (whys.some((w) => simText(w, J.why) >= DUP_SIM)) dup += 1;
         whys.push(J.why);
       }
@@ -703,7 +718,16 @@ export function judgeFit(judgements, theta) {
       dupWhyN: dup, shortWhyN: shortN,
       confMean: mean(items.map((J) => J.conf)),
       plateOpenRate: items.length ? items.filter((J) => J.plateOpened).length / items.length : null,
+      hardN: items.filter((J) => J.hard).length,
+      knowN: items.filter((J) => J.knowAuthor).length,
     };
+  });
+  // 상대 기준 — 학급 평균 + 2SD 위의 infit도 표시한다 (Pollitt 2012의 ACJ 관행)
+  const infits = Object.values(out).map((f) => f.infit).filter((x) => Number.isFinite(x));
+  const mu = mean(infits);
+  const sd = infits.length > 1 ? Math.sqrt(infits.reduce((a, x) => a + (x - mu) ** 2, 0) / (infits.length - 1)) : 0;
+  Object.values(out).forEach((f) => {
+    f.flag = Number.isFinite(f.infit) && (f.infit < INFIT_BAND[0] || f.infit > INFIT_BAND[1] || (sd > 0 && f.infit > mu + 2 * sd));
   });
   return out;
 }
@@ -836,13 +860,15 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
     medianMs: median(main.map((x) => x.ms)),
     fastN: main.filter((x) => Number.isFinite(x.ms) && x.ms < FAST_MS).length,
     fastOverrideN: main.filter((x) => x.fastOverride).length,
+    hardRate: main.length ? main.filter((x) => x.hard).length / main.length : null,
+    knowRate: main.length ? main.filter((x) => x.knowAuthor).length / main.length : null,
     droppedN: cstats.dropped || 0, droppedJudges: cstats.droppedJudges || [],
     dupWhyN: 0,
     tagDist: {}, plateOpenRate: main.length ? main.filter((x) => x.plateOpened).length / main.length : null,
     confMean: mean(main.map((x) => x.conf)),
     converged: bt.converged, iterations: bt.iterations,
   };
-  CRITERIA.forEach((c) => { quality.tagDist[c.k] = main.filter((x) => x.tag === c.k).length; });
+  TAG_OPTIONS.forEach((c) => { quality.tagDist[c.k] = main.filter((x) => x.tag === c.k).length; });
   Object.values(quality.judges).forEach((f) => { quality.dupWhyN += f.dupWhyN; });
 
   const aggAt = new Date().toISOString();
@@ -872,14 +898,19 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
   });
   works.sort((x, y) => x.rank - y.rank);
 
+  const cautions = [];
   if (!main.length) reasons.push("판정이 아직 없습니다.");
   if (quality.perWorkMean < QUALITY_MIN.perWork) reasons.push("작품당 평균 비교 수가 " + fmtNum(quality.perWorkMean, 1) + "회로 " + QUALITY_MIN.perWork + "회에 못 미칩니다.");
   if (!quality.connectivity.connected) reasons.push("비교 그래프가 하나로 이어지지 않습니다 — 아직 판정하지 않은 학생이 있으면 기다리고, 모두 마쳤는데도 그렇다면 명단을 다시 확정해야 합니다.");
   if (quality.droppedN) reasons.push("배정표와 맞지 않는 판정 " + quality.droppedN + "건을 제외했습니다 (" + quality.droppedJudges.join(", ") + ").");
   if (quality.ssr != null && quality.ssr < QUALITY_MIN.ssr) reasons.push("척도분리신뢰도(SSR)가 " + fmtNum(quality.ssr) + "로 " + QUALITY_MIN.ssr + " 아래입니다.");
-  if (quality.splitHalf.median != null && quality.splitHalf.median < QUALITY_MIN.splitHalf) reasons.push("판정자 반분 신뢰도 중앙값이 " + fmtNum(quality.splitHalf.median) + "로 " + QUALITY_MIN.splitHalf + " 아래입니다.");
-  if (quality.splitHalf.median == null && main.length) reasons.push("반분 신뢰도를 계산할 만큼 판정자가 모이지 않았습니다.");
-  return { works, quality, results, ok: reasons.length === 0, reasons, aggAt };
+  else if (quality.ssr != null && quality.ssr < QUALITY_MIN.ssrAdopt) cautions.push("SSR " + fmtNum(quality.ssr) + " — 논문 채택 기준 " + QUALITY_MIN.ssrAdopt + "에는 못 미칩니다. 공개는 되지만 결과 화면의 주의 문구가 켜지고, 판정을 더 받으면 나아집니다.");
+  if (quality.splitHalf.median != null && quality.splitHalf.median < QUALITY_MIN.splitHalf) cautions.push("판정자 반분 신뢰도 중앙값 " + fmtNum(quality.splitHalf.median) + "(보정 전 " + fmtNum(quality.splitHalf.medianRaw) + ") — 반쪽 자료의 작품당 노출이 절반이라 낮게 나오는 것이 보통이므로 보고 지표로만 둡니다.");
+  if (quality.splitHalf.median == null && main.length) cautions.push("반분 신뢰도를 계산할 만큼 판정자가 모이지 않았습니다.");
+  if (quality.knowRate != null && quality.knowRate >= 0.2) cautions.push("판정의 " + Math.round(quality.knowRate * 100) + "%에서 「누구 작품인지 알 것 같다」가 표시됐습니다 — 익명성 민감도 분석이 필요합니다.");
+  const caution = reasons.length === 0 && cautions.length > 0;
+  Object.keys(results).forEach((sid) => { results[sid].caution = caution; results[sid].ssr = quality.ssr; });
+  return { works, quality, results, ok: reasons.length === 0, caution, reasons, cautions, aggAt };
 }
 
 /* ---------- CSV ---------- */
@@ -903,12 +934,12 @@ export function csvSubmissions({ roster, subMap, pidOf }) {
 /* 판정 단위 CSV — 이 명단의 판정은 배정표 대조를 거친 것(valid=1)만, 옛 명단·대조 탈락 항목은 valid=0으로 함께 */
 export function csvJudgements({ roster, assessMap, pidOf }) {
   const pid = pidFn(pidOf);
-  const head = ["pid", "roster_ver", "valid", "screen_i", "work_a", "work_b", "left", "rep_of", "win", "win_no", "chosen_first", "axis", "vw", "conf", "tag", "ms", "fast_override", "plate_opened", "why_len", "why", "at"];
+  const head = ["pid", "roster_ver", "valid", "screen_i", "work_a", "work_b", "left", "rep_of", "win", "win_no", "chosen_first", "axis", "vw", "conf", "hard", "know_author", "tag", "ms", "fast_override", "plate_opened", "why_len", "why", "at"];
   const rows = [];
   const J = collectJudgements(assessMap, roster);
   const cur = new Set(J.map((x) => x.judge + "#" + x.i));
   J.forEach((x) => rows.push([pid(x.judge), roster && roster.fixedAt, 1, x.i, x.a, x.b, x.left, x.rep == null ? "" : x.rep, x.win, x.winNo, x.chosenLeft ? 1 : 0,
-    x.axis || "", x.vw, x.conf, x.tag, x.ms, x.fastOverride ? 1 : 0, x.plateOpened ? 1 : 0, x.why.length, x.why, x.at].map(cell)));
+    x.axis || "", x.vw, x.conf, x.hard ? 1 : 0, x.knowAuthor ? 1 : 0, x.tag, x.ms, x.fastOverride ? 1 : 0, x.plateOpened ? 1 : 0, x.why.length, x.why, x.at].map(cell)));
   Object.keys(assessMap || {}).sort(cmp).forEach((sid) => {
     const judge = (assessMap[sid] && assessMap[sid].judge) || {};
     Object.keys(judge).sort(cmp).forEach((key) => {
@@ -919,7 +950,7 @@ export function csvJudgements({ roster, assessMap, pidOf }) {
         if (!it || (it.win !== "a" && it.win !== "b")) return;
         if (isCur && cur.has(sid + "#" + it.i)) return;   // 위에서 이미 내보낸 유효 판정
         rows.push([pid(sid), b.rosterVer || "", 0, it.i, it.a, it.b, it.left, it.rep == null ? "" : it.rep, it.win, it.win === "a" ? it.a : it.b, it.win === it.left ? 1 : 0,
-          it.axis || "", it.vw, it.conf, it.tag, it.ms, it.fastOverride ? 1 : 0, it.plateOpened ? 1 : 0, trimStr(it.why).length, trimStr(it.why), it.at].map(cell));
+          it.axis || "", it.vw, it.conf, it.hard ? 1 : 0, it.knowAuthor ? 1 : 0, it.tag, it.ms, it.fastOverride ? 1 : 0, it.plateOpened ? 1 : 0, trimStr(it.why).length, trimStr(it.why), it.at].map(cell));
       });
     });
   });
@@ -929,11 +960,11 @@ export function csvJudgements({ roster, assessMap, pidOf }) {
 /* 판정자 단위 CSV — 적합도·역방향률·위치·시간·이유 품질 (설계 §7 judgeFit) */
 export function csvJudges({ agg, pidOf }) {
   const pid = pidFn(pidOf);
-  const head = ["pid", "n", "infit", "outfit", "against", "n_gap", "against_rate", "left_rate", "median_ms", "fast_n", "dup_why_n", "short_why_n", "conf_mean", "plate_open_rate"];
+  const head = ["pid", "n", "infit", "outfit", "flag", "against", "n_gap", "against_rate", "left_rate", "median_ms", "fast_n", "dup_why_n", "short_why_n", "conf_mean", "plate_open_rate", "hard_n", "know_n"];
   const judges = (agg && agg.quality && agg.quality.judges) || {};
   const rows = Object.keys(judges).sort(cmp).map((sid) => {
     const f = judges[sid];
-    return [pid(sid), f.n, r3(f.infit), r3(f.outfit), f.against, f.nGap, r3(f.againstRate), r3(f.leftRate), f.medianMs, f.fastN, f.dupWhyN, f.shortWhyN, r3(f.confMean), r3(f.plateOpenRate)].map(cell);
+    return [pid(sid), f.n, r3(f.infit), r3(f.outfit), f.flag ? 1 : 0, f.against, f.nGap, r3(f.againstRate), r3(f.leftRate), f.medianMs, f.fastN, f.dupWhyN, f.shortWhyN, r3(f.confMean), r3(f.plateOpenRate), f.hardN, f.knowN].map(cell);
   });
   return { head, rows };
 }
@@ -999,7 +1030,7 @@ export function buildSampleAssess(ids) {
     const items = (roster.plan[sid] || []).map((it) => {
       const P = sigmoid(truth[it.a] - truth[it.b] + (rnd() - 0.5) * 1.2);
       const win = rnd() < P ? "a" : "b";
-      return { ...it, win, conf: 2 + Math.floor(rnd() * 4), why: WHY[(si + it.i) % WHY.length], tag: CRITERIA[(si + it.i) % 4].k,
+      return { ...it, win, conf: null, hard: rnd() < 0.25, knowAuthor: rnd() < 0.05, why: WHY[(si + it.i) % WHY.length], tag: TAG_OPTIONS[(si + it.i) % TAG_OPTIONS.length].k,
         ms: 9000 + Math.floor(rnd() * 40000), plateOpened: rnd() < 0.6, at: "2026-04-02T05:3" + (it.i % 10) + ":00.000Z" };
     });
     const own = works.find((w) => w.sid === sid);

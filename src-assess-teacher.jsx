@@ -18,7 +18,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
 import {
-  STAGES, STAGE_ORDER, CRITERIA, ROSTER_VER, FAST_MS, INFIT_FLAG, QUALITY_MIN,
+  STAGES, STAGE_ORDER, TAG_OPTIONS, ROSTER_VER, FAST_MS, INFIT_BAND, QUALITY_MIN, K_FLOOR,
   peerCfg, subReady, makePlan, aggregate, judgeBlockOf,
   csvSubmissions, csvJudgements, csvSelf, csvScores, csvJudges, buildSampleAssess, fmtNum,
 } from "./src-assess-core.mjs";
@@ -26,10 +26,10 @@ import {
 const SPLIT_REPS = 25;          // 반분 신뢰도 반복 수 — 교사 브라우저에서 몇 초 안에 끝나는 크기
 /* 두 층의 기준을 구분해 보여 준다 — 공개 보류 권고(QUALITY_MIN, core가 ok/reasons를 만든다)와
    논문 채택 기준(research-design.md §4.5: SSR ≥ .80, 반분 중앙값 ≥ .70). 사이 값은 색 없이 둔다 */
-const SSR_ADOPT = 0.80;
-const SPLIT_ADOPT = 0.70;
+const SSR_ADOPT = QUALITY_MIN.ssrAdopt;
+const SPLIT_ADOPT = QUALITY_MIN.splitHalf;
 const FAST_SEC = Math.round(FAST_MS / 1000);
-const K_MIN = 4, K_MAX = 30;
+const K_MIN = K_FLOOR, K_MAX = 30;   // 작품당 20회 노출(k≥10)이 SSR .80의 계획 기준 — 작품이 적으면 core가 n−1로 자른다
 
 /* 단계를 바꾸기 전에 띄우는 확인 문장 — 학생 화면에 무엇이 나타나는지를 말한다 */
 const STAGE_CONFIRM = {
@@ -353,7 +353,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
   const wr = sampleMode ? "표본 학급" : undefined;   // 쓰기 단추의 title
   const q = (shownAgg && shownAgg.quality) || null;
   const judgesFit = q && q.judges ? Object.keys(q.judges).sort() : [];
-  const flagged = (f) => !!f && ((f.infit != null && f.infit > INFIT_FLAG) || (f.againstRate != null && f.againstRate > 0.4) || (f.fastN != null && f.fastN >= 3));
+  const flagged = (f) => !!f && (f.flag || (f.againstRate != null && f.againstRate > 0.4) || (f.fastN != null && f.fastN >= 3));
   /* 세 단계 색: 채택 기준 이상이면 초록, 보류 기준 아래면 붉은색, 그 사이는 색 없음 */
   const tri = (v, adopt, hold) => (v == null ? null : v >= adopt ? true : v < hold ? false : null);
   const canReveal = !sampleMode && !!shownAgg && cfg.stage !== "result" && (shownAgg.ok !== false || override);
@@ -413,11 +413,11 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
               <input type="number" min={0} max={60} value={live.minSec} disabled={sampleMode} onChange={(e) => edit("minSec", e.target.value)} />
             </div>
             <div className="field">
-              <label>이유 최소 글자 수</label>
+              <label>이유 최소 글자 수 <span className="hint">— 15자 미만은 표시로만 센다</span></label>
               <input type="number" min={0} max={100} value={live.minWhy} disabled={sampleMode} onChange={(e) => edit("minWhy", e.target.value)} />
             </div>
             <div className="field">
-              <label>판정 확신도(5단계)</label>
+              <label>판정 확신도(5단계) <span className="hint">— 기본 끔. 「판단이 어려웠다」 표시는 늘 있음</span></label>
               <div className="seg">
                 <button type="button" className={live.askConf ? "on-ok" : ""} disabled={sampleMode} onClick={() => edit("askConf", true)}>묻기</button>
                 <button type="button" className={!live.askConf ? "on-no" : ""} disabled={sampleMode} onClick={() => edit("askConf", false)}>묻지 않기</button>
@@ -535,7 +535,8 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
           {sampleMode && <span className="card-sess">표본</span>}</div>
         <div className="card-note">
           승률만 쓰면 센 상대와 붙어 진 작품이 밀립니다. 브래들리–테리 θ 옆에 승/노출을 함께 두어 모형을 몰라도 읽히게 했습니다.
-          공개 보류 권고: SSR·반분 중앙값 &lt; {QUALITY_MIN.ssr}, 작품당 비교 &lt; {QUALITY_MIN.perWork}회, 그래프 단절. 논문 채택 기준(연구 설계 §4.5)은 더 높습니다 — SSR ≥ {SSR_ADOPT}, 반분 중앙값 ≥ {SPLIT_ADOPT}.
+          공개 보류 권고: SSR &lt; {QUALITY_MIN.ssr}, 작품당 비교 &lt; {QUALITY_MIN.perWork}회, 그래프 단절, 배정 밖 판정. SSR {QUALITY_MIN.ssr}~{SSR_ADOPT}는 주의 문구와 함께 공개됩니다.
+          판정자 반분 신뢰도는 반쪽 자료라 낮게 나오는 것이 보통이므로 보고 지표입니다(논문 기준 SSR ≥ {SSR_ADOPT}, 반분 ≥ {SPLIT_ADOPT} — 쌍대비교_구현_근거.md).
         </div>
         <div className="card-body">
           <div className="at-row">
@@ -564,14 +565,20 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
                   같은 자료에 즉석 쌍을 덧붙이지 말고, 미완료 학생의 판정을 받은 뒤 다시 집계합니다.
                 </div>
               )}
-              {shownAgg.ok !== false && <div className="ok-note">신뢰도 기준을 통과했습니다. 결과를 공개할 수 있습니다.</div>}
+              {shownAgg.ok !== false && !shownAgg.caution && <div className="ok-note">신뢰도 기준을 통과했습니다. 결과를 공개할 수 있습니다.</div>}
+              {shownAgg.ok !== false && shownAgg.caution && (
+                <div className="ok-note" style={{ borderColor: "var(--amber)", color: "var(--amber)", background: "#FBF6E9" }}>
+                  <b>공개는 되지만 주의가 붙습니다.</b>
+                  <ul className="at-errs">{(shownAgg.cautions || []).map((r, i) => <li key={i}>{r}</li>)}</ul>
+                </div>
+              )}
 
               <div className="sv-block-t" style={{ marginTop: 0 }}>품질 지표</div>
               <div className="kpis at-kpis">
                 <QTile n={num(q && q.ssr)} l="SSR (척도 분리 신뢰도)" s={"채택 ≥ " + SSR_ADOPT + " · 보류 < " + QUALITY_MIN.ssr} ok={tri(q && q.ssr, SSR_ADOPT, QUALITY_MIN.ssr)} />
-                <QTile n={num(q && q.splitHalf && q.splitHalf.median)} l="반분 신뢰도 중앙값"
-                  s={q && q.splitHalf ? SPLIT_REPS + "회 · 계산 실패 " + (q.splitHalf.failed || 0) + " · 채택 ≥ " + SPLIT_ADOPT + " · 보류 < " + QUALITY_MIN.splitHalf : ""}
-                  ok={tri(q && q.splitHalf && q.splitHalf.median, SPLIT_ADOPT, QUALITY_MIN.splitHalf)} />
+                <QTile n={num(q && q.splitHalf && q.splitHalf.median)} l="판정자 반분 신뢰도 (스피어만–브라운)"
+                  s={q && q.splitHalf ? "보정 전 r " + num(q.splitHalf.medianRaw) + " · " + SPLIT_REPS + "회 · 계산 실패 " + (q.splitHalf.failed || 0) + " · 보고 지표(기준 " + SPLIT_ADOPT + ")" : ""}
+                  ok={q && q.splitHalf && q.splitHalf.median != null ? (q.splitHalf.median >= SPLIT_ADOPT ? true : null) : null} />
                 <QTile n={num(q && q.perWorkMean, 1)} l="작품당 평균 비교 수" s={"본 판정 " + (q ? q.nJudgements : "-") + "건 · 보류 < " + QUALITY_MIN.perWork + " · 보수적 목표 20"} ok={tri(q && q.perWorkMean, 20, QUALITY_MIN.perWork)} />
                 <QTile n={(q ? q.nJudgesDone : "-") + " / " + (q ? q.nJudges : "-")} l="판정자 (완료 / 전체)" />
                 <QTile n={pct(q && q.position && q.position.leftRate)} l="먼저 놓인 쪽(왼쪽·위) 선택률 — 위치 편향"
@@ -587,11 +594,13 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
                 <QTile n={q && q.droppedN != null ? q.droppedN : "-"} l="배정표와 맞지 않아 제외한 판정" s={q && q.droppedJudges && q.droppedJudges.length ? q.droppedJudges.join(", ") : "학생 문서에 배정에 없는 판정이 있으면 집계에서 뺀다"} ok={q && q.droppedN != null ? q.droppedN === 0 : null} />
                 <QTile n={q && q.dupWhyN != null ? q.dupWhyN : "-"} l="겹치는 이유 문장" />
                 <QTile n={pct(q && q.plateOpenRate)} l="작품 캡션 펼침률" />
-                <QTile n={num(q && q.confMean, 1)} l="확신도 평균 (1~5)" />
+                <QTile n={pct(q && q.hardRate)} l="「판단이 어려웠다」 비율" />
+                <QTile n={pct(q && q.knowRate)} l="「누구 작품인지 알 것 같다」 비율" ok={q && q.knowRate != null ? q.knowRate < 0.2 : null} />
+                {cfg.askConf && <QTile n={num(q && q.confMean, 1)} l="확신도 평균 (1~5)" />}
               </div>
               {q && q.tagDist && (
                 <p className="hint" style={{ marginBottom: 12 }}>
-                  결정적 축 태그 분포 — {CRITERIA.map((c) => c.label + " " + (q.tagDist[c.k] || 0)).join(" · ")}
+                  결정적 축 태그 분포 — {TAG_OPTIONS.map((c) => c.label + " " + (q.tagDist[c.k] || 0)).join(" · ")}
                 </p>
               )}
 
@@ -620,7 +629,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
                 </table>
               </div>
 
-              <div className="sv-block-t">판정자 적합도 <span className="hint" style={{ fontWeight: 400 }}>— 붉은 줄은 infit &gt; {INFIT_FLAG}, 역방향률 &gt; 40%, {FAST_SEC}초 미만 3건 이상 가운데 하나. <b>성적이 아니라 수업 자료 — 제외하지 않는다.</b> 어떤 축을 태그했는지 보면 기준이 어긋난 지점이 드러납니다.</span></div>
+              <div className="sv-block-t">판정자 적합도 <span className="hint" style={{ fontWeight: 400 }}>— 붉은 줄은 infit이 {INFIT_BAND[0]}~{INFIT_BAND[1]} 밖이거나 학급 평균+2SD 위, 역방향률 &gt; 40%, {FAST_SEC}초 미만 3건 이상 가운데 하나. <b>성적이 아니라 수업 자료 — 제외하지 않는다.</b> 판단 경향이 학급 합의와 다르다는 뜻이지 오류가 아닙니다.</span></div>
               <div className="tbl-scroll">
                 <table className="roster at-click">
                   <thead><tr><th>학번</th><th>별명</th><th>판정 수</th><th>infit</th><th>역방향률</th><th>좌측률</th><th>중앙 초</th><th>{FAST_SEC}초 미만</th><th>중복 이유</th></tr></thead>
