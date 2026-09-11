@@ -43,7 +43,7 @@ const STAGE_CONFIRM = {
 const REVEALS = [
   { k: "band", label: "밴드(상·중·하)" }, { k: "pct", label: "백분위" }, { k: "rank", label: "등수" }, { k: "none", label: "보이지 않음" },
 ];
-const TIMING = "100분 운영표 — 0–5 설명·예시 한 쌍 시연 · 5–12 자기평가① · 12–30 쌍대비교(쌍당 60~90초) · 30–33 집계 실행·신뢰도 확인 · 33–45 자기평가② · 45–60 결과 공개·토의";
+const TIMING = "100분 운영표: 0~5분 설명·예시 한 쌍 시연 · 5~12분 자기평가① · 12~30분 쌍대비교(쌍당 60~90초) · 30~33분 집계 실행·신뢰도 확인 · 33~45분 자기평가② · 45~60분 결과 공개·토의";
 
 /* ---------- 작은 도우미 ---------- */
 
@@ -109,7 +109,7 @@ function QTile({ n, l, s, ok }) {
 export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, onSel }) {
   const idsKey = (ids || []).join("|");
 
-  /* ---- 표본 학급: 결정론적 자료로 모든 표를 채운다. 쓰기 단추는 모두 잠근다 ---- */
+  /* ---- 표본 학급: 결정론적 자료로 모든 표를 채운다. 쓰기 버튼은 모두 잠근다 ---- */
   const sample = useMemo(() => (sampleMode ? buildSampleAssess(ids || []) : null), [sampleMode, idsKey]);
   const sampleAgg = useMemo(() => {
     if (!sample || !sample.roster) return null;
@@ -125,7 +125,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
   useEffect(() => {
     if (sampleMode) return undefined;
     if (typeof fbStore.watchCollection !== "function") {
-      setSubErr("fbStore.watchCollection 이 아직 없습니다 — src-fb.js 갱신이 필요합니다.");
+      setSubErr("fbStore.watchCollection이 아직 없습니다. src-fb.js를 갱신해야 합니다.");
       return undefined;
     }
     const offs = [
@@ -203,7 +203,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     setStageBusy(true);
     await flushPending();   // 설정 편집이 예약돼 있으면 단계와 함께 나가야 학생이 옛 k·질문을 보지 않는다
     const ok = await onSaveCfg({ stage: k });
-    setNote(ok === false ? { kind: "warn", text: "단계를 저장하지 못했습니다 — 연결을 확인하고 다시 누르세요." } : null);
+    setNote(ok === false ? { kind: "warn", text: "단계를 저장하지 못했습니다. 연결을 확인하고 다시 누르세요." } : null);
     setStageBusy(false);
   };
 
@@ -234,7 +234,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     const byNo = {};
     works.forEach((w) => { (byNo[w.no] = byNo[w.no] || []).push(w.sid); });
     Object.keys(byNo).filter((no) => byNo[no].length > 1)
-      .forEach((no) => errs.push("작품 번호 " + no + " 이(가) 겹칩니다: " + byNo[no].join(", ") + " — 한쪽 번호를 고친 뒤 다시 확정하세요."));
+      .forEach((no) => errs.push("작품 번호 " + no + "이(가) 겹칩니다: " + byNo[no].join(", ") + ". 한쪽 번호를 고친 뒤 다시 확정하세요."));
     if (works.length < 4) errs.push("비교 가능한 제출이 " + works.length + "점입니다. 네 점 이상이어야 쌍을 만들 수 있습니다(설계 §5 예외 처리).");
     if (errs.length) { setFixErrors(errs); return; }
     if (peer && !window.confirm(
@@ -244,7 +244,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     setFixBusy(true); setFixErrors([]); setNote(null);
     const flushed = await flushPending();
     if (flushed.pending && !flushed.ok) {
-      setFixErrors(["설정(k·반복 등) 저장에 실패해 명단을 확정하지 않았습니다 — 연결을 확인하고 설정이 「저장됨」이 된 뒤 다시 누르세요."]);
+      setFixErrors(["설정(k·반복 등) 저장에 실패해 명단을 확정하지 않았습니다. 연결을 확인하고 설정이 「저장됨」이 된 뒤 다시 누르세요."]);
       setFixBusy(false); return;
     }
     // 화면이 아직 다시 그려지기 전이면 cfgRef가 옛값이다 — 방금 보낸 설정을 얹어 쓴다
@@ -262,11 +262,11 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     };
     const ok = await fbStore.setT("peerRoster", docv);
     setFixBusy(false);
-    if (!ok) { setFixErrors(["명단을 저장하지 못했습니다 — 연결을 확인하고 다시 누르세요."]); return; }
+    if (!ok) { setFixErrors(["명단을 저장하지 못했습니다. 연결을 확인하고 다시 누르세요."]); return; }
     // 옛 명단으로 낸 집계는 이 명단의 것이 아니다 — 지워서 「결과 공개」가 옛 결과를 내보내지 않게 한다
     setAgg(null); setAggAt(null); setAggProg(null); setOverride(false);
     const st = res.stats || {};
-    setNote({ kind: "ok", text: "비교 명단을 확정했습니다 — 작품 " + st.n + "점 · 판정자 " + st.nJudges + "명 · 1인당 " + kEff + "쌍" + (kEff < c.k ? "(설정 " + c.k + "을 작품 수에 맞춰 줄임)" : "") + " · 노출 " + st.exposureMin + "~" + st.exposureMax + "회 · 서로 다른 쌍 " + st.distinctPairs + " · " + (st.connected ? "연결됨" : "연결되지 않음") });
+    setNote({ kind: "ok", text: "비교 명단을 확정했습니다. 작품 " + st.n + "점 · 판정자 " + st.nJudges + "명 · 1인당 " + kEff + "쌍" + (kEff < c.k ? "(설정 " + c.k + "을 작품 수에 맞춰 줄임)" : "") + " · 노출 " + st.exposureMin + "~" + st.exposureMax + "회 · 서로 다른 쌍 " + st.distinctPairs + " · " + (st.connected ? "연결됨" : "연결되지 않음") });
   };
 
   /* 제출 잠금 해제 — 잘못된 번호·이미지로 확정한 학생이 다시 제출할 수 있게. 명단에 든 작품은 풀지 않는다
@@ -279,7 +279,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     setUnlockBusy(id);
     const ok = await fbStore.setT("sub:" + id, { locked: false, unlockedAt: new Date().toISOString() }, { merge: true });
     setUnlockBusy("");
-    setNote(ok ? { kind: "ok", text: id + "의 제출 잠금을 풀었습니다." } : { kind: "warn", text: "잠금을 풀지 못했습니다 — 연결을 확인하세요." });
+    setNote(ok ? { kind: "ok", text: id + "의 제출 잠금을 풀었습니다." } : { kind: "warn", text: "잠금을 풀지 못했습니다. 연결을 확인하세요." });
   };
 
   /* ---- 진행 ---- */
@@ -321,7 +321,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
       setAggProg({ done: i + 1, total: sids.length, fail });
     }
     setAggBusy(false);
-    setNote(fail ? { kind: "warn", text: fail + "명의 결과를 저장하지 못했습니다 — 연결을 확인하고 집계를 다시 실행하세요." }
+    setNote(fail ? { kind: "warn", text: fail + "명의 결과를 저장하지 못했습니다. 연결을 확인하고 집계를 다시 실행하세요." }
       : { kind: "ok", text: "집계를 마치고 " + sids.length + "명의 결과를 저장했습니다." });
   };
   const doReveal = async () => {
@@ -355,7 +355,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
   };
 
   /* ---- 표시용 ---- */
-  const wr = sampleMode ? "표본 학급" : undefined;   // 쓰기 단추의 title
+  const wr = sampleMode ? "표본 학급" : undefined;   // 쓰기 버튼의 title
   const q = (shownAgg && shownAgg.quality) || null;
   const judgesFit = q && q.judges ? Object.keys(q.judges).sort() : [];
   const flagged = (f) => !!f && (f.flag || (f.againstRate != null && f.againstRate > 0.4) || (f.fastN != null && f.fastN >= 3));
@@ -369,7 +369,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
   };
   const Badge = saveSt ? (
     <span className="hint" role="status" aria-live="polite" style={{ marginLeft: 8, fontWeight: 400, color: saveSt === "err" ? "var(--seal)" : "var(--sub)" }}>
-      {saveSt === "saving" ? "저장 중…" : saveSt === "err" ? "저장 실패 — 잠시 뒤 다시 입력해 보세요" : "저장됨"}
+      {saveSt === "saving" ? "저장 중…" : saveSt === "err" ? "저장 실패. 잠시 뒤 다시 입력해 보세요" : "저장됨"}
     </span>
   ) : null;
 
@@ -386,7 +386,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
 
       {/* ---------------- 카드 1 · 단계 ---------------- */}
       <div className="card at-card">
-        <div className="card-head"><span className="card-code">상호평가 1</span><span className="card-title">단계 — 학급 전체를 한 스위치로</span>
+        <div className="card-head"><span className="card-code">상호평가 1</span><span className="card-title">단계: 학급 전체를 한 스위치로</span>
           <span className="card-sess">{cfg.stage}</span></div>
         <div className="card-note">
           단계는 학급 전체에 한꺼번에 적용됩니다. 앞 단계로 되돌리는 것도 막지 않지만, 학생이 이미 굳힌 제출·판정은 되돌아가지 않습니다.
@@ -418,11 +418,11 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
               <input type="number" min={0} max={60} value={live.minSec} disabled={sampleMode} onChange={(e) => edit("minSec", e.target.value)} />
             </div>
             <div className="field">
-              <label>이유 최소 글자 수 <span className="hint">— 15자 미만은 표시로만 센다</span></label>
+              <label>이유 최소 글자 수 <span className="hint">(15자 미만은 표시로만 셉니다)</span></label>
               <input type="number" min={0} max={100} value={live.minWhy} disabled={sampleMode} onChange={(e) => edit("minWhy", e.target.value)} />
             </div>
             <div className="field">
-              <label>판정 확신도(5단계) <span className="hint">— 기본 끔. 「판단이 어려웠다」 표시는 늘 있음</span></label>
+              <label>판정 확신도(5단계) <span className="hint">(기본은 끔. 「판단이 어려웠다」 표시는 늘 있습니다)</span></label>
               <div className="seg">
                 <button type="button" className={live.askConf ? "on-ok" : ""} disabled={sampleMode} onClick={() => edit("askConf", true)}>묻기</button>
                 <button type="button" className={!live.askConf ? "on-no" : ""} disabled={sampleMode} onClick={() => edit("askConf", false)}>묻지 않기</button>
@@ -436,22 +436,22 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
             </div>
           </div>
           <div className="field at-q">
-            <label>쌍대비교 종합 질문 — 학생 화면 두 작품 위에 그대로 뜹니다</label>
+            <label>쌍대비교 종합 질문 (학생 화면의 두 작품 위에 그대로 뜹니다)</label>
             <textarea rows={2} value={live.question || ""} maxLength={300} disabled={sampleMode} onChange={(e) => edit("question", e.target.value)} />
           </div>
           <p className="hint">
             k와 반복 수는 <b>명단을 확정하는 순간</b> 배정표에 굳습니다. 확정 뒤에 바꾸면 다음 확정부터 적용됩니다.
-            작품 n점·판정자 n명이면 작품당 약 2k회 노출 — k=12·24명이면 작품당 24회입니다.
+            작품 n점·판정자 n명이면 작품당 약 2k회 노출됩니다. k=12·24명이면 작품당 24회입니다.
           </p>
         </div>
       </div>
 
       {/* ---------------- 카드 2 · 명단 ---------------- */}
       <div className="card at-card">
-        <div className="card-head"><span className="card-code">상호평가 2</span><span className="card-title">명단 — 제출 현황과 비교 명단 확정</span>
+        <div className="card-head"><span className="card-code">상호평가 2</span><span className="card-title">명단: 제출 현황과 비교 명단 확정</span>
           <span className="card-sess">제출 {nSubmitted}/{ids.length} · 비교 가능 {nReady}</span></div>
         <div className="card-note">
-          <b>비교 가능</b> = 제출을 확정했고 작품 번호와 이미지가 있는 작품. 명단은 문서 하나로 굳혀 두어야 모든 학생이 같은 배정을 봅니다 — 확정 뒤에 들어온 제출은 판정에는 참여하되 자기 작품은 다음 확정 때 들어갑니다.
+          <b>비교 가능</b> = 제출을 확정했고 작품 번호와 이미지가 있는 작품. 명단은 문서 하나로 고정해 두어야 모든 학생이 같은 배정을 봅니다. 확정 뒤에 들어온 제출은 판정에는 참여하되 자기 작품은 다음 확정 때 들어갑니다.
         </div>
         <div className="card-body">
           <div className="at-row">
@@ -472,11 +472,11 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
             </div>
           )}
           {peer && outside.length > 0 && (
-            <div className="warn-note">명단 확정 뒤에 들어온 제출 {outside.length}건 — {outside.map((r) => r.id + (r.sub && r.sub.no ? "(" + r.sub.no + ")" : "")).join(", ")}.
+            <div className="warn-note">명단 확정 뒤에 들어온 제출 {outside.length}건: {outside.map((r) => r.id + (r.sub && r.sub.no ? "(" + r.sub.no + ")" : "")).join(", ")}.
               판정에는 참여하지만 자기 작품은 비교되지 않습니다. 다시 확정하면 들어갑니다.</div>
           )}
           {notReady.length > 0 && (
-            <p className="hint" style={{ marginBottom: 8 }}>제출은 했지만 이미지 또는 번호가 없어 비교할 수 없는 학생 {notReady.length}명 — {notReady.map((r) => r.id).join(", ")}</p>
+            <p className="hint" style={{ marginBottom: 8 }}>제출은 했지만 이미지 또는 번호가 없어 비교할 수 없는 학생 {notReady.length}명: {notReady.map((r) => r.id).join(", ")}</p>
           )}
           <div className="tbl-scroll">
             <table className="roster at-click">
@@ -509,7 +509,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
 
       {/* ---------------- 카드 3 · 진행 ---------------- */}
       <div className="card at-card">
-        <div className="card-head"><span className="card-code">상호평가 3</span><span className="card-title">진행 — 누가 어디까지 했는가</span></div>
+        <div className="card-head"><span className="card-code">상호평가 3</span><span className="card-title">진행: 누가 어디까지 했는가</span></div>
         <div className="card-body">
           <div className="kpis">
             <div className="kpi"><div className="n">{nS1}<span className="at-of"> / {ids.length}</span></div><div className="l">자기평가 ① 제출</div></div>
@@ -519,7 +519,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
           </div>
           {undone.length === 0 ? <div className="ok-note">모든 학생이 판정을 마쳤습니다.</div> : (
             <div>
-              <div className="sv-block-t" style={{ marginTop: 0 }}>판정 미완료 {undone.length}명 <span className="hint" style={{ fontWeight: 400 }}>— 누르면 학생 기록이 열립니다</span></div>
+              <div className="sv-block-t" style={{ marginTop: 0 }}>판정 미완료 {undone.length}명 <span className="hint" style={{ fontWeight: 400 }}>(누르면 학생 기록이 열립니다)</span></div>
               <div className="at-undone">
                 {undone.map((p) => (
                   <button key={p.id} type="button" className="btn small ghost" onClick={() => onSel && onSel(p.id)}>
@@ -535,13 +535,13 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
 
       {/* ---------------- 카드 4 · 집계 ---------------- */}
       <div className="card at-card">
-        <div className="card-head"><span className="card-code">상호평가 4</span><span className="card-title">집계 — 브래들리–테리 점수와 신뢰도</span>
+        <div className="card-head"><span className="card-code">상호평가 4</span><span className="card-title">집계: 브래들리–테리 점수와 신뢰도</span>
           {aggAt && <span className="card-sess">집계 {fmtT(aggAt.toISOString())}</span>}
           {sampleMode && <span className="card-sess">표본</span>}</div>
         <div className="card-note">
           승률만 쓰면 센 상대와 붙어 진 작품이 밀립니다. 브래들리–테리 θ 옆에 승/노출을 함께 두어 모형을 몰라도 읽히게 했습니다.
           공개 보류 권고: SSR &lt; {QUALITY_MIN.ssr}, 작품당 비교 &lt; {QUALITY_MIN.perWork}회, 그래프 단절, 배정 밖 판정. SSR {QUALITY_MIN.ssr}~{SSR_ADOPT}는 주의 문구와 함께 공개됩니다.
-          판정자 반분 신뢰도는 반쪽 자료라 낮게 나오는 것이 보통이므로 합격 기준이 아니라 보고 지표입니다(논문 채택 기준은 SSR ≥ {SSR_ADOPT} — 쌍대비교_구현_근거.md §4).
+          판정자 반분 신뢰도는 반쪽 자료라 낮게 나오는 것이 보통이므로 합격 기준이 아니라 보고 지표입니다(논문 채택 기준은 SSR ≥ {SSR_ADOPT}, 쌍대비교_구현_근거.md §4).
         </div>
         <div className="card-body">
           <div className="at-row">
@@ -565,7 +565,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
           ) : (
             <div>
               {shownAgg.ok === false && (
-                <div className="warn-note"><b>신뢰도 기준 미달 — 결과 공개를 보류하세요.</b>
+                <div className="warn-note"><b>신뢰도 기준 미달. 결과 공개를 보류하세요.</b>
                   <ul className="at-errs">{(shownAgg.reasons || []).map((r, i) => <li key={i}>{r}</li>)}</ul>
                   같은 자료에 즉석 쌍을 덧붙이지 말고, 미완료 학생의 판정을 받은 뒤 다시 집계합니다.
                 </div>
@@ -586,7 +586,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
                   ok={q && q.splitHalf && q.splitHalf.median != null ? (q.splitHalf.median >= SPLIT_ADOPT ? true : null) : null} />
                 <QTile n={num(q && q.perWorkMean, 1)} l="작품당 평균 비교 수" s={"본 판정 " + (q ? q.nJudgements : "-") + "건 · 보류 < " + QUALITY_MIN.perWork + " · 보수적 목표 20"} ok={tri(q && q.perWorkMean, 20, QUALITY_MIN.perWork)} />
                 <QTile n={(q ? q.nJudgesDone : "-") + " / " + (q ? q.nJudges : "-")} l="판정자 (완료 / 전체)" />
-                <QTile n={pct(q && q.position && q.position.leftRate)} l="먼저 놓인 쪽(왼쪽·위) 선택률 — 위치 편향"
+                <QTile n={pct(q && q.position && q.position.leftRate)} l="먼저 놓인 쪽(왼쪽·위) 선택률(위치 편향)"
                   s={q && q.position ? "Wilson 95% " + ci(q.position.wilson) + " · n " + q.position.n
                     + (q.position.byAxis ? " · 좌우 " + pct(q.position.byAxis.x.rate) + "(" + q.position.byAxis.x.n + ") · 위아래 " + pct(q.position.byAxis.y.rate) + "(" + q.position.byAxis.y.n + ")" : "") : ""}
                   ok={q && q.position && q.position.wilson ? (q.position.wilson[0] <= 0.5 && q.position.wilson[1] >= 0.5) : null} />
@@ -605,11 +605,11 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
               </div>
               {q && q.tagDist && (
                 <p className="hint" style={{ marginBottom: 12 }}>
-                  결정적 축 태그 분포 — {TAG_OPTIONS.map((c) => c.label + " " + (q.tagDist[c.k] || 0)).join(" · ")}
+                  결정적 축 태그 분포: {TAG_OPTIONS.map((c) => c.label + " " + (q.tagDist[c.k] || 0)).join(" · ")}
                 </p>
               )}
 
-              <div className="sv-block-t">순위표 <span className="hint" style={{ fontWeight: 400 }}>— 줄을 누르면 학생 기록이 열립니다. bias = 예측 백분위 − 실제 백분위(+면 과대평가), calib = |bias①| − |bias②|</span></div>
+              <div className="sv-block-t">순위표 <span className="hint" style={{ fontWeight: 400 }}>(줄을 누르면 학생 기록이 열립니다. bias = 예측 백분위 − 실제 백분위(+면 과대평가), calib = |bias①| − |bias②|)</span></div>
               <div className="tbl-scroll">
                 <table className="roster at-click at-rank">
                   <thead><tr><th>순위</th><th>번호</th><th>θ</th><th>SE</th><th>승/노출</th><th>좌측 선택률</th><th>예측①</th><th>예측②</th><th>bias①</th><th>bias②</th><th>calib</th><th>밴드</th></tr></thead>
@@ -634,7 +634,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
                 </table>
               </div>
 
-              <div className="sv-block-t">판정자 적합도 <span className="hint" style={{ fontWeight: 400 }}>— 붉은 줄은 infit이 {INFIT_BAND[0]}~{INFIT_BAND[1]} 밖이거나 학급 평균+2SD 위, 역방향률 &gt; 40%, {FAST_SEC}초 미만 3건 이상 가운데 하나. <b>성적이 아니라 수업 자료 — 제외하지 않는다.</b> 판단 경향이 학급 합의와 다르다는 뜻이지 오류가 아닙니다.</span></div>
+              <div className="sv-block-t">판정자 적합도 <span className="hint" style={{ fontWeight: 400 }}>(붉은 줄은 infit이 {INFIT_BAND[0]}~{INFIT_BAND[1]} 밖이거나 학급 평균+2SD 위, 역방향률 &gt; 40%, {FAST_SEC}초 미만 3건 이상 가운데 하나. <b>성적이 아니라 수업 자료이므로 제외하지 않습니다.</b> 판단 경향이 학급 합의와 다르다는 뜻이지 오류가 아닙니다.)</span></div>
               <div className="tbl-scroll">
                 <table className="roster at-click">
                   <thead><tr><th>학번</th><th>별명</th><th>판정 수</th><th>infit</th><th>역방향률</th><th>좌측률</th><th>중앙 초</th><th>{FAST_SEC}초 미만</th><th>중복 이유</th></tr></thead>
@@ -666,7 +666,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
 
       {/* ---------------- 카드 5 · CSV ---------------- */}
       <div className="card at-card">
-        <div className="card-head"><span className="card-code">상호평가 5</span><span className="card-title">CSV — 연구 자료 다섯 파일</span></div>
+        <div className="card-head"><span className="card-code">상호평가 5</span><span className="card-title">CSV: 연구 자료 다섯 파일</span></div>
         <div className="card-note">
           제출(작품 단위) · 판정(판정 단위, 옛 명단의 판정은 valid=0) · 자기평가(학생×단계) · 집계(작품 점수) · 판정자(적합도·위치·시간). 학번 대신 <b>「연구」 탭과 같은 규칙의 익명 번호</b>(학번 정렬 순 P01…)를 씁니다.
         </div>
@@ -680,7 +680,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
           </div>
           <p className="hint">
             파일 이름은 <span className="mono">상호평가_&lt;종류&gt;_&lt;yymmdd&gt;.csv</span>. 셀 앞의 <span className="mono">'</span>는 수식 주입을 막는 표시이니 그대로 두세요.
-            다섯 파일에는 학급 전원이 들어갑니다 — 논문용 집계에서는 「연구」 탭의 동의 대장을 기준으로 동의하지 않은 학생의 P 번호를 빼고 쓰세요.
+            다섯 파일에는 학급 전원이 들어갑니다. 논문용 집계에서는 「연구」 탭의 동의 대장을 기준으로 동의하지 않은 학생의 P 번호를 빼고 쓰세요.
             집계 CSV는 이 화면에서 마지막으로 실행한 집계를 내려받습니다.
           </p>
         </div>

@@ -66,7 +66,7 @@ export const stageAtLeast = (stage, target) => STAGE_ORDER.indexOf(stage) >= STA
 
 /* 기본 설정. k=12·반복 1은 24~30명 학급에서 작품당 24회 노출을 만든다 — 작품당 20회 이상이면 SSR .80이
    일반적이라는 메타분석(Kinnear 외 2025; Verhavert 외 2019; Crompvoets 외 2020)에 맞춘 값이다. 교사는 10 아래로 내리지 않는다.
-   확신도 단추는 기본으로 끈다 — 강제선택에 등급 응답을 더하면 시간만 늘고 정확도는 늘지 않았다(Mantiuk 외 2012);
+   확신도 버튼은 기본으로 끈다 — 강제선택에 등급 응답을 더하면 시간만 늘고 정확도는 늘지 않았다(Mantiuk 외 2012);
    대신 「판단이 어려웠다」 표시 하나를 늘 둔다. 이유 문장의 하한 10자는 빈칸·자리표시를 막는 선이고, 15자 미만은 표시(flag)로만 센다. */
 export const DEFAULT_PEER = {
   stage: "closed", k: 12, repeat: 1, minSec: 5, minWhy: 10, askConf: false, reveal: "band", question: PEER_QUESTION,
@@ -438,7 +438,7 @@ export function makePlan({ works, judges, k, repeat = 1, seed }) {
   const stats = planStats(plan, nos, judgeIds);
   const hash = planHash(plan);
   const errs = validatePlan({ plan, works: list, judges: judgeIds, k: kEff, repeat });
-  if (!stats.connected) errs.push("비교 그래프가 하나로 이어지지 않습니다 — k를 올리거나 다시 확정하세요.");
+  if (!stats.connected) errs.push("비교 그래프가 하나로 이어지지 않습니다. k를 올리거나 다시 확정하세요.");
   return { plan, hash, stats: { ...stats, kEff, ds }, errors: errs, kEff };
 }
 
@@ -939,13 +939,13 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
   const cautions = [];
   if (!main.length) reasons.push("판정이 아직 없습니다.");
   if (quality.perWorkMean < QUALITY_MIN.perWork) reasons.push("작품당 평균 비교 수가 " + fmtNum(quality.perWorkMean, 1) + "회로 " + QUALITY_MIN.perWork + "회에 못 미칩니다.");
-  if (!quality.connectivity.connected) reasons.push("비교 그래프가 하나로 이어지지 않습니다 — 아직 판정하지 않은 학생이 있으면 기다리고, 모두 마쳤는데도 그렇다면 명단을 다시 확정해야 합니다.");
+  if (!quality.connectivity.connected) reasons.push("비교 그래프가 하나로 이어지지 않습니다. 아직 판정하지 않은 학생이 있으면 기다리고, 모두 마쳤는데도 그렇다면 명단을 다시 확정해야 합니다.");
   if (quality.droppedN) reasons.push("배정표와 맞지 않는 판정 " + quality.droppedN + "건을 제외했습니다 (" + quality.droppedJudges.join(", ") + ").");
   if (quality.ssr != null && quality.ssr < QUALITY_MIN.ssr) reasons.push("척도분리신뢰도(SSR)가 " + fmtNum(quality.ssr) + "로 " + QUALITY_MIN.ssr + " 아래입니다.");
-  else if (quality.ssr != null && quality.ssr < QUALITY_MIN.ssrAdopt) cautions.push("SSR " + fmtNum(quality.ssr) + " — 논문 채택 기준 " + QUALITY_MIN.ssrAdopt + "에는 못 미칩니다. 공개는 되지만 결과 화면의 주의 문구가 켜지고, 판정을 더 받으면 나아집니다.");
-  if (quality.splitHalf.median != null && quality.splitHalf.median < QUALITY_MIN.splitHalf) cautions.push("판정자 반분 신뢰도 중앙값 " + fmtNum(quality.splitHalf.median) + "(보정 전 " + fmtNum(quality.splitHalf.medianRaw) + ") — 반쪽 자료의 작품당 노출이 절반이라 낮게 나오는 것이 보통이므로 보고 지표로만 둡니다.");
+  else if (quality.ssr != null && quality.ssr < QUALITY_MIN.ssrAdopt) cautions.push("SSR " + fmtNum(quality.ssr) + "은(는) 논문 채택 기준 " + QUALITY_MIN.ssrAdopt + "에는 못 미칩니다. 공개는 되지만 결과 화면의 주의 문구가 켜지고, 판정을 더 받으면 나아집니다.");
+  if (quality.splitHalf.median != null && quality.splitHalf.median < QUALITY_MIN.splitHalf) cautions.push("판정자 반분 신뢰도 중앙값 " + fmtNum(quality.splitHalf.median) + "(보정 전 " + fmtNum(quality.splitHalf.medianRaw) + ")은 반쪽 자료의 작품당 노출이 절반이라 낮게 나오는 것이 보통이므로 보고 지표로만 둡니다.");
   if (quality.splitHalf.median == null && main.length) cautions.push("반분 신뢰도를 계산할 만큼 판정자가 모이지 않았습니다.");
-  if (quality.knowRate != null && quality.knowRate >= 0.2) cautions.push("판정의 " + Math.round(quality.knowRate * 100) + "%에서 「누구 작품인지 알 것 같다」가 표시됐습니다 — 익명성 민감도 분석이 필요합니다.");
+  if (quality.knowRate != null && quality.knowRate >= 0.2) cautions.push("판정의 " + Math.round(quality.knowRate * 100) + "%에서 「누구 작품인지 알 것 같다」가 표시됐습니다. 익명성 민감도 분석이 필요합니다.");
   const caution = reasons.length === 0 && cautions.length > 0;
   // 학생 화면의 주의 문구는 보류 사유가 있는데도 교사가 알고 공개한 경우에도 켜져야 한다
   Object.keys(results).forEach((sid) => { results[sid].caution = cautions.length > 0 || reasons.length > 0; results[sid].ssr = quality.ssr; });

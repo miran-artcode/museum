@@ -138,7 +138,7 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
   useEffect(() => { startRef.current = Date.now(); setOpenPlate(false); setWarn(""); }, [items.length]);
 
   if (anchorDone(sv)) {
-    return <div className="ok-note">예시 유물 판정을 마쳤습니다 — 네 쌍 모두 기록되었습니다. 고맙습니다.</div>;
+    return <div className="ok-note">예시 유물 판정을 마쳤습니다. 네 쌍 모두 기록되었습니다. 고맙습니다.</div>;
   }
   if (!pairs.length) return null;
 
@@ -228,7 +228,7 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
         {warn && <div className="warn-note">{warn}</div>}
         <div className="sv-foot">
           <button className="btn" disabled={busy} onClick={save}>
-            {busy ? "저장 중…" : doneN + 1 >= pairs.length ? "마지막 쌍 — 제출하기" : "다음 쌍 →"}
+            {busy ? "저장 중…" : doneN + 1 >= pairs.length ? "마지막 쌍 제출하기" : "다음 쌍 →"}
           </button>
           <span className="hint">고른 것은 되돌릴 수 없습니다. 한 쌍에 1분 남짓 걸립니다.</span>
         </div>
@@ -349,13 +349,13 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
           </div>
           <span className="hint">
             {ready ? "네 쌍의 이미지가 모두 채워졌습니다. 열면 학생 화면에 나타납니다."
-              : "이미지가 비어 있는 칸이 있어 아직 열 수 없습니다 — 여덟 칸을 모두 채우세요."}
+              : "이미지가 비어 있는 칸이 있어 아직 열 수 없습니다. 여덟 칸을 모두 채우세요."}
           </span>
         </div>
 
         <div className="sv-block-t">쌍 설정
           {saveSt && <span className="hint" role="status" aria-live="polite" style={{ marginLeft: 8, fontWeight: 400, color: saveSt === "err" ? "var(--seal)" : "var(--sub)" }}>
-            {saveSt === "saving" ? "저장 중…" : saveSt === "err" ? "저장 실패 — 잠시 뒤 다시 입력해 보세요" : "저장됨"}
+            {saveSt === "saving" ? "저장 중…" : saveSt === "err" ? "저장 실패. 잠시 뒤 다시 입력해 보세요" : "저장됨"}
           </span>}
         </div>
         <p className="hint" style={{ marginBottom: 8 }}>
@@ -388,11 +388,11 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
         </div>
         <p className="hint" style={{ marginTop: 8 }}>
           「AI 전면」 선택률이 <b>50%보다 낮을수록</b> 학급이 고지를 깎은 것입니다. 정확히 50%면 라벨이 판정을 바꾸지 않았다는 뜻입니다.
-          축 분포 — {tagN.map((x) => x.t.label + " " + x.n).join(" · ")}
+          축 분포: {tagN.map((x) => x.t.label + " " + x.n).join(" · ")}
         </p>
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
           <button className="btn" onClick={exportCSV} disabled={!doneRows.length}>앵커 판정 CSV 내려받기</button>
-          <span className="hint">성향 설문 점수와 학번으로 이어 붙여 분석합니다. <b>이 파일에는 학번·별명이 들어갑니다</b> — 「연구」 탭의 익명 자료와 섞이지 않게 보관하세요.</span>
+          <span className="hint">성향 설문 점수와 학번으로 이어 붙여 분석합니다. <b>이 파일에는 학번·별명이 들어갑니다.</b> 「연구」 탭의 익명 자료와 섞이지 않게 보관하세요.</span>
         </div>
         <div className="warn-note" style={{ marginTop: 12 }}>
           <b>판정이 끝나면 반드시 알려 주세요.</b> 같은 이미지에 서로 다른 고지 문구를 붙였다는 사실을 밝히고,

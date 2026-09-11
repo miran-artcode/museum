@@ -8,17 +8,17 @@ import React, { useState, useEffect, useRef } from "react";
    5=매우 그렇다)가 스크롤 밖으로 사라진다. 앵커를 잃은 응답은 그 자체로
    측정 오차이고, 특히 역문항(a12·a15·a23)에서 오염이 가장 크다.
    여기서는 세 가지를 붙인다.
-     ① 화면에 고정되는 척도 막대 — 눈금이 아래 응답 단추와 같은 너비로
+     ① 화면에 고정되는 척도 막대 — 눈금이 아래 응답 버튼과 같은 너비로
         정렬되어 열 머리글처럼 읽힌다.
      ② 남은 문항으로 건너뛰기 — 24개 중 안 한 것을 눈으로 찾지 않게 한다.
-     ③ 키보드 방향키 이동과 스크린리더용 이름 — 기존 단추는 숫자만 읽혔다.
+     ③ 키보드 방향키 이동과 스크린리더용 이름 — 기존 버튼은 숫자만 읽혔다.
 
    src-app.jsx의 거대한 CSS 상수와 SurveyCard를 통째로 건드리지 않도록,
    src-content.jsx의 ContentStyle 선례를 따라 style을 따로 내보낸다.
    ============================================================ */
 
 /* 고정 막대의 눈금에 붙는 짧은 이름. 34px 칸에 들어가야 하므로 세 글자 이내.
-   원래 문구(LIKERT)는 카드 위쪽 안내문과 각 단추의 접근성 이름에 그대로 남는다. */
+   원래 문구(LIKERT)는 카드 위쪽 안내문과 각 버튼의 접근성 이름에 그대로 남는다. */
 export const LIKERT_SHORT = ["전혀", "아니다", "보통", "그렇다", "매우"];
 
 /* 상단 topbar가 sticky(top:0)이므로 그 높이만큼 내려서 겹치지 않게 한다.
@@ -86,7 +86,7 @@ export function SurveyProgress({ done, total, remain, onJump }) {
 }
 
 /* 화면에 고정되는 척도 막대.
-   왼쪽은 진행률, 오른쪽은 1~5 눈금(아래 응답 단추와 같은 너비·간격으로 정렬). */
+   왼쪽은 진행률, 오른쪽은 1~5 눈금(아래 응답 버튼과 같은 너비·간격으로 정렬). */
 export function SurveyScaleBar({ labels, done, total, remain, firstGapKey, onRevealGaps }) {
   const top = useTopbarHeight();
 
@@ -111,8 +111,8 @@ export function SurveyScaleBar({ labels, done, total, remain, firstGapKey, onRev
   );
 }
 
-/* 응답 단추 한 줄 — 방향키 이동과 스크린리더용 이름을 붙인 판.
-   기존 단추는 숫자만 읽혀서 "3"이 무슨 뜻인지 화면을 못 보면 알 수 없었다. */
+/* 응답 버튼 한 줄 — 방향키 이동과 스크린리더용 이름을 붙인 판.
+   기존 버튼은 숫자만 읽혀서 "3"이 무슨 뜻인지 화면을 못 보면 알 수 없었다. */
 export function LikertRow({ value, onPick, label, labels }) {
   const ref = useRef(null);
 
@@ -133,7 +133,7 @@ export function LikertRow({ value, onPick, label, labels }) {
       {[1, 2, 3, 4, 5].map((n) => (
         <button key={n} type="button" role="radio" aria-checked={value === n}
           className={value === n ? "on" : ""}
-          aria-label={n + "점 — " + labels[n - 1]}
+          aria-label={n + "점: " + labels[n - 1]}
           title={labels[n - 1]}
           tabIndex={value === n || (!(value >= 1) && n === 1) ? 0 : -1}
           onClick={() => onPick(n)}>{n}</button>
@@ -171,7 +171,7 @@ const SURVEY_UI_CSS = `
 .sv-scale-jump:focus-visible{outline:2px solid var(--seal);outline-offset:1px}
 .sv-scale-ok{font-family:var(--mono);font-size:11px;color:var(--patina);white-space:nowrap}
 
-/* 눈금 — 아래 .likert 단추와 같은 34px·4px 간격이라 열 머리글처럼 정렬된다 */
+/* 눈금 — 아래 .likert 버튼과 같은 34px·4px 간격이라 열 머리글처럼 정렬된다 */
 .sv-scale-ticks{display:flex;gap:4px;list-style:none;margin:0 0 0 auto;padding:0;flex:0 0 auto}
 .sv-scale-ticks li{
   width:34px; display:flex; flex-direction:column; align-items:center; gap:1px;
@@ -180,7 +180,7 @@ const SURVEY_UI_CSS = `
 .sv-scale-ticks b{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--ink)}
 .sv-scale-ticks span{font-size:10px;color:var(--sub);letter-spacing:-.03em;word-break:keep-all}
 
-/* 손가락 입력에서는 단추와 눈금을 함께 40px로 키워 정렬을 유지한다 */
+/* 손가락 입력에서는 버튼과 눈금을 함께 40px로 키워 정렬을 유지한다 */
 @media (pointer:coarse){
   .likert button{width:40px;height:40px;font-size:14px}
   .sv-scale-ticks li{width:40px}

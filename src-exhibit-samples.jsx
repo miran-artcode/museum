@@ -73,7 +73,7 @@ export const EXHIBIT_SAMPLES = [
 /* ---------- 임시 SVG 도판 (생성 이미지 파일이 없을 때) ---------- */
 
 const TempNote = () => (
-  <text x="12" y="290" fontSize="10" fill="#8B887F" fontFamily="monospace">임시 도판 — 생성 이미지로 교체 예정</text>
+  <text x="12" y="290" fontSize="10" fill="#8B887F" fontFamily="monospace">임시 도판 (생성 이미지로 교체 예정)</text>
 );
 
 const ScaleBar = ({ x = 250, y = 256, seg = 16, n = 6, vertical = false }) => (
@@ -87,7 +87,7 @@ const ScaleBar = ({ x = 250, y = 256, seg = 16, n = 6, vertical = false }) => (
 
 /* A — 손수레 손잡이 파편: 왼쪽 그립 온전, 오른쪽 금속 노출과 직물 테이프 수리 */
 const SvgA = () => (
-  <svg viewBox="0 0 400 300" width="100%" height="100%" role="img" aria-label="예시 A 오른손 — 손수레 손잡이 파편 임시 도판">
+  <svg viewBox="0 0 400 300" width="100%" height="100%" role="img" aria-label="예시 A 오른손, 손수레 손잡이 파편 임시 도판">
     <rect width="400" height="300" fill="#D8D6D0" />
     <ellipse cx="200" cy="178" rx="152" ry="12" fill="#000" opacity=".08" />
     <rect x="140" y="138" width="170" height="26" fill="#A9ABAB" />
@@ -112,7 +112,7 @@ const SvgA = () => (
 
 /* B — 교실 사물함 문짝: 1.2m 높이의 수평 물때 띠, 띠 아래 도장 들뜸 */
 const SvgB = () => (
-  <svg viewBox="0 0 400 300" width="100%" height="100%" role="img" aria-label="예시 B 수위선 1.2m — 교실 사물함 문짝 임시 도판">
+  <svg viewBox="0 0 400 300" width="100%" height="100%" role="img" aria-label="예시 B 수위선 1.2m, 교실 사물함 문짝 임시 도판">
     <rect width="400" height="300" fill="#D8D6D0" />
     <ellipse cx="200" cy="282" rx="90" ry="8" fill="#000" opacity=".08" />
     <rect x="146" y="24" width="112" height="254" fill="#9AA6A8" stroke="#7C898B" strokeWidth="2" />
@@ -142,7 +142,7 @@ const SvgB = () => (
 
 /* C — 황동 열쇠와 번호표: 삭아 끊어진 고무줄, 획이 얕아진 숫자 37 */
 const SvgC = () => (
-  <svg viewBox="0 0 400 300" width="100%" height="100%" role="img" aria-label="예시 C 37번 열쇠 — 신발장 열쇠와 번호표 임시 도판">
+  <svg viewBox="0 0 400 300" width="100%" height="100%" role="img" aria-label="예시 C 37번 열쇠, 신발장 열쇠와 번호표 임시 도판">
     <rect width="400" height="300" fill="#D8D6D0" />
     <ellipse cx="200" cy="196" rx="150" ry="12" fill="#000" opacity=".08" />
     <path d="M120 150 C 150 96, 210 92, 236 118" stroke="#6B4F3E" strokeWidth="5" fill="none" strokeLinecap="round" />
@@ -193,14 +193,14 @@ export function ExhibitSamples({ showPlate }) {
         <p>
           아래 세 점은 예시 작품 자료집에 수록된 가상의 예시이며, 실제 학생 작품이 아닙니다.
           예시는 도달점의 한 가지 모습일 뿐, 같은 문제라도 다른 사물과 다른 태도로 풀 수 있습니다.
-          관람 방식은 학생 작품과 같습니다 — 1차에는 작품 캡션을 가리고 보고, 2차에는 작품 캡션을 펼쳐 봅니다.
+          관람 방식은 학생 작품과 같습니다. 1차에는 작품 캡션을 가리고 보고, 2차에는 작품 캡션을 펼쳐 봅니다.
         </p>
       </div>
       <div className="gal-grid">
         {EXHIBIT_SAMPLES.map((w) => (
           <div className="work exs-work" key={w.id}>
             <div className="work-img"><SampleImg id={w.id} alt={"예시 작품 " + w.no} /></div>
-            <div><span className="exs-mark">예시 — 실제 학생 작품 아님</span></div>
+            <div><span className="exs-mark">예시 (실제 학생 작품 아님)</span></div>
             <div className="work-no">{w.no}</div>
             <div className="work-title">{showPlate ? "「" + w.title + "」" : "무제 (2차 관람에서 공개)"}</div>
             {showPlate ? (
@@ -222,7 +222,7 @@ export function ExhibitSamples({ showPlate }) {
                 {w.note && <div className="work-note">{w.note}</div>}
               </>
             ) : (
-              <div className="plate hidden-plate">LABEL CONCEALED — 1ST VIEWING</div>
+              <div className="plate hidden-plate">LABEL CONCEALED · 1ST VIEWING</div>
             )}
           </div>
         ))}

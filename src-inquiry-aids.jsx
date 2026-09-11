@@ -83,7 +83,7 @@ function LessonStrip({ L }) {
       <div className="iaid-t">
         <span className="iaid-acc">SOURCE</span>
         {L.n}차시에 본 작품·자료 {items.length}점
-        <span className="iaid-sub"> — 눌러서 크게 보고, 이 가운데 실제로 근거가 된 것을 답에 짚어 씁니다{items.length > 5 ? " (옆으로 밀면 더 있습니다)" : ""}</span>
+        <span className="iaid-sub"> (눌러서 크게 보고, 이 가운데 실제로 근거가 된 것을 답에 짚어 씁니다{items.length > 5 ? ". 옆으로 밀면 더 있습니다" : ""})</span>
       </div>
       <div className="iaid-row">
         {items.map((it, i) => (
@@ -120,7 +120,7 @@ function RoundStrip({ ws, Thumb, owner }) {
         <div className="iaid-t">
           <span className="iaid-acc">MY WORK</span>
           내가 생성한 화면
-          <span className="iaid-sub"> — 「생성 회차 기록」 카드에 결과 화면을 올리면 여기에 나란히 놓입니다</span>
+          <span className="iaid-sub"> (「생성 회차 기록」 카드에 결과 화면을 올리면 여기에 나란히 놓입니다)</span>
         </div>
         <div className="iaid-empty">아직 올린 화면이 없습니다. 위의 「생성 회차 기록」에서 회차마다 결과 화면을 올린 뒤 이 질문에 답하면, 고른 한 점과 버린 넉 점을 여기에서 나란히 보며 쓸 수 있습니다.</div>
       </div>
@@ -131,7 +131,7 @@ function RoundStrip({ ws, Thumb, owner }) {
       <div className="iaid-t">
         <span className="iaid-acc">MY WORK</span>
         내가 생성한 화면 {shots.length}점
-        <span className="iaid-sub"> — 고른 한 점과 버린 것을 나란히 놓고 답을 씁니다</span>
+        <span className="iaid-sub"> (고른 한 점과 버린 것을 나란히 놓고 답을 씁니다)</span>
       </div>
       <div className="iaid-row">
         {shots.map((r) => {
@@ -139,7 +139,7 @@ function RoundStrip({ ws, Thumb, owner }) {
           return (
             <div key={r.i} className={"iaid-tile mine " + (picked ? "picked" : "")}>
               <div className="iaid-th"><Thumb owner={owner} refId={r.img} alt={r.i + 1 + "회차 결과 화면"} size={110} /></div>
-              <div className="iaid-nm">{r.i + 1}회차{r.no ? " · " + r.no : ""}{picked ? " — 고른 것" : ""}</div>
+              <div className="iaid-nm">{r.i + 1}회차{r.no ? " · " + r.no : ""}{picked ? " · 고른 것" : ""}</div>
               {r.judge && <div className="iaid-sb">{r.judge}</div>}
             </div>
           );
@@ -167,7 +167,7 @@ function MyShots({ ws, Thumb, owner, n }) {
       <div className="iaid-t">
         <span className="iaid-acc">MY WORK</span>
         내 화면
-        <span className="iaid-sub"> — {n === 6 ? "고칠 곳과 그대로 둘 곳을 여기서 보며 씁니다" : "내 작품을 놓고 다른 작품과 견주어 씁니다"}</span>
+        <span className="iaid-sub"> ({n === 6 ? "고칠 곳과 그대로 둘 곳을 여기서 보며 씁니다" : "내 작품을 놓고 다른 작품과 견주어 씁니다"})</span>
       </div>
       <div className="iaid-row">
         {shots.map((x) => (
@@ -189,7 +189,7 @@ function GalleryLink({ n, onGallery }) {
       <div className="iaid-t">
         <span className="iaid-acc">EXHIBITION</span>
         이 질문의 자료는 학급 전시장입니다
-        <span className="iaid-sub"> — {n === 7 ? "내 작품 옆에 놓을 한 점을 전시장에서 고릅니다" : "관람에서 본 작품 두 점을 전시장에서 다시 확인합니다"}</span>
+        <span className="iaid-sub"> ({n === 7 ? "내 작품 옆에 놓을 한 점을 전시장에서 고릅니다" : "관람에서 본 작품 두 점을 전시장에서 다시 확인합니다"})</span>
       </div>
       <button type="button" className="iaid-go" onClick={onGallery}>전시장 열기 →</button>
       <div className="iaid-empty" style={{ marginTop: 6 }}>전시장을 보고 돌아오면 쓰던 답은 그대로 남아 있습니다.</div>

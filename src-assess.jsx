@@ -26,7 +26,7 @@ import {
   submissionFromWs, myPairs, simText, predPctOf, judgeBlockOf,
 } from "./src-assess-core.mjs";
 
-/* ---------- 잔가지 ---------- */
+/* ---------- 보조 함수 ---------- */
 
 const nowISO = () => new Date().toISOString();
 const fmtT = (iso) => {
@@ -69,7 +69,7 @@ function loadImg(owner, ref) {
   return imgCache.get(key);
 }
 
-/* 학급 제출 전체. 읽기 실패는 빈 지도가 아니라 null로 돌려준다 — 빈 지도로 오인하면
+/* 학급 제출 전체. 읽기 실패는 빈 맵이 아니라 null로 돌려준다 — 빈 맵으로 오인하면
    등수 예측의 분모가 0이 되어 그 문항이 조용히 사라지고, 제출 뒤에는 되돌릴 수 없다 */
 const allSubs = () => {
   if (typeof fbStore.allOfSafe === "function") {
@@ -151,8 +151,8 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
     return () => { u1(); u2(); u3(); clearTimeout(t); };
   }, [sid, sampleMode]);
 
-  /* 학급 제출 지도 — 명단이 확정·재확정될 때마다 다시 읽는다(확정 직전에 들어온 제출이 빠지지 않도록).
-     실패(null)는 기억하지 않아 다음 호출이 다시 읽고, 이미 있는 지도는 다시 읽는 동안 지우지 않는다 */
+  /* 학급 제출 맵 — 명단이 확정·재확정될 때마다 다시 읽는다(확정 직전에 들어온 제출이 빠지지 않도록).
+     실패(null)는 기억하지 않아 다음 호출이 다시 읽고, 이미 있는 맵은 다시 읽는 동안 지우지 않는다 */
   const [subFail, setSubFail] = useState(0);   // 연속 실패 횟수 — 0이면 정상. 실패마다 늘어 재시도 효과가 다시 돈다
   const subVer = useRef(null);
   const fetchSubs = () => {
@@ -217,7 +217,7 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
     : subMap ? Object.keys(subMap).filter((k) => subMap[k] && subMap[k].locked).length : null;
   const subsNote = subFail && !subMap ? (
     <div className="warn-note" role="alert" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-      <span style={{ flex: 1, minWidth: 200 }}>우리 반 작품 목록을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요 — 연결되면 다시 시도합니다.</span>
+      <span style={{ flex: 1, minWidth: 200 }}>우리 반 작품 목록을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요. 연결되면 다시 시도합니다.</span>
       <button type="button" className="btn small" onClick={reloadSubs}>다시 불러오기</button>
     </div>
   ) : null;
@@ -227,7 +227,7 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
     screen = (
       <div className="card as-card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
         평가 기록을 불러오는 중… 잠시만 기다려 주세요.
-        {slow && <div className="warn-note" style={{ marginTop: 10 }}>연결이 느립니다. 인터넷 연결을 확인해 주세요 — 연결되면 자동으로 이어집니다.</div>}
+        {slow && <div className="warn-note" style={{ marginTop: 10 }}>연결이 느립니다. 인터넷 연결을 확인해 주세요. 연결되면 자동으로 이어집니다.</div>}
       </div></div>
     );
   } else if (cur === "submit" || (stage === "submit" && subDone)) {
@@ -260,7 +260,7 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
           );
         })}
       </ol>
-      {sampleMode && <div className="warn-note">예시 화면입니다 — 여기서는 아무것도 저장되지 않습니다.</div>}
+      {sampleMode && <div className="warn-note">예시 화면입니다. 여기서는 아무것도 저장되지 않습니다.</div>}
       {subsNote}
       {screen}
     </div>
@@ -329,7 +329,7 @@ function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }) {
     if (!d.title.trim()) { setWarn("작품 제목을 적어 주세요."); return; }
     if (img === undefined) { setWarn("대표 이미지를 아직 읽는 중입니다. 잠시 뒤 다시 눌러 주세요."); return; }
     if (!img) { setWarn("대표 이미지가 없어 제출할 수 없습니다. 7차시 「전시 출품」에서 대표 이미지를 먼저 올린 뒤 이 화면으로 돌아오세요."); return; }
-    if (!window.confirm("제출을 확정하면 이 내용이 그대로 굳어 우리 반의 비교 대상이 됩니다. 고치려면 선생님께 해제를 요청해야 합니다. 지금 확정할까요?")) return;
+    if (!window.confirm("제출을 확정하면 이 내용이 그대로 고정되어 우리 반의 비교 대상이 됩니다. 고치려면 선생님께 해제를 요청해야 합니다. 지금 확정할까요?")) return;
     setBusy(true); setWarn("");
     let enc;
     try { enc = await reencode(img); }
@@ -356,7 +356,7 @@ function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }) {
       <div className="card-head"><span className="card-code">제출</span><span className="card-title">최종 작품 제출</span></div>
       <div className="card-note">
         7차시까지 쓴 제목·작품 캡션·대표 이미지를 그대로 가져왔습니다. 여기서 고친 뒤 「제출 확정」을 누르면
-        이 내용이 그대로 굳어 우리 반의 비교 대상이 됩니다. 비교 화면에는 작품 번호와 이미지, 펼쳤을 때의 작품 캡션만 보입니다.
+        이 내용이 그대로 고정되어 우리 반의 비교 대상이 됩니다. 비교 화면에는 작품 번호와 이미지, 펼쳤을 때의 작품 캡션만 보입니다.
       </div>
       <div className="card-body">
         {notInRoster && (
@@ -383,12 +383,12 @@ function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }) {
                   : <input value={d.plate[k] || ""} maxLength={80} onChange={(e) => setP(k, e.target.value)} />}
               </div>
             ))}
-            <div className="field span2"><label>허구 고지 문구 <span className="hint">— 비교 화면에는 보이지 않고, 전시와 결과에만 쓰입니다</span></label>
+            <div className="field span2"><label>허구 고지 문구 <span className="hint">(비교 화면에는 보이지 않고 전시와 결과에만 쓰입니다)</span></label>
               <input value={d.plate.notice || ""} maxLength={120} onChange={(e) => setP("notice", e.target.value)} /></div>
           </div>
         </div>
         <div className="field" style={{ marginTop: 6 }}>
-          <label>작가 노트 <span className="hint">— 7차시 기록에서 가져옴. 비교 화면에는 보이지 않습니다</span></label>
+          <label>작가 노트 <span className="hint">(7차시 기록에서 가져왔습니다. 비교 화면에는 보이지 않습니다)</span></label>
           <textarea rows={3} maxLength={1200} value={d.note} onChange={(e) => { setD((x) => ({ ...x, note: e.target.value })); setWarn(""); }} />
         </div>
         {warn && <div className="warn-note" role="alert">{warn}</div>}
@@ -413,7 +413,7 @@ function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMod
   const locked = isS2 && !!b.lockedAt;
   const [scores, setScores] = useState({});
   const [why, setWhy] = useState("");
-  const [rank, setRank] = useState(null);          // null = 아직 손잡이를 잡지 않음
+  const [rank, setRank] = useState(null);          // null = 아직 슬라이더를 움직이지 않음
   const [code, setCode] = useState(null);
   const [cwhy, setCwhy] = useState("");
   const [busy, setBusy] = useState(false);
@@ -428,7 +428,7 @@ function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMod
     if (!answered) return "다섯 문항에 모두 답해 주세요.";
     if (why.trim().length < SELF_MIN_WHY) return "근거를 " + SELF_MIN_WHY + "자 이상 적어 주세요.";
     if (n == null) return subFail ? "우리 반 작품 목록을 불러오지 못해 등수 예측을 받을 수 없습니다. 「다시 불러오기」를 눌러 주세요." : "우리 반 작품 수를 세는 중입니다. 잠시 뒤 다시 눌러 주세요.";
-    if (nOk && rank == null) return "등수 예측 손잡이를 움직여 자리를 정해 주세요.";
+    if (nOk && rank == null) return "등수 예측 슬라이더를 움직여 자리를 정해 주세요.";
     return "";
   };
   const body = () => ({
@@ -442,7 +442,7 @@ function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMod
     setBusy(true); setWarn("");
     const ok = await fbStore.setT("assess:" + sid, { ver: ASSESS_VER, self: { [phase]: v } }, { merge: true });
     setBusy(false);
-    if (!ok) setWarn("저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요 — 적은 내용은 이 화면에 그대로 남아 있습니다.");
+    if (!ok) setWarn("저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요. 적은 내용은 이 화면에 그대로 남아 있습니다.");
     return ok;
   };
   const submit1 = async () => {
@@ -476,7 +476,7 @@ function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMod
         <div className="card-head"><span className="card-code">자기평가 ②</span><span className="card-title">처음 평가와 나란히 보기</span></div>
         <div className="card-note">
           점수와 근거는 확정되었습니다. 아래에 처음 평가(①)와 이번 평가(②)를 나란히 놓았습니다.
-          달라졌든 같든 어느 쪽이 더 낫거나 못한 것이 아닙니다 — 이번 판단이 처음과 견주어 어떻게 느껴졌는지만 답해 주세요.
+          달라졌든 같든 어느 쪽이 더 낫거나 못한 것이 아닙니다. 이번 판단이 처음과 견주어 어떻게 느껴졌는지만 답해 주세요.
         </div>
         <div className="card-body">
           <table className="as-cmp">
@@ -540,7 +540,7 @@ function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMod
               <span className="as-qt">{it.text}</span>
             </div>
             <LikertRow value={scores[it.k]} onPick={(v) => { setScores((s) => ({ ...s, [it.k]: v })); setWarn(""); }}
-              label={it.label + " — " + it.text} labels={SELF_LABELS} />
+              label={it.label + ": " + it.text} labels={SELF_LABELS} />
           </div>
         ))}
         <div className="field" style={{ marginTop: 14 }}>
@@ -555,7 +555,7 @@ function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMod
           </p>
         ) : nOk && (
           <div className="field">
-            <label>우리 반 {n}점 가운데 내 작품은 몇 번째쯤일까요? <span className="hint">— 1이 가장 앞</span></label>
+            <label>우리 반 {n}점 가운데 내 작품은 몇 번째쯤일까요? <span className="hint">(1이 가장 앞)</span></label>
             <div className="as-range">
               <span className="as-rv">1</span>
               <input type="range" min={1} max={n} step={1} value={rankShown} aria-label="등수 예측" aria-valuetext={rankShown + "번째쯤"}
@@ -565,7 +565,7 @@ function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMod
               <span className="as-rv">{n}</span>
             </div>
             <div className={"as-rank-txt" + (rank == null ? " dim" : "")} aria-live="polite">
-              {rank == null ? "손잡이를 움직여 자리를 정하세요" : "우리 반 " + n + "점 가운데 " + rankShown + "번째쯤"}
+              {rank == null ? "슬라이더를 움직여 자리를 정하세요" : "우리 반 " + n + "점 가운데 " + rankShown + "번째쯤"}
             </div>
           </div>
         )}
@@ -653,7 +653,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
     return () => { live = false; };
   }, [subMap, curKey, reloadTick]); // eslint-disable-line
 
-  /* 배정된 작품이 지도에 없으면(확정 직전 제출 등) 한 번 다시 읽는다 */
+  /* 배정된 작품이 맵에 없으면(확정 직전 제출 등) 한 번 다시 읽는다 */
   const missing = !!(subMap && cur) && (!workOf(cur.a).sub || !workOf(cur.b).sub);
   const reloadedRef = useRef("");
   useEffect(() => {
@@ -815,8 +815,8 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
         )}
         {finished ? (
           saveErr
-            ? <div className="warn-note" role="alert">판정은 모두 골랐지만 마지막 판정이 아직 저장되지 않았습니다 — 위의 「다시 저장」을 눌러 주세요.</div>
-            : <div className="ok-note" role="status">동료 비교를 마쳤습니다 — {N}쌍 모두 기록되었습니다. 고맙습니다.</div>
+            ? <div className="warn-note" role="alert">판정은 모두 골랐지만 마지막 판정이 아직 저장되지 않았습니다. 위의 「다시 저장」을 눌러 주세요.</div>
+            : <div className="ok-note" role="status">동료 비교를 마쳤습니다. {N}쌍 모두 기록되었습니다. 고맙습니다.</div>
         ) : (
           <>
             <div className="as-q">{cfg.question}</div>
@@ -827,13 +827,13 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
               </button>
               {(missing || imgMissing) && <button type="button" className="btn small ghost" onClick={() => { setImgs((m) => { const c = { ...m }; delete c[cur.a]; delete c[cur.b]; return c; }); reloadSubs().finally(() => setReloadTick((t) => t + 1)); }}>작품 다시 불러오기</button>}
               <span className="hint">{canPick || busy ? "먼저 이미지만 보고 판단해도 되고, 작품 캡션을 펼쳐 보고 판단해도 됩니다."
-                : (missing || imgMissing) ? "작품 이미지를 불러오지 못했습니다. 이미지가 없으면 비교할 수 없습니다 — 다시 불러온 뒤에도 안 보이면 선생님께 알려 주세요."
+                : (missing || imgMissing) ? "작품 이미지를 불러오지 못했습니다. 이미지가 없으면 비교할 수 없습니다. 다시 불러온 뒤에도 안 보이면 선생님께 알려 주세요."
                   : "두 작품을 모두 본 뒤에 고를 수 있습니다."}</span>
             </div>
 
             {cfg.askConf && (
               <div className="field">
-                <label>이 판단을 얼마나 확신하나요? <span className="hint">— 작품의 점수가 아니라 판단이 얼마나 확실한지 묻습니다. 성적과 관계없습니다.</span></label>
+                <label>이 판단을 얼마나 확신하나요? <span className="hint">(작품의 점수가 아니라 판단이 얼마나 확실한지 묻습니다. 성적과 관계없습니다.)</span></label>
                 <div className="as-opts" role="radiogroup" aria-label="판단 확신도">
                   {CONF_LABELS.map((l, i) => (
                     <button type="button" key={l} role="radio" aria-checked={conf === i + 1} className={conf === i + 1 ? "on" : ""}
@@ -843,7 +843,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
               </div>
             )}
             <div className="field">
-              <label>고른 이유를 한 문장으로 ({cfg.minWhy}자 이상) — 결정에 가장 큰 영향을 준 화면의 특징이나 작품 캡션의 근거</label>
+              <label>고른 이유를 한 문장으로 ({cfg.minWhy}자 이상). 결정에 가장 큰 영향을 준 화면의 특징이나 작품 캡션의 근거를 적습니다</label>
               <textarea rows={2} maxLength={REASON_MAX} value={why} onChange={(e) => { setWhy(e.target.value); setWarn(""); }}
                 placeholder="예: 손잡이 안쪽만 닳아 있어서 실제로 쥐고 쓴 물건처럼 보였다" />
               <span className={"as-count" + (whyLen < cfg.minWhy ? " low" : "")}>{whyLen} / {REASON_MAX}</span>
@@ -866,7 +866,7 @@ function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFail, rel
             {warn && <div className="warn-note" role="alert">{warn}</div>}
             <div className="sv-foot">
               <button className="btn" disabled={busy} onClick={next}>
-                {busy ? "저장 중…" : doneN + 1 >= N ? "마지막 쌍 — 제출하기" : "다음 쌍 →"}
+                {busy ? "저장 중…" : doneN + 1 >= N ? "마지막 쌍 제출하기" : "다음 쌍 →"}
               </button>
               <span className="hint">고른 것은 되돌릴 수 없습니다. 한 쌍에 1분 남짓 걸립니다.</span>
             </div>
@@ -928,7 +928,7 @@ function ResultScreen({ cfg, result, self }) {
         <span className="card-sess">{fmtT(r.aggAt)} 집계</span></div>
       <div className="card-note">같은 반 친구들이 두 작품씩 견주며 남긴 판단을 모은 것입니다. 누가 어떻게 판정했는지는 나오지 않습니다. 이유를 먼저 읽고, 자리는 그 뒤에 봅니다.</div>
       <div className="card-body">
-        {tagLine && <p className="as-plays">심사자들이 결정적이었다고 고른 것 — {tagLine}</p>}
+        {tagLine && <p className="as-plays">심사자들이 결정적이었다고 고른 것: {tagLine}</p>}
         <div className="as-h">이 작품을 고른 판정의 이유 ({won.length})</div>
         {won.length ? list(won) : <p className="hint">기록된 문장이 없습니다.</p>}
         <div className="as-h">다른 작품을 고른 판정의 이유 ({lost.length})</div>
@@ -968,7 +968,7 @@ const ASSESS_CSS = `
 .as-card{border-top:3px solid var(--ink)}
 .as-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-/* 진행 띠 — 제출 · 자기평가① · 동료 비교 · 자기평가② · 결과 */
+/* 진행 표시줄 — 제출 · 자기평가① · 동료 비교 · 자기평가② · 결과 */
 .as-strip{display:flex;gap:6px;flex-wrap:wrap;list-style:none;margin:0 0 14px;padding:0}
 .as-step{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);border:1px solid var(--line);background:var(--card);padding:5px 10px;font-family:var(--sans)}
 .as-step i{font-style:normal;font-family:var(--mono);font-size:11px}
@@ -987,7 +987,7 @@ const ASSESS_CSS = `
 .as-qt{display:block;font-size:12.5px;color:var(--sub);margin-top:2px;line-height:1.55}
 .as-item .sv-q b{font-weight:700}
 
-/* 보기 단추 — 확신도 · 결정적 축 · 변화 사유 */
+/* 보기 버튼 — 확신도 · 결정적 축 · 변화 사유 */
 .as-opts{display:flex;gap:6px;flex-wrap:wrap}
 .as-opts button{padding:8px 12px;border:1px solid var(--line);background:#fff;font-family:var(--sans);font-size:12.5px;color:var(--ink);cursor:pointer;line-height:1.4;text-align:left}
 .as-opts button:hover{border-color:var(--ink)}
@@ -1051,7 +1051,7 @@ const ASSESS_CSS = `
 .as-tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--sub);border:1px solid var(--line);padding:1px 5px;margin-right:6px;white-space:nowrap}
 .as-fixed{font-size:12px;color:var(--sub);border-top:1px solid var(--line2);padding-top:10px;margin-top:14px;line-height:1.7}
 
-/* 손가락 입력에서는 단추를 40px 이상으로 · 움직임 줄이기 · 640px 이하에서는 두 작품을 세로로 */
+/* 손가락 입력에서는 버튼을 40px 이상으로 · 움직임 줄이기 · 640px 이하에서는 두 작품을 세로로 */
 @media (pointer:coarse){.as-opts button,.as-work .btn,.as-tools .btn,.as-step{min-height:40px}}
 @media (prefers-reduced-motion:reduce){.as-bar i{transition:none}}
 @media (max-width:640px){

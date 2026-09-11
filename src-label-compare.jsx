@@ -49,7 +49,7 @@ const FallbackImg = () => (
     <rect x="640" y="255" width="234" height="52" rx="26" fill="#3A3A34" />
     <rect x="640" y="255" width="120" height="52" rx="26" fill="#9A6B4F" />
     <text x="512" y="380" textAnchor="middle" fontSize="22" fill="#6E6C62" fontFamily="sans-serif">
-      도판을 불러오지 못했습니다 — 한쪽 그립만 벗겨진 파이프 손잡이 파편
+      도판을 불러오지 못했습니다 (한쪽 그립만 벗겨진 파이프 손잡이 파편)
     </text>
   </svg>
 );
@@ -105,13 +105,13 @@ export function LabelCompare({ compact }) {
   .lcmp-tbl tr{margin-bottom:9px;border:1px solid var(--line2)}
   .lcmp-tbl td{border:none;border-top:1px solid var(--line2)}
   .lcmp-tbl td.k{width:auto}
-  .lcmp-tbl td.a:before{content:"캡션 A — ";font-family:var(--mono);font-size:11px;color:var(--sub)}
-  .lcmp-tbl td.b:before{content:"캡션 B — ";font-family:var(--mono);font-size:11px;color:var(--seal)}
+  .lcmp-tbl td.a:before{content:"캡션 A: ";font-family:var(--mono);font-size:11px;color:var(--sub)}
+  .lcmp-tbl td.b:before{content:"캡션 B: ";font-family:var(--mono);font-size:11px;color:var(--seal)}
 }
       `}</style>
       <div className="lcmp-head">
         <span className="lcmp-acc">LABEL A / LABEL B</span>
-        <h4>자료 — 작품 캡션 두 장 비교</h4>
+        <h4>자료: 작품 캡션 두 장 비교</h4>
         <button type="button" className="lcmp-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? "접기" : "펼치기"}
         </button>
@@ -124,7 +124,7 @@ export function LabelCompare({ compact }) {
       {open && (
         <div className="lcmp-body">
           <div className="lcmp-img"><CompareImg /></div>
-          <div className="lcmp-cap">사진은 한 장 — 픽셀은 하나도 바뀌지 않았습니다</div>
+          <div className="lcmp-cap">사진은 한 장이고, 픽셀은 하나도 바뀌지 않았습니다</div>
           <table className="lcmp-tbl">
             <thead>
               <tr><th /><th className="a">캡션 A</th><th className="b">캡션 B</th></tr>
@@ -158,7 +158,7 @@ export function LabelCompare({ compact }) {
                 <li>가렸을 때 읽기가 가장 많이 무너지는 줄, 그 한 줄이 답의 후보입니다.</li>
               </ol>
               <div className="lcmp-demo">
-                답의 모양은 이렇습니다 — “<b>재질</b>이 ‘금속’에서 ‘강철 파이프, 합성고무 그립, 직물 테이프’로 나뉘자,
+                답의 모양은 이렇습니다. “<b>재질</b>이 ‘금속’에서 ‘강철 파이프, 합성고무 그립, 직물 테이프’로 나뉘자,
                 감아 놓은 테이프가 장식이 아니라 <b>고쳐 쓴 흔적</b>으로 보였다.”
                 이것은 형식을 보여 주는 예일 뿐이니 그대로 쓰지 말고, 다섯 줄을 직접 가려 보고 내 눈이 가장 크게 움직인 줄을 고르세요.
               </div>

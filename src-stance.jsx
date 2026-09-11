@@ -10,11 +10,11 @@
    v1의 문항·채점은 건드리지 않으므로 사전·사후 비교의 동일성이 유지된다.
 
    화면(고2 대상, 42문항을 한 번에 훑는 긴 설문):
-   - 머리띠를 고정해 지금 어느 묶음에 있고 몇 문항 했는지 늘 보이게 한다.
+   - 상단 표시줄을 고정해 지금 어느 묶음에 있고 몇 문항 했는지 늘 보이게 한다.
    - 숫자 보기의 뜻(1이 무엇, 5가 무엇)이 스크롤로 사라지지 않게 한다.
    - 묶음 이름은 학생의 말로 적는다. 척도 이름("인간중심 창의성 신념" 같은)은
      보여 주지 않는다 — 무엇을 재는지 알려 주면 답이 그쪽으로 쏠린다.
-   - 응답 단추·건너뛰기·미응답 표시는 src-survey-ui.jsx(v1 설문용으로 만든 계층)를
+   - 응답 버튼·건너뛰기·미응답 표시는 src-survey-ui.jsx(v1 설문용으로 만든 계층)를
      그대로 쓴다. 두 설문의 조작감이 같아야 응답이 비교된다.
    ============================================================ */
 
@@ -210,7 +210,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy, saveInfo })
   const barRef = useRef(null);
   const secRefs = useRef([]);
 
-  /* 상단 띠 높이(그 아래에 머리띠를 붙인다)는 화면 폭에 따라 바뀐다 — src-survey-ui.jsx의
+  /* 상단 바 높이(그 아래에 고정 표시줄을 붙인다)는 화면 폭에 따라 바뀐다 — src-survey-ui.jsx의
      공용 훅이 재서 따라가고 --sv-top도 거기서 세운다. 두 설문이 같은 측정을 쓴다. */
   const topH = useTopbarHeight();
 
@@ -231,7 +231,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy, saveInfo })
   if (submitted) {
     return (
       <div className="ok-note">
-        {isPost ? "사후" : "사전"} 성향 설문을 제출했습니다 · {fmtT(sv.submittedAt)} — 솔직하게 답해 주어 고맙습니다.
+        {isPost ? "사후" : "사전"} 성향 설문을 제출했습니다 · {fmtT(sv.submittedAt)}. 솔직하게 답해 주어 고맙습니다.
       </div>
     );
   }
@@ -262,7 +262,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy, saveInfo })
       <div className="card-head">
         <span className="card-code">{isPost ? "사후 설문 2" : "사전 설문 2"}</span>
         <span className="card-title">작품을 보는 나의 눈</span>
-        <span className="card-sess" role="status" aria-live="polite">{saveInfo === "err" ? "저장 실패 — 연결 확인 · " : saveInfo === "saving" ? "저장 중… · " : saveInfo === "saved" ? "저장됨 · " : ""}{total}문항 · 약 {isPost ? 5 : 8}분</span>
+        <span className="card-sess" role="status" aria-live="polite">{saveInfo === "err" ? "저장 실패(연결 확인) · " : saveInfo === "saving" ? "저장 중… · " : saveInfo === "saved" ? "저장됨 · " : ""}{total}문항 · 약 {isPost ? 5 : 8}분</span>
       </div>
       <div className="card-note">
         정답이 없고 성적과도 관계없는 설문입니다. 여러분이 작품을 어떤 눈으로 보는지 알아보려는 것이고, 개인의 답을 따로 확인하지 않습니다.
@@ -289,7 +289,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy, saveInfo })
                 ))}
               </ol>
             ) : (
-              <p className="st-hint">문항마다 보기가 다릅니다 — 보기를 읽고 고르세요.</p>
+              <p className="st-hint">문항마다 보기가 다릅니다. 보기를 읽고 고르세요.</p>
             )}
           </div>
         </div>
@@ -353,7 +353,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy, saveInfo })
                                   const n = i + it.base;
                                   return (
                                     <button type="button" key={n} className={gv === n ? "on" : ""}
-                                      role="radio" aria-checked={gv === n} aria-label={w + " — " + l}
+                                      role="radio" aria-checked={gv === n} aria-label={w + ": " + l}
                                       title={l} onClick={() => setGrid(it.k, w, n)}>{n}</button>
                                   );
                                 })}
@@ -375,7 +375,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy, saveInfo })
             {busy ? "제출 중…" : remain > 0 ? "아직 " + remain + "문항 남았습니다" : "제출하기"}
           </button>
           {remain > 0 && <button type="button" className="st-jump" onClick={jump}>남은 문항으로 가기 →</button>}
-          <span className="hint">답은 고르는 즉시 저장됩니다. 모두 답하면 제출 단추가 켜지고, 제출한 뒤에는 고칠 수 없습니다.</span>
+          <span className="hint">답은 고르는 즉시 저장됩니다. 모두 답하면 제출 버튼이 활성화되고, 제출한 뒤에는 고칠 수 없습니다.</span>
         </div>
       </div>
     </div>
@@ -417,7 +417,7 @@ export function StanceMini({ st }) {
   );
 }
 
-/* ---------- 잔가지 ---------- */
+/* ---------- 보조 함수 ---------- */
 
 const nowISO = () => new Date().toISOString();
 const fmtT = (iso) => {
@@ -429,8 +429,8 @@ const fmtT = (iso) => {
 
 /* ---------- 화면 스타일 ----------
    거대한 CSS 상수를 건드리지 않도록 따로 내보낸다 (src-content.jsx의 선례).
-   응답 단추·미응답 표시·건너뛰기 강조는 src-survey-ui.jsx의 규칙을 그대로 쓰고,
-   여기서는 s1에만 있는 것(묶음 머리띠·보기 단추·낱말표)만 더한다. */
+   응답 버튼·미응답 표시·건너뛰기 강조는 src-survey-ui.jsx의 규칙을 그대로 쓰고,
+   여기서는 s1에만 있는 것(묶음 고정 표시줄·보기 버튼·낱말표)만 더한다. */
 
 const STANCE_CSS = `
 /* 뼈대(.sv-stickybar)와 진행률(.sv-prog*)은 src-survey-ui.jsx에 있다.

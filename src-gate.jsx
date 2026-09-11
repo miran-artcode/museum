@@ -61,7 +61,7 @@ export function GateHeader({ onEnter, onUnits, onTeacher, onGallery, onDemo }) {
         </nav>
       </div>
       <div className="g4-masthead">
-        <button className="g4-logo" onClick={onUnits} aria-label="허구의 아카이브 — 수업 소개로 이동">
+        <button className="g4-logo" onClick={onUnits} aria-label="허구의 아카이브 수업 소개로 이동">
           <span>FICTIVE</span>
           <span>ARCHIVE</span>
           <span className="g4-logo-kr">허구의 아카이브 · 창작 과정 기록실</span>
@@ -100,7 +100,7 @@ export function GateSections({ onEnter }) {
               </div>
               <h3>{s.title}</h3>
               <p>{s.body}</p>
-              <button className="g4-arrow" onClick={onEnter} aria-label={s.title + " — 기록실 입장으로 이동"}>입장 →</button>
+              <button className="g4-arrow" onClick={onEnter} aria-label={s.title + " 기록실 입장으로 이동"}>입장 →</button>
             </div>
           </article>
         ))}
