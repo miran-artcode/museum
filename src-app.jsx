@@ -430,8 +430,8 @@ const SCHEMA_DEF = [
     fields: [
       { k: "tname", t: "text", label: "가칭" }, { k: "user", t: "text", label: "사용자" },
       { k: "func", t: "text", label: "기능" }, { k: "mat", t: "text", label: "재질" },
-      { k: "struct", t: "text", label: "구조" }, { k: "wear", t: "text", phTrace: "3차시 흔적에서 닳은 부분만: ", label: "마모" },
-      { k: "break", t: "text", label: "파손" }, { k: "repair", t: "text", phTrace: "3차시 흔적에서 고친 부분만: ", label: "수리" },
+      { k: "struct", t: "text", label: "구조" }, { k: "wear", t: "text", phTrace: "위 3차시 흔적에서 닳은 부분만 (예: 고무가 벗겨져 금속이 드러남)", label: "마모" },
+      { k: "break", t: "text", label: "파손" }, { k: "repair", t: "text", phTrace: "위 3차시 흔적에서 고친 부분만 (예: 테이프를 세 겹 감음. 없으면 ‘없음’)", label: "수리" },
       { k: "stain", t: "text", label: "오염" }, { k: "discard", t: "text", label: "폐기 이유" },
       { k: "context", t: "area", label: "2300년 출토 맥락: 어디서, 무엇과 함께, 어떤 상태로 발견되었다는 설정인지" },
     ],
@@ -3092,11 +3092,13 @@ function ScenesEcho({ ws }) {
     <div className="obs-echo"><b>계단 2에서 모아 온 장면</b>
       {legacy ? <div style={{ whiteSpace: "pre-wrap" }}>{legacy}</div>
         : scenes.length ? <ol>{scenes.map((r, i) => <li key={i}>{[r.when, r.where, r.what].filter(filled).join(" · ")}</li>)}</ol>
-        : <div>아직 장면이 없습니다. 2차시 탭 계단 2에 먼저 적습니다.{canGo ? " 지금 급하면 계단 2에 한두 줄만 적고 여기로 돌아와 시작해도 됩니다." : ""}</div>}
+        : <div>{canGo
+            ? "아직 장면이 없습니다. 2차시 탭 계단 2에 먼저 적습니다. 지금 급하면 계단 2에 한두 줄만 적고 여기로 돌아와 시작해도 됩니다."
+            : "아직 장면이 없습니다. 계단 2는 지금 닫혀 있으니 선생님께 열어 달라고 말합니다. 그동안은 기억나는 장면 하나(언제·어디서·무엇을)를 아래 「만나는 때와 곳」 칸에 적어 두고 시작해도 됩니다."}</div>}
       {nav && (
         <div className="carry-row">
           <button type="button" className="btn small ghost" disabled={!canGo} onClick={() => nav.go("2차시", "s3a")}>고치려면 2차시 탭 계단 2로</button>
-          {!canGo && <span className="hint" style={{ margin: 0 }}>2차시가 닫혀 있어 지금은 고칠 수 없습니다.</span>}
+          {!canGo && (legacy || scenes.length > 0) && <span className="hint" style={{ margin: 0 }}>2차시가 닫혀 있어 지금은 고칠 수 없습니다.</span>}
         </div>
       )}
     </div>
@@ -3124,7 +3126,7 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
       ) : (
         <div className="risk-echo"><b>먼저 할 일</b>계단 1에서 관찰 방법부터 고릅니다. 고르면 이 표의 칸 이름이 그 방법에 맞게 바뀝니다.</div>
       )}
-      <ThinkSteps steps={m ? f.steps : (f.steps || []).slice(1)} title="도움말: 쓰기 전에 두 가지" />
+      <ThinkSteps steps={m ? f.steps : (f.steps || []).slice(1)} title={m ? "도움말: 쓰기 전에 두 가지" : "도움말: 쓰기 전에 한 가지"} />
       {legacy && (
         <div className="carry" style={{ borderLeftColor: "var(--amber)", background: "var(--card2)" }}>
           <b>이전에 줄글로 쓴 내용</b>
@@ -3234,7 +3236,9 @@ function PickInvField({ f, fieldKey, v, setField, ws }) {
           })}
         </div>
       )}
-      <span className="hint">하나만 고릅니다. 고르지 않은 것은 지우지 마세요. 무엇을 빼고 골랐는지가 기록입니다.</span>
+      <span className="hint">{list.length > 0 && !filled(v)
+        ? "위 목록 가운데 하나를 눌러 고릅니다. 고를 때까지는 1번이 다음 계단으로 넘어갑니다. 고르지 않은 것은 지우지 마세요. 무엇을 빼고 골랐는지가 기록입니다."
+        : "하나만 고릅니다. 고르지 않은 것은 지우지 마세요. 무엇을 빼고 골랐는지가 기록입니다."}</span>
     </div>
   );
 }
@@ -3282,6 +3286,9 @@ function CandsField({ f, fieldKey, v, setField, ws }) {
           </tbody>
         </table>
       </div>
+      {rows.some((r) => filled(r.obj)) && !rows.some((r) => r.verdict === "고름" && filled(r.obj)) && (
+        <span className="hint">아직 「고름」을 누른 물건이 없습니다. 누를 때까지는 1번 물건이 계단 6으로 넘어갑니다.</span>
+      )}
     </div>
   );
 }
@@ -3325,7 +3332,7 @@ function TracesField({ f, fieldKey, v, setField, ws }) {
       {cell(i, "spot", "어느 자리 (한 군데만)", "오른쪽 끝, 손바닥이 닿는 자리", 80, false)}
       {cell(i, "shape", "어떤 자국 (사진에 찍히는 말로, ‘…있다’로 끝맺기)", "고무가 벗겨져 쇠가 드러나 있고, 그 위에 천 테이프가 세 겹 감겨 있다", 200, true)}
       {cell(i, "act", "어떤 동작 (‘…하기’)", "한 손으로 비틀어 쥐고 끌기", 60, false)}
-      {cell(i, "freq", "하루 몇 번씩, 몇 년 동안", "하루 200번씩 4년 동안", 40, false)}
+      {cell(i, "freq", "하루 몇 번씩, 몇 년 동안 (모르면 어림해서)", "하루 200번씩 4년 동안", 40, false)}
     </div>
   );
   return (
@@ -3460,6 +3467,7 @@ function ReverseField({ f, fieldKey, v, setField, ws }) {
             ? <div style={{ color: "var(--sub)", fontSize: 12.5, padding: "3px 2px" }}>거의 같게 읽혔으니 돌아가지 않아도 됩니다.</div>
             : <select value={back} onChange={(e) => up(i, "backTo", e.target.value)}>{backOpts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select>}
           {!same && backSt && <span className="hint">위 계단 표시줄에서 「계단 {backSt.n}」을 눌러 고친 뒤 여기로 돌아옵니다.</span>}
+          {!same && filled(r.gap) && back === "none" && <span className="hint">어느 계단으로 돌아갈지 고릅니다. 정말 안 돌아가기로 했다면 「안 돌아감」을 그대로 둡니다.</span>}
         </div>
         {!same && back !== "none" && (
           <div className="tf wide">
@@ -3515,10 +3523,12 @@ function LadderSummaryBox({ ws, setField }) {
       {row("흔적", "trace", sum.trace, (
         <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {restoreBtn("trace")}
-          <button type="button" className="btn small ghost" onClick={() => setEditTrace((p) => !p)}>{editTrace ? "닫기" : "흔적 글 고치기"}</button>
+          {filled(auto.trace) || filled(d["s3b.trace"])
+            ? <button type="button" className="btn small ghost" onClick={() => setEditTrace((p) => !p)}>{editTrace ? "닫기" : "흔적 글 고치기"}</button>
+            : <span className="hint" style={{ margin: 0 }}>계단 6의 흔적 네 칸을 채우면 여기에 뜹니다.</span>}
         </span>
       ))}
-      {editTrace && (
+      {editTrace && (filled(auto.trace) || filled(d["s3b.trace"])) && (
         <textarea rows={3} maxLength={400} value={filled(d["s3b.trace"]) ? d["s3b.trace"] : (auto.trace || "")}
           placeholder="4차시가 읽는 흔적 글입니다. 자리·자국·동작·되풀이가 다 들어가게 손봅니다."
           onChange={(e) => setField("s3b.trace", e.target.value)} />
@@ -3615,7 +3625,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
         <StageEcho sec={sec} f={f} ws={ws} />
         {f.t === "text" && !wide ? (
           /* phTrace: 4차시 마모·수리 칸은 3차시 흔적 글의 앞머리를 예시로 보여 준다 (칸마다 다른 머리말) */
-          <input value={v ?? ""} placeholder={f.phTrace && filled(ladderSummary(ws).trace) ? f.phTrace + ladderSummary(ws).trace.slice(0, 40) : (f.def || "")}
+          <input value={v ?? ""} placeholder={f.phTrace && filled(ladderSummary(ws).trace) ? f.phTrace : (f.def || "")}
             maxLength={f.max || 300} onChange={(e) => setField(key, e.target.value)} />
         ) : f.t === "text" ? (
           <textarea rows={legacyLong ? 3 : 2} value={v ?? ""} maxLength={legacyLong ? 4000 : f.max} placeholder={f.def || ""} onChange={(e) => setField(key, e.target.value)} />
