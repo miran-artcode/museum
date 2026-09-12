@@ -20,6 +20,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { fbStore } from "./src-fb.js";
 import { useTopbarHeight } from "./src-survey-ui.jsx";
+import { SCHEMA_REV, REV_SECTIONS } from "./src-ladder.jsx";
 
 export const CONTENT_KEY = "lessonEdits";
 const TEACHER = "teacher";
@@ -28,12 +29,25 @@ const pick = (o, k, d) => (o && o[k] != null ? o[k] : d);
 
 const emptyContent = () => ({ lessons: {}, secs: {}, fields: {} });
 
+/* 번역 사다리 카드(REV_SECTIONS)는 2026-09에 문항이 통째로 바뀌었다.
+   그 전에 저장된 덮어쓰기(rev가 다른 것)는 새 문안을 가리므로 읽을 때 버린다.
+   교사가 다시 고치면 setSec·setFld가 지금 rev를 붙여 저장한다. */
+function dropStale(obj, secOf) {
+  const out = {};
+  Object.keys(obj || {}).forEach((k) => {
+    const v = obj[k];
+    if (REV_SECTIONS.includes(secOf(k)) && !(v && v.rev === SCHEMA_REV)) return;
+    out[k] = v;
+  });
+  return out;
+}
+
 function normalize(c) {
   if (!c || typeof c !== "object") return emptyContent();
   return {
     lessons: c.lessons && typeof c.lessons === "object" ? c.lessons : {},
-    secs: c.secs && typeof c.secs === "object" ? c.secs : {},
-    fields: c.fields && typeof c.fields === "object" ? c.fields : {},
+    secs: dropStale(c.secs && typeof c.secs === "object" ? c.secs : {}, (k) => k),
+    fields: dropStale(c.fields && typeof c.fields === "object" ? c.fields : {}, (k) => String(k).split(".")[0]),
     updatedAt: c.updatedAt || "",
   };
 }
@@ -460,8 +474,8 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
 
   const touch = (fn) => { setDraft(fn); setDirty(true); };
   const setL = (patch) => touch((d) => ({ ...d, lessons: { ...d.lessons, [String(n)]: { ...(d.lessons[String(n)] || {}), ...patch } } }));
-  const setSec = (id, patch) => touch((d) => ({ ...d, secs: { ...d.secs, [id]: { ...(d.secs[id] || {}), ...patch } } }));
-  const setFld = (id, k, patch) => touch((d) => ({ ...d, fields: { ...d.fields, [id + "." + k]: { ...(d.fields[id + "." + k] || {}), ...patch } } }));
+  const setSec = (id, patch) => touch((d) => ({ ...d, secs: { ...d.secs, [id]: { ...(d.secs[id] || {}), ...patch, rev: SCHEMA_REV } } }));
+  const setFld = (id, k, patch) => touch((d) => ({ ...d, fields: { ...d.fields, [id + "." + k]: { ...(d.fields[id + "." + k] || {}), ...patch, rev: SCHEMA_REV } } }));
 
   const rds = isArr(cur.readings) ? cur.readings : [];
   const patchRd = (i, patch) => setL({ readings: rds.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
