@@ -96,6 +96,84 @@ service cloud.firestore {
                     && s1Kept();
     }
 
+    // 적응형 쪽지시험 — 문항 은행(공개부)·정답 키·응시 기록 (쪽지시험_구현_근거.md §8, src-quiz-core.mjs 계약)
+    // 은행 공개부에는 정답이 없고(keyHash만) 교사가 시험을 연 뒤(stage != closed)에만 학생이 읽는다. 정답 키는 교사만 읽고 쓴다.
+    // 응시 문서 quiz/{학번}은 본인·교사만 읽는다. 학생은 시작 마감 안에 startedAt을 서버 시각으로 만들고,
+    // 끝내기(finishedAt) 전까지, 제한 시간(배수·보전·추가·전체 정지 + 60초 유예) 안에서만 진행 필드를 고친다.
+    // 시작 시각·반·seed·은행 버전과 교사 필드(pausedTotalSec·extraSec·result 등)는 학생이 바꾸지 못하고,
+    // 제출한 블록(blocks)·이미 연 블록의 문항(served)은 그대로여야 하며, 이벤트 목록(events)은 줄어들지 않는다.
+    // 시간이 끝난 뒤에는 마무리 필드(status·finishedAt·clientScore·events·lock·warn·cur)만 쓸 수 있다.
+    function quizV(res) {
+      return res.data.get('v', {});
+    }
+    function quizCfg() {
+      return get(/databases/$(database)/documents/meta/config).data.get('v', {}).get('quiz', {});
+    }
+    function quizStage() {
+      return quizCfg().get('stage', 'closed');
+    }
+    // 교사만 쓰는 v 안의 키
+    function quizTeacherKeys() {
+      return ['pausedTotalSec', 'extraSec', 'extraReason', 'falsePos', 'note', 'resumeOk', 'result'];
+    }
+    // 시작 뒤 값이 고정되는 v 안의 키
+    function quizFixedKeys() {
+      return ['sid', 'half', 'seed', 'ver', 'bankVer', 'timeMult', 'noImage'];
+    }
+    // 열린 상태이고 시작 마감(열린 시각 + startDeadlineSec) 전인가
+    function quizStartOpen() {
+      let cfg = quizCfg();
+      return cfg.get('stage', 'closed') == 'open'
+          && request.time.toMillis() < cfg.get('openedAtMs', 0) + cfg.get('startDeadlineSec', 900) * 1000;
+    }
+    // 서버 시각이 시작 시각 + (제한 시간 × 배수 + 보전 + 추가 + 전체 정지 + 60초 유예) 안인가
+    function quizWithinTime(sid) {
+      let cfg = quizCfg();
+      let b = quizV(resource);
+      return request.time.toMillis() < resource.data.startedAt.toMillis()
+          + (cfg.get('durationSec', 2400) * cfg.get('timeMult', {}).get(sid, 1)
+             + b.get('pausedTotalSec', 0) + b.get('extraSec', 0) + cfg.get('pausedAccumSec', 0) + 60) * 1000;
+    }
+    // 이미 있던 블록 키는 바뀌지 않는다 (새 블록을 더하는 것만 허용)
+    function quizBlocksKept() {
+      let b = quizV(resource).get('blocks', {});
+      return !quizV(request.resource).get('blocks', {}).diff(b).affectedKeys().hasAny(b.keys());
+    }
+    function quizServedKept() {
+      let b = quizV(resource).get('served', {});
+      return !quizV(request.resource).get('served', {}).diff(b).affectedKeys().hasAny(b.keys());
+    }
+    function quizEventsGrow() {
+      return quizV(request.resource).get('events', []).size() >= quizV(resource).get('events', []).size();
+    }
+    match /quizBank/{docId} {
+      allow read: if isTeacher() || (signedIn() && quizStage() != 'closed');
+      allow write: if isTeacher();
+    }
+    match /quizKeys/{docId} {
+      allow read, write: if isTeacher();
+    }
+    match /quiz/{sid} {
+      allow read: if isOwner(sid) || isTeacher();
+      allow delete: if isTeacher();
+      allow create, update: if isTeacher() && sizeOk();
+      allow create: if isOwner(sid) && sizeOk()
+                    && quizStartOpen()
+                    && request.resource.data.startedAt == request.time
+                    && !quizV(request.resource).keys().hasAny(quizTeacherKeys())
+                    && quizV(request.resource).get('finishedAt', null) == null;
+      allow update: if isOwner(sid) && sizeOk()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['v', 'hb', 'lockedAt', 'updatedAt'])
+                    && request.resource.data.startedAt == resource.data.startedAt
+                    && quizV(resource).get('finishedAt', null) == null
+                    && !quizV(request.resource).diff(quizV(resource)).affectedKeys().hasAny(quizTeacherKeys())
+                    && !quizV(request.resource).diff(quizV(resource)).affectedKeys().hasAny(quizFixedKeys())
+                    && quizBlocksKept() && quizServedKept() && quizEventsGrow()
+                    && (quizWithinTime(sid)
+                        || quizV(request.resource).diff(quizV(resource)).affectedKeys()
+                             .hasOnly(['status', 'finishedAt', 'clientScore', 'events', 'lock', 'warn', 'cur']));
+    }
+
     // 연구 참여 동의 대장: 교사만 읽고 쓴다.
     // 명부(students)에 두지 않는 이유 — 명부는 로그인한 학생 모두가 읽으므로
     // 누가 연구에서 빠졌는지가 학생끼리 보이게 된다. 동의 여부는 학생 사이에 드러나서는 안 된다.

@@ -8,6 +8,7 @@ import { initializeApp } from "firebase/app";
 import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, getDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc,
+  serverTimestamp, arrayUnion, getDocFromServer, getDocsFromServer,
 } from "firebase/firestore";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -115,6 +116,10 @@ function route(key) {
   if (key === "peerRoster") return { kind: "doc", path: ["meta", "peerRoster"] };
   if (key.startsWith("sub:")) return { kind: "doc", path: ["submissions", safe(key.slice(4))] };
   if (key.startsWith("assess:")) return { kind: "doc", path: ["assess", safe(key.slice(7))] };
+  // 적응형 쪽지시험: 은행(공개부)·정답 키·응시 기록 (src-quiz-core.mjs 계약)
+  if (key === "quizBank") return { kind: "doc", path: ["quizBank", "v1"] };
+  if (key === "quizKeys") return { kind: "doc", path: ["quizKeys", "v1"] };
+  if (key.startsWith("quiz:")) return { kind: "doc", path: ["quiz", safe(key.slice(5))] };
   return { kind: "doc", path: ["misc", safe(key)] };
 }
 
@@ -296,4 +301,88 @@ export const fbStore = {
     try { await deleteDoc(doc(db, "students", safe(sid))); return true; }
     catch (e) { console.error("removeStudent fail", sid, e); return false; }
   },
+
+  /* ---------- 적응형 쪽지시험 (src-quiz-core.mjs 계약, impl-spec §3) ----------
+     응시 문서 quiz/{학번}은 봉투(v·updatedAt) 밖에 서버 시각 필드 startedAt·hb·lockedAt 을 둔다.
+     규칙이 startedAt == request.time 과 제한 시간을 서버 시각으로 대조하므로 학생 브라우저의 시계는 믿지 않는다.
+     Timestamp는 millis로 바꿔 돌려주고, serverTimestamp가 아직 서버에서 확정되지 않은 로컬 스냅샷에서는 null이다. */
+
+  /* 응시 시작: 문서를 새로 만든다 (merge 없음). 이미 있는 문서에 다시 부르면 startedAt이 바뀌므로
+     규칙이 학생의 재시작을 거부한다 — 이어 풀기는 quizPatch로 한다 */
+  quizStart(sid, v) {
+    const write = (async () => {
+      try {
+        await setDoc(doc(db, "quiz", safe(sid)), { v, startedAt: serverTimestamp(), hb: serverTimestamp(), lockedAt: null, updatedAt: Date.now() });
+        return true;
+      } catch (e) { console.error("quizStart fail", sid, e); return false; }
+    })();
+    return Promise.race([write, new Promise((res) => setTimeout(() => res(false), 8000))]);
+  },
+
+  /* 진행 갱신: v의 준 필드만 깊은 병합하고 심장박동(hb)을 함께 찍는다.
+     vPatch 안에 quizEvent(ev) 같은 FieldValue를 넣어도 되도록 값을 그대로 넘긴다.
+     빈 vPatch(심장박동만)일 때 v: {} 를 보내면 merge가 v 전체를 빈 맵으로 바꾸므로 v 자체를 뺀다.
+     opts.lock → lockedAt 서버 시각, opts.unlock → lockedAt null (교사 해제) */
+  quizPatch(sid, vPatch, opts) {
+    const ms = (opts && opts.timeout) || 8000;
+    const write = (async () => {
+      try {
+        const top = { hb: serverTimestamp(), updatedAt: Date.now() };
+        if (vPatch && Object.keys(vPatch).length) top.v = vPatch;
+        if (opts && opts.lock) top.lockedAt = serverTimestamp();
+        if (opts && opts.unlock) top.lockedAt = null;
+        await setDoc(doc(db, "quiz", safe(sid)), top, { merge: true });
+        return true;
+      } catch (e) { console.error("quizPatch fail", sid, e); return false; }
+    })();
+    return Promise.race([write, new Promise((res) => setTimeout(() => res(false), ms))]);
+  },
+
+  /* 이벤트 추가용 FieldValue 보조 함수 — 화면 모듈이 firebase를 직접 import하지 않게 한다 */
+  quizEvent(ev) { return arrayUnion(ev); },
+
+  /* 서버에서 되읽기 (캐시 안 씀). serverNowMs는 방금 쓴 hb의 서버 시각이므로
+     쓰기 직후에 불렀을 때만 「지금 서버 시각」의 뜻이 있다 */
+  async quizReadServer(sid) {
+    try {
+      const s = await getDocFromServer(doc(db, "quiz", safe(sid)));
+      if (!s.exists()) return { ok: true, data: null };
+      const d = quizShape(s.data());
+      return { ok: true, data: { ...d, serverNowMs: d.hbMs } };
+    } catch (e) { console.error("quizReadServer fail", sid, e); return { ok: false, data: null }; }
+  },
+
+  /* 자기 응시 문서 구독 (잠금 해제·재개 허용을 기다릴 때). 없으면 cb(null) */
+  quizWatch(sid, cb) {
+    return onSnapshot(doc(db, "quiz", safe(sid)), (s) => {
+      if (!s.exists()) return cb(null);
+      cb(quizShape(s.data()));
+    }, () => {});
+  },
+
+  /* 교사: 응시 문서 전체 구독 → { [학번]: { v, startedAtMs, hbMs, lockedAtMs } } */
+  quizWatchAll(cb) {
+    return onSnapshot(collection(db, "quiz"), (snap) => {
+      const out = {};
+      snap.forEach((d) => { out[d.id] = quizShape(d.data()); });
+      cb(out);
+    }, () => {});
+  },
+
+  /* 교사 재계산용: 서버에서 전체 읽기, 같은 모양. 실패는 ok:false (빈 학급과 구분) */
+  async quizAllServer() {
+    try {
+      const snap = await getDocsFromServer(collection(db, "quiz"));
+      const out = {};
+      snap.forEach((d) => { out[d.id] = quizShape(d.data()); });
+      return { ok: true, data: out };
+    } catch (e) { console.error("quizAllServer fail", e); return { ok: false, data: null }; }
+  },
 };
+
+/* 응시 문서의 서버 시각 필드를 millis로. 대기 중인 serverTimestamp(로컬 스냅샷)는 null */
+const tsMs = (x) => (x && typeof x.toMillis === "function" ? x.toMillis() : null);
+function quizShape(data) {
+  const d = data || {};
+  return { v: d.v !== undefined ? d.v : null, startedAtMs: tsMs(d.startedAt), hbMs: tsMs(d.hb), lockedAtMs: tsMs(d.lockedAt) };
+}
