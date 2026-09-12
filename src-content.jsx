@@ -635,7 +635,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                         const isInq = sec.kind === "inquiry" && f.t === "area";
                         return (
                           <div className="ed-fld" key={f.k}>
-                            <div className="ed-fld-h"><span className="mono">{sec.id}.{f.k}</span>{f.qtype && <span className="ed-qtype">{f.qtype}</span>}</div>
+                            <div className="ed-fld-h"><span className="mono">{sec.id}.{f.k}{f.key ? " → 저장 " + f.key : ""}</span>{f.qtype && <span className="ed-qtype">{f.qtype}</span>}</div>
                             <EdArea label="발문 (학생에게 보이는 물음)" min={2} max={8} value={label} onChange={(v) => setFld(sec.id, f.k, { label: v })} />
                             {isInq ? (
                               /* 탐구 질문은 생각 계단 대신 되묻기를 쓴다 — 첫 답을 굳힌 뒤 학생마다 다른 줄이 배정된다 */
@@ -643,7 +643,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                                 hint="답의 보기를 나열하지 말고, 학생이 쓴 것을 가리키는 한 문장으로 씁니다. 학생마다 다른 줄이 배정되므로 다섯 줄쯤 둡니다. 비워 두면 원본으로 돌아갑니다."
                                 min={3} max={10} value={arrToLines(probes)} onChange={(v) => setFld(sec.id, f.k, { probes: linesToArr(v) })} />
                             ) : (
-                              <EdArea label="생각 단계 도우미" hint="한 줄에 하나씩. 비워 두면 도우미 상자가 사라집니다." min={2} max={10}
+                              <EdArea label="생각 단계 (학생 화면에는 「도움말」 상자로 보입니다)" hint="한 줄에 하나씩. 비워 두면 도우미 상자가 사라집니다." min={2} max={10}
                                 value={arrToLines(steps)} onChange={(v) => setFld(sec.id, f.k, { steps: linesToArr(v) })} />
                             )}
                           </div>
@@ -653,7 +653,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                   </details>
                 );
               })}
-              <p className="hint">항목 이름(l1.q1 같은 것)은 기록이 저장되는 자리라 바뀌지 않습니다. 물음만 고쳐도 이미 저장된 학생 답은 그대로 남습니다.</p>
+              <p className="hint">항목 이름(l1.q1 같은 것)은 기록이 저장되는 자리라 바뀌지 않습니다. 물음만 고쳐도 이미 저장된 학생 답은 그대로 남습니다. 화살표가 붙은 항목(번역 사다리 계단 3)은 오른쪽 키에 저장됩니다.</p>
             </div>
           </div>
 

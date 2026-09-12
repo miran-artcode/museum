@@ -174,7 +174,7 @@ const OBS_METHODS = [
     good: "문제와 내가 만나는 접점을 찾을 때. 경계 너머라 들어가 보지 못한 자리를 드러냅니다.",
     miss: "내 동선 바깥의 일은 처음부터 지도에 없습니다. 내가 겪지 않는 문제는 잡히지 않습니다.",
     col: { when: "지나는 때", where: "지도 위의 지점", what: "거기서 눈에 걸린 것" },
-    ph: { when: "등굣길 07:40", where: "지하철역 3번 출구 앞", what: "매일 같은 자리에 접혀 있는 종이 상자" },
+    ph: { when: "등굣길 07:40", where: "우리 동 입구 앞", what: "밤사이 놓이고 간 상자 두 개, 문틀 옆에 눌린 자국" },
   },
   {
     k: "inventory", label: "사물 목록", sub: "한 자리에 있는 것을 판단하지 말고 빠짐없이 적는다",
@@ -430,8 +430,8 @@ const SCHEMA_DEF = [
     fields: [
       { k: "tname", t: "text", label: "가칭" }, { k: "user", t: "text", label: "사용자" },
       { k: "func", t: "text", label: "기능" }, { k: "mat", t: "text", label: "재질" },
-      { k: "struct", t: "text", label: "구조" }, { k: "wear", t: "text", phTrace: true, label: "마모" },
-      { k: "break", t: "text", label: "파손" }, { k: "repair", t: "text", phTrace: true, label: "수리" },
+      { k: "struct", t: "text", label: "구조" }, { k: "wear", t: "text", phTrace: "3차시 흔적에서 닳은 부분만: ", label: "마모" },
+      { k: "break", t: "text", label: "파손" }, { k: "repair", t: "text", phTrace: "3차시 흔적에서 고친 부분만: ", label: "수리" },
       { k: "stain", t: "text", label: "오염" }, { k: "discard", t: "text", label: "폐기 이유" },
       { k: "context", t: "area", label: "2300년 출토 맥락: 어디서, 무엇과 함께, 어떤 상태로 발견되었다는 설정인지" },
     ],
@@ -872,7 +872,7 @@ function fieldProgress(f, v) {
     case "reverse": {
       // 「거의 같게 읽음」이면 돌아가지 않아도 되고, 돌아갔다면 고친 것까지 적어야 한 건이다
       const r = rows.find((x) => x && filled(x.read));
-      const ok = r && filled(r.gap) && (normBack(r.backTo) === "none" || filled(r.fixed));
+      const ok = r && filled(r.gap) && (r.gap === GAP_OPTS[0] || normBack(r.backTo) === "none" || filled(r.fixed));
       return { total: 1, done: ok ? 1 : 0 };
     }
     default: return { total: 1, done: filled(v) ? 1 : 0 };
@@ -1260,7 +1260,7 @@ function creativityAxesOne(ws, rare) {
   }
 
   // 설정의 촘촘함: 흔적 서술 + 일대기 5칸 + 출토 맥락 + 작품 캡션 구체성 + 점검 근거
-  const b1 = clamp01(strLen(d["s3b.trace"]) / 120);
+  const b1 = clamp01(strLen(ladderSummary(d).trace) / 120);
   const b2 = ["s4a.wear", "s4a.break", "s4a.repair", "s4a.stain", "s4a.discard"].filter((k) => strLen(d[k]) >= 10).length / 5;
   const b3 = clamp01(strLen(d["s4a.context"]) / 150);
   const b4 = ((filled(d["s6b.era"]) ? 1 : 0) + (/\d/.test(d["s6b.size"] || "") ? 1 : 0) + (strLen(d["s6b.context"]) >= 40 ? 1 : 0)) / 3;
@@ -2032,18 +2032,18 @@ function fieldUnits(f, v) {
     case "invis": rows.forEach((r, i) => {
       if (!r) return;
       const ty = (INVIS_TYPES.find((x) => x.k === r.type) || {}).label || "";
-      push("보이지 않는 것 " + (i + 1) + (ty ? " [" + ty + "]" : ""), [r.text, r.why].filter(filled).join(": "));
+      push("안 보이는 것 " + (i + 1) + (ty ? " [" + ty + "]" : ""), [r.text, r.why].filter(filled).join(": "));
     }); break;
     case "cands": rows.forEach((r, i) => {
       if (!r) return;
-      push("후보 " + (i + 1) + (r.verdict ? " [" + r.verdict + "]" : ""), [r.obj, r.where, r.whose, r.act, r.why].filter(filled).join(" · "));
+      push("물건 " + (i + 1) + (r.verdict ? " [" + (r.verdict === "접음" ? "뺌" : r.verdict) + "]" : ""), [r.obj, r.where, r.whose, r.act, r.why].filter(filled).join(" · "));
     }); break;
     case "traces": rows.forEach((r, i) => {
       if (!r) return;
-      push("흔적 " + (i + 1), [r.inv && "보이지 않는 것: " + r.inv, r.spot && "자리: " + r.spot, r.shape && "모양: " + r.shape,
-        r.act && "동작: " + r.act, r.freq && "빈도: " + r.freq, r.span && "기간: " + r.span].filter(Boolean).join(" / "));
+      push("흔적 " + (i + 1), [r.inv && "안 보이는 것: " + r.inv, r.spot && "자리: " + r.spot, r.shape && "자국: " + r.shape,
+        r.act && "동작: " + r.act, traceFreq(r) && "되풀이: " + traceFreq(r)].filter(Boolean).join(" / "));
     }); break;
-    case "stmt": stmtVersions(v).forEach((x, i, arr) => push(i === arr.length - 1 ? "진술 (최종)" : "진술 v" + (i + 1), x.text)); break;
+    case "stmt": stmtVersions(v).forEach((x, i, arr) => push(i === arr.length - 1 ? "번역 문장 (마지막)" : "번역 문장 v" + (i + 1), x.text)); break;
     case "reverse": rows.forEach((r, i) => {
       if (!r) return;
       push("짝에게 읽히기 " + (i + 1), [r.shown && "보여 준 것: " + r.shown, r.read && "짝이 읽은 것: " + r.read, r.gap && "맞은 정도: " + r.gap,
@@ -2124,13 +2124,16 @@ function ladderSummary(ws) {
 /* 요약 세 값(s3b.invisible·object·trace)을 사다리에서 다시 끌어온다.
    비어 있거나 마지막 자동값(_s3bAuto)과 같을 때만 덮어써, 학생이 손본 값과 옛 수기값은 남긴다.
    setField 안에서 next에 직접 쓰므로 고쳐 쓰기 이력·시간 장부·붙여넣기 기록은 건드리지 않는다. */
-function deriveSummary(next) {
+function deriveSummary(next, prevWs) {
   const auto = { invisible: ladderPick(next), object: ladderObject(next), trace: ladderTrace(next) };
   const prev = (next && next._s3bAuto) || {};
+  // 옛 기록(_s3bAuto가 없음)은 직전 사다리 값과 같으면 자동값으로 본다. 옛 「가져오기」로 복사한 값이 「직접 고침」으로 굳지 않게
+  const before = prevWs && !(next && next._s3bAuto) ? { invisible: ladderPick(prevWs), object: ladderObject(prevWs), trace: ladderTrace(prevWs) } : {};
+  const norm = (s) => String(s || "").replace(/,\s+/g, " ").trim();
   const out = { ...next };
   ["invisible", "object", "trace"].forEach((x) => {
     const cur = out["s3b." + x];
-    if (!filled(cur) || String(cur).trim() === String(prev[x] || "").trim()) out["s3b." + x] = auto[x];
+    if (!filled(cur) || norm(cur) === norm(prev[x]) || (before[x] != null && norm(cur) === norm(before[x]))) out["s3b." + x] = auto[x];
   });
   out._s3bAuto = auto;
   return out;
@@ -2181,7 +2184,8 @@ function translationMetrics(ws) {
   const traces = rowsOf(d["s3t3.traces"]).filter((r) => filled(r.spot) || filled(r.shape));
   const causal = traces.filter((r) => filled(r.act) && (filled(r.freq) || filled(r.span)));
   const rev = rowsOf(d["s3t4.reverse"]).filter((r) => filled(r.read));
-  const revisits = rev.filter((r) => normBack(r.backTo) !== "none");
+  // 「거의 같게 읽음」 행은 돌아갈 계단이 숨겨지므로 되돌림으로 세지 않는다
+  const revisits = rev.filter((r) => r.gap !== GAP_OPTS[0] && normBack(r.backTo) !== "none");
 
   const s1 = stmtFirst(d["s3t3.stmt1"]);
   const s2 = stmtNow(d["s3t4.stmt2"]);
@@ -2912,11 +2916,11 @@ function ThinkMeter({ text }) {
 }
 
 /* 생각 계단 — 큰 개념에서 작은 개념으로 내려오는 순서 안내 */
-function ThinkSteps({ steps }) {
+function ThinkSteps({ steps, title }) {
   if (!steps || !steps.length) return null;
   return (
     <div className="think-steps">
-      <div className="ts-t">도움말: 차례로 생각하고, 마지막 줄의 답을 중심으로 씁니다.</div>
+      <div className="ts-t">{title || "도움말: 차례로 생각하고, 마지막 줄의 답을 중심으로 씁니다."}</div>
       <ol>{steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
     </div>
   );
@@ -3013,13 +3017,13 @@ function Carry({ ws, items, strong, title, toLadder }) {
     attitude: ["태도", sum.attitude],
   };
   const rows = (items || CARRY_DEFAULT).map((k) => [k, ...all[k]]).filter((x) => filled(x[2]));
-  if (!rows.length) return null;
+  if (!rows.length && !strong) return null;
   const canGo = toLadder && nav && isOpen(nav.openMap, "3차시");
   return (
     <div className="carry">
       <b>{title || "앞 계단에서 가져온 것"}</b>
       {rows.map(([k, l, v]) => <div className="cr" key={k}><span className="l">{l}</span><span className="v">{v}</span></div>)}
-      {strong && <div className="cr strong"><span className="l">읽어 줄 것</span><span className="v">{strong}</span></div>}
+      {strong && <div className="cr strong"><span className="l">읽어 줄 것</span><span className="v">{rows.length ? strong : "계단 5·6을 채우면 여기에 물건과 흔적이 뜹니다. 그 두 줄만 읽어 줍니다."}</span></div>}
       {toLadder && nav && (
         <div className="carry-row">
           <button type="button" className="btn small ghost" disabled={!canGo} onClick={() => nav.go("3차시", "s3c")}>3차시 탭에서 고치기</button>
@@ -3060,40 +3064,43 @@ function StageEcho({ sec, f, ws }) {
   if (key === "s12.labelCmp") return <LabelCompare compact />;
 
   if (key === "s3o.methodWhy" && obs) return (
-    <div className="obs-echo"><b>고른 방법: {obs.label}</b>
+    <div className="obs-echo"><b>고른 관찰 방법: {obs.label}</b>
       <div>잘 잡아냅니다: {obs.good}</div>
-      <ol>{obs.how.map((h, i) => <li key={i}>{h}</li>)}</ol>
     </div>
   );
   if (key === "s3o.blind" && obs) return (
     <div className="risk-echo"><b>{josa(obs.label, "이", "가")} 놓치는 것</b>{obs.miss}</div>
   );
-  if (key === "s3p.problem") {
-    const raw = d["s3a.scenes"];
-    const legacy = typeof raw === "string" && raw.trim() ? raw : "";
-    const scenes = rowsOf(raw).filter((r) => filled(r.what));
-    const canGo = nav && isOpen(nav.openMap, "2차시");
-    return (
-      <div className="obs-echo"><b>계단 2에서 모아 온 장면</b>
-        {legacy ? <div style={{ whiteSpace: "pre-wrap" }}>{legacy}</div>
-          : scenes.length ? <ol>{scenes.map((r, i) => <li key={i}>{[r.when, r.where, r.what].filter(filled).join(" · ")}</li>)}</ol>
-          : <div>아직 장면이 없습니다. 2차시 탭 계단 2에 먼저 적습니다. 지금 급하면 한두 줄만 적고 시작해도 됩니다.</div>}
-        {nav && (
-          <div className="carry-row">
-            <button type="button" className="btn small ghost" disabled={!canGo} onClick={() => nav.go("2차시", "s3a")}>고치려면 2차시 탭 계단 2로</button>
-            {!canGo && <span className="hint" style={{ margin: 0 }}>2차시가 닫혀 있어 지금은 고칠 수 없습니다.</span>}
-          </div>
-        )}
-      </div>
-    );
-  }
   if (key === "s3c.modeWhy" && mode) return (
-    <div className="obs-echo"><b>고른 방법: {mode.label}</b>
+    <div className="obs-echo"><b>가장 가까운 방법: {mode.label}</b>
       <div>이럴 때 맞습니다: {mode.fit}</div>
       <div>관람자가 하게 되는 일: {mode.does}</div>
     </div>
   );
   return null;
+}
+
+/* 계단 3 카드 맨 위: 계단 2에서 모아 온 장면을 읽기 전용으로 다시 보여 준다 (문제는 이 장면에서 나온다) */
+function ScenesEcho({ ws }) {
+  const d = ws || {};
+  const nav = React.useContext(NavCtx);
+  const raw = d["s3a.scenes"];
+  const legacy = typeof raw === "string" && raw.trim() ? raw : "";
+  const scenes = rowsOf(raw).filter((r) => filled(r.what));
+  const canGo = nav && isOpen(nav.openMap, "2차시");
+  return (
+    <div className="obs-echo"><b>계단 2에서 모아 온 장면</b>
+      {legacy ? <div style={{ whiteSpace: "pre-wrap" }}>{legacy}</div>
+        : scenes.length ? <ol>{scenes.map((r, i) => <li key={i}>{[r.when, r.where, r.what].filter(filled).join(" · ")}</li>)}</ol>
+        : <div>아직 장면이 없습니다. 2차시 탭 계단 2에 먼저 적습니다.{canGo ? " 지금 급하면 계단 2에 한두 줄만 적고 여기로 돌아와 시작해도 됩니다." : ""}</div>}
+      {nav && (
+        <div className="carry-row">
+          <button type="button" className="btn small ghost" disabled={!canGo} onClick={() => nav.go("2차시", "s3a")}>고치려면 2차시 탭 계단 2로</button>
+          {!canGo && <span className="hint" style={{ margin: 0 }}>2차시가 닫혀 있어 지금은 고칠 수 없습니다.</span>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* 계단 2: 장면 세 줄. 열 이름과 예시는 계단 1에서 고른 방법에 맞게 바뀐다 */
@@ -3110,13 +3117,14 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
     <div className="field span2">
       <label>{f.label}</label>
       {m ? (
-        <div className="obs-echo"><b>고른 방법: {m.label}</b>
+        <div className="obs-echo"><b>고른 관찰 방법: {m.label}</b>
+          <div style={{ fontWeight: 700, marginTop: 4 }}>이렇게 합니다</div>
           <ol>{m.how.map((h, i) => <li key={i}>{h}</li>)}</ol>
         </div>
       ) : (
-        <div className="risk-echo"><b>먼저 할 일</b>먼저 계단 1에서 관찰 방법을 고릅니다. 고르면 이 표의 칸 이름이 그 방법에 맞게 바뀝니다.</div>
+        <div className="risk-echo"><b>먼저 할 일</b>계단 1에서 관찰 방법부터 고릅니다. 고르면 이 표의 칸 이름이 그 방법에 맞게 바뀝니다.</div>
       )}
-      <ThinkSteps steps={f.steps} />
+      <ThinkSteps steps={m ? f.steps : (f.steps || []).slice(1)} title="도움말: 쓰기 전에 두 가지" />
       {legacy && (
         <div className="carry" style={{ borderLeftColor: "var(--amber)", background: "var(--card2)" }}>
           <b>이전에 줄글로 쓴 내용</b>
@@ -3157,13 +3165,19 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
 const INVIS_PH = ["상자를 놓고 가는 사람의 몸과 시간", "한 사람이 하루에 옮기는 상자 수", "(있으면 하나 더)"];
 function InvisField({ f, fieldKey, v, setField, ws }) {
   const rows = padRows(v, 3, { text: "", type: "" });
-  const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
+  const picked0 = (ws || {})["s3t1.pick"];
+  const up = (i, k, val) => {
+    setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
+    // 고른 줄의 글을 고치면 고른 값(s3t1.pick)도 따라간다. 안 그러면 고른 버튼이 꺼진 채 옛 문장이 남는다
+    if (k === "text" && filled(picked0) && picked0 === rows[i].text) setField("s3t1.pick", val);
+  };
   const picked = Array.from(new Set(rows.map((r) => r.type).filter(Boolean)));
   return (
     <div className="field span2">
       <label>{f.label}</label>
       <Carry ws={ws} items={["problem", "contact"]} />
-      <ThinkSteps steps={f.steps} />
+      <ThinkSteps steps={f.steps} title="도움말: 쓰기 전에 두 가지" />
+      <div className="hint" style={{ marginBottom: 8 }}>{INVIS_TYPES.map((t) => t.label + ": " + t.hint).join(" · ")}</div>
       <div className="tbl-scroll">
         <table className="lt stack">
           <thead><tr><th></th><th>안 보이는 것</th><th style={{ width: 176 }}>왜 안 보이나</th></tr></thead>
@@ -3246,7 +3260,7 @@ function CandsField({ f, fieldKey, v, setField, ws }) {
     <div className="field span2">
       <label>{f.label}</label>
       <Carry ws={ws} items={["problem", "invisible", "find"]} />
-      <ThinkSteps steps={f.steps} />
+      <ThinkSteps steps={f.steps} title="도움말: 쓰기 전에 두 가지" />
       <div className="tbl-scroll">
         <table className="lt stack">
           <thead><tr><th></th><th style={{ width: 150 }}>물건</th><th style={{ width: 150 }}>어디에 있나</th><th>누가 어떻게 만지나</th><th style={{ width: 92 }}>고름 / 뺌</th></tr></thead>
@@ -3309,7 +3323,7 @@ function TracesField({ f, fieldKey, v, setField, ws }) {
   const form = (i) => (
     <div className="trace-form" key={i}>
       {cell(i, "spot", "어느 자리 (한 군데만)", "오른쪽 끝, 손바닥이 닿는 자리", 80, false)}
-      {cell(i, "shape", "어떤 자국 (사진에 찍히는 말로, ‘…했다’로 끝맺기)", "고무가 벗겨져 쇠가 드러나고, 그 위에 천 테이프를 세 겹 감았다", 200, true)}
+      {cell(i, "shape", "어떤 자국 (사진에 찍히는 말로, ‘…있다’로 끝맺기)", "고무가 벗겨져 쇠가 드러나 있고, 그 위에 천 테이프가 세 겹 감겨 있다", 200, true)}
       {cell(i, "act", "어떤 동작 (‘…하기’)", "한 손으로 비틀어 쥐고 끌기", 60, false)}
       {cell(i, "freq", "하루 몇 번씩, 몇 년 동안", "하루 200번씩 4년 동안", 40, false)}
     </div>
@@ -3318,7 +3332,7 @@ function TracesField({ f, fieldKey, v, setField, ws }) {
     <div className="field span2">
       <label>{f.label}</label>
       <Carry ws={ws} items={["invisible", "object"]} />
-      <ThinkSteps steps={f.steps} />
+      <ThinkSteps steps={f.steps} title="도움말: 쓰기 전에 두 가지" />
       {form(0)}
       {show2
         ? <div><div className="tf-sub">자국 하나 더 (선택)</div>{form(1)}</div>
@@ -3341,6 +3355,12 @@ function StmtField({ f, fieldKey, v, setField, ws }) {
   const prevStage = f.prev ? TRANSLATE_STAGES.find((s) => s.key === STAGE_OF_KEY[f.prev]) : null;
   const prevN = prevStage ? prevStage.n : 6;
   const set = (text) => setField(fieldKey, { ...(typeof v === "object" && v ? v : {}), text, at: now() });
+  // 쓰던 문장이 있으면 지우기 전에 한 번 묻는다 (남기지 않은 문장은 되돌릴 길이 없다)
+  const put = (text) => {
+    const c = String(cur || "").trim();
+    if (c && c !== String(text).trim() && !window.confirm("지금 쓰고 있는 문장을 지우고 넣습니다. 먼저 「이 문장으로 남기기」를 누르면 지금 문장이 남습니다. 그래도 넣을까요?")) return;
+    set(text);
+  };
   const fix = () => {
     const t = String(cur || "").trim();
     if (!t) return;
@@ -3357,7 +3377,7 @@ function StmtField({ f, fieldKey, v, setField, ws }) {
           {filled(prevText) ? <div>{prevText}</div> : <div style={{ color: "var(--sub)" }}>아직 첫 문장이 없습니다. 계단 {prevN}에서 먼저 씁니다.</div>}
           {filled(prevText) && (
             <div className="carry-row">
-              <button type="button" className="btn small ghost" onClick={() => set(prevText)}>이 문장을 아래로 가져오기</button>
+              <button type="button" className="btn small ghost" onClick={() => put(prevText)}>이 문장을 아래로 가져오기</button>
               <span className="hint" style={{ margin: 0 }}>가져온 뒤 ‘마모’·‘오래’·‘노동’ 같은 큰 말을 사진에 찍히는 말(자리·모양·횟수)로 바꿉니다.</span>
             </div>
           )}
@@ -3365,23 +3385,23 @@ function StmtField({ f, fieldKey, v, setField, ws }) {
       )}
       <div className="stmt-box">
         <div className="stmt-tpl">
-          <small>문장 틀 (위 칸으로 만든 예시 문장)</small>
+          <small>{f.prev ? "문장 틀 (계단 " + prevN + "의 흔적 칸으로 만든 문장. 막히면 이 틀을 써도 됩니다)" : (canTpl ? "문장 틀 (위 칸으로 만든 문장)" : "문장 틀 (위 칸을 채우면 여기에 문장이 만들어집니다)")}</small>
           {tpl}
         </div>
         <div className="stmt-row" style={{ marginTop: 0, marginBottom: 8 }}>
-          <button type="button" className="btn small ghost" disabled={!canTpl} onClick={() => set(tpl.replace(/「[^」]*」/g, "____"))}>이 틀을 아래에 넣기</button>
+          <button type="button" className="btn small ghost" disabled={!canTpl} onClick={() => put(tpl.replace(/「[^」]*」/g, "____"))}>이 틀을 아래에 넣기</button>
           <span className="hint" style={{ margin: 0 }}>
-            {canTpl ? "틀을 넣은 뒤 ____ 자리를 내 말로 바꾸고, 어색한 말을 고칩니다."
-              : (f.prev ? "계단 6의 흔적 칸(자리·자국·동작)을 채우면 문장 틀이 만들어집니다." : "위 흔적 칸(자리·자국·동작)을 채우면 문장 틀이 만들어집니다.")}
+            {canTpl ? "틀을 넣은 뒤 어색한 말을 내 말로 고칩니다. ____가 남았으면 그 자리를 채웁니다."
+              : (f.prev ? "계단 " + prevN + "의 흔적 칸(자리·자국·동작)을 채우면 문장 틀이 만들어집니다." : "위 흔적 칸(자리·자국·동작)을 채우면 문장 틀이 만들어집니다.")}
           </span>
         </div>
         <textarea rows={4} maxLength={1200} value={cur} placeholder="물건 · 자리 · 자국 · 동작 · 되풀이 · 안 보이는 것이 한 문단 안에 다 들어가게 씁니다."
           onChange={(e) => set(e.target.value)} />
         <div className="stmt-row">
           <span className="conc-chip">{String(cur || "").trim().length}자</span>
-          <span className="conc-chip">남김 {saved.length}회</span>
+          <span className="conc-chip">남긴 문장 {saved.length}개</span>
           <button type="button" className="btn small" onClick={fix} disabled={!filled(cur)}>이 문장으로 남기기</button>
-          <span className="hint" style={{ margin: 0, flex: "1 1 180px" }}>남길 때마다 그때의 문장이 따로 남습니다. 고쳐 쓴 과정이 그대로 기록이 됩니다.</span>
+          <span className="hint" style={{ margin: 0, flex: "1 1 180px" }}>다 썼으면 「이 문장으로 남기기」를 누릅니다. 고친 뒤 다시 누르면 앞 문장은 지워지지 않고 남아 고쳐 쓴 과정이 기록됩니다. 안 눌러도 지금 쓴 문장은 저장됩니다.</span>
         </div>
         {vers.length > 0 && (
           <div className="stmt-vers">
@@ -3407,11 +3427,14 @@ function ReverseField({ f, fieldKey, v, setField, ws }) {
   const [more, setMore] = useState(false);
   const has2 = rows[1] && (filled(rows[1].read) || filled(rows[1].gap));
   const show2 = more || has2;
-  const backOpts = [{ v: "none", l: "안 돌아감" }, ...TRANSLATE_STAGES.filter((s) => s.n >= 3 && s.n <= 6).map((s) => ({ v: s.key, l: "계단 " + s.n + " " + s.name }))];
+  const backOpts0 = [{ v: "none", l: "안 돌아감" }, ...TRANSLATE_STAGES.filter((s) => s.n >= 3 && s.n <= 6).map((s) => ({ v: s.key, l: "계단 " + s.n + " " + s.name }))];
   const form = (i) => {
     const r = rows[i];
     const same = r.gap === GAP_OPTS[0];
     const back = normBack(r.backTo);
+    // 옛 기록의 계단 1·2도 고를 수 있었으므로, 그 값이면 목록에 그대로 보여 준다
+    const backOpts = backOpts0.some((o) => o.v === back) ? backOpts0 : [...backOpts0, { v: back, l: backLabel(back) + " (옛 기록)" }];
+    const backSt = TRANSLATE_STAGES.find((s) => s.key === back);
     return (
       <div className="reverse-form" key={i}>
         <div className="tf wide">
@@ -3423,7 +3446,11 @@ function ReverseField({ f, fieldKey, v, setField, ws }) {
           <div className="seg">
             {GAP_OPTS.map((o) => (
               <button type="button" key={o} className={r.gap === o ? (o === GAP_OPTS[0] ? "on-ok" : o === GAP_OPTS[2] ? "on-no" : "on-mid") : ""} aria-pressed={r.gap === o}
-                onClick={() => up(i, "gap", r.gap === o ? "" : o)}>{o}</button>
+                onClick={() => {
+                  const nextGap = r.gap === o ? "" : o;
+                  // 「거의 같게 읽음」이면 돌아갈 계단이 없으니 앞서 고른 값을 지운다
+                  setField(fieldKey, rows.map((x, j) => (j === i ? { ...x, gap: nextGap, backTo: nextGap === GAP_OPTS[0] ? "none" : x.backTo } : x)));
+                }}>{o}</button>
             ))}
           </div>
         </div>
@@ -3432,6 +3459,7 @@ function ReverseField({ f, fieldKey, v, setField, ws }) {
           {same
             ? <div style={{ color: "var(--sub)", fontSize: 12.5, padding: "3px 2px" }}>거의 같게 읽혔으니 돌아가지 않아도 됩니다.</div>
             : <select value={back} onChange={(e) => up(i, "backTo", e.target.value)}>{backOpts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select>}
+          {!same && backSt && <span className="hint">위 계단 표시줄에서 「계단 {backSt.n}」을 눌러 고친 뒤 여기로 돌아옵니다.</span>}
         </div>
         {!same && back !== "none" && (
           <div className="tf wide">
@@ -3446,7 +3474,7 @@ function ReverseField({ f, fieldKey, v, setField, ws }) {
     <div className="field span2">
       <label>{f.label}</label>
       <Carry ws={ws} items={["object", "trace"]} strong="물건과 흔적, 이 두 줄만. 문제 이름은 말하지 않습니다." />
-      <ThinkSteps steps={f.steps} />
+      <ThinkSteps steps={f.steps} title="도움말: 쓰기 전에 두 가지" />
       {form(0)}
       {show2
         ? <div><div className="tf-sub">짝 한 명 더 (선택)</div>{form(1)}</div>
@@ -3492,12 +3520,12 @@ function LadderSummaryBox({ ws, setField }) {
       ))}
       {editTrace && (
         <textarea rows={3} maxLength={400} value={filled(d["s3b.trace"]) ? d["s3b.trace"] : (auto.trace || "")}
-          placeholder="4차시가 읽는 흔적 글입니다. 자리·모양·동작·되풀이가 다 들어가게 손봅니다."
+          placeholder="4차시가 읽는 흔적 글입니다. 자리·자국·동작·되풀이가 다 들어가게 손봅니다."
           onChange={(e) => setField("s3b.trace", e.target.value)} />
       )}
       {row("마지막 문장", null, sum.stmt)}
       {row("태도", null, sum.attitude)}
-      <div className="foot">4차시 유물 설계는 이 다섯 줄에서 시작합니다. 직접 고친 줄은 그대로 두고, 나머지는 사다리를 고치면 따라 바뀝니다.</div>
+      <div className="foot">4차시 유물 설계는 이 상자의 문제·안 보이는 것·물건·흔적·태도에서 시작합니다. 직접 고친 줄은 그대로 두고, 나머지는 사다리를 고치면 따라 바뀝니다.</div>
     </div>
   );
 }
@@ -3544,7 +3572,7 @@ function CardPick({ f, fieldKey, v, setField, ws }) {
           )}
         </div>
       ) : (
-        <span className="hint">카드를 눌러 고르면 그 방법의 절차와 한계가 여기에 펼쳐집니다. 고르기 전에 여러 장을 눌러 읽어 봐도 됩니다.</span>
+        <span className="hint">{f.src === "obs" ? "카드를 눌러 고르면 그 방법의 절차와 한계가 여기에 펼쳐집니다." : "카드를 눌러 고르면 그 방법이 맞는 때와 위험이 여기에 펼쳐집니다."} 고르기 전에 여러 장을 눌러 읽어 봐도 됩니다.</span>
       )}
     </div>
   );
@@ -3570,9 +3598,14 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
   }
   if (f.t === "text" || f.t === "area") {
     const meter = f.t === "area" && (f.steps || sec.kind === "learn" || sec.kind === "inquiry");
+    // 사다리의 한 줄 까닭 칸(max 80자 이상)은 예시가 잘리지 않게 두 줄짜리 넓은 칸으로 그린다.
+    // 옛 기록이 여러 줄이거나 상한을 넘으면 줄바꿈을 잃지 않게 넓은 칸에 상한 없이 보인다.
+    const sv = String(v ?? "");
+    const legacyLong = f.t === "text" && !!f.max && (sv.includes("\n") || sv.length > f.max);
+    const wide = f.t === "text" && ((sec.ladder || sec.summary) && (f.max || 0) >= 80 || legacyLong);
     // data-fk는 SectionCard가 칸마다 감싸며 한 곳에서 달아 준다
     return (
-      <div className={"field " + (f.t === "area" ? "span2" : "")}>
+      <div className={"field " + (f.t === "area" || wide ? "span2" : "")}>
         {f.qtype ? (
           <div className="q-head"><span className={"q-type " + (f.qtype === "설계" ? "design" : "concept")}>{f.qtype}</span><label style={{ margin: 0 }}>{f.label}</label></div>
         ) : (
@@ -3580,14 +3613,17 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
         )}
         <ThinkSteps steps={f.steps} />
         <StageEcho sec={sec} f={f} ws={ws} />
-        {f.t === "text" ? (
-          /* phTrace: 4차시 마모·수리 칸은 3차시 흔적 글의 앞머리를 예시로 보여 준다 */
-          <input value={v ?? ""} placeholder={f.phTrace && filled(ladderSummary(ws).trace) ? ladderSummary(ws).trace.slice(0, 60) : (f.def || "")}
+        {f.t === "text" && !wide ? (
+          /* phTrace: 4차시 마모·수리 칸은 3차시 흔적 글의 앞머리를 예시로 보여 준다 (칸마다 다른 머리말) */
+          <input value={v ?? ""} placeholder={f.phTrace && filled(ladderSummary(ws).trace) ? f.phTrace + ladderSummary(ws).trace.slice(0, 40) : (f.def || "")}
             maxLength={f.max || 300} onChange={(e) => setField(key, e.target.value)} />
+        ) : f.t === "text" ? (
+          <textarea rows={legacyLong ? 3 : 2} value={v ?? ""} maxLength={legacyLong ? 4000 : f.max} placeholder={f.def || ""} onChange={(e) => setField(key, e.target.value)} />
         ) : (
           <textarea rows={f.rows || 3} value={v ?? ""} maxLength={4000} placeholder={f.ph || ""} onChange={(e) => setField(key, e.target.value)} />
         )}
-        {lenHint(v, f.max || (f.t === "text" ? 300 : 4000))}
+        {legacyLong && <span className="hint">이전에 여러 줄로 쓴 답입니다. 한 줄로 줄여 써도 됩니다.</span>}
+        {lenHint(v, legacyLong ? 4000 : (f.max || (f.t === "text" ? 300 : 4000)))}
         {meter && <ThinkMeter text={v} />}
       </div>
     );
@@ -4803,6 +4839,7 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
       <div className="card-body">
         {sec.intro && <LadderIntro sec={sec} />}
         {sec.ladder && <LadderRail sec={sec} ws={ws} />}
+        {sec.id === "s3p" && <ScenesEcho ws={ws} />}
         {sec.summary && <LadderSummaryBox ws={ws} setField={setField} />}
         {/* 4차시 유물 설계는 3차시 사다리의 결론에서 시작한다 */}
         {sec.carry && <Carry ws={ws} items={["problem", "invisible", "object", "trace", "attitude"]} title="3차시 번역 사다리에서 가져온 것" toLadder />}
@@ -5059,7 +5096,7 @@ function StudentApp({ me, onExit, onGallery }) {
       t[sid] = { first: (t[sid] && t[sid].first) || now(), last: now(), edits: ((t[sid] && t[sid].edits) || 0) + 1 };
       next._t = t;
       // 사다리의 결론(s3b.*)은 학생이 다시 적지 않고 여기서 끌어온다
-      return DERIVE_KEYS.includes(k) ? deriveSummary(next) : next;
+      return DERIVE_KEYS.includes(k) ? deriveSummary(next, p) : next;
     });
     dirtyRef.current = true;
     setSaveState("dirty");
@@ -6886,7 +6923,7 @@ function LadderMap({ ws }) {
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">선택</span><span className="card-title">세 번의 선택과 그 까닭</span></div>
+        <div className="card-head"><span className="card-code">선택</span><span className="card-title">세 번의 선택과 태도, 그 까닭</span></div>
         <div className="card-body">
           {(() => {
             const obs = OBS_METHODS.find((x) => x.k === tm.obsMethod);
@@ -7052,11 +7089,11 @@ function ConcSlope({ rows, onSel }) {
               <line className={"ln " + (up ? "up" : dn ? "dn" : "")} x1={x1} y1={y(r.tm.conc1)} x2={x2} y2={y(r.tm.conc2)} />
               <circle className="dot" cx={x1} cy={y(r.tm.conc1)} r="2.5" />
               <circle className="dot" cx={x2} cy={y(r.tm.conc2)} r="2.5" />
-              <title>{r.id + " " + r.nick + ": 초안 " + r.tm.conc1 + " → 확정 " + r.tm.conc2}</title>
+              <title>{r.id + " " + r.nick + ": 첫 문장 " + r.tm.conc1 + " → 마지막 문장 " + r.tm.conc2}</title>
             </g>
           );
         })}
-        {pts.length === 0 && <text x={W / 2} y={H / 2} textAnchor="middle">아직 초안과 확정 진술을 모두 쓴 학생이 없습니다</text>}
+        {pts.length === 0 && <text x={W / 2} y={H / 2} textAnchor="middle">아직 첫 문장과 마지막 문장을 모두 쓴 학생이 없습니다</text>}
       </svg>
       <div className="tt-legend">
         <span><i style={{ background: "var(--patina)" }} />구체성이 오른 학생</span>
@@ -7290,7 +7327,7 @@ const RESEARCH_VARS = [
   { k: "reverse_n", name: "짝에게 읽힌 건수", unit: "0–2", def: "계단 7(T7)에서 짝의 읽기를 기록한 건수", get: (c) => c.tm.reverseN },
   { k: "gap_same", name: "의도대로 읽힌 건수", unit: "건", def: "계단 7에서 ‘거의 같게 읽음’으로 판정한 건수", get: (c) => c.tm.gapSame },
   { k: "gap_diff", name: "다르게 읽힌 건수", unit: "건", def: "계단 7에서 ‘다르게 읽음’으로 판정한 건수", get: (c) => c.tm.gapDiff },
-  { k: "revisit_n", name: "되돌아간 횟수", unit: "회", def: "계단 7에서 앞 계단으로 되돌아가 고쳤다고 기록한 횟수 (옛 기록의 계단 이름은 LEGACY_BACK 대응표로 새 계단에 집계)", get: (c) => c.tm.revisitN },
+  { k: "revisit_n", name: "되돌아간 횟수", unit: "회", def: "계단 7에서 앞 계단으로 되돌아가 고쳤다고 기록한 횟수 (옛 기록의 계단 이름은 LEGACY_BACK 대응표로 새 계단에 집계. 「거의 같게 읽음」 행은 세지 않음)", get: (c) => c.tm.revisitN },
   { k: "stmt_versions", name: "문장 남김 횟수", unit: "회", def: "계단 6·7의 번역 문장을 「이 문장으로 남기기」로 남긴 누적 횟수", get: (c) => c.tm.stmtVers },
   { k: "conc_pre", name: "구체성(첫 문장)", unit: "0–100", def: "계단 6에서 처음 남긴 번역 문장의 관찰어 지수", get: (c) => c.tm.conc1 },
   { k: "conc_post", name: "구체성(마지막 문장)", unit: "0–100", def: "계단 7 번역 문장(마지막)의 관찰어 지수", get: (c) => c.tm.conc2 },
@@ -7675,7 +7712,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     const tc = {};
     cases.forEach((c) => Object.keys(c.tm.invTypeFreq || {}).forEach((k) => { tc[k] = (tc[k] || 0) + c.tm.invTypeFreq[k]; }));
     const tt = Object.values(tc).reduce((a, b) => a + b, 0);
-    L.push(mdHead(["유형", "설명", "선택 건수", "%"]));
+    L.push(mdHead(["까닭", "설명", "선택 건수", "%"]));
     INVIS_TYPES.forEach((t) => L.push(mdRow([t.label, t.hint, tc[t.k] || 0, tt ? Math.round(((tc[t.k] || 0) / tt) * 100) : 0])));
     L.push("");
     L.push("## 표 4. 관찰 방법의 선택과 가까운 방법·태도의 분포");
@@ -7842,8 +7879,8 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("연구 문제");
     L.push("");
-    L.push("1. 학생들은 사회문제를 어떤 관찰 절차로 모으며, 절차의 선택은 모이는 장면을 어떻게 달라지게 하는가.");
-    L.push("2. 학생들은 사회참여 미술의 어느 방법을 골라 자기 문제를 드러내며, 그 선택의 이유와 그 방법에 딸린 위험을 어떻게 다루는가.");
+    L.push("1. 학생들은 사회문제를 어떤 관찰 방법으로 모으며, 방법의 선택은 모이는 장면을 어떻게 달라지게 하는가.");
+    L.push("2. 흔적을 설계한 뒤 학생들은 자기 작업이 사회참여 미술의 어느 방법에 가장 가깝다고 짚으며, 그 까닭을 어떻게 대는가.");
     L.push("3. 보이지 않는 대상을 사물의 흔적으로 옮기는 동안 학생의 진술은 어떻게 달라지는가.");
     L.push("4. 짝에게 읽히기에서 의도와 다른 읽기를 만난 학생은 사고를 어떻게 고치는가.");
     L.push("");
@@ -7866,7 +7903,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("계단 1에서 학생은 다섯 가지 관찰 방법 가운데 하나를 고른다. ‘잘 살펴보라’는 지시만으로는 자료가 모이지 않으므로 방법을 명시하고, 방법마다 잘 잡히는 것과 놓치는 것을 함께 제시했다. 놓칠 것 같은 것을 적는 칸은 선택으로 두었다.");
     L.push("");
-    L.push(mdHead(["관찰 절차", "이론적 출처", "잘 잡아내는 것", "놓치는 것"]));
+    L.push(mdHead(["관찰 방법", "이론적 출처", "잘 잡아내는 것", "놓치는 것"]));
     OBS_METHODS.forEach((m) => L.push(mdRow([m.label, m.from, m.good, m.miss])));
     L.push("");
     L.push("돌아보기에서 학생은 사회참여 미술이 사회를 드러내 온 여덟 가지 방법 가운데 자기 작업과 가장 가까운 것 하나를 짚고 그 까닭을 한 줄 적는다. 여덟 방법은 3차시 감상에서 작품으로 익힌다. 이 단원의 결과물 자체는 가림과 우회 · 허구와 파라픽션 · 증거와 포렌식 세 방법을 겹쳐 놓은 형식이며, 이 사실을 학생에게 미리 밝힌다. 같은 자리에서 말하는 태도(고발·경고·공감·기록·질문)와 그 까닭도 정하며, 이것이 4차시 캡션의 말투와 7차시 진열의 기준이 된다.");
@@ -9134,7 +9171,7 @@ const SAMPLE_SEEDS = [
   { id: "10114", nick: "야간등", upto: 30, ldr: 10, obs: "sound", mode: "indirect", ivt: ["place", "time", "norm"], problem: "고립된 노년", title: "", relic: "", no: "", show: false,
     grade: { r0: "중", r3: "중" } },
   { id: "10119", nick: "셔터", upto: 12, ldr: 7, obs: "drift", ivt: ["place", "gone", "place"], problem: "폐업한 상가", title: "", relic: "", no: "", show: false, grade: null },
-  { id: "10123", nick: "장갑", upto: 70, ldr: 16, obs: "map", mode: "forensic", ivt: ["time", "norm", "time"], back: "none", gap: "거의 같게 읽음",
+  { id: "10123", nick: "장갑", upto: 60, ldr: 16, obs: "map", mode: "forensic", ivt: ["time", "norm", "time"], back: "none", gap: "거의 같게 읽음",
     st1: "배달하는 사람의 손이 겪는 일은 장갑에 남는다.",
     st2: "겨울마다 반복된 배달 노동은 방한 장갑 왼쪽 검지 끝에, 표면 섬유가 해어져 안쪽 솜이 드러나고 그 둘레가 검게 눌린 모양으로 남는다. 이 흔적은 화면을 두드려 배달을 확인하는 동작을 하루 90회씩 세 해 겨울 반복했을 때 생긴다.", problem: "배달 노동", title: "왼쪽 검지", relic: "손끝 마모 방한 장갑", no: "D-03", show: true,
     grade: { r0: "상", r1: "중", r2: "중", r3: "중", o0: true, o2: true } },
@@ -9486,7 +9523,7 @@ const DEMO_WS = {
   ],
   "s3t2.dropWhy": "종이 상자: 며칠이면 버려져서 몇 년치 자국이 쌓이지 않는다",
   "s3t3.traces": [
-    { spot: "오른쪽 끝, 손바닥이 닿는 자리", shape: "합성고무가 벗겨져 금속이 드러나고 그 위에 직물 테이프를 세 겹 감았다. 테이프 아래 금속면은 손바닥 너비만큼 광택이 남았다", act: "한 손으로 비틀어 쥐고 끌기", freq: "하루 200번씩 4년 동안" },
+    { spot: "오른쪽 끝, 손바닥이 닿는 자리", shape: "합성고무가 벗겨져 금속이 드러나 있고 그 위에 직물 테이프가 세 겹 감겨 있다. 테이프 아래 금속면은 손바닥 너비만큼 광택이 남아 있다", act: "한 손으로 비틀어 쥐고 끌기", freq: "하루 200번씩 4년 동안" },
   ],
   "s3t3.stmt1": {
     text: "새벽에 상자를 옮기는 사람의 반복된 노동은 손수레 손잡이의 오른쪽에 마모로 남는다. 이 흔적은 한 손으로 끄는 동작을 오래 반복했을 때 생긴다.",
@@ -9500,11 +9537,11 @@ const DEMO_WS = {
     { read: "공사장에서 오래 쓴 공구 같다고 했다. 테이프를 감은 걸 보고 현장에서 급하게 고쳐 쓴 물건이라고 읽었다.", gap: "다르게 읽음", backTo: "T6", fixed: "흔적을 손바닥 너비의 광택으로 좁히고, 테이프를 감은 방향을 끄는 방향과 맞춰 다시 적었다" },
   ],
   "s3t4.stmt2": {
-    text: "손수레 손잡이의 오른쪽 그립, 손바닥이 닿는 자리를 보면 합성고무가 벗겨져 금속이 드러나고 그 위에 직물 테이프를 세 겹 감았다. 이것은 한 손으로 손잡이를 비틀어 쥐고 끄는 동작을 하루 200번씩 4년 동안 되풀이해서 생긴 자국이다. 이 자국이 새벽마다 상자를 놓고 가는 사람의 몸과 시간을 대신 보여 준다.",
+    text: "손수레 손잡이의 오른쪽 끝, 손바닥이 닿는 자리를 보면 합성고무가 벗겨져 금속이 드러나 있고 그 위에 직물 테이프가 세 겹 감겨 있다. 이것은 한 손으로 손잡이를 비틀어 쥐고 끄는 동작을 하루 200번씩 4년 동안 되풀이해서 생긴 자국이다. 이 자국이 새벽마다 상자를 놓고 가는 사람의 몸과 시간을 대신 보여 준다.",
     at: "2026-03-12T05:10:00.000Z",
     versions: [
       { at: "2026-03-12T04:35:00.000Z", text: "새벽 배송 노동은 손수레 오른쪽 손잡이에 고무가 벗겨지고 테이프를 감은 모양으로 남는다. 한 손으로 끄는 동작을 여러 해 반복했을 때 생긴다." },
-      { at: "2026-03-12T05:10:00.000Z", text: "손수레 손잡이의 오른쪽 그립, 손바닥이 닿는 자리를 보면 합성고무가 벗겨져 금속이 드러나고 그 위에 직물 테이프를 세 겹 감았다. 이것은 한 손으로 손잡이를 비틀어 쥐고 끄는 동작을 하루 200번씩 4년 동안 되풀이해서 생긴 자국이다. 이 자국이 새벽마다 상자를 놓고 가는 사람의 몸과 시간을 대신 보여 준다." },
+      { at: "2026-03-12T05:10:00.000Z", text: "손수레 손잡이의 오른쪽 끝, 손바닥이 닿는 자리를 보면 합성고무가 벗겨져 금속이 드러나 있고 그 위에 직물 테이프가 세 겹 감겨 있다. 이것은 한 손으로 손잡이를 비틀어 쥐고 끄는 동작을 하루 200번씩 4년 동안 되풀이해서 생긴 자국이다. 이 자국이 새벽마다 상자를 놓고 가는 사람의 몸과 시간을 대신 보여 준다." },
     ],
   },
   "s3c.attitude": "기록",
