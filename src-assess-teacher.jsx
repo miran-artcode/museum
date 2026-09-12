@@ -679,7 +679,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
       <div className="card at-card">
         <div className="card-head"><span className="card-code">상호평가 5</span><span className="card-title">CSV: 연구 자료 다섯 파일</span></div>
         <div className="card-note">
-          제출(작품 단위) · 판정(판정 단위, 옛 명단의 판정은 valid=0) · 자기평가(학생×단계) · 집계(작품 점수) · 판정자(적합도·위치·시간). 학번 대신 <b>「연구」 탭과 같은 규칙의 익명 번호</b>(학번 정렬 순 P01…)를 씁니다.
+          제출(작품 단위) · 판정(판정 단위, 옛 명단의 판정은 valid=0) · 자기평가(학생×단계) · 집계(작품 점수) · 판정자(적합도·위치 편향·시간). 학번 대신 <b>「연구」 탭과 같은 규칙의 익명 번호</b>(학번 정렬 순 P01…)를 씁니다.
         </div>
         <div className="card-body">
           <div className="at-row">
