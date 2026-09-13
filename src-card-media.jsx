@@ -85,7 +85,7 @@ export const CARD_MEDIA = {
         { src: "/img/lessons/L2_s11_3.jpg", cap: "「현대미술관, 독수리 부서」 전시 전경. 유리 진열장과 벽면에 시대와 지역이 서로 다른 독수리 도상들이 번호를 달고 진열되어 있다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" },
         { src: "/img/lessons/L2_s17_1.jpg", cap: "한스 하케, 「샤폴스키 외, 맨해튼 부동산 보유 현황」(1971)의 부분. 건물 정면 사진 아래에 소유·거래 내역을 타자기로 친 기록이 한 쌍을 이룬다.", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/Hans_Haacke" },
       ],
-      links: [{ t: "마르셀 브로타에스", u: "https://en.wikipedia.org/wiki/Marcel_Broodthaers" }, { t: "한스 하케", u: "https://en.wikipedia.org/wiki/Hans_Haacke" }, { t: "제도비평이란(테이트)", u: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" }],
+      links: [{ t: "마르셀 브로타에스", u: "https://en.wikipedia.org/wiki/Marcel_Broodthaers" }, { t: "하케 「샤폴스키 외」(휘트니 소장 기록)", u: "https://whitney.org/collection/works/29487" }, { t: "한스 하케", u: "https://en.wikipedia.org/wiki/Hans_Haacke" }, { t: "제도비평이란(테이트)", u: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" }],
     },
     intervene: {
       images: [
