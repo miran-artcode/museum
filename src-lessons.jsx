@@ -50,6 +50,10 @@ export const LESSONS_DEF = [
           "교탁 위의 사물은 지금 미술인가요, 아닌가요. 그렇게 판단한 이유는 무엇인가요.",
           "제목이 붙는 순간 판단이 달라졌나요. 달라졌다면 무엇이 판단을 바꾸었나요.",
         ],
+        images: [
+          { src: "/img/lessons/L1_w_stieglitz.jpg", cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 《블라인드 맨》 2호에 실려 작품을 오늘날까지 전하고 있습니다.", credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz", link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573", srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg" },
+          { src: "/img/lessons/L1_s14_1.jpg", cap: "솔 르윗의 「월 드로잉」 연작 설치 장면. 흑백 띠의 기하학적 패턴이 전시장 벽면 전체를 덮고 있습니다. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504" },
+        ],
         works: [],
       },
       {
@@ -70,6 +74,9 @@ export const LESSONS_DEF = [
         ],
         images: [
           { src: "/img/lessons/L1_s08_3.jpg", cap: "「샘」이 실린 『더 블라인드 맨』 2호(1917) 지면을 연필로 옮겨 그린 수업 자료 드로잉. 스티글리츠의 기록 사진 속 소변기와 R. Mutt 1917 서명, ‘독립미술가협회가 거부한 출품작’이라는 지면 문구까지 손으로 다시 그렸습니다. 사라진 원본이 사진으로, 그 사진이 다시 그림으로 옮겨지는 전승의 사슬을 보여 줍니다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573" },
+          { src: "/img/lessons/L1_w_stieglitz.jpg", cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 《블라인드 맨》 2호에 실려 작품을 오늘날까지 전하고 있습니다.", credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz", link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573", srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg" },
+          { src: "/img/lessons/L1_w_sia1917_1.jpg", cap: "독립미술가협회, 「제1회 연례전 전시장 풍경」(1917). 뉴욕 그랜드 센트럴 팰리스의 기둥 사이 가벽에 2천 점이 넘는 출품작을 심사 없이 작가 이름 알파벳순으로 걸어 놓은 모습입니다. 뉴욕 파크 브라더스(Pach Bros.) 스튜디오가 촬영한 사진으로, 예일대 바이네키 도서관 캐서린 드라이어 문서에 소장되어 있습니다.", credit: "퍼블릭 도메인 · 예일대 바이네키 도서관(캐서린 S. 드라이어 문서/소시에테 아노님 아카이브) · 사진 Pach Bros., N.Y.", link: "https://en.wikipedia.org/wiki/Society_of_Independent_Artists", srcPage: "https://collections.library.yale.edu/catalog/2040447" },
+          { src: "/img/lessons/L1_w_sia1917_2.jpg", cap: "독립미술가협회, 「제1회 연례전 도록」 속표지(1917). ‘심사 없음, 상 없음(No Jury—No Prizes)’, ‘출품작은 알파벳순으로 건다’는 원칙과 전시 장소(그랜드 센트럴 팰리스)·기간(4월 10일~5월 6일)이 인쇄되어 있습니다. 게티 연구소 소장본을 인터넷 아카이브에서 디지털화한 것입니다.", credit: "퍼블릭 도메인(1917 미국 출판) · 인터넷 아카이브 · 게티 연구소 소장본", link: "https://en.wikipedia.org/wiki/Society_of_Independent_Artists", srcPage: "https://archive.org/details/catalogueofannua1191unse" },
         ],
         works: [
           { a: "마르셀 뒤샹", w: "「샘」", y: "1917", d: "기성품 선택·명명·출품. 원본 소실 후 사진과 복제 에디션으로 남음", links: [{ t: "마르셀 뒤샹", u: "https://ko.wikipedia.org/wiki/마르셀_뒤샹" }, { t: "「샘」(1917)", u: "https://ko.wikipedia.org/wiki/샘_(뒤샹)" }, { t: "테이트 소장 기록", u: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573" }] },
@@ -92,11 +99,13 @@ export const LESSONS_DEF = [
           { src: "/img/lessons/L1_s11_2.jpg", cap: "마르셀 뒤샹, 「자전거 바퀴」(1913, 후대 재제작본). 부엌 의자에 자전거 바퀴를 뒤집어 고정했습니다. 두 사물을 결합한 이 작업을 뒤샹은 뒷날 ‘나의 첫 레디메이드’라 불렀습니다.", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/Bicycle_Wheel" },
           { src: "/img/lessons/L1_s11_3.jpg", cap: "마르셀 뒤샹, 「병 걸이」(1914, 재제작본). 파리에서 산 아연 도금 병 건조대를 아무것도 하지 않은 채 작품으로 선언했습니다. 원본은 여동생이 버렸습니다.", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/Bottle_Rack" },
           { src: "/img/lessons/L1_s11_4.png", cap: "뒤샹이 1915년 「부러진 팔에 앞서서」에 쓴 것과 같은 종류의 눈삽을 보여 주는 수업 자료 예시 이미지. 실제 작품은 이런 눈삽에 문구를 적고 서명해 천장에 매달았습니다.", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/In_Advance_of_the_Broken_Arm" },
+          { src: "/img/lessons/L1_w_brokenarm.jpg", cap: "마르셀 뒤샹, 「부러진 팔에 앞서서」(1915, 원본 유실; 1964년 재제작본). 상점에서 산 눈삽을 천장에 매달아 놓은 레디메이드로, 베를린 함부르거 반호프 미술관에 전시된 모습입니다. 1945년 재제작본은 예일대학교 미술관에, 1964년 판본은 뉴욕 현대미술관(MoMA)에 소장되어 있습니다.", credit: "영어 위키백과 · CC BY 2.0 · 사진 Tomislav Medak (Flickr)", link: "https://www.moma.org/collection/works/105050", srcPage: "https://en.wikipedia.org/wiki/File:In_Advance_of_the_Broken_Arm.jpeg" },
+          { src: "/img/lessons/L1_w_stieglitz.jpg", cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 《블라인드 맨》 2호에 실려 작품을 오늘날까지 전하고 있습니다.", credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz", link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573", srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg" },
         ],
         works: [
           { a: "마르셀 뒤샹", w: "「자전거 바퀴」", y: "1913", d: "의자와 바퀴의 결합. 이름도 이론도 없이 시작된 첫 실험", links: [{ t: "「자전거 바퀴」", u: "https://en.wikipedia.org/wiki/Bicycle_Wheel" }] },
           { a: "마르셀 뒤샹", w: "「병 걸이」", y: "1914", d: "아무것도 하지 않은 선언. 개입이 가장 적은 레디메이드", links: [{ t: "「병 걸이」", u: "https://en.wikipedia.org/wiki/Bottle_Rack" }] },
-          { a: "마르셀 뒤샹", w: "「부러진 팔에 앞서서」", y: "1915", d: "눈삽에 문구를 적어 매닮. 글과 제목이 개입하는 명명의 사례", links: [{ t: "「부러진 팔에 앞서서」", u: "https://en.wikipedia.org/wiki/In_Advance_of_the_Broken_Arm" }] },
+          { a: "마르셀 뒤샹", w: "「부러진 팔에 앞서서」", y: "1915", d: "눈삽에 문구를 적어 매닮. 글과 제목이 개입하는 명명의 사례", links: [{ t: "「부러진 팔에 앞서서」", u: "https://en.wikipedia.org/wiki/In_Advance_of_the_Broken_Arm" }, { t: "MoMA 소장품 (1964년 판본)", u: "https://www.moma.org/collection/works/105050" }, { t: "예일대학교 미술관 소장 기록 (1945년 재제작본)", u: "https://artgallery.yale.edu/collections/objects/47004" }] },
         ],
       },
       {
@@ -136,6 +145,8 @@ export const LESSONS_DEF = [
         ],
         images: [
           { src: "/img/lessons/L1_s15_3.jpg", cap: "앤디 워홀, 「브릴로 상자」(1964). 합판에 실크스크린. 흰 좌대 위에 놓인 이 상자는 슈퍼마켓의 세제 상자와 겉모습이 거의 같습니다. 눈에 보이는 차이로는 어느 쪽이 작품인지 설명할 수 없습니다.", credit: "수업 자료 도판", link: "https://ko.wikipedia.org/wiki/앤디_워홀" },
+          { src: "/img/lessons/L1_w_stieglitz.jpg", cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 《블라인드 맨》 2호에 실려 작품을 오늘날까지 전하고 있습니다.", credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz", link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573", srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg" },
+          { src: "/img/lessons/L1_s14_1.jpg", cap: "솔 르윗의 「월 드로잉」 연작 설치 장면. 흑백 띠의 기하학적 패턴이 전시장 벽면 전체를 덮고 있습니다. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504" },
         ],
         works: [
           { a: "앤디 워홀", w: "「브릴로 상자」", y: "1964", d: "세제 상자와 구별되지 않는 작품. 단토의 물음이 시작된 자리", links: [{ t: "앤디 워홀", u: "https://ko.wikipedia.org/wiki/앤디_워홀" }] },
@@ -177,11 +188,13 @@ export const LESSONS_DEF = [
         ],
         images: [
           { src: "/img/lessons/L1_s26_1.jpg", cap: "척 클로스, 「빅 셀프 포트레이트」(1968). 사진처럼 보이지만 흑백 사진 한 장을 격자로 나누어 칸마다 옮겨 그린 회화입니다. 실제 크기는 사람 키를 훌쩍 넘습니다.", credit: "수업 자료 도판", link: "https://walkerart.org/collections/artworks/big-self-portrait" },
+          { src: "/img/lessons/L1_w_estes.jpg", cap: "리처드 에스테스, 「이중 자화상」(1976). 식당 유리창에 비친 거리·자동차·건물 사이로 삼각대 카메라 옆에 선 작가의 모습이 창 유리와 실내 거울에 두 번 비칩니다. 캔버스에 유채, 60.8×91.5cm, 뉴욕 현대미술관(MoMA) 소장입니다.", credit: "© Richard Estes · 뉴욕 현대미술관(MoMA) 소장품 페이지 — 교육 목적 인용", link: "https://www.moma.org/collection/works/80047" },
+          { src: "/img/lessons/L1_w_hanson.jpg", cap: "두에인 핸슨, 「관광객들」(1970). 폴리에스터 수지와 유리섬유로 실제 사람에게서 본을 떠 실물 크기로 만든 두 인물에 유화 물감을 칠하고 진짜 옷과 카메라, 가방을 입힌 조각입니다. 두 인물은 각각 따로 본을 떴으며 실제로는 서로 만난 적이 없습니다. 스코틀랜드 국립미술관(에든버러) 소장, 1979년 구입.", credit: "Flickr · CC BY-NC-SA 2.0 · 사진 Leo Reynolds · 작품 © Estate of Duane Hanson / VAGA at ARS, NY · DACS, London", link: "https://www.nationalgalleries.org/art-and-artists/297/tourists-1970", srcPage: "https://www.flickr.com/photos/lwr/25066818553" },
         ],
         works: [
           { a: "척 클로스", w: "「빅 셀프 포트레이트」", y: "1968", d: "격자 전사로 사진의 시각을 회화에 옮김. 거리에 따라 달라지는 믿음", links: [{ t: "척 클로스", u: "https://en.wikipedia.org/wiki/Chuck_Close" }, { t: "워커 아트센터 소장 기록", u: "https://walkerart.org/collections/artworks/big-self-portrait" }] },
-          { a: "리처드 에스테스", w: "「이중 자화상」", y: "1976", d: "유리 반사의 정밀 묘사. 카메라보다 선명한 손", links: [{ t: "리처드 에스테스", u: "https://en.wikipedia.org/wiki/Richard_Estes" }, { t: "포토리얼리즘", u: "https://ko.wikipedia.org/wiki/포토리얼리즘" }] },
-          { a: "두에인 핸슨", w: "「관광객들」", y: "1970", d: "실물 크기 채색 조각. 전시장에서 사람으로 읽히는 경험", links: [{ t: "두에인 핸슨", u: "https://en.wikipedia.org/wiki/Duane_Hanson" }, { t: "하이퍼리얼리즘", u: "https://ko.wikipedia.org/wiki/하이퍼리얼리즘" }] },
+          { a: "리처드 에스테스", w: "「이중 자화상」", y: "1976", d: "유리 반사의 정밀 묘사. 카메라보다 선명한 손", links: [{ t: "리처드 에스테스", u: "https://en.wikipedia.org/wiki/Richard_Estes" }, { t: "포토리얼리즘", u: "https://ko.wikipedia.org/wiki/포토리얼리즘" }, { t: "MoMA 소장품 페이지", u: "https://www.moma.org/collection/works/80047" }, { t: "브리태니커 Richard Estes", u: "https://www.britannica.com/biography/Richard-Estes" }] },
+          { a: "두에인 핸슨", w: "「관광객들」", y: "1970", d: "실물 크기 채색 조각. 전시장에서 사람으로 읽히는 경험", links: [{ t: "두에인 핸슨", u: "https://en.wikipedia.org/wiki/Duane_Hanson" }, { t: "하이퍼리얼리즘", u: "https://ko.wikipedia.org/wiki/하이퍼리얼리즘" }, { t: "스코틀랜드 국립미술관 소장 기록", u: "https://www.nationalgalleries.org/art-and-artists/297/tourists-1970" }, { t: "Art UK 작품 기록", u: "https://artuk.org/discover/artworks/tourists-270879" }] },
         ],
       },
       {
@@ -197,8 +210,11 @@ export const LESSONS_DEF = [
           "리히터는 왜 잘 찍힌 사진을 일부러 흐리게 만들었을까요.",
           "실제 유물 사진, 극사실 회화, 생성 이미지는 각각 촬영되는 순간 카메라 앞에 무엇이 있었나요.",
         ],
+        images: [
+          { src: "/img/lessons/L1_w_richter.jpg", cap: "게르하르트 리히터, 「베티(Betty)」(1988). 딸 베티를 찍은 1978년 사진을 바탕으로 그린 유화(102×72 cm)로, 등을 돌린 소녀의 붉은 꽃무늬 옷과 흐릿하게 번진 윤곽이 사진과 회화 사이의 경계를 묻습니다. 세인트루이스 미술관 소장.", credit: "© Gerhard Richter · 작가 공식 사이트 gerhard-richter.com — 교육 목적 인용", link: "https://www.gerhard-richter.com/en/art/paintings/photo-paintings/children-52/betty-7668" },
+        ],
         works: [
-          { a: "게르하르트 리히터", w: "포토페인팅 연작", y: "1960년대~", d: "사진을 옮긴 뒤 일부러 흐리게 만든 회화. 사진에 대한 신뢰가 어디서 오는지 드러냄", links: [{ t: "게르하르트 리히터", u: "https://en.wikipedia.org/wiki/Gerhard_Richter" }] },
+          { a: "게르하르트 리히터", w: "포토페인팅 연작", y: "1960년대~", d: "사진을 옮긴 뒤 일부러 흐리게 만든 회화. 사진에 대한 신뢰가 어디서 오는지 드러냄", links: [{ t: "게르하르트 리히터", u: "https://en.wikipedia.org/wiki/Gerhard_Richter" }, { t: "작가 공식 사이트 — 「Betty」 작품 페이지", u: "https://www.gerhard-richter.com/en/art/paintings/photo-paintings/children-52/betty-7668" }, { t: "위키백과(한국어) 게르하르트 리히터", u: "https://ko.wikipedia.org/wiki/%EA%B2%8C%EB%A5%B4%ED%95%98%EB%A5%B4%ED%8A%B8_%EB%A6%AC%ED%9E%88%ED%84%B0" }] },
         ],
       },
       {
@@ -215,6 +231,11 @@ export const LESSONS_DEF = [
           "「샘」의 복제품들은 각각 작품인가요, 하나의 작품인가요. 내 입장의 가장 약한 지점은 어디인가요.",
           "기술이 필요 없는 미술을 배우는 수업에서 나는 무엇을 익히고 있나요. 손의 기량, 판단의 능력, 인식의 방식 가운데 골라 봅시다.",
         ],
+        images: [
+          { src: "/img/lessons/L1_w_stieglitz.jpg", cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 《블라인드 맨》 2호에 실려 작품을 오늘날까지 전하고 있습니다.", credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz", link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573", srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg" },
+          { src: "/img/lessons/L1_s14_1.jpg", cap: "솔 르윗의 「월 드로잉」 연작 설치 장면. 흑백 띠의 기하학적 패턴이 전시장 벽면 전체를 덮고 있습니다. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504" },
+          { src: "/img/lessons/L1_s26_1.jpg", cap: "척 클로스, 「빅 셀프 포트레이트」(1968). 사진처럼 보이지만 흑백 사진 한 장을 격자로 나누어 칸마다 옮겨 그린 회화입니다. 실제 크기는 사람 키를 훌쩍 넘습니다.", credit: "수업 자료 도판", link: "https://walkerart.org/collections/artworks/big-self-portrait" },
+        ],
         works: [],
       },
       {
@@ -229,6 +250,11 @@ export const LESSONS_DEF = [
         asks: [
           "오늘 본 작품 가운데 가장 납득하기 어려웠던 것은 무엇인가요. 그 불편함은 어디에서 왔나요.",
           "이 작업이 미술이 되기 위해 필요한 것은 무엇이라고 생각하나요. 그것이 왜 필요한가요.",
+        ],
+        images: [
+          { src: "/img/lessons/L1_w_stieglitz.jpg", cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 《블라인드 맨》 2호에 실려 작품을 오늘날까지 전하고 있습니다.", credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz", link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573", srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg" },
+          { src: "/img/lessons/L1_s14_1.jpg", cap: "솔 르윗의 「월 드로잉」 연작 설치 장면. 흑백 띠의 기하학적 패턴이 전시장 벽면 전체를 덮고 있습니다. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504" },
+          { src: "/img/lessons/L1_s22_3.jpg", cap: "조지프 코수스, 「하나 그리고 세 개의 의자」(1965) 설치 장면. 실물 접이의자를 가운데 두고, 왼쪽에 그 의자를 찍은 실물 크기 사진 패널, 오른쪽에 ‘chair’ 항목의 사전 정의를 확대한 텍스트 패널이 걸려 있습니다.", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/One_and_Three_Chairs" },
         ],
         works: [],
       },
@@ -275,6 +301,8 @@ export const LESSONS_DEF = [
       ],
       images: [
         { src: "/img/lessons/L2_s05_1.jpg", cap: "청자 상감운학문 매병, 고려 12~13세기. 구름과 학 무늬를 상감 기법으로 새긴 매병으로, 국립중앙박물관 소장품이다. 이 도자기는 만들어질 당시 ‘미술’이었을까요.", credit: "국립중앙박물관 소장품 검색", link: "https://www.museum.go.kr/" },
+        { src: "/img/lessons/L1_w_stieglitz.jpg", cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 《블라인드 맨》 2호에 실려 작품을 오늘날까지 전하고 있습니다.", credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz", link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573", srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg" },
+        { src: "/img/lessons/L1_s14_1.jpg", cap: "솔 르윗의 「월 드로잉」 연작 설치 장면. 흑백 띠의 기하학적 패턴이 전시장 벽면 전체를 덮고 있습니다. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504" },
       ],
       works: [],
     },
@@ -288,6 +316,9 @@ export const LESSONS_DEF = [
       asks: [
         "그릇이 국보가 되는 과정에서, 이름을 바꿔 단 사람은 사물을 만든 사람일까요 아닐까요.",
         "그 과정에서 사라진 정보가 있다면 무엇일까요.",
+      ],
+      images: [
+        { src: "/img/lessons/L2_w_lascaux.jpg", cap: "작자 미상(구석기), 「라스코 동굴 벽화」(약 1만 7천~2만 1천 년 전으로 추정). 프랑스 도르도뉴 지방 라스코 동굴 '황소의 방' 벽면에 오록스(야생 소)·말·사슴을 광물 안료로 칠하고 불어 뿌려 그린 것으로, 1940년에 발견되었으며 유네스코 세계유산 '베제르 계곡의 선사 유적지와 장식 동굴'(1979년 등재)에 포함되어 있습니다.", credit: "퍼블릭 도메인(PD-Art) · 위키미디어 공용 · 사진 Prof saxx (CC BY-SA 3.0)", link: "https://archeologie.culture.gouv.fr/lascaux/en", srcPage: "https://commons.wikimedia.org/wiki/File:Lascaux_painting.jpg" },
       ],
       works: [
         { a: "문헌", w: "스타니스제프스키 『이것은 미술이 아니다』", y: "1995", d: "미술을 근대 제도가 만든 문화적 구성물로 설명", links: [{ t: "미술이라는 제도(개념미술)", u: "https://ko.wikipedia.org/wiki/개념미술" }, { t: "책 찾아보기", u: "https://ko.wikipedia.org/w/index.php?search=%EC%9D%B4%EA%B2%83%EC%9D%80+%EB%AF%B8%EC%88%A0%EC%9D%B4+%EC%95%84%EB%8B%88%EB%8B%A4+%EC%8A%A4%ED%83%80%EB%8B%88%EC%8A%A4%EC%A0%9C%ED%94%84%EC%8A%A4%ED%82%A4" }] },
@@ -331,6 +362,7 @@ export const LESSONS_DEF = [
         { src: "/img/lessons/L2_s06_1.jpg", cap: "「현대미술관, 독수리 부서」 개관 무렵의 것으로 전하는 기록 사진. 전시 공간에 모인 사람들 앞에서 이야기하는 장면이 담겨 있다.", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/Marcel_Broodthaers" },
         { src: "/img/lessons/L2_s11_3.jpg", cap: "「현대미술관, 독수리 부서」 전시 전경. 유리 진열장과 벽면에 시대와 지역이 서로 다른 독수리 도상들이 번호를 달고 진열되어 있다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" },
         { src: "/img/lessons/L2_s13_2.jpg", cap: "인쇄물 펼침면에 실린 「독수리 부서」 기록 사진. 전시의 ‘공식 기록’은 이렇게 도록과 인쇄물의 형식으로 만들어진다.", credit: "수업 자료 도판" },
+        { src: "/img/lessons/L2_w_pensebete.jpg", cap: "마르셀 브로타에스, 「팡세베트(Pense-Bête)」(1964). 팔리지 않은 자신의 마지막 시집 『팡세베트』 묶음을 석고로 좌대에 붙여 읽을 수 없게 만든 작품으로, 시인에서 미술가로 전환한 그의 첫 조각입니다. 혼합 매체. 2006년부터 플랑드르 공동체 컬렉션 소장품으로 S.M.A.K.(겐트)에 대여되어 있습니다.", credit: "© Estate of Marcel Broodthaers · S.M.A.K. 겐트 소장품 페이지 — 교육 목적 인용", link: "https://smak.be/en/artworks/le-pense-bete-3492" },
       ],
       works: [
         { a: "마르셀 브로타에스", w: "「현대미술관, 독수리 부서」", y: "1968~72", d: "가상 미술관과 ‘이것은 미술 작품이 아니다’ 팻말. 제도의 권한을 전시", links: [{ t: "마르셀 브로타에스", u: "https://en.wikipedia.org/wiki/Marcel_Broodthaers" }, { t: "제도비평이란", u: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" }] },
@@ -453,12 +485,23 @@ export const LESSONS_DEF = [
           "다섯째, 소리 산책입니다. 머레이 셰이퍼의 음향생태학과 힐데가르트 베스터캄프의 사운드워크에서 왔습니다. 짝과 함께 안전한 길을 걷되 한 사람은 눈을 감고 다른 사람이 팔을 잡아 이끕니다. 들리는 소리를 순서대로 소리 내어 말하고 짝이 받아 적은 뒤, 역할을 바꿔 한 번 더 걷습니다. 벽과 문 뒤에서 일어나는 일은 눈에 보이지 않지만 소리로는 넘어옵니다. 귀는 눈이 못 가는 곳까지 갑니다. 다만 소리가 나지 않는 일과 이미 끝나 버린 일은 놓칩니다.",
           "고른 방법의 「이렇게 합니다」를 그대로 따르되, 적을 때는 풀이하지 말고 본 것만 적습니다. ‘힘들어 보였다’가 아니라 ‘손잡이에 테이프가 감겨 있었다’입니다. 계단 1에 방법과 고른 까닭 한 줄을, 계단 2에 장면 세 줄을 적으면 과제는 끝입니다. 놓칠 것 같은 것이 있으면 계단 1의 선택 칸에 한 줄 적어 둡니다. 놓친 것을 스스로 아는 일이 관찰의 절반입니다.",
         ],
+        images: [
+          { src: "/img/lessons/L2_w_t1_drift.jpg", cap: "기 드보르, 「파리 심리지리 가이드: 사랑의 정념에 관한 담론」(1957). 파리 조감도를 잘라 낸 조각들을 흩어 놓고 붉은 화살표로 ‘표류(dérive)’의 경로와 ‘분위기 단위’의 위치를 이어 놓은 석판화 지도로, ‘상상주의 바우하우스’(MIBI) 명의로 펴냈으며 바르셀로나 현대미술관(MACBA) 소장품입니다.", credit: "© Guy Debord · MACBA(바르셀로나 현대미술관) 소장품 페이지 — 교육 목적 인용", link: "https://www.macba.cat/en/obra/r3779-guide-psychogeographique-de-paris-discours-sur-les-passions-de-lamour-pentes-psychogeographiques-de-la-derive-et-localisation-dunites-dambiance/" },
+          { src: "/img/lessons/L2_w_t1_fixed_1.jpg", cap: "윌리엄 H. 화이트, 「작은 도시 공간의 사회적 삶」(1980)의 관찰 현장인 뉴욕 시그램 빌딩 광장(2025년 촬영). 화이트는 1970년대 스트리트 라이프 프로젝트에서 이 광장을 시간 경과 카메라로 기록하며 사람들이 어디에 앉고 얼마나 머무는지를 시간 표집으로 세었습니다.", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 Epicgenius", link: "https://www.pps.org/article/wwhyte", srcPage: "https://commons.wikimedia.org/wiki/File:Seagram_Building_Nov_2025_22.jpg" },
+          { src: "/img/lessons/L2_w_t1_fixed_2.jpg", cap: "윌리엄 H. 화이트, 「작은 도시 공간의 사회적 삶」(1980)에서 다룬 뉴욕 페일리 파크(2021년 촬영). 폭포 벽 앞에서 사람들이 옮길 수 있는 의자에 앉아 쉬는 모습으로, 화이트가 ‘앉을 자리’와 물·나무가 사람을 모으는 효과를 설명할 때 든 대표 사례입니다.", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 Rhododendrites", link: "https://www.pps.org/article/wwhyte", srcPage: "https://commons.wikimedia.org/wiki/File:Paley_Park_(54035).jpg" },
+          { src: "/img/lessons/L2_w_t1_map.jpg", cap: "케빈 린치, 「인터뷰에서 언급된 곳, 보스턴(19건의 인터뷰)」(1954~1959). 『도시의 이미지』(1960)의 바탕이 된 MIT 보스턴 연구 ‘도시의 지각적 형태’에서 손으로 그린 채색 지도로, 시민 인터뷰에서 언급된 빈도(사분위)에 따라 길·가장자리·구역·결절점·랜드마크를 색을 달리해 표시했습니다. MIT 도서관 특별컬렉션(케빈 린치 페이퍼, MC 208) 소장.", credit: "© MIT 도서관 특별컬렉션(Kevin Lynch Papers, MC 208) · MIT DOME — 교육 목적 인용", link: "https://en.wikipedia.org/wiki/The_Image_of_the_City", srcPage: "https://dome.mit.edu/handle/1721.3/36506" },
+          { src: "/img/lessons/L2_w_t1_inventory_1.jpg", cap: "조르주 페렉, 「파리의 어느 장소에 대한 완전한 묘사 시도」(1975). 페렉은 1974년 10월 18일부터 사흘 동안 파리 생쉴피스 광장 8번지의 이 카페 드 라 메리(Café de la Mairie)를 비롯한 광장의 몇 자리에 앉아, 눈앞을 지나는 버스·비둘기·행인을 모두 적으려 했습니다(사진은 2022년 촬영).", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 CVB", link: "https://fr.wikipedia.org/wiki/Tentative_d%27%C3%A9puisement_d%27un_lieu_parisien", srcPage: "https://commons.wikimedia.org/wiki/File:8_place_Saint-Sulpice_Paris.jpg" },
+          { src: "/img/lessons/L2_w_t1_inventory_2.jpg", cap: "조르주 페렉, 「파리의 어느 장소에 대한 완전한 묘사 시도」(1975). 페렉이 사흘 동안 관찰한 생쉴피스 광장의 일상으로, 분수 가장자리와 성당 모퉁이, 오가는 행인과 비둘기가 보입니다 — 페렉은 이런 '아무 일도 일어나지 않을 때 일어나는 일'을 목록처럼 적었습니다(사진은 2012년 촬영).", credit: "위키미디어 공용 · CC BY 2.0 · 사진 Alexander Baranov", link: "https://fr.wikipedia.org/wiki/Tentative_d%27%C3%A9puisement_d%27un_lieu_parisien", srcPage: "https://commons.wikimedia.org/wiki/File:Paris_Place_Saint-Sulpice_20120512.jpg" },
+          { src: "/img/lessons/L2_s27_3.jpg", cap: "마크 디온, 「테이트 템스 발굴」, 1999. 템스강 하안에서 수습한 도자기 파편·병·뼈 등을 17세기 ‘호기심의 방’ 형식의 양문형 목제 캐비닛에 분류해 넣었다. 테이트 소장.", credit: "테이트 소장 기록(T07669)", link: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" },
+          { src: "/img/lessons/L2_w_t1_sound_1.jpg", cap: "머레이 셰이퍼(R. Murray Schafer), 2007년 미국 애리조나 대학교에서 촬영한 사진입니다. 셰이퍼는 1970년대 사이먼프레이저 대학교에서 월드 사운드스케이프 프로젝트를 이끌고 『세계의 조율』(1977)을 펴내며 음향생태학의 기초를 놓은 캐나다 작곡가입니다.", credit: "위키미디어 공용 · CC BY-SA 3.0 · 사진 Eli n", link: "https://www.sfu.ca/~truax/wsp.html", srcPage: "https://commons.wikimedia.org/wiki/File:R._Murray_Schafer.jpg" },
+          { src: "/img/lessons/L2_w_t1_sound_2.jpg", cap: "월드 사운드스케이프 프로젝트(WSP) 팀, 사이먼프레이저 대학교, 1973. 왼쪽부터 머레이 셰이퍼, 브루스 데이비스, 피터 휴스, 배리 트루악스, 하워드 브룸필드, 힐데가르트 베스터캄프입니다. 이 팀은 1970년대 캐나다와 유럽의 소리 환경을 현장 녹음하며 음향생태학 연구의 기초를 놓았습니다.", credit: "© Simon Fraser University / Barry Truax · SFU WSP 공식 페이지 — 교육 목적 인용", link: "https://www.sfu.ca/~truax/wsp.html" },
+        ],
         works: [
-          { a: "기 드보르 / 상황주의 인터내셔널", w: "「표류의 이론」", y: "1956", d: "목적지를 지우고 걷는 심리지리 실천" },
-          { a: "윌리엄 화이트", w: "「작은 도시 공간의 사회적 삶」", y: "1980", d: "한 자리를 시간대를 바꿔 반복 관찰하는 시간 표집" },
-          { a: "케빈 린치", w: "「도시의 이미지」", y: "1960", d: "사람들이 머릿속에 지닌 도시의 상, 인지 지도" },
-          { a: "조르주 페렉", w: "「파리의 어느 장소에 대한 완전한 묘사 시도」", y: "1975", d: "판단 없이 적어 내려가는 사물 목록" },
-          { a: "머레이 셰이퍼 / 힐데가르트 베스터캄프", w: "음향생태학과 사운드워크", y: "1970~", d: "듣기만 하며 걷고 들린 것을 기록하는 방법" },
+          { a: "기 드보르 / 상황주의 인터내셔널", w: "「표류의 이론」", y: "1956", d: "목적지를 지우고 걷는 심리지리 실천", links: [{ t: "MACBA 소장품 페이지", u: "https://www.macba.cat/en/obra/r3779-guide-psychogeographique-de-paris-discours-sur-les-passions-de-lamour-pentes-psychogeographiques-de-la-derive-et-localisation-dunites-dambiance/" }, { t: "Bureau of Public Secrets 「표류의 이론」 영역", u: "https://www.bopsecrets.org/SI/2.derive.htm" }, { t: "위키백과(영어) Dérive", u: "https://en.wikipedia.org/wiki/D%C3%A9rive" }] },
+          { a: "윌리엄 화이트", w: "「작은 도시 공간의 사회적 삶」", y: "1980", d: "한 자리를 시간대를 바꿔 반복 관찰하는 시간 표집", links: [{ t: "Project for Public Spaces — 윌리엄 H. 화이트", u: "https://www.pps.org/article/wwhyte" }, { t: "위키백과(영어) — 책·영화 항목", u: "https://en.wikipedia.org/wiki/The_Social_Life_of_Small_Urban_Spaces" }, { t: "위키백과(영어) — William H. Whyte", u: "https://en.wikipedia.org/wiki/William_H._Whyte" }] },
+          { a: "케빈 린치", w: "「도시의 이미지」", y: "1960", d: "사람들이 머릿속에 지닌 도시의 상, 인지 지도", links: [{ t: "위키백과(영어) The Image of the City", u: "https://en.wikipedia.org/wiki/The_Image_of_the_City" }, { t: "MIT 도서관 DOME — Perceptual Form of the City", u: "https://dome.mit.edu/handle/1721.3/33656" }, { t: "위키백과(한국어) 케빈 A. 린치", u: "https://ko.wikipedia.org/wiki/%EC%BC%80%EB%B9%88_A._%EB%A6%B0%EC%B9%98" }] },
+          { a: "조르주 페렉", w: "「파리의 어느 장소에 대한 완전한 묘사 시도」", y: "1975", d: "판단 없이 적어 내려가는 사물 목록", links: [{ t: "위키백과(프랑스어) — 작품 항목", u: "https://fr.wikipedia.org/wiki/Tentative_d%27%C3%A9puisement_d%27un_lieu_parisien" }, { t: "위키백과(영어) — An Attempt at Exhausting a Place in Paris", u: "https://en.wikipedia.org/wiki/An_Attempt_at_Exhausting_a_Place_in_Paris" }, { t: "위키백과(한국어) — 조르주 페렉", u: "https://ko.wikipedia.org/wiki/%EC%A1%B0%EB%A5%B4%EC%A3%BC_%ED%8E%98%EB%A0%89" }] },
+          { a: "머레이 셰이퍼 / 힐데가르트 베스터캄프", w: "음향생태학과 사운드워크", y: "1970~", d: "듣기만 하며 걷고 들린 것을 기록하는 방법", links: [{ t: "SFU 월드 사운드스케이프 프로젝트", u: "https://www.sfu.ca/~truax/wsp.html" }, { t: "힐데가르트 베스터캄프 공식 — 「Soundwalking」(1974)", u: "https://www.hildegardwesterkamp.ca/writings/writings-by/?post_id=13&title=soundwalking" }, { t: "캐나다 백과사전 — R. Murray Schafer", u: "https://thecanadianencyclopedia.ca/en/article/r-murray-schafer" }] },
         ],
       },
   ],
@@ -552,6 +595,9 @@ export const LESSONS_DEF = [
           "우리 전시를 본 관람자가 ‘마음이 아팠다’라고만 말하고 나간다면 그 전시는 성공일까요.",
           "동의·소진·방법, 세 이유 가운데 자기에게 가장 설득력 있는 것은 무엇이고 왜 그렇습니까.",
         ],
+        images: [
+          { src: "/img/lessons/L3_s32_2.jpg", cap: "임흥순, 「위로공단」(2014)의 홍보 스틸. 눈을 가린 인물이 공장 지대 옥상에 서 있고, 2015년 베네치아 비엔날레 은사자상 수상 표기가 함께 실려 있습니다.", credit: "「위로공단」 홍보 자료 (수업 자료 도판)", link: "https://ko.wikipedia.org/wiki/위로공단" },
+        ],
         works: [
           { a: "문헌", w: "손택 『타인의 고통』", y: "2003", d: "고통 이미지의 소비가 만드는 무뎌짐과 구경의 문제", links: [{ t: "수전 손택", u: "https://ko.wikipedia.org/wiki/수전_손택" }, { t: "『타인의 고통』", u: "https://ko.wikipedia.org/wiki/타인의_고통" }] },
           { a: "문헌 (배경)", w: "스피박 「서발턴은 말할 수 있는가」 / 알코프 「타인을 대변하는 문제」", y: "1988 / 1991", d: "대변의 왜곡과 대변의 불가피함. 이 수업에서는 쟁점의 지형으로만 소개" },
@@ -576,9 +622,10 @@ export const LESSONS_DEF = [
         images: [
           { src: "/img/lessons/L3_s19_3.jpg", cap: "알프레도 자, 「리얼 픽처스」(1995)의 설치 전경. 사진을 봉인한 검은 상자들이 쌓여 있고, 관람자는 상자 표면의 문장만 읽을 수 있습니다.", credit: "작가 공식 사이트·MoCP 전시 기록·로잔 주립미술관(MCBA) 소장 정보", link: "https://alfredojaar.net/" },
           { src: "/img/lessons/L3_s21_3.jpg", cap: "알프레도 자, 「구테테 에메리타의 눈」(1996)의 발광 텍스트 패널. 구테테 에메리타가 교회에서 가족이 살해되는 것을 목격한 상황을 서술한 글로, 관람자는 이 글을 읽은 뒤에야 그의 눈을 찍은 슬라이드와 만납니다.", credit: "작가 공식 사이트 alfredojaar.net", link: "https://alfredojaar.net/" },
+          { src: "/img/lessons/L3_w_newsweek.jpg", cap: "알프레도 자, 「무제(뉴스위크)」(1994). 르완다 학살이 시작된 직후인 1994년 4월 11일자부터, 잡지가 17주 만에 처음으로 르완다를 표지로 다룬 8월 1일자까지 『뉴스위크』 표지 17장을 나란히 걸고 각 표지 아래에 같은 주 르완다에서 벌어진 일을 짧은 글로 적어 넣은 설치입니다(2009년 마드리드 아르코 아트페어, 갤러리 토마스 슐테 부스 전시 장면).", credit: "플리커 · CC BY 2.0 · 사진 Julian Stallabrass", link: "https://alfredojaar.net/projects/1994/the-rwanda-project/untitlednewsweek/", srcPage: "https://www.flickr.com/photos/slowkodachrome/4354165922" },
         ],
         works: [
-          { a: "알프레도 자", w: "「무제(뉴스위크)」", y: "1994", d: "학살 기간의 잡지 표지를 시간 순서로 나열해 보도의 지연 자체를 드러냄", links: [{ t: "알프레도 자", u: "https://en.wikipedia.org/wiki/Alfredo_Jaar" }] },
+          { a: "알프레도 자", w: "「무제(뉴스위크)」", y: "1994", d: "학살 기간의 잡지 표지를 시간 순서로 나열해 보도의 지연 자체를 드러냄", links: [{ t: "알프레도 자", u: "https://en.wikipedia.org/wiki/Alfredo_Jaar" }, { t: "작가 공식 사이트 작품 페이지", u: "https://alfredojaar.net/projects/1994/the-rwanda-project/untitlednewsweek/" }, { t: "게티 미술관 작가 대담", u: "https://www.getty.edu/news/barbaric-indifference-a-conversation-with-artist-alfredo-jaar/" }] },
           { a: "알프레도 자", w: "「리얼 픽처스」", y: "1995", d: "사진의 봉인과 상자 표면의 서술. 과잉 노출과 완전한 침묵 사이의 설계", links: [{ t: "작가 공식 사이트", u: "https://alfredojaar.net/" }] },
           { a: "알프레도 자", w: "「구테테 에메리타의 눈」", y: "1996", d: "끔찍한 장면 대신 목격자의 눈. 글을 먼저 읽게 하는 순서의 설계", links: [{ t: "알프레도 자", u: "https://en.wikipedia.org/wiki/Alfredo_Jaar" }, { t: "작가 공식 사이트", u: "https://alfredojaar.net/" }] },
         ],
@@ -607,6 +654,7 @@ export const LESSONS_DEF = [
           { src: "/img/lessons/L3_s30_3.jpg", cap: "크지슈토프 보디치코, 「노숙자 차량 프로젝트」(1988~89)의 전시 설치 전경. 주황색 덮개가 달린 실물 손수레 뒤로 당시 뉴욕 거리의 사진과 설계 도면들이 걸려 있습니다.", credit: "허시혼 미술관(HMSG 2017.010) 소장 기록 (수업 자료 도판)", link: "https://en.wikipedia.org/wiki/Krzysztof_Wodiczko" },
           { src: "/img/lessons/L3_s32_2.jpg", cap: "임흥순, 「위로공단」(2014)의 홍보 스틸. 눈을 가린 인물이 공장 지대 옥상에 서 있고, 2015년 베네치아 비엔날레 은사자상 수상 표기가 함께 실려 있습니다.", credit: "「위로공단」 홍보 자료 (수업 자료 도판)", link: "https://ko.wikipedia.org/wiki/위로공단" },
           { src: "/img/lessons/L3_s33_3.jpg", cap: "포렌식 아키텍처, 「그렌펠 타워 화재」 조사(2017~)의 3차원 모형 화면. 시민이 촬영한 영상과 사진을 시간·위치별로 정렬해 불길의 확산 경로를 재구성했습니다.", credit: "포렌식 아키텍처 공식 사이트 forensic-architecture.org", link: "https://forensic-architecture.org/" },
+          { src: "/img/lessons/L3_w_shibboleth.jpg", cap: "도리스 살세도, 「시볼렛」(2007). 테이트 모던 터빈 홀의 콘크리트 바닥을 167m 길이로 갈라 놓은 균열을 위에서 내려다본 모습입니다. 관람객이 균열을 들여다보거나 사진을 찍고 있으며, 2007년 10월부터 2008년 4월까지 유니레버 시리즈로 전시되었습니다.", credit: "위키미디어 공용 · CC BY-SA 3.0 · 사진 Gdobon", link: "https://www.tate.org.uk/whats-on/tate-modern/unilever-series/unilever-series-doris-salcedo-shibboleth", srcPage: "https://commons.wikimedia.org/wiki/File:Shibboleth_-_Tate_Modern_2007.jpg" },
         ],
         works: [
           { a: "도리스 살세도", w: "「아트라빌리아리오스」", y: "1992~2004", d: "실종자의 신발과 반투명 막. 몸에 닳은 형태가 개별성을 보증", links: [{ t: "도리스 살세도", u: "https://en.wikipedia.org/wiki/Doris_Salcedo" }] },
@@ -636,11 +684,24 @@ export const LESSONS_DEF = [
           "우리 전시가 관람자를 불편하게 만들어야 한다면, 그것은 어떤 종류의 불편함이어야 할까요.",
           "우리 학급 전시가 끝난 뒤 무엇이 남으면 성공이라고 하겠습니까. 기록, 어휘, 관계 가운데 지금 기준을 정해 봅시다.",
         ],
+        images: [
+          { src: "/img/lessons/L3_s32_2.jpg", cap: "임흥순, 「위로공단」(2014)의 홍보 스틸. 눈을 가린 인물이 공장 지대 옥상에 서 있고, 2015년 베네치아 비엔날레 은사자상 수상 표기가 함께 실려 있습니다.", credit: "「위로공단」 홍보 자료 (수업 자료 도판)", link: "https://ko.wikipedia.org/wiki/위로공단" },
+          { src: "/img/lessons/L3_s21_3.jpg", cap: "알프레도 자, 「구테테 에메리타의 눈」(1996)의 발광 텍스트 패널. 구테테 에메리타가 교회에서 가족이 살해되는 것을 목격한 상황을 서술한 글로, 관람자는 이 글을 읽은 뒤에야 그의 눈을 찍은 슬라이드와 만납니다.", credit: "작가 공식 사이트 alfredojaar.net", link: "https://alfredojaar.net/" },
+          { src: "/img/lessons/L2_s27_3.jpg", cap: "마크 디온, 「테이트 템스 발굴」, 1999. 템스강 하안에서 수습한 도자기 파편·병·뼈 등을 17세기 ‘호기심의 방’ 형식의 양문형 목제 캐비닛에 분류해 넣었다. 테이트 소장.", credit: "테이트 소장 기록(T07669)", link: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" },
+          { src: "/img/lessons/L2_s33_3.jpg", cap: "호안 폰트쿠베르타·페레 포르미게라, 「파우나」, 1987. 박제 표본이 든 유리 진열장과 벽면의 사진·문서·노트가 자연사 박물관의 형식으로 설치된 전시 전경.", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/Joan_Fontcuberta" },
+          { src: "/img/lessons/L2_s35_2.jpg", cap: "아틀라스 그룹 / 왈리드 라아드, 「사라진 레바논 전쟁」 노트북의 한 면. 경마 사진 둘레에 날짜, 기록, 역사학자들의 내기 내역이 주석처럼 달려 있다.", credit: "수업 자료 도판", link: "https://www.theatlasgroup1989.org/" },
+          { src: "/img/lessons/L3_s33_3.jpg", cap: "포렌식 아키텍처, 「그렌펠 타워 화재」 조사(2017~)의 3차원 모형 화면. 시민이 촬영한 영상과 사진을 시간·위치별로 정렬해 불길의 확산 경로를 재구성했습니다.", credit: "포렌식 아키텍처 공식 사이트 forensic-architecture.org", link: "https://forensic-architecture.org/" },
+          { src: "/img/lessons/L2_s11_3.jpg", cap: "「현대미술관, 독수리 부서」 전시 전경. 유리 진열장과 벽면에 시대와 지역이 서로 다른 독수리 도상들이 번호를 달고 진열되어 있다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" },
+          { src: "/img/lessons/L2_s17_1.jpg", cap: "한스 하케, 「샤폴스키 외, 맨해튼 부동산 보유 현황」(1971)의 부분. 건물 정면 사진 아래에 소유·거래 내역을 타자기로 친 기록이 한 쌍을 이룬다.", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/Hans_Haacke" },
+          { src: "/img/lessons/L3_w_wodiczko.jpg", cap: "크지슈토프 보디치코, 「홈리스 프로젝션: 플라스 데자르」(2014). 몬트리올 비엔날레(BNLMTL 2014) 기간에 플라스 데자르의 메종뇌브 극장 정면 층계형 난간 위로 그 도시 노숙인들의 모습과 목소리를 영상으로 투사한 공공 프로젝션으로, 1980년부터 이어진 건물·기념비 프로젝션 연작의 하나입니다.", credit: "위키미디어 공용 · CC BY 2.0 · 사진 art_inthecity (Flickr)", link: "https://act.mit.edu/about/people/krzysztof-wodiczko/", srcPage: "https://commons.wikimedia.org/wiki/File:Krzysztof_Wodiczko,_Homeless_Projection,_2014_(15730201502).jpg" },
+          { src: "/img/lessons/L3_w_beuys_1.jpg", cap: "요제프 보이스, 「7000그루의 참나무 — 도시 행정 대신 도시 숲 가꾸기」(1982–87). 카셀 프리데리치아눔 정면 잔디밭의 참나무 두 그루와 밑동의 현무암 기둥으로, 오른쪽은 1982년 보이스가 도쿠멘타 7을 위해 처음 심은 나무, 왼쪽은 1987년 아들 벤첼이 심은 마지막 나무이며, 나무마다 현무암 기둥 하나를 짝지어 세운 이 사업은 시민이 함께 만드는 ‘사회적 조각’의 대표 사례입니다.", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 Codc", link: "https://www.7000eichen.de/", srcPage: "https://commons.wikimedia.org/wiki/File:7000_Eichen_vor_Fridericianum.jpg" },
+          { src: "/img/lessons/L3_w_beuys_2.jpg", cap: "요제프 보이스, 「7000그루의 참나무」(1982–87) 기록 사진, 1982년 6월. 도쿠멘타 7 개막 무렵 프리데리치아눔 앞에 현무암 기둥 7,000개를 쌓아 시작한 더미로, 나무 한 그루가 심길 때마다 돌 하나를 옮겨 세워 더미가 조금씩 줄어들도록 했으며, 건물 프리즈의 글귀는 로렌스 위너의 작품입니다.", credit: "위키미디어 공용 · CC BY-SA 2.5 · 사진 J. Bunse", link: "https://www.7000eichen.de/", srcPage: "https://commons.wikimedia.org/wiki/File:Documenta_7_Beuys_Weiner_Fridericianum_1982.jpg" },
+        ],
         works: [
-          { a: "임흥순", w: "「위로공단」", y: "2014", d: "증언과 기록: 여성 노동자의 말을 이미지와 겹쳐 놓음" },
-          { a: "알프레도 자", w: "「르완다 프로젝트」", y: "1994~2000", d: "가림과 우회: 끔찍한 장면 대신 생존자의 눈만" },
-          { a: "포렌식 아키텍처", w: "사건 재구성 작업", y: "2010~", d: "증거와 포렌식: 물질의 흔적으로 사건의 시각을 되짚음" },
-          { a: "크지슈토프 보디치코", w: "건물 프로젝션 연작", y: "1980~", d: "개입과 전술: 기념비에 사람의 손과 목소리를 겹쳐 비춤" },
+          { a: "임흥순", w: "「위로공단」", y: "2014", d: "증언과 기록: 여성 노동자의 말을 이미지와 겹쳐 놓음", links: [{ t: "위키백과(한국어) 위로공단", u: "https://ko.wikipedia.org/wiki/위로공단" }] },
+          { a: "알프레도 자", w: "「르완다 프로젝트」", y: "1994~2000", d: "가림과 우회: 끔찍한 장면 대신 생존자의 눈만", links: [{ t: "작가 공식 사이트", u: "https://alfredojaar.net/" }] },
+          { a: "포렌식 아키텍처", w: "사건 재구성 작업", y: "2010~", d: "증거와 포렌식: 물질의 흔적으로 사건의 시각을 되짚음", links: [{ t: "포렌식 아키텍처(공식)", u: "https://forensic-architecture.org/" }] },
+          { a: "크지슈토프 보디치코", w: "건물 프로젝션 연작", y: "1980~", d: "개입과 전술: 기념비에 사람의 손과 목소리를 겹쳐 비춤", links: [{ t: "MIT ACT — 작가 소개", u: "https://act.mit.edu/about/people/krzysztof-wodiczko/" }, { t: "허시혼 미술관 — 1988년 프로젝션 재상영 보도자료", u: "https://hirshhorn.si.edu/news/press-release/hirshhorn-to-restage-krzysztof-wodiczko-projection-on-museum-exterior" }, { t: "위키백과(영어)", u: "https://en.wikipedia.org/wiki/Krzysztof_Wodiczko" }] },
           { a: "니콜라 부리요 / 클레어 비숍", w: "「관계미학」 / 「적대와 관계미학」", y: "1998 / 2004", d: "관계와 대화, 그리고 그 방법에 대한 반론", links: [{ t: "니콜라 부리요", u: "https://en.wikipedia.org/wiki/Nicolas_Bourriaud" }] },
           { a: "그랜트 케스터", w: "『대화 조각들(Conversation Pieces)』", y: "2004", d: "듣는 일과 장기 협업의 호혜성을 기준으로 세운 대화적 미학" },
         ],
@@ -747,11 +808,13 @@ export const LESSONS_DEF = [
       ],
       images: [
         { src: "/img/lessons/L4_s25_3.jpg", cap: "전시물 옆에 세워진 작품 캡션 실물. 번호·명칭·제작 연도·재질·소장처가 규격화된 활자와 정해진 순서로 인쇄되어 있습니다. 이 규격이 곧 신뢰의 신호가 됩니다.", credit: "전시 작품 캡션 실무 자료 도판 · 항목 구성은 국립중앙박물관 소장품 정보 서식 참조" },
+        { src: "/img/lessons/L4_w_imperato.jpg", cap: "작가 미상(페란테 임페라토를 위해 제작), 「페란테 임페라토 박물관의 초상(Ritratto del Museo di Ferrante Imperato)」(1599). 『자연사(Dell'Historia Naturale)』(나폴리, 1599)에 실린 접이식 판화로, 천장에 매단 악어와 벽면 가득한 표본·책장, 방문객에게 수집품을 보여 주는 장면을 담았으며 자연사 수집실(호기심의 방)을 그린 가장 이른 도판으로 알려져 있습니다.", credit: "퍼블릭 도메인 · 위키미디어 공용", link: "https://en.wikipedia.org/wiki/Cabinet_of_curiosities", srcPage: "https://commons.wikimedia.org/wiki/File:RitrattoMuseoFerranteImperato.jpg" },
+        { src: "/img/lessons/L4_w_dion_cabinet.jpg", cap: "마크 디온, 「멜랑콜리 박물관」(2019), 스탠퍼드대학교 캔터 미술관 설치 전경입니다. 15세에 세상을 떠난 릴런드 스탠퍼드 주니어의 초상을 붉은 커튼으로 감싸고, 양옆 조명 진열장에 스탠퍼드 가족 소장품을 흙(초록)·공기(흰색)·물(파랑)·불(빨강)의 원소별로 나누어 넣은 빅토리아풍 ‘애도의 캐비닛’으로, 소장품 700여 점을 다룬 전시의 중심 작품입니다.", credit: "플리커 · CC BY-NC 2.0 · 사진 Rob Corder", link: "https://museum.stanford.edu/exhibitions/melancholy-museum-love-death-and-mourning-stanford", srcPage: "https://www.flickr.com/photos/rocor/51594759330/" },
       ],
       works: [
         { a: "개념", w: "포미안의 세미오포어", y: "1987", d: "쓸모에서 의미로 지위가 바뀐 사물. 박물관화의 이론적 뼈대", links: [{ t: "크시슈토프 포미안", u: "https://en.wikipedia.org/wiki/Krzysztof_Pomian" }, { t: "박물관학", u: "https://ko.wikipedia.org/wiki/박물관학" }] },
         { a: "형식 자료", w: "분더카머 도판과 근대 박물관 진열", y: "16~19세기", d: "경이의 수집에서 분류의 지식으로. 작품 캡션의 탄생", links: [{ t: "분더카머", u: "https://ko.wikipedia.org/wiki/분더카머" }, { t: "경이의 방(영문)", u: "https://en.wikipedia.org/wiki/Cabinet_of_curiosities" }] },
-        { a: "마크 디온", w: "「경이의 캐비닛」 연작", y: "2000~", d: "분더카머 형식을 되살려 분류라는 행위 자체를 보여 줌", links: [{ t: "마크 디온", u: "https://en.wikipedia.org/wiki/Mark_Dion" }, { t: "경이의 방(분더카머)", u: "https://en.wikipedia.org/wiki/Cabinet_of_curiosities" }] },
+        { a: "마크 디온", w: "「경이의 캐비닛」 연작", y: "2000~", d: "분더카머 형식을 되살려 분류라는 행위 자체를 보여 줌", links: [{ t: "마크 디온", u: "https://en.wikipedia.org/wiki/Mark_Dion" }, { t: "경이의 방(분더카머)", u: "https://en.wikipedia.org/wiki/Cabinet_of_curiosities" }, { t: "캔터 미술관(스탠퍼드) 전시 페이지", u: "https://museum.stanford.edu/exhibitions/melancholy-museum-love-death-and-mourning-stanford" }, { t: "오클랜드 미술관(OMCA) — 마블러스 뮤지엄", u: "https://museumca.org/on-view/marvelous-museum-project-mark-dion/" }, { t: "위키백과(영어) Mark Dion (artist)", u: "https://en.wikipedia.org/wiki/Mark_Dion_(artist)" }] },
         { a: "토니 베넷", w: "「전시적 복합체」", y: "1988", d: "박물관은 사물을 보여 주는 동시에 보는 법을 가르치는 장치라는 분석", links: [{ t: "토니 베넷(영문)", u: "https://en.wikipedia.org/wiki/Tony_Bennett_(sociologist)" }] },
       ],
     },
@@ -815,6 +878,7 @@ export const LESSONS_DEF = [
         { src: "/img/lessons/L4_s20_3.jpg", cap: "수거함에 뒤섞여 쌓인 현대의 생활 쓰레기. 이 상태로는 그냥 쓰레기지만, 항목별로 나누고 계량하고 기록하는 순간 한 시대의 소비를 증언하는 자료가 됩니다.", credit: "쓰레기 고고학(garbology) 교육 자료 도판" },
         { src: "/img/lessons/L4_s30_3.jpg", cap: "트레버 파글렌, 「마지막 사진들(The Last Pictures)」, 2012. 이미지 100장을 미세 에칭한 실리콘 디스크와 금빛 보호 외피. 이 디스크가 통신위성에 실려 정지궤도에 올랐습니다.", credit: "Creative Time 「The Last Pictures」 프로젝트 공개 자료", link: "https://en.wikipedia.org/wiki/Trevor_Paglen" },
         { src: "/img/lessons/L4_s32_3.jpg", cap: "문자를 쓰지 않고 위험을 전하려는 방사선 경고 기호들. 왼쪽은 국제적으로 쓰이는 삼엽 기호, 오른쪽은 방사선원·해골·달아나는 사람을 그림으로 담은 보조 경고 기호입니다. 기호조차 먼 미래에는 다르게 읽힐 수 있다는 것이 핵 기호학의 고민입니다.", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/Long-term_nuclear_waste_warning_messages" },
+        { src: "/img/lessons/L2_s27_3.jpg", cap: "마크 디온, 「테이트 템스 발굴」, 1999. 템스강 하안에서 수습한 도자기 파편·병·뼈 등을 17세기 ‘호기심의 방’ 형식의 양문형 목제 캐비닛에 분류해 넣었다. 테이트 소장.", credit: "테이트 소장 기록(T07669)", link: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" },
       ],
       works: [
         { a: "윌리엄 라스제·컬런 머피", w: "『러비시!(Rubbish!: The Archaeology of Garbage)』", y: "1992", d: "투손 쓰레기 프로젝트의 기록. 진술과 사물의 어긋남 자체가 자료가 됨", links: [{ t: "윌리엄 라스제(영문)", u: "https://en.wikipedia.org/wiki/William_Rathje" }] },
@@ -944,10 +1008,11 @@ export const LESSONS_DEF = [
         ],
         images: [
           { src: "/img/lessons/L5_s13_2.jpg", cap: "알렉산더 가드너, 「반란군 저격병의 집(Home of a Rebel Sharpshooter, Gettysburg)」, 1863. 시신을 약 40야드 옮겨 배치한 뒤 촬영한 것으로 확인된 사진", credit: "미국 의회도서관 남북전쟁 유리 원판 컬렉션·시카고 미술관 소장 기록", link: "https://en.wikipedia.org/wiki/Alexander_Gardner_(photographer)" },
+          { src: "/img/lessons/L5_w_capa.jpg", cap: "로버트 카파, 「쓰러지는 병사」(1936). 스페인 내전 코르도바 전선에서 공화파 민병대원이 총에 맞아 쓰러지는 순간을 찍은 것으로 알려진 젤라틴 실버 프린트로, 1936년 9월 프랑스 잡지 『Vu』에 처음 실렸으며 1970년대부터 연출 여부를 둘러싼 논쟁이 이어지고 있습니다. 뉴욕 현대미술관(MoMA) 소장(에드워드 스타이컨 기증).", credit: "© International Center of Photography/Magnum Photos · MoMA 소장품 페이지 — 교육 목적 인용", link: "https://www.icp.org/browse/archive/objects/death-of-a-loyalist-militiaman-near-espejo-c%C3%B3rdoba-front-spain-1", srcPage: "https://www.moma.org/collection/works/46684" },
         ],
         works: [
           { a: "알렉산더 가드너", w: "「반란군 저격병의 집」", y: "1863", d: "참이면서 연출인 사진. 편집과 조작의 기준선 논쟁의 출발점", links: [{ t: "알렉산더 가드너", u: "https://en.wikipedia.org/wiki/Alexander_Gardner_(photographer)" }] },
-          { a: "로버트 카파", w: "「쓰러지는 병사」", y: "1936", d: "연출 논쟁이 미결로 남은 사례. 판정은 이미지 밖의 자료가 만든다", links: [{ t: "로버트 카파", u: "https://ko.wikipedia.org/wiki/로버트_카파" }, { t: "「쓰러지는 병사」", u: "https://en.wikipedia.org/wiki/The_Falling_Soldier" }] },
+          { a: "로버트 카파", w: "「쓰러지는 병사」", y: "1936", d: "연출 논쟁이 미결로 남은 사례. 판정은 이미지 밖의 자료가 만든다", links: [{ t: "로버트 카파", u: "https://ko.wikipedia.org/wiki/로버트_카파" }, { t: "「쓰러지는 병사」", u: "https://en.wikipedia.org/wiki/The_Falling_Soldier" }, { t: "ICP 로버트 카파 아카이브 소장 기록", u: "https://www.icp.org/browse/archive/objects/death-of-a-loyalist-militiaman-near-espejo-c%C3%B3rdoba-front-spain-1" }, { t: "위키백과(한국어) 로버트 카파", u: "https://ko.wikipedia.org/wiki/%EB%A1%9C%EB%B2%84%ED%8A%B8_%EC%B9%B4%ED%8C%8C" }] },
           { a: "규정", w: "월드 프레스 포토 출품 규정", y: "현행", d: "더하거나 지우면 실격. 지표성을 지키는 업계의 선", links: [{ t: "World Press Photo", u: "https://en.wikipedia.org/wiki/World_Press_Photo" }] },
         ],
       },
@@ -966,6 +1031,9 @@ export const LESSONS_DEF = [
           "발자국·연기·사진·그림·이모지·유물번호 표기를 도상·지표·상징으로 나눠 보세요.",
           "‘사진의 진실은 어디에 있는가’를 한 문장으로 써 보세요. 세 층 가운데 하나를 반드시 짚어 주세요.",
           "여러분의 설계 카드에서 관람자를 찌를 항목은 어느 것입니까. 하나만 고르세요.",
+        ],
+        images: [
+          { src: "/img/lessons/L5_s13_2.jpg", cap: "알렉산더 가드너, 「반란군 저격병의 집(Home of a Rebel Sharpshooter, Gettysburg)」, 1863. 시신을 약 40야드 옮겨 배치한 뒤 촬영한 것으로 확인된 사진", credit: "미국 의회도서관 남북전쟁 유리 원판 컬렉션·시카고 미술관 소장 기록", link: "https://en.wikipedia.org/wiki/Alexander_Gardner_(photographer)" },
         ],
         works: [
           { a: "문헌", w: "바르트 『밝은 방』", y: "1980", d: "지표성. ‘그것이 존재했음’이라는 사진의 확신", links: [{ t: "롤랑 바르트", u: "https://ko.wikipedia.org/wiki/롤랑_바르트" }, { t: "『밝은 방』", u: "https://en.wikipedia.org/wiki/Camera_Lucida_(book)" }, { t: "지표성(indexicality)", u: "https://en.wikipedia.org/wiki/Indexicality" }] },
@@ -988,13 +1056,18 @@ export const LESSONS_DEF = [
           "미첼의 진단(지표가 끊어졌다)과 거닝의 반론(담론이 진실을 만든다) 가운데 여러분은 어느 쪽에 섭니까.",
           "이미지의 신뢰가 이미지 밖에서 온다면, 우리 전시에서 그 ‘바깥’은 구체적으로 무엇입니까.",
         ],
+        images: [
+          { src: "/img/lessons/L5_w_sputnik_1.jpg", cap: "호안 폰트쿠베르타, 「스푸트니크」 연작 중 〈우주비행사 이반 이스토치니코프 공식 초상〉(1997). 소련 우주복 차림의 이 '실종된 우주비행사'는 작가 자신의 얼굴을 쓴 허구의 인물로, 같은 제목의 톤 처리 젤라틴 실버 프린트가 하버드 미술관에 소장되어 있습니다.", credit: "© Joan Fontcuberta/VEGAP · 작가 공식 사이트 — 교육 목적 인용", link: "https://harvardartmuseums.org/collections/object/52764" },
+          { src: "/img/lessons/L5_w_sputnik_2.jpg", cap: "호안 폰트쿠베르타, 1997년 발표한 「스푸트니크」 연작을 다시 선보인 전시장(2021)에 선 작가. 붉은 벽의 'СПУТНИК' 글자와 소유즈 우주선 사진, 마트료시카·문서를 넣은 진열장이 보이며, 허구의 우주비행사 이야기를 실제 기록 전시처럼 꾸민 방식을 알 수 있습니다.", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 Marina Domínguez Serra", link: "https://harvardartmuseums.org/collections/object/52764", srcPage: "https://commons.wikimedia.org/wiki/File:Joan_Fontcuberta_dins_la_seva_exposici%C3%B3_Sputnik.jpg" },
+          { src: "/img/lessons/L5_s13_2.jpg", cap: "알렉산더 가드너, 「반란군 저격병의 집(Home of a Rebel Sharpshooter, Gettysburg)」, 1863. 시신을 약 40야드 옮겨 배치한 뒤 촬영한 것으로 확인된 사진", credit: "미국 의회도서관 남북전쟁 유리 원판 컬렉션·시카고 미술관 소장 기록", link: "https://en.wikipedia.org/wiki/Alexander_Gardner_(photographer)" },
+        ],
         works: [
           { a: "문헌", w: "벤야민 「기술복제시대의 예술작품」", y: "1936", d: "아우라의 붕괴와 전시 가치의 상승. 원본 없는 이미지도 전시될 수 있다", links: [{ t: "발터 벤야민", u: "https://ko.wikipedia.org/wiki/발터_벤야민" }, { t: "「기술복제시대의 예술작품」", u: "https://en.wikipedia.org/wiki/The_Work_of_Art_in_the_Age_of_Mechanical_Reproduction" }] },
           { a: "문헌", w: "버거 『다른 방식으로 보기』", y: "1972", d: "복제는 권위를 맥락을 붙이는 사람에게 옮긴다. 작품 캡션의 권위", links: [{ t: "존 버거", u: "https://ko.wikipedia.org/wiki/존_버거" }, { t: "『다른 방식으로 보기』", u: "https://en.wikipedia.org/wiki/Ways_of_Seeing" }] },
           { a: "문헌", w: "미첼 『재구성된 눈』", y: "1992", d: "픽셀은 값이다. 포스트-포토그래픽 시대의 진단", links: [] },
           { a: "문헌", w: "거닝 「지표는 무엇을 위한 것인가」", y: "2004", d: "진실은 지표가 아니라 담론이 만든다. 우리 전시가 서는 자리", links: [] },
           { a: "문헌", w: "보드리야르 『시뮬라시옹』", y: "1981", d: "원본 없는 이미지, 시뮬라크르. 허구 고지의 이론적 배경", links: [{ t: "장 보드리야르", u: "https://ko.wikipedia.org/wiki/장_보드리야르" }, { t: "『시뮬라시옹』", u: "https://en.wikipedia.org/wiki/Simulacra_and_Simulation" }, { t: "시뮬라크르", u: "https://ko.wikipedia.org/wiki/시뮬라크르" }] },
-          { a: "호안 폰트쿠베르타", w: "「스푸트니크」", y: "1997", d: "가상 우주비행사의 기록 아카이브. 형식이 만드는 믿음의 실험", links: [{ t: "호안 폰트쿠베르타", u: "https://en.wikipedia.org/wiki/Joan_Fontcuberta" }, { t: "파라픽션이란", u: "https://en.wikipedia.org/wiki/Parafiction" }] },
+          { a: "호안 폰트쿠베르타", w: "「스푸트니크」", y: "1997", d: "가상 우주비행사의 기록 아카이브. 형식이 만드는 믿음의 실험", links: [{ t: "호안 폰트쿠베르타", u: "https://en.wikipedia.org/wiki/Joan_Fontcuberta" }, { t: "파라픽션이란", u: "https://en.wikipedia.org/wiki/Parafiction" }, { t: "하버드 미술관 소장 기록", u: "https://harvardartmuseums.org/collections/object/52764" }, { t: "위키백과(한국어) — 소유스 2호 「승무원 탑승 주장 사건」", u: "https://ko.wikipedia.org/wiki/%EC%86%8C%EC%9C%A0%EC%8A%A4_2%ED%98%B8#%EC%8A%B9%EB%AC%B4%EC%9B%90_%ED%83%91%EC%8A%B9_%EC%A3%BC%EC%9E%A5_%EC%82%AC%EA%B1%B4" }] },
         ],
       },
       {
@@ -1051,9 +1124,10 @@ export const LESSONS_DEF = [
         ],
         images: [
           { src: "/img/lessons/L5_s39_5.jpg", cap: "미술관 전시실에 놓인 마르셀 뒤샹의 「자전거 바퀴」(1913년 원작의 재제작본) 앞에서 해설자가 설명하는 영상의 한 장면. 기성품과 우연을 미술로 끌어들인 뒤샹의 계보를 보여 주는 수업 자료 도판", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/Bicycle_Wheel" },
+          { src: "/img/lessons/L5_w_stoppages.jpg", cap: "마르셀 뒤샹, 「3개의 표준 정지(3 stoppages étalon)」(1913–14). 1m 길이 실 세 가닥을 1m 높이에서 떨어뜨려 우연히 생긴 곡선 그대로 캔버스 띠에 붙여 유리판에 고정하고, 그 곡선을 본뜬 나무 자 세 개와 함께 나무 상자에 담은 작품입니다. 뉴욕 현대미술관(MoMA) 소장, 캐서린 S. 드라이어 유증.", credit: "© Artists Rights Society (ARS), New York / ADAGP, Paris / Estate of Marcel Duchamp · MoMA 소장품 페이지 — 교육 목적 인용", link: "https://www.moma.org/collection/works/78990" },
         ],
         works: [
-          { a: "마르셀 뒤샹", w: "「3개의 표준 정지」", y: "1913–14", d: "우연의 통조림. 우연을 받아들이기로 정한 것은 작가라는 근거", links: [{ t: "마르셀 뒤샹", u: "https://ko.wikipedia.org/wiki/마르셀_뒤샹" }, { t: "「3개의 표준 정지」", u: "https://en.wikipedia.org/wiki/3_Standard_Stoppages" }] },
+          { a: "마르셀 뒤샹", w: "「3개의 표준 정지」", y: "1913–14", d: "우연의 통조림. 우연을 받아들이기로 정한 것은 작가라는 근거", links: [{ t: "마르셀 뒤샹", u: "https://ko.wikipedia.org/wiki/마르셀_뒤샹" }, { t: "「3개의 표준 정지」", u: "https://en.wikipedia.org/wiki/3_Standard_Stoppages" }, { t: "MoMA 소장품", u: "https://www.moma.org/collection/works/78990" }, { t: "테이트 소장 기록(1964 복제본)", u: "https://www.tate.org.uk/art/artworks/duchamp-3-stoppages-etalon-3-standard-stoppages-t07507" }, { t: "위키백과(영어) 마르셀 뒤샹", u: "https://en.wikipedia.org/wiki/Marcel_Duchamp#Leaving_%22retinal_art%22_behind" }] },
           { a: "존 케이지", w: "우연 작곡에 관한 진술", y: "인터뷰·강연", d: "얻은 것을 받아들인다, 표현 대신 변화", links: [{ t: "존 케이지", u: "https://ko.wikipedia.org/wiki/존_케이지" }] },
           { a: "게르하르트 리히터", w: "우연에 관한 진술", y: "인터뷰", d: "계획된 우연이지만 언제나 놀라움. 선별 판단의 언어", links: [{ t: "게르하르트 리히터", u: "https://ko.wikipedia.org/wiki/게르하르트_리히터" }] },
         ],
@@ -1099,10 +1173,15 @@ export const LESSONS_DEF = [
           "결과가 카드와 달랐을 때 여러분은 무엇을 고쳤습니까. 고친 줄 번호와 달라진 점으로 답해 보세요.",
           "이 이미지를 여러분의 작품이라고 말할 수 있습니까. A~D 가운데 입장을 밝히고, 오늘 배운 결정 하나를 근거로 들고, 1차시 뒤샹과 비교하거나 구별해 보세요.",
         ],
+        images: [
+          { src: "/img/lessons/L5_w_thaler.jpg", cap: "스티븐 세일러의 AI ‘크리에이티비티 머신’, 「최근의 낙원 입구(A Recent Entrance to Paradise)」(2012). 담쟁이와 보랏빛 꽃에 뒤덮인 벽돌 터널로 철길이 이어지는 장면을 AI가 자율 생성한 디지털 이미지로, 세일러가 기계를 저작자로 저작권 등록을 신청했으나 미국 저작권청과 연방법원(Thaler v. Perlmutter)이 인간 저작자가 없다는 이유로 거절해 미국에서는 저작권 보호를 받지 못하는(사실상 퍼블릭 도메인) 작품입니다.", credit: "퍼블릭 도메인(미국 저작권청·연방법원, 인간 저작자 부재로 등록 거절) · 위키미디어 공용", link: "https://media.cadc.uscourts.gov/opinions/docs/2025/03/23-5233.pdf", srcPage: "https://commons.wikimedia.org/wiki/File:A_Recent_Entrance_to_Paradise.jpg" },
+          { src: "/img/lessons/L5_w_allen.jpg", cap: "제이슨 앨런, 「우주 오페라 극장(Théâtre D'opéra Spatial)」(2022). 이미지 생성 AI 미드저니에 624회 이상 프롬프트를 입력해 만든 뒤 포토샵으로 손보고 Gigapixel AI로 확대한 디지털 이미지로, 2022년 콜로라도 주 박람회 미술 대회 디지털 아트 부문에서 1위를 차지했습니다. 미국 저작권청 심사위원회는 2023년 9월 5일 AI가 생성한 부분은 인간의 저작물이 아니라는 이유로 저작권 등록을 최종 거부했고, 이에 따라 위키미디어 공용에 퍼블릭 도메인(PD-algorithm)으로 올라와 있습니다.", credit: "퍼블릭 도메인(PD-algorithm, 미국 저작권청 등록 거부) · 위키미디어 공용 · Jason M. Allen / Midjourney, 출처 Colorado State Fair", link: "https://ko.wikipedia.org/wiki/Th%C3%A9%C3%A2tre_D%27op%C3%A9ra_Spatial", srcPage: "https://commons.wikimedia.org/wiki/File:Th%C3%A9%C3%A2tre_D%E2%80%99op%C3%A9ra_Spatial.png" },
+          { src: "/img/lessons/L1_s14_1.jpg", cap: "솔 르윗의 「월 드로잉」 연작 설치 장면. 흑백 띠의 기하학적 패턴이 전시장 벽면 전체를 덮고 있습니다. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504" },
+        ],
         works: [
           { a: "결정", w: "미국 저작권청 『새벽의 자리야』 부분 취소", y: "2023", d: "이미지는 취소, 선택·배열은 인정. 인간의 결정 목록의 법적 근거", links: [{ t: "『새벽의 자리야』", u: "https://en.wikipedia.org/wiki/Zarya_of_the_Dawn" }] },
-          { a: "판례", w: "세일러 대 펄머터", y: "2025", d: "저자는 인간이어야 한다는 확정. 프롬프트 저자성은 미결", links: [{ t: "Thaler v. Perlmutter", u: "https://en.wikipedia.org/wiki/Thaler_v._Perlmutter" }] },
-          { a: "사례", w: "앨런 「우주 오페라 극장」", y: "2022", d: "공모전 1위와 등록 거절. 두 제도는 다른 질문에 답한다", links: [{ t: "「우주 오페라 극장」", u: "https://en.wikipedia.org/wiki/Théâtre_d%27Opéra_Spatial" }] },
+          { a: "판례", w: "세일러 대 펄머터", y: "2025", d: "저자는 인간이어야 한다는 확정. 프롬프트 저자성은 미결", links: [{ t: "Thaler v. Perlmutter", u: "https://en.wikipedia.org/wiki/Thaler_v._Perlmutter" }, { t: "D.C. 연방항소법원 판결문 Thaler v. Perlmutter, No. 23-5233 (2025-03-18) PDF", u: "https://media.cadc.uscourts.gov/opinions/docs/2025/03/23-5233.pdf" }, { t: "미국 저작권청 심사위원회 결정문(2022-02-14) PDF", u: "https://www.copyright.gov/rulings-filings/review-board/docs/a-recent-entrance-to-paradise.pdf" }, { t: "Stanford Copyright and Fair Use Center — Thaler v. Perlmutter 사건 요약", u: "https://fairuse.stanford.edu/case/thaler-v-perlmutter/" }] },
+          { a: "사례", w: "앨런 「우주 오페라 극장」", y: "2022", d: "공모전 1위와 등록 거절. 두 제도는 다른 질문에 답한다", links: [{ t: "「우주 오페라 극장」", u: "https://en.wikipedia.org/wiki/Théâtre_d%27Opéra_Spatial" }, { t: "위키백과(한국어)", u: "https://ko.wikipedia.org/wiki/Th%C3%A9%C3%A2tre_D%27op%C3%A9ra_Spatial" }, { t: "미국 저작권청 심사위원회 결정문(2023-09-05) PDF", u: "https://www.copyright.gov/rulings-filings/review-board/docs/Theatre-Dopera-Spatial.pdf" }, { t: "위키백과(영어)", u: "https://en.wikipedia.org/wiki/Th%C3%A9%C3%A2tre_D%27op%C3%A9ra_Spatial" }] },
           { a: "법령", w: "「인공지능 발전과 신뢰 기반 조성 등에 관한 기본법」", y: "2026 시행", d: "생성 사실 표시 의무. 우리 허구 표기와 같은 방향", links: [] },
           { a: "법령", w: "EU 인공지능법 제50조", y: "2026 적용", d: "합성 콘텐츠의 인공 생성 사실 표시 요구", links: [{ t: "EU AI Act", u: "https://en.wikipedia.org/wiki/Artificial_Intelligence_Act" }] },
         ],
@@ -1195,12 +1274,15 @@ export const LESSONS_DEF = [
         ],
         images: [
           { src: "/img/lessons/L6_s13_2.jpg", cap: "온 카와라의 「Today」 연작 가운데 한 점(1994년 9월 5일자 날짜 회화)이 작업대 위에 붓·물감과 함께 놓여 있는 모습. 연작은 1966년 1월 4일 시작되었고, 그날 안에 완성하지 못한 그림은 폐기하는 규칙으로 제작되었습니다.", credit: "수업 자료 도판", link: "https://en.wikipedia.org/wiki/On_Kawara" },
+          { src: "/img/lessons/L6_w_weiner.jpg", cap: "로렌스 위너, 「Statements」(1968). 루이스 켈너 재단과 세스 시겔롭이 뉴욕에서 1,000부로 펴낸 위너의 첫 아티스트북 펼침면으로, 오른쪽 면에 「벽돌 벽에 던진 외부용 녹색 에나멜 1쿼트」라는 문장 하나만 작게 인쇄되어 있습니다. 그림 없이 24개의 문장만으로 이루어진 책입니다.", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 Username20251942", link: "https://en.wikipedia.org/wiki/Lawrence_Weiner", srcPage: "https://commons.wikimedia.org/wiki/File:Lawrence_Weiner_Statements_1968_(Page-spread).jpg" },
+          { src: "/img/lessons/L6_w_barry.jpg", cap: "로버트 배리, 「불활성 기체 연작: 헬륨, 네온, 아르곤, 크립톤, 크세논 / 측정된 부피에서 무한한 팽창으로」(1969). 로스앤젤레스 주변 여러 곳에서 보이지 않는 희유 기체 다섯 가지를 대기 중에 방출한 작업의 유일한 물적 흔적인 활판 인쇄 포스터로, 거의 백지인 종이 아래쪽에 작가명·기체 이름·세스 시겔로브의 주소와 전화번호 한 줄만 찍혀 있습니다. 뉴욕 현대미술관(MoMA) 소장.", credit: "© Robert Barry · MoMA 소장품 페이지 — 교육 목적 인용", link: "https://www.moma.org/collection/works/109710" },
+          { src: "/img/lessons/L6_w_artlanguage.jpg", cap: "아트 & 랭귀지, 『Art-Language』 창간호(1969년 5월). '개념미술 저널(The Journal of conceptual art)'이라는 부제를 단 제1권 제1호의 표지로, 편집자 네 사람(테리 앳킨슨·데이비드 베인브리지·마이클 볼드윈·해럴드 허렐)의 이름과 솔 르윗의 「개념미술에 관한 문장들」, 댄 그레이엄, 로런스 위너의 글이 실린 목차가 그림 없이 활자로만 인쇄되어 있습니다.", credit: "퍼블릭 도메인(PD-text, 문자만으로 이루어진 표지) · 위키미디어 공용 · Art & Language 공식 계정 업로드(VRT 티켓 2019100310005079) · 소장처 표기: 몽소로 성 현대미술관(Château de Montsoreau-Musée d'art contemporain)", link: "https://www.tate.org.uk/art/art-terms/a/art-language", srcPage: "https://commons.wikimedia.org/wiki/File:Art_language_journal_conceptual_art_contemporary_art.jpg" },
         ],
         works: [
-          { a: "로렌스 위너", w: "「Statements」", y: "1968", d: "작품은 만들어지지 않아도 된다는 선언. 카드가 원본이라는 우리 원칙의 근거", links: [{ t: "Lawrence Weiner", u: "https://en.wikipedia.org/wiki/Lawrence_Weiner" }] },
+          { a: "로렌스 위너", w: "「Statements」", y: "1968", d: "작품은 만들어지지 않아도 된다는 선언. 카드가 원본이라는 우리 원칙의 근거", links: [{ t: "Lawrence Weiner", u: "https://en.wikipedia.org/wiki/Lawrence_Weiner" }, { t: "MoMA — 세스 시겔롭 아카이브 전시 페이지", u: "https://www.moma.org/interactives/exhibitions/2013/siegelaub/" }] },
           { a: "온 카와라", w: "「Today」 연작(날짜 회화)", y: "1966–", d: "규칙이 작품을 만든다. 서식 통일과 동반 출토품의 논리", links: [{ t: "On Kawara", u: "https://en.wikipedia.org/wiki/On_Kawara" }] },
-          { a: "로버트 배리", w: "「불활성 기체 연작」", y: "1969", d: "볼 수 없는 것을 문장으로 전시. 우리와 뒤집힌 관계", links: [{ t: "Robert Barry", u: "https://en.wikipedia.org/wiki/Robert_Barry_(artist)" }] },
-          { a: "잡지", w: "『Art-Language』 창간호", y: "1969", d: "텍스트 자체가 작품인 잡지. 르윗 「개념미술에 관한 문장들」 수록", links: [{ t: "Art & Language", u: "https://en.wikipedia.org/wiki/Art_%26_Language" }] },
+          { a: "로버트 배리", w: "「불활성 기체 연작」", y: "1969", d: "볼 수 없는 것을 문장으로 전시. 우리와 뒤집힌 관계", links: [{ t: "Robert Barry", u: "https://en.wikipedia.org/wiki/Robert_Barry_(artist)" }, { t: "MoMA 소장품 페이지", u: "https://www.moma.org/collection/works/109710" }, { t: "MoMA 작가 페이지", u: "https://www.moma.org/artists/352-robert-barry" }] },
+          { a: "잡지", w: "『Art-Language』 창간호", y: "1969", d: "텍스트 자체가 작품인 잡지. 르윗 「개념미술에 관한 문장들」 수록", links: [{ t: "Art & Language", u: "https://en.wikipedia.org/wiki/Art_%26_Language" }, { t: "테이트 미술용어 — Art and Language", u: "https://www.tate.org.uk/art/art-terms/a/art-language" }, { t: "위키백과(한국어) — 아트 앤 랭귀지", u: "https://ko.wikipedia.org/wiki/%EC%95%84%ED%8A%B8_%EC%95%A4_%EB%9E%AD%EA%B7%80%EC%A7%80" }, { t: "위키백과(영어) — Art-Language (저널)", u: "https://en.wikipedia.org/wiki/Art-Language" }] },
         ],
       },
       {
@@ -1220,10 +1302,12 @@ export const LESSONS_DEF = [
         ],
         images: [
           { src: "/img/lessons/L6_s18_2.jpg", cap: "마사 로슬러, 「두 개의 불충분한 묘사 체계로 본 바우어리」(1974–75) 부분. 왼쪽 패널에는 타자기로 친 낱말들(dead soldiers, dead marines, 빈 술병을 가리키는 속어)이, 오른쪽 패널에는 길가에 버려진 빈 병 무더기를 찍은 흑백 사진이 나란히 놓여 있습니다.", credit: "수업 자료 도판(휘트니 미술관 등 소장)", link: "https://en.wikipedia.org/wiki/Martha_Rosler" },
+          { src: "/img/lessons/L6_w_sekula.jpg", cap: "앨런 세큘라, 「어류 이야기(Fish Story)」(1989–95) 연작 중 〈아시아 항구에서 온 40피트 컨테이너를 내리는 해머헤드 크레인, 아메리칸 프레지던트 라인스 터미널, 로스앤젤레스항 샌피드로〉(1992년 11월). 세계의 항구와 해상 노동을 사진과 글로 기록한 연작의 한 장면으로, 실버 다이 블리치 프린트이며 뉴욕 현대미술관(MoMA)에 소장되어 있습니다.", credit: "© The Estate of Allan Sekula · MoMA 소장품 페이지 — 교육 목적 인용", link: "https://www.moma.org/collection/works/164247", srcPage: "https://www.moma.org/collection/works/164235" },
+          { src: "/img/lessons/L2_s10_3.jpg", cap: "르네 마그리트, 「이미지의 배반」, 1929, 캔버스에 유채. 화면 아래에 “Ceci n’est pas une pipe(이것은 파이프가 아니다)”라고 적혀 있다. 로스앤젤레스 카운티 미술관(LACMA) 소장.", credit: "LACMA 소장품 정보 · 수업 자료 도판", link: "https://en.wikipedia.org/wiki/The_Treachery_of_Images" },
         ],
         works: [
           { a: "마사 로슬러", w: "「두 개의 불충분한 묘사 체계로 본 바우어리」", y: "1974–75", d: "사진과 낱말의 병치로 두 체계의 한계를 동시에 드러냄. ‘미상’ 표기의 태도", links: [{ t: "Martha Rosler", u: "https://en.wikipedia.org/wiki/Martha_Rosler" }] },
-          { a: "앨런 세큘라", w: "「어류 이야기」", y: "1995", d: "같은 재료가 형식(책·전시·투사)에 따라 다른 작품이 됨. 7차시 전시 구성의 예고", links: [{ t: "Allan Sekula", u: "https://en.wikipedia.org/wiki/Allan_Sekula" }] },
+          { a: "앨런 세큘라", w: "「어류 이야기」", y: "1995", d: "같은 재료가 형식(책·전시·투사)에 따라 다른 작품이 됨. 7차시 전시 구성의 예고", links: [{ t: "Allan Sekula", u: "https://en.wikipedia.org/wiki/Allan_Sekula" }, { t: "MoMA 소장품 — Chapter One, Fish Story", u: "https://www.moma.org/collection/works/164247" }, { t: "워커아트센터 — Allan Sekula: Fish Story 전시", u: "https://www.walkerart.org/whats-on/allan-sekula-fish-story/" }] },
         ],
       },
       {
@@ -1297,6 +1381,9 @@ export const LESSONS_DEF = [
           "이 규약을 어겼을 때 무엇이 문제입니까.",
           "세 캡션 가운데 하나만 남긴다면 무엇을 고르겠습니까. 그 선택이 여러분의 주장입니다.",
         ],
+        images: [
+          { src: "/img/lessons/L6_s18_2.jpg", cap: "마사 로슬러, 「두 개의 불충분한 묘사 체계로 본 바우어리」(1974–75) 부분. 왼쪽 패널에는 타자기로 친 낱말들(dead soldiers, dead marines, 빈 술병을 가리키는 속어)이, 오른쪽 패널에는 길가에 버려진 빈 병 무더기를 찍은 흑백 사진이 나란히 놓여 있습니다.", credit: "수업 자료 도판(휘트니 미술관 등 소장)", link: "https://en.wikipedia.org/wiki/Martha_Rosler" },
+        ],
         works: [],
       },
     ],
@@ -1331,10 +1418,16 @@ export const LESSONS_DEF = [
           "전시가 하나의 저작이 될 수 있다는 생각도 이 무렵 이후에 자랐습니다. 큐레이터 하랄트 제만이 1969년에 기획한 「태도가 형식이 될 때」는 개별 작품 목록보다 전시 전체의 구성이 발언이 된 사례로 꼽히며, 이후 큐레이팅은 작품을 고르고 잇고 배치해 새로운 의미를 만드는 저자적 실천으로 논의되어 왔습니다. 여러분이 오늘 정하는 진열 방식(단독·계열·파편·오분류·복원 표시)과 이웃 작품과의 관계가 바로 그 실천의 축소판입니다. 단독은 한 점에 시선을 모으고, 계열은 반복에서 구조를 읽게 하고, 파편은 잃어버린 전체를 상상하게 하고, 오분류는 분류 행위 자체를 보이게 하고, 복원 표시는 손질의 경계를 공개합니다.",
           "조판은 이 결정의 마지막 층입니다. 같은 허구 고지도 본문 서체로 작품 캡션 맨 아래 넣으면 기록 형식의 일부로 읽히고, 화면 옆에 크게 붙이면 허구성 자체가 작품의 앞면이 됩니다. 브로타에스가 ‘이것은 미술 작품이 아니다’ 팻말로 했던 일을 여러분은 고지의 타이포그래피로 합니다.",
         ],
+        images: [
+          { src: "/img/lessons/L7_w_salon.jpg", cap: "피에트로 안토니오 마르티니, 「1787년 루브르 살롱전 광경」(1787). 요한 하인리히 람베르크의 그림을 바탕으로 한 에칭·인그레이빙 판화로, 루브르 살롱 카레의 벽면을 바닥부터 천장까지 빈틈없이 채운 그림들과 그 앞에 몰려든 관람객을 보여 줍니다. 메트로폴리탄 미술관 소장(1949년 엘리샤 휘틀지 컬렉션).", credit: "퍼블릭 도메인(CC0) · 위키미디어 공용 · 메트로폴리탄 미술관 오픈 액세스", link: "https://www.metmuseum.org/art/collection/search/393346", srcPage: "https://commons.wikimedia.org/wiki/File:Exposition_au_Salon_du_Louvre_en_1787_Met_DP-15578-001.jpg" },
+          { src: "/img/lessons/L7_w_whitecube.jpg", cap: "「조지프 앨버스: 흑과 백」 전시 전경, 워딩턴 커스토 갤러리(런던), 2014. 흰 벽에 작품을 눈높이로 한 점씩 띄워 거는 ‘화이트 큐브’ 진열 방식으로, 1930년대 뉴욕 현대미술관(MoMA)에서 자리 잡아 오늘날 미술관·갤러리의 기본 형식이 된 관례입니다.", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 MargotGlt", link: "https://www.tate.org.uk/art/art-terms/w/white-cube", srcPage: "https://commons.wikimedia.org/wiki/File:ALBERS_VIEW_1.jpg" },
+          { src: "/img/lessons/L7_w_attitudes.jpg", cap: "하랄트 제만 기획, 「태도가 형식이 될 때」(1969). 쿤스트할레 베른 전시장에서 유리판을 이어 붙인 이글루 형태의 작품과 나뭇가지 주위에 사람들이 모여 있는 흑백 기록 사진으로, 작가들이 현장에서 직접 작품을 만들고 설치한 이 전시는 큐레이터의 역할을 새로 정의한 사례로 꼽힙니다.", credit: "© Kunsthalle Bern 아카이브 · 교육 목적 인용 (사진 저작권 별도, 촬영자 미표기)", link: "https://past.kunsthalle-bern.ch/en/-exhibitions/1969/when-attitudes-become-form/" },
+          { src: "/img/lessons/L2_s11_3.jpg", cap: "「현대미술관, 독수리 부서」 전시 전경. 유리 진열장과 벽면에 시대와 지역이 서로 다른 독수리 도상들이 번호를 달고 진열되어 있다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" },
+        ],
         works: [
           { a: "문헌", w: "오도허티 『하얀 입방체 안에서』", y: "1976", d: "화이트큐브라는 형식의 발명. 거는 방식이 보는 방식을 정함", links: [{ t: "브라이언 오도허티", u: "https://en.wikipedia.org/wiki/Brian_O'Doherty" }, { t: "화이트 큐브", u: "https://en.wikipedia.org/wiki/White_cube" }] },
-          { a: "전시", w: "제만 「태도가 형식이 될 때」", y: "1969", d: "전시 구성 자체가 발언이 된 사례. 큐레이팅의 저자성", links: [{ t: "하랄트 제만", u: "https://en.wikipedia.org/wiki/Harald_Szeemann" }, { t: "큐레이터", u: "https://ko.wikipedia.org/wiki/큐레이터" }] },
-          { a: "형식 자료", w: "살롱전 진열과 근대 미술관 진열 비교", y: "19~20세기", d: "빽빽한 벽에서 눈높이 한 점으로. 진열 관례의 역사", links: [{ t: "파리 살롱", u: "https://ko.wikipedia.org/wiki/파리_살롱" }, { t: "전시 디자인", u: "https://en.wikipedia.org/wiki/Exhibition_design" }] },
+          { a: "전시", w: "제만 「태도가 형식이 될 때」", y: "1969", d: "전시 구성 자체가 발언이 된 사례. 큐레이팅의 저자성", links: [{ t: "하랄트 제만", u: "https://en.wikipedia.org/wiki/Harald_Szeemann" }, { t: "큐레이터", u: "https://ko.wikipedia.org/wiki/큐레이터" }, { t: "쿤스트할레 베른 전시 아카이브(1969)", u: "https://past.kunsthalle-bern.ch/en/-exhibitions/1969/when-attitudes-become-form/" }, { t: "폰다치오네 프라다 — Bern 1969/Venice 2013", u: "https://www.fondazioneprada.org/project/when-attitudes-become-form/?lang=en" }, { t: "위키백과(영어) Live In Your Head: When Attitudes Become Form", u: "https://en.wikipedia.org/wiki/Live_In_Your_Head:_When_Attitudes_Become_Form" }] },
+          { a: "형식 자료", w: "살롱전 진열과 근대 미술관 진열 비교", y: "19~20세기", d: "빽빽한 벽에서 눈높이 한 점으로. 진열 관례의 역사", links: [{ t: "파리 살롱", u: "https://ko.wikipedia.org/wiki/파리_살롱" }, { t: "전시 디자인", u: "https://en.wikipedia.org/wiki/Exhibition_design" }, { t: "메트로폴리탄 미술관 소장품", u: "https://www.metmuseum.org/art/collection/search/393346" }, { t: "위키백과(영어) Salon (Paris)", u: "https://en.wikipedia.org/wiki/Salon_(Paris)" }, { t: "테이트 미술 용어: White cube", u: "https://www.tate.org.uk/art/art-terms/w/white-cube" }] },
         ],
       },
       {
@@ -1385,6 +1478,11 @@ export const LESSONS_DEF = [
           "이 단원에서 여러분은 실재한 적 없는 유물을 만들었고 그것이 허구임을 작품 캡션에 적었습니다. 그런데도 관람자는 그 이미지에서 지금 우리 사회의 문제를 읽었습니다. 지표성 없는 이미지가 무언가를 증언할 수 있다면 그 힘은 흔적의 인과, 기록의 형식, 작가의 선택, 관람자의 해석이 함께 만든 것입니다. 아틀라스 그룹이 허구의 문서고로 전쟁의 기억을 다루었듯, 여러분의 가짜 유물은 허구라는 사실을 숨기지 않으면서 현재를 가리킵니다.",
           "같은 기술이 허구를 숨기는 쪽으로 쓰일 때 그것을 딥페이크라 부릅니다. 두 사용을 가르는 것은 사용자의 의도와 사용 방식입니다. 진실을 가리키려는 의도로 허구임을 공개하며 쓰는가, 속이려는 의도로 허구임을 감추며 쓰는가. 여러분은 여덟 차시 동안 앞의 사용을 훈련했고, 그 훈련이 앞으로 만날 수많은 이미지 앞에서 물을 질문(이 이미지는 자신이 무엇인지 밝히고 있는가)을 남겼습니다.",
           "마지막으로 1차시의 다섯 후보로 돌아갑니다. 기술·선택·명명·전시·관념. 그때 정한 순위가 지금도 같은지, 달라졌다면 어느 활동이 그것을 움직였는지 이야기해 봅니다. 뒤샹은 선택으로, 브로타에스는 제도의 장치로, 라아드는 허구의 형식으로 각자의 답을 만들었습니다. 여러분의 답은 이 여덟 차시의 기록 안에 있습니다.",
+        ],
+        images: [
+          { src: "/img/lessons/L1_w_stieglitz.jpg", cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 《블라인드 맨》 2호에 실려 작품을 오늘날까지 전하고 있습니다.", credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz", link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573", srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg" },
+          { src: "/img/lessons/L2_s11_3.jpg", cap: "「현대미술관, 독수리 부서」 전시 전경. 유리 진열장과 벽면에 시대와 지역이 서로 다른 독수리 도상들이 번호를 달고 진열되어 있다.", credit: "수업 자료 도판", link: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" },
+          { src: "/img/lessons/L2_s35_2.jpg", cap: "아틀라스 그룹 / 왈리드 라아드, 「사라진 레바논 전쟁」 노트북의 한 면. 경마 사진 둘레에 날짜, 기록, 역사학자들의 내기 내역이 주석처럼 달려 있다.", credit: "수업 자료 도판", link: "https://www.theatlasgroup1989.org/" },
         ],
         works: [
           { a: "복습", w: "뒤샹 「샘」 · 브로타에스 「독수리 부서」 · 아틀라스 그룹 아카이브", y: "-", d: "선택·제도·허구의 형식이라는 세 답을 자기 작품과 잇기", links: [{ t: "뒤샹 「샘」", u: "https://ko.wikipedia.org/wiki/샘_(뒤샹)" }, { t: "브로타에스", u: "https://en.wikipedia.org/wiki/Marcel_Broodthaers" }, { t: "아틀라스 그룹 아카이브", u: "https://www.theatlasgroup1989.org/" }] },

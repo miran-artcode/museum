@@ -178,6 +178,7 @@ function LessonFigure({ img }) {
           {img.cap}
           {img.credit && <span className="lz-cr">{img.credit}</span>}
           {img.link && <a className="wk-link" href={img.link} target="_blank" rel="noopener noreferrer">원본 보기 ↗</a>}
+          {img.srcPage && <a className="wk-link" href={img.srcPage} target="_blank" rel="noopener noreferrer">파일 출처 ↗</a>}
         </figcaption>
       )}
     </figure>

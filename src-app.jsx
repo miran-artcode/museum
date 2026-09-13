@@ -15,6 +15,7 @@ import {
 } from "./src-anchor.jsx";
 import { SurveyStyle, SurveyScaleBar, LikertRow, useTopbarHeight, prefersReducedMotion } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
+import { CardMedia, CardMediaStyle } from "./src-card-media.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
@@ -3566,6 +3567,7 @@ function CardPick({ f, fieldKey, v, setField, ws }) {
           {f.src === "obs" ? (
             <div>
               <p className="pc-from">{cur.from}</p>
+              <CardMedia src="obs" k={cur.k} />
               <p className="pc-idea">{cur.idea}</p>
               <div className="pc-row"><b>이렇게 합니다</b><ol>{cur.how.map((h, i) => <li key={i}>{h}</li>)}</ol></div>
               <div className="pc-row ok"><b>잘 잡아냅니다</b><span>{cur.good}</span></div>
@@ -3574,6 +3576,7 @@ function CardPick({ f, fieldKey, v, setField, ws }) {
           ) : (
             <div>
               <p className="pc-from">{cur.works}</p>
+              <CardMedia src="engage" k={cur.k} />
               <div className="pc-row"><b>관람자가 하게 되는 일</b><span>{cur.does}</span></div>
               <div className="pc-row ok"><b>이럴 때 맞습니다</b><span>{cur.fit}</span></div>
               <div className="pc-row no"><b>이 방법의 위험</b><span>{cur.risk}</span></div>
@@ -9694,6 +9697,7 @@ function App() {
     <div className="app">
       <style>{CSS}</style>
       <ContentStyle />
+      <CardMediaStyle />
       <SurveyStyle />
       <StanceStyle />
       <AnchorStyle />
