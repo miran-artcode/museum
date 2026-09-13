@@ -30,6 +30,9 @@ import {
 import { AssessTab, AssessStyle } from "./src-assess.jsx";
 import { AssessPanel, AssessTeacherStyle } from "./src-assess-teacher.jsx";
 import { peerCfg } from "./src-assess-core.mjs";
+import { QuizTab, QuizStyle } from "./src-quiz.jsx";
+import { QuizPanel, QuizTeacherStyle } from "./src-quiz-teacher.jsx";
+import { quizCfg } from "./src-quiz-core.mjs";
 import { startDwell } from "./src-dwell.js";
 import { imgPresetOf, prepareImage, imgErrText, imgHintText, BLUR_CONFIRM } from "./src-media-img.js";
 
@@ -4892,13 +4895,15 @@ function StudentApp({ me, onExit, onGallery }) {
   const [tab, setTab] = useState(SESSIONS[0]);
   /* 「최종 평가」 — 차시 탭과 별개의 화면(src-assess.jsx). 교사가 단계를 닫으면 차시 화면으로 돌아간다 */
   const [assessOn, setAssessOn] = useState(false);
+  /* 「쪽지시험」 — 적응형 선택형 시험 화면(src-quiz.jsx). 교사가 단계를 닫으면 차시 화면으로 돌아간다 */
+  const [quizOn, setQuizOn] = useState(false);
   useEffect(() => {
     if (loaded && !isOpen(openMap, tab)) {
       flush(); // 닫히기 직전까지 쓴 내용부터 저장
       const first = SESSIONS.find((s) => isOpen(openMap, s));
       if (first) {
         // 최종 평가 화면을 보는 중이면 차시만 조용히 옮긴다 — 화면은 그대로인데 「이동했습니다」라고 말하면 헷갈린다
-        if (!assessOn) setCloseNote("선생님이 「" + tab + "」를 닫아 「" + first + "」로 이동했습니다. 쓰던 내용은 저장되어 있습니다.");
+        if (!assessOn && !quizOn) setCloseNote("선생님이 「" + tab + "」를 닫아 「" + first + "」로 이동했습니다. 쓰던 내용은 저장되어 있습니다.");
         setTab(first);
       }
     }
@@ -4912,6 +4917,8 @@ function StudentApp({ me, onExit, onGallery }) {
   const [cfgAll, setCfgAll] = useState(null);   // 설정 문서 전체 — 붙여넣기 출처 묻기 같은 토글을 읽는다
   const peerStage = peerCfg(cfgAll).stage;
   useEffect(() => { if (peerStage === "closed") setAssessOn(false); }, [peerStage]);
+  const quizStage = quizCfg(cfgAll).stage;
+  useEffect(() => { if (quizStage === "closed") setQuizOn(false); }, [quizStage]);
   const [svBusy, setSvBusy] = useState(false);
   const [svSave, setSvSave] = useState(null); // 설문 자동 저장 상태: null | saving | saved | err
   const svTimer = useRef(null);
@@ -5294,6 +5301,7 @@ function StudentApp({ me, onExit, onGallery }) {
 
   const switchTab = (s) => {
     if (assessOn) setAssessOn(false);   // 최종 평가 화면에서 차시 탭을 누르면 그 차시로 돌아간다
+    if (quizOn) setQuizOn(false);
     if (s === tab) return;
     // 스케치의 미저장 획은 컴포넌트 안에만 있어 탭이 바뀌면(언마운트) 사라진다
     if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
@@ -5387,7 +5395,7 @@ function StudentApp({ me, onExit, onGallery }) {
           {SESSIONS.map((s) => {
             const open = isOpen(openMap, s);
             return (
-              <button key={s} role="tab" aria-selected={tab === s && !assessOn} className={"sess-tab " + (tab === s && !assessOn ? "on" : "") + (open ? "" : " locked")}
+              <button key={s} role="tab" aria-selected={tab === s && !assessOn && !quizOn} className={"sess-tab " + (tab === s && !assessOn && !quizOn ? "on" : "") + (open ? "" : " locked")}
                 onClick={() => open && switchTab(s)} disabled={!open} title={open ? s : s + " 잠김"}>
                 {open ? <SessionDot ratio={sessionProgress(s, ws)} /> : <span className="lock">잠김</span>}{s}
               </button>
@@ -5398,9 +5406,19 @@ function StudentApp({ me, onExit, onGallery }) {
               onClick={() => {
                 if (assessOn) return;
                 if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
-                flush(); setAssessOn(true); window.scrollTo({ top: 0 });
+                flush(); setQuizOn(false); setAssessOn(true); window.scrollTo({ top: 0 });
               }}>
               <span className="dot part" />최종 평가
+            </button>
+          )}
+          {quizStage !== "closed" && (
+            <button role="tab" aria-selected={quizOn} className={"sess-tab qz-tab " + (quizOn ? "on" : "")} title="쪽지시험: 미술사·미술이론 선택형 적응형 시험"
+              onClick={() => {
+                if (quizOn) return;
+                if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
+                flush(); setAssessOn(false); setQuizOn(true); window.scrollTo({ top: 0 });
+              }}>
+              <span className="dot part" />쪽지시험
             </button>
           )}
         </div>}
@@ -5446,12 +5464,13 @@ function StudentApp({ me, onExit, onGallery }) {
         )}
 
         {loaded && assessOn && <AssessTab me={me} ws={ws} cfgAll={cfgAll} />}
-        {loaded && !assessOn && !isOpen(openMap, tab) ? (
+        {loaded && quizOn && <QuizTab me={me} cfgAll={cfgAll} />}
+        {loaded && !assessOn && !quizOn && !isOpen(openMap, tab) ? (
           <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
             이 차시는 아직 열리지 않았습니다. 선생님이 수업 시간에 열어 주면 강의 노트와 학습지가 나타납니다.
           </div></div>
         ) : null}
-        {loaded && !assessOn && isOpen(openMap, tab) && LESSONS.filter((L) => L.session === tab).map((L) => {
+        {loaded && !assessOn && !quizOn && isOpen(openMap, tab) && LESSONS.filter((L) => L.session === tab).map((L) => {
           const confirmSec = secs.find((s) => s.id === "l" + L.n);
           const inquirySec = secs.find((s) => s.id === "q" + L.n);
           return (
@@ -5462,7 +5481,7 @@ function StudentApp({ me, onExit, onGallery }) {
             </React.Fragment>
           );
         })}
-        {loaded && !assessOn && isOpen(openMap, tab) && secs.filter((s) => s.kind !== "learn" && s.kind !== "inquiry").map((sec) => (
+        {loaded && !assessOn && !quizOn && isOpen(openMap, tab) && secs.filter((s) => s.kind !== "learn" && s.kind !== "inquiry").map((sec) => (
           <SectionCard key={sec.id} sec={sec} ws={ws} setField={setField} />
         ))}
       </div>
@@ -8704,7 +8723,7 @@ function TeacherApp({ onExit, onGallery }) {
               </div>
             )}
             <div className="t-tabs">
-              {["현황", "차시 공개", "수업 안내", "수업 편집", "기록 현황", "사고 과정", "창의성", "설문", "상호평가", "연구", "설정"].map((t) => (
+              {["현황", "차시 공개", "수업 안내", "수업 편집", "기록 현황", "사고 과정", "창의성", "설문", "상호평가", "쪽지시험", "연구", "설정"].map((t) => (
                 <button key={t} className={"btn small " + (tab === t ? "" : "ghost")} onClick={() => switchTab(t)}>
                   {t}{t === "수업 편집" && edDirty ? " ●" : ""}
                 </button>
@@ -8960,6 +8979,19 @@ function TeacherApp({ onExit, onGallery }) {
                     const ok = await store.setT("config", { peer: part, peerUpdated: now() }, { merge: true });
                     if (ok) setCfgAll((prev) => ({ ...(prev || {}), peer: { ...peerCfg(prev), ...part } }));
                     else setMsg("상호평가 설정을 저장하지 못했습니다.");
+                    return ok;
+                  }} />
+              </div>
+            ) : tab === "쪽지시험" ? (
+              <div>
+                {msg && <div className="ok-note">{msg}</div>}
+                <QuizPanel ids={ids} roster={roster} wsMap={wsMap} cfgAll={cfgAll} sampleMode={sampleMode} onSel={openStudent}
+                  onSaveCfg={async (patch) => {
+                    // 상호평가(peer)와 같은 병합 저장: 패널이 준 필드만 quiz 아래에 합쳐 쓴다
+                    const part = { ...patch, updatedAt: now() };
+                    const ok = await store.setT("config", { quiz: part, quizUpdated: now() }, { merge: true });
+                    if (ok) setCfgAll((prev) => ({ ...(prev || {}), quiz: { ...quizCfg(prev), ...part } }));
+                    else setMsg("쪽지시험 설정을 저장하지 못했습니다.");
                     return ok;
                   }} />
               </div>
@@ -9703,6 +9735,8 @@ function App() {
       <AnchorStyle />
       <AssessStyle />
       <AssessTeacherStyle />
+      <QuizStyle />
+      <QuizTeacherStyle />
       <InquiryStyle />
       <LadderStyle />
       <ThemeStyle />
