@@ -46,6 +46,30 @@ const STAGE_CONFIRM = {
   ended: "「시작 마감」으로 바꿉니다. 새로 시작할 수 없고, 이미 시작한 학생은 자기 남은 시간까지 계속 풉니다.",
   published: "「결과 공개」로 바꿉니다. 저장된 결과가 있는 학생에게 점수·급 경로·문항별 정답과 해설·이탈 기록이 보입니다.",
 };
+/* 당일 운영 점검표(설계 §6.6). 화면에서 바로 보게 둔다 */
+const CHECKLIST = [
+  "전날: 컴퓨터실 한 대에서 연습 화면까지 실행(전체화면·이미지·서버 시각). OS 알림·메신저·업데이트 알림을 끈다. 좌석표를 입력·출력한다. 은행을 올리고 「은행 상태」가 일치하는지 본다.",
+  "0분: 규칙 5문장, 「이탈 3회면 잠기고 선생님이 풀어 준다」, 「문항 오류는 전원 정답 처리」를 말한다.",
+  "3분: 연습 시작. 전체화면이 안 되는 자리는 이 단계에서 걸러 자리를 옮긴다(옮기면 반이 바뀔 수 있으므로 좌석표를 갱신).",
+  "6분: 「열기」. 15분 안에 전원 시작 확인.",
+  "6~46분: 실시간 카드를 보며 순시한다. 빨간 칸(잠금·중복 접속)으로 간다. 「전체 일시정지」는 정전·서버 장애에만 쓴다.",
+  "46~50분: 전원 「완료」 확인 후 「시작 마감」.",
+  "당일 저녁: 재계산 → 문항 통계의 빨간 표시(정답 키 확인) → 경계·불일치 학생 → 「결과 공개」.",
+];
+/* 경계 사례(설계 §4.5): 학생에게 보여 줄 표. 회귀 테스트에 같은 11개가 들어 있다 */
+const BOUNDARY_CASES = [
+  ["가", "4/5 ↑", "4급 4/5 ↑", "5급 3/5 =", "5급 3/5 =", 5, 14, 20, "A 8", "A의 최솟값. 5급 6/10 유지"],
+  ["나", "5/5 ↑", "4급 5/5 ↑", "5급 4/5 =", "5급 2/5 ↓", 4, 16, 20, "B 7", "5급까지 도달했으나 마지막에 유지 못함"],
+  ["다", "4/5 ↑", "4급 4/5 ↑", "5급 2/5 ↓", "4급 4/5", 4, 14, 20, "B 7", "위로 올리지 않음"],
+  ["라", "5/5 ↑", "4급 2/5 ↓", "3급 5/5 ↑", "4급 2/5 ↓", 3, 14, 20, "C 5", "4급 누적 4/10. 경로 민감"],
+  ["마", "3/5 =", "3급 3/5 =", "3급 3/5 =", "3급 3/5 =", 3, 12, 20, "C 5", "전형적 C(60%)"],
+  ["바", "2/5 ↓", "2급 4/5 ↑", "3급 4/5 ↑", "4급 3/5 =", 4, 13, 20, "B 6", "하강 뒤 회복"],
+  ["사", "2/5 ↓", "2급 2/5 ↓", "1급 3/5 =", "1급 3/5 =", 1, 10, 20, "E 3", "1급에 머물렀으나 추측 수준 아님"],
+  ["아", "1/5 ↓", "2급 1/5 ↓", "1급 2/5 ↓", "1급 2/5", 1, 6, 20, "E 2", "추측과 구별 안 됨(c ≤ 8)"],
+  ["자", "5/5 ↑", "4급 5/5 ↑", "5급 4/5 =", "5급 시간 종료 1/5", 4, 15, 17, "B 7", "빈 3문항이 오답으로 들어가 한 급 내려감"],
+  ["차", "3/5 =", "3급 2/5 ↓", "2급 시간 종료 2/5", "미시작 0/5(1급)", 1, 7, 13, "E 2", "미시작 블록의 0/5가 라우팅에 들어감"],
+  ["카", "3/5 =", "3급 4/5 ↑", "4급 시간 종료 1/5", "미시작 0/5(3급)", 2, 8, 11, "D 4", "3급→4급 도달 뒤 시간 부족"],
+];
 const REFS = [
   "Yan, D., von Davier, A. A., & Lewis, C. (Eds.). (2014). Computerized multistage testing: Theory and applications. CRC Press. (정답 수 라우팅 MST)",
   "Hendrickson, A. (2007). An NCME instructional module on multistage testing. Educational Measurement: Issues and Practice, 26(2), 44–52.",
@@ -451,9 +475,10 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
   const [rowBusy, setRowBusy] = useState("");
   const [keepMap, setKeepMap] = useState({});          // 해제 때 시간 보전 여부(기본 켬)
   const [rowAct, setRowAct] = useState(null);          // { sid, kind: "extra" | "resume", min, reason }
+  /* 교사 쓰기는 hb(학생 심장박동)를 찍지 않는다(noHb). 찍으면 「끊김」 표시와 학생 화면의 중복 접속 판정이 어긋난다 */
   const patchV = async (sid, vPatch, opts) => {
     if (typeof fbStore.quizPatch !== "function") { setNote({ kind: "warn", text: "fbStore.quizPatch가 없어 저장할 수 없습니다." }); return false; }
-    return fbStore.quizPatch(sid, vPatch, opts);
+    return fbStore.quizPatch(sid, vPatch, { noHb: true, ...(opts || {}) });
   };
   const doUnlock = async (r) => {
     if (sampleMode || rowBusy) return;
@@ -617,6 +642,9 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
   }, [attempts, keysDoc, bank]);
   const twins = useMemo(() => (stats ? twinStats(stats) : []), [stats]);
   const mono = useMemo(() => (stats ? levelMonotonic(stats) : null), [stats]);
+  const shiftCands = useMemo(() => levelShiftCandidates(stats, mono && mono.means), [stats, mono]);
+  const moveCons = useMemo(() => moveConsistency(resultsMap, attempts), [resultsMap, attempts]);
+  const bandHalves = useMemo(() => bandByHalf(resultsMap, attempts), [resultsMap, attempts]);
   const rel = useMemo(() => {
     if (!keysDoc) return null;
     try { return reliabilityStats({ attempts, keys: keysDoc, corrections: keysDoc.corrections || [], results: resultsMap }); }
@@ -913,7 +941,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
           </div>
           <div className="tbl-scroll">
             <table className="roster at-click qt-tbl qt-live">
-              <thead><tr><th>학번</th><th>별명</th><th>반</th><th>상태</th><th>블록</th><th>답한 수</th><th>남은 시간</th><th>경고</th><th>잠금</th><th>짧은 이탈</th><th>심장박동</th><th>중복</th><th>시작</th><th>조치</th></tr></thead>
+              <thead><tr><th>학번</th><th>별명</th><th>반</th><th>상태</th><th>블록</th><th>답한 수</th><th>남은 시간</th><th>경고</th><th>잠금</th><th>짧은 이탈</th><th>심장박동</th><th>중복</th><th>기록</th><th>시작</th><th>조치</th></tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className={r.st === "locked" || r.dup ? "qt-row-bad" : r.stale ? "qt-row-warn" : ""} onClick={() => onSel && onSel(r.id)}>
@@ -924,11 +952,12 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
                     <td className="mono">{r.v ? r.cur + "/" + BLOCKS : "-"}</td>
                     <td className="mono">{r.v ? r.ans.n + "/" + r.ans.of : "-"}</td>
                     <td className="mono">{r.remain == null ? "-" : (r.remain <= 0 ? "종료" : fmtMMSS(r.remain)) + (r.st === "locked" ? " (고정)" : cfg.paused ? " (정지)" : "")}</td>
-                    <td className={"mono" + (r.warn ? " qt-warn" : "")}>{r.v ? r.warn : "-"}</td>
-                    <td className={"mono" + (r.lockN ? " qt-bad" : "")}>{r.v ? r.lockN : "-"}</td>
-                    <td className={"mono" + (r.shortBlur >= SHORT_BLUR_N ? " qt-warn" : "")}>{r.v ? r.shortBlur : "-"}</td>
-                    <td className={"mono" + (r.stale ? " qt-bad" : "")}>{r.hbAge == null ? "-" : r.st === "done" ? "완료" : r.hbAge + "초 전"}</td>
+                    <td className={"mono" + (r.warn ? " qt-warn" : "")}>{r.v ? r.warn + (cfg.warnLimit ? "/" + cfg.warnLimit : "") : "-"}</td>
+                    <td className={"mono" + (r.lockN ? " qt-bad" : "")}>{r.v ? r.lockN : "-"}{r.lockN >= LOCK_INTERVENE ? <b className="qt-bad"> 감독 개입 필요</b> : null}</td>
+                    <td className={"mono" + (r.shortBlur >= SHORT_BLUR_N ? " qt-warn" : "")}>{r.v ? r.shortBlur : "-"}{r.shortBlur >= SHORT_BLUR_N ? <span className="hint"> 반복</span> : null}</td>
+                    <td className={"mono" + (r.stale ? " qt-bad" : "")}>{r.hbAge == null ? "-" : r.st === "done" ? "완료" : r.hbAge + "초 전" + (r.stale ? " (끊김)" : "")}</td>
                     <td className={r.dup ? "qt-bad" : ""}>{r.dup ? "있음" : "-"}</td>
+                    <td className="mono">{!r.v ? "-" : <>{r.nEv}{r.capped ? <b className="qt-bad"> 상한</b> : null}{r.reconnects ? <span className="hint"> · 재접속 {r.reconnects}</span> : null}{r.resizes ? <span className="qt-warn"> · 도킹 의심</span> : null}</>}</td>
                     <td className="mono">{Number.isFinite(r.m.startedAtMs) ? fmtHMS(r.m.startedAtMs) : "-"}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       {!r.v ? "-" : (
@@ -961,6 +990,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
           )}
           <p className="hint">
             남은 시간 = 40분 × 배수 + 보전 + 추가 + 전체 정지 − 경과. 잠김·전체 정지 중에는 그 시점 값으로 고정해 보입니다. 심장박동은 학생 화면이 20초마다 보내며 {HB_STALE_SEC}초를 넘기면 연결 끊김으로 봅니다.
+            「기록」은 이탈 이벤트 수이며 {MAX_EVENTS}건에 이르면 「상한」(그 뒤의 이벤트는 저장되지 않음), 창 크기가 화면의 90% 미만으로 줄면 「도킹 의심」, 잠금 {LOCK_INTERVENE}회부터 「감독 개입 필요」로 표시합니다.
             「세션 초기화」는 「다른 곳에서 응시 중」으로 막힌 학생을 풀어 주고, 「재개 허용」은 기술 장애로 완료 처리된 학생을 같은 문항으로 이어 풀게 합니다(사유를 남기세요).
           </p>
         </div>
@@ -1004,7 +1034,11 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
                       <td className="mono">{res ? res.n : "-"}</td>
                       <td className="mono"><b>{res ? res.score : "-"}</b></td>
                       <td className="mono">{res ? res.band : "-"}</td>
-                      <td className="qt-flags">{res ? (res.flags || []).map((f) => <Flag key={f} f={f} />) : null}{res && res.mismatch && res.mismatch.detail ? <span className="hint qt-detail">{res.mismatch.detail}</span> : null}</td>
+                      <td className="qt-flags">
+                        {res ? (res.flags || []).map((f) => <Flag key={f} f={f} />) : null}
+                        {res && wilsonStraddle(res) ? <span className="qt-flag qt-flag-wilson" title="c/20의 Wilson 95% 구간이 자기 행의 점수 경계를 걸칩니다">Wilson 걸침</span> : null}
+                        {res && res.mismatch && res.mismatch.detail ? <span className="hint qt-detail">{res.mismatch.detail}</span> : null}
+                      </td>
                       <td className="mono">{r.v ? r.warn + "/" + r.lockN : "-"}</td>
                       <td className={"mono" + (diff ? " qt-bad" : "")}>{cs ? cs.score + "점" + (diff ? " (차이)" : "") : "-"}</td>
                       <td>{res ? (res.published ? "공개" : "-") : "-"}</td>
@@ -1017,7 +1051,10 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
               </tbody>
             </table>
           </div>
-          <p className="hint">F 옆의 *는 정정으로 이동이 유리해져 한 급을 더한 학생(설계 §4.6). 「가채점」은 학생 브라우저가 낸 점수이며 재계산과 다르면 「차이」로 표시합니다(정정이 있으면 달라지는 것이 정상).</p>
+          <p className="hint">
+            F 옆의 *는 정정으로 이동이 유리해져 한 급을 더한 학생(설계 §4.6). 「가채점」은 학생 브라우저가 낸 점수이며 재계산과 다르면 「차이」로 표시합니다(정정이 있으면 달라지는 것이 정상).
+            표시의 뜻: 경계 ①은 c가 자기 행의 점수 경계에서 ±1, 경계 ②는 어느 블록의 정답 수가 3 또는 4(한 문항 차이로 이동이 바뀜), 경계 ③은 미응답 있음, 경로 민감은 경계 ② 블록이 둘 이상, 불일치는 재계산·추출 재현이 기록과 다름(빨강), Wilson 걸침은 c/20의 95% 구간이 점수 경계를 걸침.
+          </p>
 
           {sheetSid && !sheet && <div className="warn-note">응시 기록표를 만들지 못했습니다. 은행과 정답 키가 있어야 합니다.</div>}
           {sheet && (
@@ -1185,6 +1222,18 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
               </div>
               {mono && mono.violations.length > 0 && <p className="hint qt-bad">어긋나는 급 쌍: {mono.violations.map((p) => p[0] + "급 ≤ " + p[1] + "급").join(", ")}</p>}
 
+              <div className="sv-block-t">급 오배정 의심 <span className="hint" style={{ fontWeight: 400 }}>(노출 {ITEM_FLAG_MIN_N} 이상이고 정답률이 한 급 위 평균보다 낮거나 한 급 아래 평균보다 높은 문항. 다음 해 급 이동 후보이며 올해 점수는 바꾸지 않습니다)</span></div>
+              {shiftCands.length === 0 ? <p className="hint">해당 문항이 없습니다{seenStats.filter((s) => s.n >= ITEM_FLAG_MIN_N).length === 0 ? " (노출 " + ITEM_FLAG_MIN_N + " 이상인 문항이 아직 없습니다)" : ""}.</p> : (
+                <div className="tbl-scroll qt-scroll">
+                  <table className="roster qt-tbl">
+                    <thead><tr><th>id</th><th>급</th><th>n</th><th>p</th><th>까닭</th></tr></thead>
+                    <tbody>
+                      {shiftCands.map((c) => <tr key={c.id} className="qt-row-warn"><td className="mono">{c.id}</td><td className="mono">{c.level}</td><td className="mono">{c.n}</td><td className="mono">{num(c.p)}</td><td>{c.why}</td></tr>)}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
               <div className="sv-block-t">쌍둥이 불균형 <span className="hint" style={{ fontWeight: 400 }}>(같은 명세의 A·B 문항. 둘 다 노출 {ITEM_STAT_MIN_N} 이상이고 정답률 차 ≥ {TWIN_DIFF}이면 표시)</span></div>
               <div className="at-row">
                 <label className="qt-keep"><input type="checkbox" checked={twinAll} onChange={(e) => setTwinAll(e.target.checked)} />전부 보기 ({twins.length}쌍)</label>
@@ -1223,8 +1272,23 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
                 <div className="kpi"><div className="n">{pct(rel.routingConsistent.rate)}</div><div className="l">라우팅 일관성 (블록 4 규칙을 한 번 더 적용한 급 = F) · n {rel.routingConsistent.n}</div></div>
                 <div className="kpi"><div className="n">{pct(rel.boundarySensitive.rate)}</div><div className="l">경계 민감도 (문항 하나가 뒤집히면 점수가 바뀌는 학생) · n {rel.boundarySensitive.n}</div></div>
                 <div className={"kpi" + (rel.halves.flag ? " qt-kpi-warn" : "")}><div className="n">{num(rel.halves.A.mean, 1)} / {num(rel.halves.B.mean, 1)}</div><div className="l">A·B 반 평균 점수 (n {rel.halves.A.n}·{rel.halves.B.n}) · 차 {num(rel.halves.diff, 1)}{rel.halves.flag ? " · 반 불균형 의심" : ""}</div></div>
+                <div className={"kpi" + (moveCons.ok === false ? " qt-kpi-warn" : "")}><div className="n">{pct(moveCons.up.mean)} / {pct(moveCons.stay.mean)}</div><div className="l">이동 일관성: 상승 뒤 다음 블록 정답률 / 유지 뒤 (n {moveCons.up.n}·{moveCons.stay.n}){moveCons.ok === false ? " · 상승 뒤가 더 높음(급이 더 어렵지 않았음)" : ""} · 하강 뒤 {pct(moveCons.down.mean)} (n {moveCons.down.n})</div></div>
+              </div>
+              <div className="tbl-scroll">
+                <table className="roster qt-tbl qt-score">
+                  <caption>A·B 반별 등급 분포 (반 불균형은 12~13명씩이라 1점 이상 차이만 봅니다)</caption>
+                  <thead><tr><th>반</th>{["A", "B", "C", "D", "E"].map((b) => <th key={b}>{b}</th>)}<th>계</th></tr></thead>
+                  <tbody>
+                    {["A", "B"].map((h) => {
+                      const d = bandHalves[h] || {};
+                      const tot = Object.values(d).reduce((a, b) => a + b, 0);
+                      return <tr key={h}><td className="mono">{h}반</td>{["A", "B", "C", "D", "E"].map((b) => <td key={b} className="mono">{d[b] || 0}</td>)}<td className="mono">{tot}</td></tr>;
+                    })}
+                  </tbody>
+                </table>
               </div>
               <p className="hint">{rel.note}</p>
+              <p className="hint">블록 1 KR-20은 학생마다 문항이 달라 정답률로 Σpq를 근사한 참고값입니다. 경계 민감도는 같은 F에서 c ± 1, 마지막 블록 2·3개, 앞 블록 3·4개 가운데 하나라도 해당하는 학생의 비율입니다. 등급 분포·이동 일관성은 「재계산」으로 저장된 결과를 기준으로 합니다.</p>
             </div>
           )}
         </div>
@@ -1261,6 +1325,17 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
             시간표: 개인 타이머 40분, 최장 경로 3→4→5→5가 33분 20초. 학생 화면의 권장 종료는 블록 번호 기준 {BLOCK_END_MIN.map((m, i) => "블록 " + (i + 1) + " " + m + "분").join(" · ")}(급을 드러내지 않기 위해 누적으로 보입니다).
             라우팅 4/3/2: 순수 추측(p=.25)이 한 블록에서 오를 확률 1.6%. 5급 최종급이면 구조상 c ≥ 14. 영역: {[1, 2, 3, 4].map((a) => AREA_MARK[a] + " " + AREAS[a]).join(" · ")}.
           </p>
+          <details className="qt-details"><summary>경계 사례 11개 (학생에게 보여 줄 표. 「나」와 「가」가 도달과 유지의 차이를, 「라」가 총 정답 수가 같아도 마지막 급이 다르면 점수가 다름을 보입니다)</summary>
+            <div className="tbl-scroll">
+              <table className="roster qt-tbl">
+                <thead><tr><th>사례</th><th>블록 1(3급)</th><th>블록 2</th><th>블록 3</th><th>블록 4</th><th>F</th><th>c</th><th>n</th><th>점수</th><th>설명</th></tr></thead>
+                <tbody>{BOUNDARY_CASES.map((r) => <tr key={r[0]}>{r.map((c, i) => <td key={i} className={i >= 5 && i <= 8 ? "mono" : ""}>{i === 8 ? <b>{c}</b> : c}</td>)}</tr>)}</tbody>
+              </table>
+            </div>
+          </details>
+          <details className="qt-details"><summary>당일 운영 점검표</summary>
+            <ol className="qt-rules">{CHECKLIST.map((s, i) => <li key={i}>{s}</li>)}</ol>
+          </details>
           <details className="qt-details"><summary>참고 문헌 (확인된 것만)</summary>
             <ul className="at-errs">{REFS.map((r, i) => <li key={i}>{r}</li>)}</ul>
           </details>
@@ -1342,6 +1417,15 @@ const QUIZ_TEACHER_CSS = `
 .qt-flag-mismatch,.qt-flag-keyCheck{border-color:var(--seal);color:var(--seal);font-weight:700}
 .qt-flag-dup,.qt-flag-shortBlur,.qt-flag-incomplete,.qt-flag-levelCheck,.qt-flag-lowDisc{border-color:var(--amber);color:var(--amber)}
 .qt-flag-pathSensitive{border-color:var(--ink)}
+.qt-flag-wilson{border-style:dashed;color:var(--sub)}
+/* .at-row·.at-errs·.at-of·.at-click 는 상호평가 패널의 스타일(AssessTeacherStyle)과 같은 이름이다.
+   그 스타일이 함께 실리지 않아도 이 패널이 무너지지 않도록 같은 규칙을 .qt-panel 아래에 한 번 더 둔다 */
+.qt-panel .at-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.qt-panel .at-errs{margin:6px 0 0 18px;padding:0}
+.qt-panel .at-errs li{margin:2px 0}
+.qt-panel .at-of{font-size:15px;color:var(--sub);font-weight:400}
+.qt-panel .at-click tbody tr{cursor:pointer}
+.qt-panel .at-click tbody tr:hover td{background:var(--card2)}
 .qt-detail{display:block;white-space:normal;max-width:320px}
 .qt-corr li{margin:3px 0}
 .qt-sheet{border:1px solid var(--line);padding:14px 16px;margin:12px 0;background:var(--card)}

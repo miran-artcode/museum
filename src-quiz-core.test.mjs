@@ -209,7 +209,7 @@ test("전수 검산(6^4 경로): 5급 최종급이면 c >= 14, 경로는 규칙�
   }
   assert.ok(n5 > 0);
   assert.equal(cMin5, 14);
-  assert.deepEqual(maxVisit, { 1: 2, 2: 3, 3: 4, 4: 3, 5: 2 });   // final-design §2.1
+  assert.deepEqual(maxVisit, { 1: 2, 2: 3, 3: 4, 4: 3, 5: 2 });   // 쪽지시험_구현_근거.md §2.1
   LEVELS.forEach((l) => [1, 2, 3, 4].forEach((a) => assert.ok(CELL_MIN[l][a - 1] >= maxVisit[l] * AREA_MIX[l][a - 1], "CELL_MIN " + l + "-" + a)));
 });
 

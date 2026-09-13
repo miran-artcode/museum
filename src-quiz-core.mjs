@@ -8,7 +8,7 @@
      · 채점 — 학생 브라우저 가채점(keyHash)과 교사 재계산(정답 키·정정) 두 갈래가 같은 함수를 쓴다
      · 사후 통계(문항·쌍둥이·급 단조성·신뢰도 기술 통계), 응시 기록표, 연구용 CSV, 은행 검증·분리, 표본 자료
 
-   측정 규칙의 원본은 design/final-design.md §1~§4 이고 구현 계약은 impl-spec.md §2 이다.
+   측정 규칙의 원본과 구현 계약은 쪽지시험_구현_근거.md(§1~§4 규칙, §8.2 재현 계약)이다.
    이 파일의 상수는 그 문서의 결정을 그대로 옮긴 것이다. 문구는 CLAUDE.md 한국어 규칙(줄표 금지)을 따른다.
    ============================================================ */
 
@@ -20,9 +20,9 @@ export const BLOCK_SIZE = 5;
 export const LEVEL_NAMES = { 1: "용어 인지", 2: "사실 연결", 3: "개념 이해", 4: "익숙한 사례 적용", 5: "처음 보는 사례 적용" };
 export const LEVEL_WORDS = { 1: "가장 낮은 단계", 2: "낮은 단계", 3: "가운데 단계", 4: "높은 단계", 5: "가장 어려운 단계" };
 export const AREAS = { 1: "미술사의 흐름", 2: "사물·흔적·환유", 3: "이미지와 증거", 4: "관찰·사회·전시·비평" };
-/* 급별 블록 안 영역 ①②③④ 문항 수 (final-design §5.2). 5급은 ④를 빼고 ②③을 두 배로 둔다 */
+/* 급별 블록 안 영역 ①②③④ 문항 수 (쪽지시험_구현_근거.md §5.2). 5급은 ④를 빼고 ②③을 두 배로 둔다 */
 export const AREA_MIX = { 1: [2, 1, 1, 1], 2: [2, 1, 1, 1], 3: [2, 1, 1, 1], 4: [2, 1, 1, 1], 5: [1, 2, 2, 0] };
-/* 반(half)당 칸 최소 문항 수 (final-design §5.3): 급별 최대 방문 블록 수 × 블록당 영역 문항 수 이상이면 어떤 경로에도 반복이 없다 */
+/* 반(half)당 칸 최소 문항 수 (쪽지시험_구현_근거.md §5.3): 급별 최대 방문 블록 수 × 블록당 영역 문항 수 이상이면 어떤 경로에도 반복이 없다 */
 export const CELL_MIN = { 1: [4, 2, 2, 2], 2: [7, 3, 3, 3], 3: [9, 4, 4, 4], 4: [7, 3, 3, 3], 5: [2, 5, 5, 0] };
 export const LEVEL_SEC = { 1: 40, 2: 50, 3: 70, 4: 90, 5: 120 };   // 문항당 권장 초
 export const BLOCK_END_MIN = [7, 15, 25, 35];                       // 블록별 권장 종료 (시작 후 분)
@@ -31,7 +31,7 @@ export const MIN_ANSWERED = 10;                                     // 이보다
 export const STEM_MAX = { 1: 60, 2: 80, 3: 120, 4: 160, 5: 220 };  // 문두 글자 상한
 export const CASE_MAX_5 = 140;                                      // 5급 사례 서술 상한(문항 필드 caseLen 로 검사)
 export const MAX_EVENTS = 300;
-/* 급별 설계 목표 정답률과 사후 통계의 기대 범위 (final-design §2.2, §6.1) */
+/* 급별 설계 목표 정답률과 사후 통계의 기대 범위 (쪽지시험_구현_근거.md §2.2, §6.1) */
 export const LEVEL_TARGET_P = { 1: 0.85, 2: 0.75, 3: 0.60, 4: 0.50, 5: 0.40 };
 export const LEVEL_P_RANGE = { 1: [0.75, 0.95], 2: [0.65, 0.90], 3: [0.50, 0.80], 4: [0.40, 0.70], 5: [0.30, 0.60] };
 export const ITEM_STAT_MIN_N = 5;      // 노출이 이보다 적으면 회색(해석 보류)
@@ -39,7 +39,7 @@ export const ITEM_FLAG_MIN_N = 8;      // 판정 표시는 이 이상에서만
 export const TWIN_DIFF = 0.30;         // 쌍둥이 정답률 차가 이 이상이면 표시
 export const SHORT_BLUR_N = 5;         // 2초 미만 이탈이 이 횟수 이상이면 「짧은 이탈 반복」
 
-/* 학생·학부모에게 그대로 보여 줄 다섯 문장 (final-design §1) */
+/* 학생·학부모에게 그대로 보여 줄 다섯 문장 (쪽지시험_구현_근거.md §1) */
 export const RULE_SENTENCES = [
   "5문항씩 4블록, 모두 20문항을 40분 안에 풉니다. 모든 학생이 가운데 급인 3급에서 시작합니다.",
   "한 블록에서 4개 이상 맞히면 다음 블록은 한 급 어려워지고, 3개면 그대로, 2개 이하면 한 급 쉬워집니다(가장 쉬운 1급과 가장 어려운 5급이 끝입니다).",
@@ -48,7 +48,7 @@ export const RULE_SENTENCES = [
   "시험 중에는 현재 급과 정답 여부를 보여 주지 않고, 시험이 끝나면 급 경로·블록별 정답 수·점수표의 내 행·화면 이탈 기록을 모두 공개합니다. 다른 창으로 나가면 기록되고, 세 번째에는 시험이 잠겨 선생님이 풀어 줍니다.",
 ];
 
-/* 산출표 (final-design §4.2). 위에서부터 F가 같고 c >= cMin 인 첫 행이 점수다 */
+/* 산출표 (쪽지시험_구현_근거.md §4.2). 위에서부터 F가 같고 c >= cMin 인 첫 행이 점수다 */
 export const SCORE_ROWS = [
   { F: 5, cMin: 18, score: 10, band: "A" },
   { F: 5, cMin: 16, score: 9, band: "A" },
@@ -62,20 +62,20 @@ export const SCORE_ROWS = [
 ];
 /* 경계 ①: c가 자기 행의 경계(F=5: 18·16·14, F=4: 14, F=1: 9)에서 ±1 */
 export const SCORE_BOUNDS = { 5: [18, 16, 14], 4: [14], 3: [], 2: [], 1: [9] };
-/* 결과 표시(flags)의 고정 순서 (impl-spec §1.5) */
+/* 결과 표시(flags)의 고정 순서 (쪽지시험_구현_근거.md §6.2) */
 export const FLAG_ORDER = ["boundary1", "boundary2", "boundary3", "pathSensitive", "mismatch", "incomplete", "dup", "shortBlur"];
 export const FLAG_LABELS = {
   boundary1: "경계 ① 점수", boundary2: "경계 ② 라우팅", boundary3: "경계 ③ 미응답", pathSensitive: "경로 민감",
   mismatch: "불일치", incomplete: "미완료", dup: "중복 접속", shortBlur: "짧은 이탈 반복",
 };
 
-/* 신뢰도 화면 고정 문구 (final-design §6.4 6번) */
+/* 신뢰도 화면 고정 문구 (쪽지시험_구현_근거.md §6.4 6번) */
 export const RELIABILITY_NOTE =
   "한 학급 25명의 결과로는 문항 난이도를 확정할 수 없다(정답률 표준오차 약 .10, 상관 표준오차 약 ±.2). " +
   "이 통계는 다음 해 문항을 고치는 데 쓰며 이 학급의 점수를 바꾸는 근거가 아니다. " +
-  "5문항 블록 하나의 이동 판정은 오차가 크며(p=.7일 때 정답 수 표준편차 1.02), 등급 판정은 ±1등급 오차를 가질 수 있다.";
+  "5문항 블록 하나의 이동 판정은 오차가 크며(p=.7일 때 정답 수 표준편차 1.02), 등급 판정에는 ±1등급 오차가 있을 수 있다.";
 
-/* 기본 설정 (impl-spec §1.1). 제한 시간 40분은 화면에서 고정 표시하고 설정으로 바꾸지 않는다 */
+/* 기본 설정 (쪽지시험_구현_근거.md §8.1). 제한 시간 40분은 화면에서 고정 표시하고 설정으로 바꾸지 않는다 */
 export const DEFAULT_QUIZ = {
   stage: "closed",        // "closed" | "open" | "ended" | "published"
   openedAtMs: 0,          // stage를 open으로 바꾼 교사 브라우저 시각 Date.now() (규칙이 시작 마감 계산에 씀)
@@ -343,7 +343,7 @@ export function correctCount(block, keys, corrections) {
   return c;
 }
 /* 산출표: n < 10 이면 무조건 E 2점, 그 밖에는 F 행 안에서 c 로 점수.
-   F=5 인데 c < 14 인 조합은 구조상 나오지 않는다(final-design §4.3). 조작된 기록으로만 가능하므로 그 F의 가장 낮은 행으로 둔다 */
+   F=5 인데 c < 14 인 조합은 구조상 나오지 않는다(쪽지시험_구현_근거.md §4.3). 조작된 기록으로만 가능하므로 그 F의 가장 낮은 행으로 둔다 */
 export function scoreOf(F, c, n) {
   if (!(n >= MIN_ANSWERED)) return { score: 2, band: "E" };
   const row = SCORE_ROWS.find((r) => r.F === F && c >= r.cMin);
@@ -380,7 +380,7 @@ export function clientScoreOf({ blocks, bank }) {
   return scoreBlocks(blocks, (id, pick) => isCorrect(idx.get(String(id)), pick, salt));
 }
 
-/* 학생별 표시 (final-design §6.2). 표시는 표시일 뿐 점수를 바꾸지 않는다 */
+/* 학생별 표시 (쪽지시험_구현_근거.md §6.2). 표시는 표시일 뿐 점수를 바꾸지 않는다 */
 export function flagsOf(res, blocks, v) {
   const out = new Set();
   const bounds = SCORE_BOUNDS[res.F] || [];
@@ -397,7 +397,7 @@ export function flagsOf(res, blocks, v) {
   return FLAG_ORDER.filter((f) => out.has(f));
 }
 
-/* 교사 재계산. 실제로 받은 문항과 실제 경로는 바꾸지 않고 c·F만 다시 센다(final-design §4.6).
+/* 교사 재계산. 실제로 받은 문항과 실제 경로는 바꾸지 않고 c·F만 다시 센다(쪽지시험_구현_근거.md §4.6).
    정정(allCorrect)으로 블록 1~3 어느 곳에서든 이동이 원래보다 유리해졌으면(하강→유지, 유지→상승) F에 한 급을 더한다(최대 5).
    블록 4의 변화는 F 규칙에 이미 반영되므로 따로 더하지 않는다.
    불일치: seed로 재현한 추출이 served와 다르거나, blocks의 문항·급이 served·규칙과 다르거나, 가채점과 F·c·점수가 다르면 표시 */
@@ -500,7 +500,7 @@ function responsesOf(attempts, keys) {
   return rows;
 }
 
-/* 문항 통계 (final-design §6.1). n<5 는 회색(few), 판정 표시는 n>=8 에서만 */
+/* 문항 통계 (쪽지시험_구현_근거.md §6.1). n<5 는 회색(few), 판정 표시는 n>=8 에서만 */
 export function itemStats({ attempts, keysDoc, bank }) {
   const idx = bankIndex(bank);
   const per = {};
@@ -567,7 +567,7 @@ export function levelMonotonic(stats) {
   return { means, violations };
 }
 
-/* 신뢰도 기술 통계 (final-design §6.4). 계수 하나로 요약할 수 없는 적응형·25명 자료라 참고값만 낸다.
+/* 신뢰도 기술 통계 (쪽지시험_구현_근거.md §6.4). 계수 하나로 요약할 수 없는 적응형·25명 자료라 참고값만 낸다.
    block1.kr20: 블록 1(전원 3급)에서 문항별 정답률(노출 기준)로 Σpq 를 근사한 KR-20. 문항이 학생마다 달라 참고값이다.
    routingConsistent: 블록 4 규칙을 한 번 더 적용한 급이 F와 같은 비율.
    boundarySensitive: 문항 하나가 뒤집히면 점수가 바뀌는 학생 비율(같은 F에서 c±1, 마지막 블록 2·3, 앞 블록 3·4). */
@@ -612,7 +612,7 @@ export function reliabilityStats({ attempts, keys, corrections, results }) {
   };
 }
 
-/* 응시 기록표 (final-design §6.3): 이의 답변의 유일한 자료. 문항 표·블록 표·요약·이탈 기록(오탐 표시 포함) */
+/* 응시 기록표 (쪽지시험_구현_근거.md §6.3): 이의 답변의 유일한 자료. 문항 표·블록 표·요약·이탈 기록(오탐 표시 포함) */
 export function recordSheet({ attempt, result, keysDoc, bank }) {
   const v = attempt || {};
   const idx = bankIndex(bank);
@@ -832,7 +832,7 @@ export function makeSyntheticBank({ ver = "synthetic-v1", seedSalt = "synthetic-
   };
 }
 
-/* 화면 구조를 보여 주기 위한 가상 학급. 급별 참 정답률 프로파일(final-design §4.7)로 답을 뽑으므로
+/* 화면 구조를 보여 주기 위한 가상 학급. 급별 참 정답률 프로파일(쪽지시험_구현_근거.md §4.7)로 답을 뽑으므로
    결과표·문항 통계·신뢰도가 그럴듯한 값으로 채워진다. 같은 ids면 늘 같은 결과다 */
 export function buildSampleQuiz(ids) {
   const sids = (ids || []).slice().sort(cmp);

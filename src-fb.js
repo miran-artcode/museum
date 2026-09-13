@@ -322,12 +322,15 @@ export const fbStore = {
   /* 진행 갱신: v의 준 필드만 깊은 병합하고 심장박동(hb)을 함께 찍는다.
      vPatch 안에 quizEvent(ev) 같은 FieldValue를 넣어도 되도록 값을 그대로 넘긴다.
      빈 vPatch(심장박동만)일 때 v: {} 를 보내면 merge가 v 전체를 빈 맵으로 바꾸므로 v 자체를 뺀다.
-     opts.lock → lockedAt 서버 시각, opts.unlock → lockedAt null (교사 해제) */
+     opts.lock → lockedAt 서버 시각, opts.unlock → lockedAt null (교사 해제)
+     opts.noHb → hb 를 찍지 않는다. 교사 화면의 쓰기(결과·오탐·메모·시간 추가·세션 초기화·해제)에 쓴다.
+       hb 는 학생 세션의 심장박동이라 교사가 갱신하면 「끊김」 표시와 학생 화면의 중복 접속 판정(hb 60초 안 + sess 다름)이 어긋난다 */
   quizPatch(sid, vPatch, opts) {
     const ms = (opts && opts.timeout) || 8000;
     const write = (async () => {
       try {
-        const top = { hb: serverTimestamp(), updatedAt: Date.now() };
+        const top = { updatedAt: Date.now() };
+        if (!(opts && opts.noHb)) top.hb = serverTimestamp();
         if (vPatch && Object.keys(vPatch).length) top.v = vPatch;
         if (opts && opts.lock) top.lockedAt = serverTimestamp();
         if (opts && opts.unlock) top.lockedAt = null;
