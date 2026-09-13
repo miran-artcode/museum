@@ -302,7 +302,7 @@ export const fbStore = {
     catch (e) { console.error("removeStudent fail", sid, e); return false; }
   },
 
-  /* ---------- 적응형 쪽지시험 (src-quiz-core.mjs 계약, impl-spec §3) ----------
+  /* ---------- 적응형 쪽지시험 (src-quiz-core.mjs 계약, 쪽지시험_구현_근거.md §8) ----------
      응시 문서 quiz/{학번}은 봉투(v·updatedAt) 밖에 서버 시각 필드 startedAt·hb·lockedAt 을 둔다.
      규칙이 startedAt == request.time 과 제한 시간을 서버 시각으로 대조하므로 학생 브라우저의 시계는 믿지 않는다.
      Timestamp는 millis로 바꿔 돌려주고, serverTimestamp가 아직 서버에서 확정되지 않은 로컬 스냅샷에서는 null이다. */

@@ -1,12 +1,13 @@
 /* ============================================================
-   적응형 쪽지시험 — 교사 화면 「퀴즈」 탭
+   적응형 쪽지시험 — 교사 화면 「쪽지시험」 탭
 
    일곱 장의 카드: 설정(단계·시간·좌석표·학생별 배수·비활성 문항·전체 일시정지), 문항 은행(검증·올리기·열람),
    실시간(응시 현황·해제·시간 추가·세션 초기화·재개), 결과(재계산·표시·응시 기록표·정정·공개·CSV),
-   문항 통계, 신뢰도, 설계 근거. 측정 규칙의 원본은 design/final-design.md, 구현 계약은 impl-spec.md §5.
+   문항 통계, 신뢰도, 설계 근거. 측정 규칙과 화면 구성의 원본은 쪽지시험_구현_근거.md(§6 사후 통계와 교사 화면, §7 잠금 규칙).
 
    이 파일은 계산을 하지 않는다 — 추출 재현·채점·통계·CSV 행은 모두 src-quiz-core.mjs 가 만들고,
-   여기서는 부르고 보여 주고 저장할 뿐이다. src-app.jsx 를 import 하지 않는다(순환).
+   여기서는 부르고 보여 주고 저장할 뿐이다. 예외는 표시 전용의 작은 비교 셋(Wilson 걸침·급 이동 후보·이동 일관성)으로,
+   core 가 돌려주는 값을 견주기만 한다. src-app.jsx 를 import 하지 않는다(순환).
 
    저장 규약
    - 단계·설정은 onSaveCfg(patch) 한 길로만 나간다. 메인 세션이 { quiz: {...} } 만 merge 로 쓴다.
@@ -20,9 +21,9 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
 import {
   LEVELS, BLOCKS, BLOCK_SIZE, LEVEL_NAMES, LEVEL_WORDS, AREAS, AREA_MIX, CELL_MIN, LEVEL_SEC, BLOCK_END_MIN,
-  LEVEL_TARGET_P, LEVEL_P_RANGE, ITEM_STAT_MIN_N, ITEM_FLAG_MIN_N, TWIN_DIFF, SHORT_BLUR_N, MIN_ANSWERED,
-  RULE_SENTENCES, SCORE_ROWS, FLAG_LABELS, RELIABILITY_NOTE, QUIZ_STAGES, quizCfg,
-  parseSeatGrid, halfOf, recompute, resultItems, itemStats, twinStats, levelMonotonic, reliabilityStats, recordSheet,
+  LEVEL_TARGET_P, LEVEL_P_RANGE, ITEM_STAT_MIN_N, ITEM_FLAG_MIN_N, TWIN_DIFF, SHORT_BLUR_N, MIN_ANSWERED, MAX_EVENTS,
+  RULE_SENTENCES, SCORE_ROWS, SCORE_BOUNDS, FLAG_LABELS, RELIABILITY_NOTE, QUIZ_STAGES, quizCfg,
+  parseSeatGrid, halfOf, moveOf, wilson, recompute, resultItems, itemStats, twinStats, levelMonotonic, reliabilityStats, recordSheet,
   csvAttempts, csvResponses, csvEvents, csvItems, validateBank, splitBank, remainingSec, buildSampleQuiz, fmtMMSS,
 } from "./src-quiz-core.mjs";
 
@@ -30,6 +31,8 @@ const DEADLINE_MIN = [5, 30];       // 시작 마감(분) 허용 범위
 const WARN_LIMIT = [2, 5];          // 경고 한도 허용 범위
 const MULTS = [1, 1.5, 2];          // 학생별 시간 배수
 const HB_STALE_SEC = 60;            // 심장박동이 이보다 오래되면 연결 끊김으로 본다(중복 접속 판정과 같은 값)
+const LOCK_INTERVENE = 3;           // 잠금이 이 횟수에 이르면 「감독 개입 필요」(설계 §7.3: 9회 경고 = 세 번째 잠금)
+const N_ITEMS = BLOCKS * BLOCK_SIZE;
 const AREA_MARK = { 1: "①", 2: "②", 3: "③", 4: "④" };
 const ITEM_FLAG_LABELS = {
   few: "노출 부족", levelCheck: "난이도 재검토", lowDisc: "변별 없음", keyCheck: "정답 키 확인", deadOption: "기능하지 않는 오답", longTime: "길이 재검토",
@@ -123,7 +126,9 @@ function downloadCsv(name, head, rows) {
 
 /* 응시 문서 하나의 표시 상태. 문서가 없으면 none */
 const statusOf = (v) => (!v ? "none" : v.status === "locked" ? "locked" : v.status === "done" || v.finishedAt ? "done" : "running");
-/* 지금 블록에서 고른 답 수(초안 기준). 완료면 제출된 블록의 응답 수 합 */
+/* 지금 블록에서 고른 답 수(초안 기준). 완료면 제출된 블록의 응답 수 합.
+   초안(draft)의 모양은 학생 화면이 정한다 — { 문항id: 보기id } 평면 맵, { "k": { 문항id: 보기id } } 블록별 맵,
+   { "k": { answers: [] } } 배열 셋 다 받아 센다(어느 쪽이든 「고른 수」만 보면 된다) */
 function answeredOf(v) {
   if (!v) return { n: 0, of: 0 };
   if (statusOf(v) === "done") {
@@ -131,13 +136,71 @@ function answeredOf(v) {
     Object.values(v.blocks || {}).forEach((b) => { if (!b) return; of += (b.itemIds || []).length; (b.answers || []).forEach((a) => { if (isPick(a)) n += 1; }); });
     return { n, of };
   }
-  const s = (v.served || {})[String(v.cur || 1)];
+  const cur = String(v.cur || 1);
+  const s = (v.served || {})[cur];
   const ids = (s && s.itemIds) || [];
-  return { n: ids.filter((id) => isPick((v.draft || {})[id])).length, of: ids.length || BLOCK_SIZE };
+  const d = v.draft || {};
+  const blk = d[cur] && typeof d[cur] === "object" ? d[cur] : d;
+  const n = Array.isArray(blk.answers) ? blk.answers.filter(isPick).length : ids.filter((id) => isPick(blk[id])).length;
+  return { n, of: ids.length || BLOCK_SIZE };
 }
-const countEv = (v, type) => ((v && Array.isArray(v.events)) ? v.events.filter((e) => e && e.type === type).length : 0);
+const eventsOf = (v) => ((v && Array.isArray(v.events)) ? v.events.filter(Boolean) : []);
+const countEv = (v, type) => eventsOf(v).filter((e) => e.type === type).length;
 /* 잠근 시각: 서버 시각이 아직 없으면(쓰기 대기) 학생이 적은 ISO 로 대신한다 */
 const lockedMsOf = (v, meta) => (meta && Number.isFinite(meta.lockedAtMs) ? meta.lockedAtMs : v && v.lock && v.lock.at ? Date.parse(v.lock.at) : NaN);
+
+/* ---------- 표시 전용 비교 (core 값을 견주기만 한다) ---------- */
+
+/* Wilson 걸침(설계 §6.2): c/20 의 Wilson 95% 구간이 자기 행의 점수 경계를 걸치는가.
+   경계 b 는 「c ≥ b 이면 윗줄」이므로 b − 0.5 가 구간 안에 있으면 걸친 것으로 본다. 점수는 바꾸지 않는다 */
+function wilsonStraddle(res) {
+  if (!res || !(res.n >= MIN_ANSWERED)) return false;
+  const bounds = SCORE_BOUNDS[res.F] || [];
+  if (!bounds.length) return false;
+  const [lo, hi] = wilson(res.c / N_ITEMS, N_ITEMS);
+  return bounds.some((b) => lo * N_ITEMS <= b - 0.5 && hi * N_ITEMS >= b - 0.5);
+}
+/* 급 오배정 의심(설계 §6.1): 노출 8 이상이고 (i) 정답률이 한 급 위 문항들의 평균보다 낮거나
+   (ii) 한 급 아래 평균보다 높은 문항. 급별 평균은 levelMonotonic 의 means 를 그대로 쓴다. 「다음 해 급 이동 후보」 목록 */
+function levelShiftCandidates(stats, means) {
+  if (!stats || !means) return [];
+  return stats.map((s) => {
+    if (!(s.n >= ITEM_FLAG_MIN_N) || s.p == null || s.level == null) return null;
+    const up = means[s.level + 1], down = means[s.level - 1];
+    const why = [];
+    if (up != null && s.p < up) why.push("한 급 위 평균 " + num(up) + "보다 낮음");
+    if (down != null && s.p > down) why.push("한 급 아래 평균 " + num(down) + "보다 높음");
+    return why.length ? { id: s.id, level: s.level, p: s.p, n: s.n, why: why.join(", ") } : null;
+  }).filter(Boolean);
+}
+/* 이동 일관성(설계 §6.4 5번): 상승한 학생의 다음 블록 정답률이 유지한 학생의 다음 블록 정답률보다 낮은가
+   (급이 실제로 더 어려웠는가). 다음 블록을 실제로 푼 경우만 센다 */
+function moveConsistency(resultsMap, attempts) {
+  const acc = { up: [], stay: [], down: [] };
+  Object.keys(resultsMap || {}).forEach((sid) => {
+    const r = resultsMap[sid], v = (attempts || {})[sid] || {};
+    if (!r || !Array.isArray(r.path) || !Array.isArray(r.blockCorrect)) return;
+    for (let k = 1; k < BLOCKS; k += 1) {
+      if (!(v.blocks && (v.blocks[String(k + 1)] || v.blocks[k + 1]))) continue;
+      const mv = moveOf(r.path[k - 1], r.blockCorrect[k - 1]);
+      (mv > 0 ? acc.up : mv < 0 ? acc.down : acc.stay).push(r.blockCorrect[k] / BLOCK_SIZE);
+    }
+  });
+  const m = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  const up = m(acc.up), stay = m(acc.stay), down = m(acc.down);
+  return { up: { n: acc.up.length, mean: up }, stay: { n: acc.stay.length, mean: stay }, down: { n: acc.down.length, mean: down }, ok: up != null && stay != null ? up < stay : null };
+}
+/* A·B 반별 최종급(등급) 분포(설계 §6.4 4번). 반은 응시 문서의 half */
+function bandByHalf(resultsMap, attempts) {
+  const out = { A: {}, B: {} };
+  Object.keys(resultsMap || {}).forEach((sid) => {
+    const r = resultsMap[sid];
+    if (!r || !r.band) return;
+    const h = ((attempts || {})[sid] || {}).half === "B" ? "B" : "A";
+    out[h][r.band] = (out[h][r.band] || 0) + 1;
+  });
+  return out;
+}
 
 function Flag({ f }) {
   return <span className={"qt-flag qt-flag-" + f}>{FLAG_LABELS[f] || f}</span>;
@@ -372,9 +435,11 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
       remain = remainingSec({ nowMs: Number.isFinite(at) ? at : nowMs, startedAtMs: m.startedAtMs, cfg, v, sid: id });
     }
     const hbAge = Number.isFinite(m.hbMs) ? Math.max(0, Math.round((nowMs - m.hbMs) / 1000)) : null;
+    const nEv = eventsOf(v).length;
     return {
       id, nick: nickOf(id), v, m, st, cur: v ? v.cur || 1 : null, ans, remain,
       warn: v ? Number(v.warn) || 0 : 0, lockN: v && v.lock ? Number(v.lock.count) || 0 : 0, shortBlur: countEv(v, "blur_short"), dup: countEv(v, "dup") > 0,
+      nEv, capped: nEv >= MAX_EVENTS, reconnects: countEv(v, "reconnect"), resizes: countEv(v, "resize"),
       hbAge, stale: st === "running" && hbAge != null && hbAge > HB_STALE_SEC, half: v ? v.half : null,
     };
   });
@@ -394,7 +459,8 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     if (sampleMode || rowBusy) return;
     const keep = keepMap[r.id] !== false;
     const lockedMs = lockedMsOf(r.v, r.m);
-    const add = keep && Number.isFinite(lockedMs) ? Math.max(0, Math.round((Date.now() - lockedMs) / 1000)) : 0;
+    // 멈춘 초 = 교사 브라우저 시각 − 잠근 서버 시각. 교사 시계가 크게 어긋나도 제한 시간(배수 최대 2) 밖의 값은 주지 않는다
+    const add = keep && Number.isFinite(lockedMs) ? Math.min(cfg.durationSec * 2, Math.max(0, Math.round((Date.now() - lockedMs) / 1000))) : 0;
     if (!window.confirm(r.id + "의 잠금을 풉니다. " + (keep ? "멈춘 " + fmtMMSS(add) + "을 남은 시간에 더합니다(시간 보전)." : "시간을 보전하지 않습니다.") + " 계속할까요?")) return;
     setRowBusy(r.id);
     const ok = await patchV(r.id, { status: "running", pausedTotalSec: (Number(r.v.pausedTotalSec) || 0) + add }, { unlock: true });
@@ -467,7 +533,10 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     if (sampleMode || pubBusy || stageBusy) return;
     const withRes = Object.keys(resultsMap);
     const noRes = Object.keys(attempts).filter((sid) => !resultsMap[sid]);
-    let msg = STAGE_CONFIRM.published + "\n\n결과가 있는 학생 " + withRes.length + "명에게 공개 표시를 씁니다.";
+    const unpub = withRes.filter((sid) => !resultsMap[sid].published);
+    // 이미 공개된 뒤에도 다시 누를 수 있다 — 별도 응시·재계산으로 뒤늦게 생긴 결과에 공개 표시를 쓰기 위해서다
+    let msg = (cfg.stage === "published" ? "공개 표시를 다시 씁니다. 아직 공개 표시가 없는 결과 " + unpub.length + "건이 학생에게 보이게 됩니다." : STAGE_CONFIRM.published)
+      + "\n\n결과가 있는 학생 " + withRes.length + "명에게 공개 표시를 씁니다.";
     if (noRes.length) msg += "\n\n주의: 응시했지만 결과가 없는 학생 " + noRes.length + "명(" + noRes.slice(0, 6).join(", ") + (noRes.length > 6 ? " 외" : "") + "). 먼저 「재계산」을 누르세요.";
     const mism = withRes.filter((sid) => (resultsMap[sid].flags || []).includes("mismatch"));
     if (mism.length) msg += "\n\n주의: 불일치 표시 학생 " + mism.length + "명(" + mism.join(", ") + "). 원응답을 먼저 확인하세요.";
