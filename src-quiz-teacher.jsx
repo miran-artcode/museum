@@ -549,10 +549,10 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
       const ok = await patchV(withRes[i], { result: { published: true, publishedAt: at } });
       if (!ok) fail += 1;
     }
-    const ok = await saveNow({ stage: "published" });
+    const ok = cfg.stage === "published" ? true : await saveNow({ stage: "published" });
     setPubBusy(false);
     setNote(!ok || fail ? { kind: "warn", text: (fail ? fail + "명의 공개 표시를 저장하지 못했습니다. " : "") + (ok ? "" : "단계를 저장하지 못했습니다. ") + "다시 누르세요." }
-      : { kind: "ok", text: "결과를 공개했습니다. 학생 화면에 자기 결과가 보입니다." });
+      : { kind: "ok", text: "결과를 공개했습니다(" + withRes.length + "명). 학생 화면에 자기 결과가 보입니다." });
   };
 
   /* ---- 응시 기록표 ---- */
@@ -979,9 +979,10 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
             <button type="button" className="btn" disabled={sampleMode || calcBusy || pubBusy} title={wr} onClick={runRecompute}>
               {calcBusy ? "재계산 중… " + (calcProg ? calcProg.done + "/" + calcProg.total : "") : "재계산"}
             </button>
-            <button type="button" className="btn" disabled={sampleMode || calcBusy || pubBusy || stageBusy || cfg.stage === "published" || !Object.keys(resultsMap).length} title={wr} onClick={doPublish}>
-              {pubBusy ? "공개 중…" : cfg.stage === "published" ? "결과 공개됨" : "결과 공개"}
+            <button type="button" className="btn" disabled={sampleMode || calcBusy || pubBusy || stageBusy || !Object.keys(resultsMap).length} title={wr} onClick={doPublish}>
+              {pubBusy ? "공개 중…" : cfg.stage === "published" ? "공개 표시 다시 쓰기" : "결과 공개"}
             </button>
+            {cfg.stage === "published" && Object.values(resultsMap).some((r) => !r.published) && <span className="hint qt-warn">공개 표시가 없는 결과 {Object.values(resultsMap).filter((r) => !r.published).length}건</span>}
             {calcProg && !calcBusy && <span className="hint">{calcProg.done}/{calcProg.total} 저장{calcProg.fail ? " · 실패 " + calcProg.fail : ""}</span>}
           </div>
           <div className="tbl-scroll">
