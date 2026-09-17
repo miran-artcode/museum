@@ -20,6 +20,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { LikertRow, scrollToSurveyItem, LIKERT_SHORT, useTopbarHeight, SurveyProgress } from "./src-survey-ui.jsx";
+import { ConfirmButton } from "./src-ux.jsx";
 
 export const STANCE_VER = "s1";
 
@@ -371,9 +372,9 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy, saveInfo })
         })}
 
         <div className="sv-foot">
-          <button className="btn" disabled={remain > 0 || busy} onClick={onSubmit}>
-            {busy ? "제출 중…" : remain > 0 ? "아직 " + remain + "문항 남았습니다" : "제출하기"}
-          </button>
+          <ConfirmButton className="btn" disabled={remain > 0 || busy} onConfirm={onSubmit}
+            ask="제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?" yes="제출" no="더 보기"
+            label={busy ? "제출 중…" : remain > 0 ? "아직 " + remain + "문항 남았습니다" : "제출하기"} />
           {remain > 0 && <button type="button" className="st-jump" onClick={jump}>남은 문항으로 가기 →</button>}
           <span className="hint">답은 고르는 즉시 저장됩니다. 모두 답하면 제출 버튼이 활성화되고, 제출한 뒤에는 고칠 수 없습니다.</span>
         </div>

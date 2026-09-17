@@ -235,7 +235,7 @@ export function ExhibitSamples({ showPlate }) {
                 {w.note && <div className="work-note">{w.note}</div>}
               </>
             ) : (
-              <div className="plate hidden-plate">LABEL CONCEALED · 1ST VIEWING</div>
+              <div className="plate hidden-plate">1차 관람 · 작품 캡션 가림</div>
             )}
           </div>
         ))}

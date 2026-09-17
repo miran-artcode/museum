@@ -18,6 +18,7 @@ import { LESSONS_DEF } from "./src-lessons.jsx";
 import { CardMedia, CardMediaStyle } from "./src-card-media.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
+import { UxStyle, ConfirmButton, session, TeacherTabs } from "./src-ux.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { LabelCompare } from "./src-label-compare.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
@@ -4641,9 +4642,9 @@ function SurveyCard({ phase, block, onChange, onSubmit, busy, saveInfo }) {
           </div>
         )}
         <div className="sv-foot">
-          <button className="btn" disabled={done < total || !extraDone || busy} onClick={onSubmit}>
-            {busy ? "제출 중…" : done < total ? "남은 문항 " + (total - done) + "개" : !extraDone ? "돌아보기 문항이 남았습니다" : "제출하기"}
-          </button>
+          <ConfirmButton className="btn" disabled={done < total || !extraDone || busy} onConfirm={onSubmit}
+            ask="제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?" yes="제출" no="더 보기"
+            label={busy ? "제출 중…" : done < total ? "남은 문항 " + (total - done) + "개" : !extraDone ? "돌아보기 문항이 남았습니다" : "제출하기"} />
           <span className="hint">모든 문항에 답하면 제출 버튼이 활성화됩니다. 제출한 뒤에는 고칠 수 없습니다.</span>
         </div>
       </div>
@@ -4748,6 +4749,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
       if (!okR) { setBusy(false); await authApi.leave(); return setErr("명단에 없는 학번이거나 저장하지 못했습니다. 선생님께 학번 등록을 요청하세요."); }
     }
     setBusy(false);
+    session.save({ role: "student", sid: id, nick: name }); // 같은 탭의 새로고침·뒤로 가기에서 되살린다 (src-ux.jsx)
     onStudent({ sid: id, nick: name });
   };
 
@@ -4763,6 +4765,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
       const cfg = (await store.get("config")) || {};
       await store.set("config", { open: cfg.open || DEFAULT_OPEN, created: now() }, { merge: true });
     }
+    session.save({ role: "teacher" });
     onTeacher();
   };
 
@@ -4797,13 +4800,13 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
           <form onSubmit={(e) => { e.preventDefault(); enterStudent(); }}>
             <div className="field"><label htmlFor="g4-sid">학번 (숫자만, 예: 10203)</label>
               <input id="g4-sid" inputMode="numeric" value={sid} onChange={(e) => setSid(e.target.value.replace(/\D/g, ""))} maxLength={6} /></div>
-            <div className="field"><label htmlFor="g4-nick">별명 (처음 한 번만 정합니다 · 이미 정했다면 비워 두세요 · 실명 금지)</label>
+            <div className="field"><label htmlFor="g4-nick">별명 (처음 입장할 때만 · 실명 금지)</label>
               <input id="g4-nick" value={nick} onChange={(e) => setNick(e.target.value)} maxLength={12} /></div>
             <div className="field"><label htmlFor="g4-pin">비밀번호 숫자 4자리</label>
               <input id="g4-pin" type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} maxLength={4} /></div>
             {err && <div className="err" role="alert">{err}</div>}
             <button type="submit" className="btn full" disabled={busy}>{busy ? "확인 중…" : "기록실 입장"}</button>
-            <p className="gate-note">처음 입장하면 학번과 별명이 등록되고, 다음부터는 학번과 비밀번호로 이어서 작성합니다.</p>
+            <p className="gate-note">처음 입장하면 학번과 별명이 등록되고, 다음부터는 학번과 비밀번호로 이어서 작성합니다. 별명을 이미 정했다면 비워 둡니다.</p>
           </form>
         ) : mode === "teacher" ? (
           <form onSubmit={(e) => { e.preventDefault(); enterTeacher(); }}>
@@ -5231,9 +5234,7 @@ function StudentApp({ me, onExit, onGallery }) {
     if (svTimer.current) clearTimeout(svTimer.current);
     svTimer.current = setTimeout(svPersist, 800);
   };
-  const confirmSubmit = () => window.confirm("제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?");
   const svSubmit = async (phase) => {
-    if (!confirmSubmit()) return;
     const cur = surveyRef.current || {};
     const block = cur[phase] || {};
     const started = block.startedAt || now();
@@ -5259,7 +5260,6 @@ function StudentApp({ me, onExit, onGallery }) {
     svTimer.current = setTimeout(svPersist, 800);
   };
   const stSubmit = async (phase) => {
-    if (!confirmSubmit()) return;
     const cur = surveyRef.current || {};
     const st = cur.stance || {};
     const block = st[phase] || {};
@@ -5305,6 +5305,21 @@ function StudentApp({ me, onExit, onGallery }) {
     setSvBusy(false);
     if (!ok) alert("판정을 저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
   };
+
+  /* 최종 평가·쪽지시험 화면으로. 탭 버튼과 탭 줄 위의 이동 안내가 함께 쓴다 */
+  const goStage = (which) => {
+    if (which === "assess" ? assessOn : quizOn) return;
+    if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
+    flush();
+    setAssessOn(which === "assess");
+    setQuizOn(which === "quiz");
+    window.scrollTo({ top: 0 });
+  };
+  /* 폰에서는 탭 줄이 가로로 넘친다. 지금 보는 탭이 화면 밖에 있으면 보이는 곳까지 민다 */
+  useEffect(() => {
+    const el = document.querySelector(".sess-tab.on");
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [tab, loaded, assessOn, quizOn]);
 
   const switchTab = (s) => {
     if (assessOn) setAssessOn(false);   // 최종 평가 화면에서 차시 탭을 누르면 그 차시로 돌아간다
@@ -5398,6 +5413,19 @@ function StudentApp({ me, onExit, onGallery }) {
           <span className="prog-num">전체 {pct}%</span>
           <span className="prog-num">올린 사진·녹음 {mediaCount(ws)}개</span>
         </div>}
+        {/* 최종 평가·쪽지시험 탭은 탭 줄 맨 뒤라 폰에서는 보이지 않는다. 열려 있는 동안 이동 안내를 탭 줄 위에 둔다 */}
+        {loaded && peerStage !== "closed" && !assessOn && (
+          <div className="ok-note stage-open" role="status">
+            <span>최종 평가(제출·자기평가·동료 비교)가 열려 있습니다.</span>
+            <button className="btn small" onClick={() => goStage("assess")}>최종 평가로 이동</button>
+          </div>
+        )}
+        {loaded && quizStage !== "closed" && !quizOn && (
+          <div className="ok-note stage-open" role="status">
+            <span>쪽지시험이 열려 있습니다.</span>
+            <button className="btn small" onClick={() => goStage("quiz")}>쪽지시험으로 이동</button>
+          </div>
+        )}
         {loaded && <div className="sess-tabs" role="tablist">
           {SESSIONS.map((s) => {
             const open = isOpen(openMap, s);
@@ -5410,21 +5438,13 @@ function StudentApp({ me, onExit, onGallery }) {
           })}
           {peerStage !== "closed" && (
             <button role="tab" aria-selected={assessOn} className={"sess-tab as-tab " + (assessOn ? "on" : "")} title="최종 평가: 제출·자기평가·동료 비교"
-              onClick={() => {
-                if (assessOn) return;
-                if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
-                flush(); setQuizOn(false); setAssessOn(true); window.scrollTo({ top: 0 });
-              }}>
+              onClick={() => goStage("assess")}>
               <span className="dot part" />최종 평가
             </button>
           )}
           {quizStage !== "closed" && (
             <button role="tab" aria-selected={quizOn} className={"sess-tab qz-tab " + (quizOn ? "on" : "")} title="쪽지시험: 미술사·미술이론 선택형 적응형 시험"
-              onClick={() => {
-                if (quizOn) return;
-                if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
-                flush(); setAssessOn(false); setQuizOn(true); window.scrollTo({ top: 0 });
-              }}>
+              onClick={() => goStage("quiz")}>
               <span className="dot part" />쪽지시험
             </button>
           )}
@@ -8742,13 +8762,7 @@ function TeacherApp({ onExit, onGallery }) {
                 지금 보이는 학급은 <b>표본 자료</b>입니다. 화면 구조를 살펴보기 위한 가상 학생 8명이며, 실제 학생이 입장하면 자동으로 실데이터로 바뀝니다.
               </div>
             )}
-            <div className="t-tabs">
-              {["현황", "차시 공개", "수업 안내", "수업 편집", "기록 현황", "사고 과정", "창의성", "설문", "상호평가", "쪽지시험", "연구", "설정"].map((t) => (
-                <button key={t} className={"btn small " + (tab === t ? "" : "ghost")} onClick={() => switchTab(t)}>
-                  {t}{t === "수업 편집" && edDirty ? " ●" : ""}
-                </button>
-              ))}
-            </div>
+            <TeacherTabs tab={tab} onSwitch={switchTab} dirty={edDirty} />
             {loading ? <div style={{ color: "var(--sub)" }}>학급 기록을 불러오는 중…</div> : tab === "현황" ? (
               <div>
                 <div className="kpis">
@@ -9483,7 +9497,15 @@ function Gallery({ onBack, backLabel }) {
             학생용 학습지의 7차시 「기록 R 전시 출품」에서 작품 번호를 적고 전시 공개로 바꾸면 이 벽면에 걸립니다.
           </div>
         )}
-        <ExhibitSamples showPlate={showPlate} />
+        {works && works.length > 0 ? (
+          /* 학급 작품이 걸리면 예시 구간은 접어 둔다. 폰에서 자기 반 작품까지 다섯 화면을 내려야 했다 */
+          <details className="gal-samples">
+            <summary>전시 진열 예시와 예시 작품 세 점 보기</summary>
+            <ExhibitSamples showPlate={showPlate} />
+          </details>
+        ) : (
+          <ExhibitSamples showPlate={showPlate} />
+        )}
         {works === null ? (
           <p style={{ textAlign: "center", color: "var(--sub)" }}>전시 작품을 불러오는 중…</p>
         ) : works.length === 0 ? null : (() => {
@@ -9513,7 +9535,7 @@ function Gallery({ onBack, backLabel }) {
                     </dl>
                   </div>
                 ) : (
-                  <div className="plate hidden-plate">LABEL CONCEALED · 1ST VIEWING</div>
+                  <div className="plate hidden-plate">1차 관람 · 작품 캡션 가림</div>
                 )}
                 {showPlate && w.note && <div className="work-note">{w.note}</div>}
               </div>
@@ -9754,6 +9776,26 @@ function App() {
   // 전시장은 게이트·학생·교사 어디서든 들어오므로, 돌아갈 곳과 버튼 문구를 진입 지점에 맞춘다
   const [galFrom, setGalFrom] = useState("gate");
   const goGallery = (from) => { setGalFrom(from); setView("gallery"); };
+  /* 같은 탭에서 새로고침·뒤로 가기를 하면 입장 화면으로 떨어지던 문제.
+     sessionStorage의 표(src-ux.jsx)와 Firebase 인증의 현재 계정이 맞을 때만 그 화면을 되살린다 */
+  const [restoring, setRestoring] = useState(() => !!session.read());
+  useEffect(() => {
+    if (!restoring) return;
+    let done = false;
+    const finish = (u) => {
+      if (done) return;
+      done = true;
+      const s = session.read();
+      const id = u && u.email ? String(u.email).split("@")[0] : "";
+      if (s && s.role === "teacher" && id === "teacher") setView("teacher");
+      else if (s && s.role === "student" && s.sid && s.sid === id) { setMe({ sid: s.sid, nick: s.nick || "" }); setView("student"); }
+      else session.clear();
+      setRestoring(false);
+    };
+    const un = authApi.watch(finish);
+    const t = setTimeout(() => finish(authApi.current()), 4000); // 인증 초기화가 늦으면 입장 화면으로
+    return () => { un(); clearTimeout(t); };
+  }, []);
 
   return (
     <div className="app">
@@ -9770,13 +9812,15 @@ function App() {
       <InquiryStyle />
       <LadderStyle />
       <ThemeStyle />
-      {view === "gate" && <Gate
+      <UxStyle />
+      {restoring && <div style={{ padding: "60px 16px", textAlign: "center", color: "var(--sub)", fontSize: 13 }}>기록실을 여는 중…</div>}
+      {view === "gate" && !restoring && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
         onTeacher={() => setView("teacher")}
         onGallery={() => goGallery("gate")}
         onDemo={() => setView("demo")} />}
-      {view === "student" && me && <StudentApp me={me} onGallery={() => goGallery("student")} onExit={() => { setMe(null); setMediaOwner("preview"); setView("gate"); }} />}
-      {view === "teacher" && <TeacherApp onGallery={() => goGallery("teacher")} onExit={() => setView("gate")} />}
+      {view === "student" && me && <StudentApp me={me} onGallery={() => goGallery("student")} onExit={() => { session.clear(); setMe(null); setMediaOwner("preview"); setView("gate"); }} />}
+      {view === "teacher" && <TeacherApp onGallery={() => goGallery("teacher")} onExit={() => { session.clear(); setView("gate"); }} />}
       {view === "gallery" && <Gallery onBack={() => setView(galFrom === "student" && !me ? "gate" : galFrom)}
         backLabel={galFrom === "student" && me ? "기록실로 돌아가기" : galFrom === "teacher" ? "교사 화면으로" : "입장 화면으로"} />}
       {view === "demo" && <DemoView onBack={() => setView("gate")} />}

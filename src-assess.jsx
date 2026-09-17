@@ -20,6 +20,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
 import { LikertRow } from "./src-survey-ui.jsx";
+import { ConfirmButton } from "./src-ux.jsx";
 import {
   ASSESS_VER, CRITERIA, TAG_OPTIONS, SELF_ITEMS, SELF_LABELS, CONF_LABELS, CHANGE_CODES,
   stageAtLeast, peerCfg, MIN_WHY_CHANGE, REASON_MAX, DUP_SIM,
@@ -332,13 +333,17 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
   const notInRoster = !!(roster && roster.fixedAt && !(roster.works || []).some((w) => w && String(w.sid) === sid));
   const canSkip = stageAtLeast(stage, "self1");
 
+  /* 확정 여부를 묻기 전의 검사. ConfirmButton의 precheck로 쓴다 */
+  const submitCheck = () => {
+    if (sampleMode) { setWarn("예시 화면에서는 저장되지 않습니다."); return false; }
+    if (!d.no.trim()) { setWarn("작품 번호가 비어 있습니다. 7차시 「전시 출품」에서 받은 번호를 적어 주세요."); return false; }
+    if (!d.title.trim()) { setWarn("작품 제목을 적어 주세요."); return false; }
+    if (img === undefined) { setWarn("대표 이미지를 아직 읽는 중입니다. 잠시 뒤 다시 눌러 주세요."); return false; }
+    if (!img) { setWarn("대표 이미지가 없어 제출할 수 없습니다. 7차시 「전시 출품」에서 대표 이미지를 먼저 올린 뒤 이 화면으로 돌아오세요."); return false; }
+    return true;
+  };
   const submit = async () => {
-    if (sampleMode) { setWarn("예시 화면에서는 저장되지 않습니다."); return; }
-    if (!d.no.trim()) { setWarn("작품 번호가 비어 있습니다. 7차시 「전시 출품」에서 받은 번호를 적어 주세요."); return; }
-    if (!d.title.trim()) { setWarn("작품 제목을 적어 주세요."); return; }
-    if (img === undefined) { setWarn("대표 이미지를 아직 읽는 중입니다. 잠시 뒤 다시 눌러 주세요."); return; }
-    if (!img) { setWarn("대표 이미지가 없어 제출할 수 없습니다. 7차시 「전시 출품」에서 대표 이미지를 먼저 올린 뒤 이 화면으로 돌아오세요."); return; }
-    if (!window.confirm("제출을 확정하면 이 내용이 그대로 고정되어 우리 반의 비교 대상이 됩니다. 고치려면 선생님께 해제를 요청해야 합니다. 지금 확정할까요?")) return;
+    if (!submitCheck()) return;
     setBusy(true); setWarn("");
     let enc;
     try { enc = await reencode(img); }
@@ -402,7 +407,9 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
         </div>
         {warn && <div className="warn-note" role="alert">{warn}</div>}
         <div className="sv-foot">
-          <button className="btn" disabled={busy || sampleMode} onClick={submit}>{busy ? "저장 중…" : "제출 확정"}</button>
+          <ConfirmButton className="btn" disabled={busy || sampleMode} precheck={submitCheck} onConfirm={submit} yes="확정"
+            ask="제출을 확정하면 이 내용이 그대로 고정되어 우리 반의 비교 대상이 됩니다. 고치려면 선생님께 해제를 요청해야 합니다. 지금 확정할까요?"
+            label={busy ? "저장 중…" : "제출 확정"} />
           {canSkip && <button type="button" className="btn ghost" disabled={busy || sampleMode} onClick={onSkip}>제출하지 않고 다음 단계로</button>}
           <span className="hint">확정하면 고칠 수 없습니다. 이미지는 긴 변 {SUB_MAX_PX}px로 줄인 사본을 따로 저장합니다.{canSkip ? " 제출하지 않아도 판정에는 참여합니다." : ""}</span>
         </div>
@@ -454,15 +461,15 @@ export function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sa
     if (!ok) setWarn("저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요. 적은 내용은 이 화면에 그대로 남아 있습니다.");
     return ok;
   };
+  /* 제출·확정 여부를 묻기 전의 검사. ConfirmButton의 precheck로 쓴다 */
+  const precheck1 = () => { const e = check(); if (e) { setWarn(e); return false; } return true; };
   const submit1 = async () => {
-    const e = check(); if (e) { setWarn(e); return; }
-    if (!window.confirm("제출하면 답을 고칠 수 없습니다. 지금 제출할까요?")) return;
+    if (!precheck1()) return;
     const p = body(); const at = nowISO();
     await save({ ...p, submittedAt: at, durSec: durOf(p.startedAt, at) });
   };
   const lock2 = async () => {
-    const e = check(); if (e) { setWarn(e); return; }
-    if (!window.confirm("확정하면 점수와 근거를 고칠 수 없습니다. 지금 확정할까요?")) return;
+    if (!precheck1()) return;
     const p = body();
     await save({ ...p, lockedAt: nowISO(), submittedAt: null });
   };
@@ -580,9 +587,9 @@ export function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sa
         )}
         {warn && <div className="warn-note" role="alert">{warn}</div>}
         <div className="sv-foot">
-          <button className="btn" disabled={busy || sampleMode} onClick={isS2 ? lock2 : submit1}>
-            {busy ? "저장 중…" : isS2 ? "현재 점수 확정" : "제출하기"}
-          </button>
+          <ConfirmButton className="btn" disabled={busy || sampleMode} precheck={precheck1} onConfirm={isS2 ? lock2 : submit1}
+            ask={isS2 ? "확정하면 점수와 근거를 고칠 수 없습니다. 지금 확정할까요?" : "제출하면 답을 고칠 수 없습니다. 지금 제출할까요?"} yes={isS2 ? "확정" : "제출"}
+            label={busy ? "저장 중…" : isS2 ? "현재 점수 확정" : "제출하기"} />
           <span className="hint">{isS2 ? "확정하면 점수와 근거를 고칠 수 없습니다. 확정한 뒤에 처음 평가와 나란히 봅니다." : "제출하면 고칠 수 없습니다."}</span>
         </div>
       </div>
