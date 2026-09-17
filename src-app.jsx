@@ -22,6 +22,7 @@ import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { LabelCompare } from "./src-label-compare.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
 import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, InquiryStyle, inquiryTraceRows } from "./src-inquiry.jsx";
+import { makeSnapshotter, WsHistoryCard } from "./src-ws-history.jsx";
 import {
   ATTITUDES, ATTITUDE_HINTS, LADDER_INTRO, TRANSLATE_STAGES, REFLECT_KEYS, DERIVE_KEYS,
   LEGACY_BACK, normBack, backLabel, SYMBOL_WORDS, findSymbol, SCHEMA_REV, REV_SECTIONS,
@@ -4885,6 +4886,7 @@ function StudentApp({ me, onExit, onGallery }) {
   useContent();                              // 교사가 수업 내용을 고치면 이 화면도 다시 그린다
   useEffect(() => watchContent(), []);
   const WSKEY = "ws:" + me.sid;
+  const snapWs = useRef(makeSnapshotter(me.sid)); // 저장 성공 때마다 1시간 단위 사본 (src-ws-history.jsx)
   const [ws, setWs] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [readErr, setReadErr] = useState(false); // 최초 로드 실패 — 덮어쓰기를 막으려 학습지를 잠근다
@@ -5054,6 +5056,7 @@ function StudentApp({ me, onExit, onGallery }) {
         setWs(data);
       }
       setSavedAt(data._updatedAt);
+      snapWs.current(data);
       if (dirtyRef.current) { setSaveState("dirty"); doSave(); }
       else setSaveState("saved");
     } else {
@@ -5728,6 +5731,8 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
           ) : (
             <div>
               {mgmtMsg && <div className="ok-note">{mgmtMsg}</div>}
+
+              <WsHistoryCard sid={sid} ws={ws} busy={busyMgmt} setMsg={setMgmtMsg} onRestored={(w) => setWs(w)} />
 
               <div className="card">
                 <div className="card-head"><span className="card-code">관리 1</span><span className="card-title">별명 변경</span></div>

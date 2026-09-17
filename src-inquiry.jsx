@@ -20,9 +20,11 @@ import { fbStore } from "./src-fb.js";
      ④ 같은 칸에서 고친다 — 덧붙여도, 지워도, 뒤집어도 된다. 첫 답과 고친 답이 나란히 남는다.
 
    발판은 차시가 갈수록 물러난다 (fading)
-     전부(1·2차시)  출발점 보임 · 되묻기 둘 자동
-     되묻기·스스로(3~5차시)  출발점 접힘 · 되묻기 하나 자동 + 스스로 묻는 물음 하나
-     스스로(6~8차시)  출발점 없음 · 스스로 묻는 물음 먼저, 되묻기는 요청할 때만
+     전부(1·2차시)  되묻기 둘 자동
+     되묻기·스스로(3~5차시)  되묻기 하나 자동 + 스스로 묻는 물음 하나
+     스스로(6~8차시)  스스로 묻는 물음 먼저, 되묻기는 요청할 때만
+   출발점(사례에서·반례에서…) 칩은 2026-09-17에 학생 화면에서 뺐다. 학생에게 무엇을 고르라는 것인지
+   전해지지 않았고 물음 위에 낯선 낱말만 늘어놓았다. 옛 기록의 route 값은 교사 열람에만 남는다.
      교사는 「차시 공개」 탭에서 차시별로 수준을 바꿀 수 있다 (config.inqAid).
 
    되묻기를 쓸 때 지킨 규칙
@@ -32,7 +34,7 @@ import { fbStore } from "./src-fb.js";
      · 한 문장. 답을 요구하되 형식을 요구하지 않는다
 
    기록되는 것 (worksheets/{학번}._inq[필드키])
-     route 출발점 · v1 첫 답 · v1At · v1Level 그때의 지원 수준 · probes 받은 되묻기(id·문장·시각)
+     route 출발점(옛 기록만) · v1 첫 답 · v1At · v1Level 그때의 지원 수준 · probes 받은 되묻기(id·문장·시각)
      selfQ 스스로 쓴 물음 · revAt 첫 답 뒤 마지막으로 고친 시각
      밑줄 키라 붙여넣기 분모·미디어 참조·코딩 시트 순회에서 자동으로 빠진다.
      연구 CSV 「탐구 되묻기 단위」와 교사 기록 열람의 「되묻기 흔적」이 이 값을 읽는다.
@@ -45,9 +47,9 @@ const REV_GAP_MS = 30000;   // 고친 시각은 30초에 한 번만 갱신 (매 
 
 /* ---------- 지원 수준 ---------- */
 export const INQ_LEVELS = [
-  { k: "full", label: "전부", sub: "출발점 보임 · 첫 답 뒤 되묻기 둘(물음별 하나 + 공통 하나)이 바로 옴" },
-  { k: "probe", label: "되묻기·스스로", sub: "출발점 접힘 · 되묻기 하나 + 스스로 묻는 물음 하나" },
-  { k: "self", label: "스스로", sub: "출발점 없음 · 스스로 묻는 물음 먼저, 되묻기는 요청할 때만" },
+  { k: "full", label: "전부", sub: "첫 답 뒤 되묻기 둘(물음별 하나 + 공통 하나)이 바로 옴" },
+  { k: "probe", label: "되묻기·스스로", sub: "되묻기 하나 + 스스로 묻는 물음 하나" },
+  { k: "self", label: "스스로", sub: "스스로 묻는 물음 먼저, 되묻기는 요청할 때만" },
 ];
 /* 기본 일정 — 앞에서는 앱이 묻고 뒤로 갈수록 학생이 묻는다 */
 export const INQ_SUPPORT = { 1: "full", 2: "full", 3: "probe", 4: "probe", 5: "probe", 6: "self", 7: "self", 8: "self" };
@@ -59,7 +61,7 @@ export function inqLevel(cfg, code) {
 }
 const levelLabel = (k) => ((INQ_LEVELS.find((l) => l.k === k) || {}).label || k);
 
-/* ---------- 출발점 — 내용이 아니라 들어가는 길만 다르게 ---------- */
+/* ---------- 출발점 — 학생 화면에서는 뺐고, 옛 기록(_inq.route)의 이름 풀이에만 쓴다 ---------- */
 export const INQ_ROUTES = [
   { k: "case", label: "사례에서", sub: "오늘 본 것 하나를 붙잡고 시작합니다", ph: "…을 보면 …" },
   { k: "counter", label: "반례에서", sub: "이 물음이 맞지 않는 경우부터 찾습니다", ph: "…인 경우에는 그렇지 않다. 그렇다면 …" },
@@ -103,8 +105,8 @@ export const INQ_STEMS = [
 /* ---------- 탐구 질문 정의 — SCHEMA_DEF의 q1~q8 자리에 들어간다 ----------
    필드 키(concept·design·debate·reflect)는 저장 자리라 바꾸지 않는다.
    steps 대신 probes(물음별 되묻기)를 둔다. 교사가 「수업 편집」에서 고칠 수 있다. */
-const NOTE = "정해진 답이 없는 질문입니다. 먼저 쓰고, 되묻는 물음을 받아 고칩니다. 첫 답과 고친 답이 함께 남습니다. 어느 입장인지는 평가하지 않고, 근거와 되묻기 뒤에 답이 어떻게 움직였는지를 봅니다.";
-const inqSec = (n, fields) => ({ id: "q" + n, session: n + "차시", code: String(n), kind: "inquiry", title: "탐구 질문", note: NOTE, fields });
+/* 구간 안내문은 두지 않는다 (2026-09-17). 물음 자체가 안내이고, 절차 설명은 칸 아래 한 줄이면 된다. */
+const inqSec = (n, fields) => ({ id: "q" + n, session: n + "차시", code: String(n), kind: "inquiry", title: "탐구 질문", fields });
 const concept = (label, probes) => ({ k: "concept", t: "area", qtype: "개념", label, probes });
 const design = (label, probes) => ({ k: "design", t: "area", qtype: "설계", pair: true, label, probes });
 const debate = (label) => ({ k: "debate", t: "debate", qtype: "논쟁", label });
@@ -285,21 +287,6 @@ export function textSim(a, b) {
 
 /* ---------- 학생 화면 ---------- */
 
-function RouteChips({ order, cur, onPick }) {
-  return (
-    <div className="inq-routes" role="group" aria-label="출발점">
-      {order.map((i) => {
-        const r = INQ_ROUTES[i];
-        const on = cur === r.k;
-        return (
-          <button type="button" key={r.k} className={"inq-chip " + (on ? "on" : "")} aria-pressed={on}
-            title={r.sub} onClick={() => onPick(on ? "" : r.k)}>{r.label}</button>
-        );
-      })}
-    </div>
-  );
-}
-
 function SelfQ({ value, onChange, level }) {
   const [stems, setStems] = useState(level !== "self");
   return (
@@ -324,12 +311,9 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
   const seed = String(sid || "") + "|" + key;
   const specific = Array.isArray(f.probes) ? f.probes.filter(filled) : [];
   const generic = INQ_GENERIC[f.qtype] || INQ_GENERIC["개념"];
-  const [routesOpen, setRoutesOpen] = useState(false);
   const [showV1, setShowV1] = useState(false);
 
   const setTr = (patch) => setField("_inq", { ...all, [key]: { ...tr, ...patch } });
-  const route = INQ_ROUTES.find((r) => r.k === tr.route);
-  const routeOrder = seededOrder(INQ_ROUTES.length, seed + "|r");
   const sOrder = seededOrder(specific.length, seed + "|s");
   const gOrder = seededOrder(generic.length, seed + "|g");
   const drawn = tr.drawn || { s: 0, g: 0 };
@@ -372,8 +356,7 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
     if (tr.v1 && (!tr.revAt || Date.now() - new Date(tr.revAt).getTime() > REV_GAP_MS)) setTr({ revAt: now() });
   };
 
-  const showRoutes = level === "full" || (level === "probe" && routesOpen);
-  const ph = route ? route.ph : "물음을 읽고 지금 떠오르는 대로 씁니다. 틀려도 됩니다.";
+  const ph = "자기 생각을 씁니다. 틀려도 됩니다.";
   const changed = tr.v1 ? textSim(tr.v1, text) < 0.9 || Math.abs(text.trim().length - tr.v1.trim().length) > 8 : false;
 
   return (
@@ -383,20 +366,6 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
         <label style={{ margin: 0 }}>{f.label}</label>
       </div>
       {echo}
-      {level !== "self" && (
-        <div className="inq-start">
-          <span className="inq-acc">출발점</span>
-          {showRoutes ? (
-            <>
-              <span className="inq-sub">골라도 되고 그냥 써도 됩니다. 고르면 들어가는 길만 달라집니다.</span>
-              <RouteChips order={routeOrder} cur={tr.route || ""} onPick={(k) => setTr({ route: k, routeAt: now() })} />
-              {route && <div className="inq-sub" style={{ marginTop: 4 }}>{route.label}: {route.sub}</div>}
-            </>
-          ) : (
-            <button type="button" className="inq-link" onClick={() => setRoutesOpen(true)}>출발점이 필요하면 ▸</button>
-          )}
-        </div>
-      )}
       <textarea rows={f.rows || 4} value={text} maxLength={4000} placeholder={ph} onChange={(e) => onText(e.target.value)} />
       {!tr.v1 ? (
         <div className="inq-foot">
@@ -406,16 +375,16 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
             </button>
           ) : null}
           <span className="hint">
-            {!text.trim() ? "다 쓰면 「첫 답 확정」 버튼이 나타납니다. 확정한 뒤에 되묻는 물음을 받고, 그 물음에 답하며 글을 고칩니다."
-              : text.trim().length < MIN_V1 ? "조금 더 쓰면(" + MIN_V1 + "자부터) 「첫 답 확정」 버튼이 나타납니다."
-              : "확정하면 지금 글이 첫 답으로 따로 남습니다. 그 뒤에 고친 글은 첫 답과 나란히 기록됩니다."}
+            {!text.trim() ? "다 쓰면 「첫 답 확정」 버튼이 나타납니다."
+              : text.trim().length < MIN_V1 ? MIN_V1 + "자부터 「첫 답 확정」 버튼이 나타납니다."
+              : "확정하면 지금 글이 첫 답으로 남고, 되묻는 물음을 받습니다."}
           </span>
         </div>
       ) : (
         <div className="inq-probe">
           <div className="inq-pt">
             <span className="inq-acc">되묻기</span>
-            첫 답({tr.v1.trim().length}자)은 따로 남았습니다. 아래 물음에 답하면서 <b>위 칸의 글을 고칩니다</b>. 덧붙여도, 지워도, 뒤집어도 됩니다.
+            아래 물음에 답하면서 <b>위 칸의 글을 고칩니다</b>. 첫 답은 따로 남아 있습니다.
           </div>
           {level === "self" && <SelfQ level={level} value={tr.selfQ} onChange={(v) => setTr({ selfQ: v, selfQAt: now() })} />}
           {probes.length > 0 && (
@@ -431,7 +400,7 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
               </button>
             )}
             <button type="button" className="inq-link" onClick={() => setShowV1(!showV1)}>{showV1 ? "첫 답 접기" : "첫 답 보기"}</button>
-            <span className="hint">{changed ? "첫 답에서 움직였습니다." : "아직 첫 답 그대로입니다. 되묻기에 고칠 곳이 없다면, 왜 없는지를 덧붙이는 것도 답이 됩니다."}</span>
+            <span className="hint">{changed ? "첫 답에서 움직였습니다." : "아직 첫 답 그대로입니다."}</span>
           </div>
           {showV1 && <div className="inq-v1"><div className="inq-l">첫 답 · {fmtShort(tr.v1At)}</div>{tr.v1}</div>}
         </div>
@@ -529,7 +498,7 @@ export function InquiryAidConfig({ cfgAll, setCfgAll, setMsg }) {
         </ul>
         <p className="hint" style={{ marginTop: 6 }}>
           되묻기 문장은 「수업 편집」 탭의 탐구 질문 항목에서 고칩니다. 답의 보기를 나열하지 않고, 학생이 쓴 것을 가리키는 한 문장으로 씁니다.
-          공통 되묻기(개념 {INQ_GENERIC["개념"].length}개 · 설계 {INQ_GENERIC["설계"].length}개)와 출발점 다섯은 코드에 있습니다.
+          공통 되묻기(개념 {INQ_GENERIC["개념"].length}개 · 설계 {INQ_GENERIC["설계"].length}개)는 코드에 있습니다.
         </p>
       </div>
     </div>

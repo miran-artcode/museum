@@ -7,7 +7,7 @@
 import { initializeApp } from "firebase/app";
 import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
-  doc, getDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc,
+  doc, getDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc, query, where,
   serverTimestamp, arrayUnion, getDocFromServer, getDocsFromServer,
 } from "firebase/firestore";
 import {
@@ -107,6 +107,8 @@ function route(key) {
   if (key === "config") return { kind: "doc", path: ["meta", "config"] };
   if (key === "roster") return { kind: "roster" };
   if (key.startsWith("ws:")) return { kind: "doc", path: ["worksheets", safe(key.slice(3))] };
+  // 기록지 시점 사본: {학번}_{YYYYMMDDHH} — 자동 저장 때 학생이 쓰고 교사가 되돌린다 (src-ws-history.jsx)
+  if (key.startsWith("wsh:")) return { kind: "doc", path: ["wsHistory", safe(key.slice(4))] };
   if (key.startsWith("grade:")) return { kind: "doc", path: ["grades", safe(key.slice(6))] };
   if (key.startsWith("survey:")) return { kind: "doc", path: ["surveys", safe(key.slice(7))] };
   if (key.startsWith("media:")) return { kind: "doc", path: ["media", safe(key.slice(6))] };
@@ -215,6 +217,16 @@ export const fbStore = {
       const data = s.data();
       cb(data && data.v !== undefined ? data.v : data);
     }, () => {});
+  },
+
+  /* 한 학생의 기록지 시점 사본 목록. 실패와 없음을 구분한다 (되돌리기 화면이 빈 목록을 "없음"으로 보이면 안 되므로) */
+  async listWsHistory(sid) {
+    try {
+      const snap = await getDocs(query(collection(db, "wsHistory"), where("v.sid", "==", String(sid))));
+      const out = [];
+      snap.forEach((d) => { const x = d.data(); const v = x && x.v !== undefined ? x.v : x; if (v && v.ws) out.push({ id: d.id, ...v }); });
+      return { ok: true, data: out };
+    } catch (e) { console.error("history read fail", sid, e); return { ok: false, data: [] }; }
   },
 
   watchStudents(cb) {

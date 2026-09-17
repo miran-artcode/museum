@@ -42,6 +42,14 @@ service cloud.firestore {
       allow delete: if isTeacher();
     }
 
+    // 기록지 시점 사본: 문서 이름이 {학번}_{시간대}라 앞부분으로 소유자를 판별한다.
+    // 학생 화면의 자동 저장이 만들고, 교사가 「관리」 탭에서 읽어 그 시점으로 되돌린다 (src-ws-history.jsx)
+    match /wsHistory/{docId} {
+      allow read: if isTeacher() || (signedIn() && docId.split('_')[0] == uid());
+      allow create, update: if signedIn() && (docId.split('_')[0] == uid() || isTeacher()) && sizeOk();
+      allow delete: if isTeacher();
+    }
+
     // 채점 기록: 본인은 읽기만, 쓰기는 교사만
     match /grades/{sid} {
       allow read: if isOwner(sid) || isTeacher();
