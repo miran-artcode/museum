@@ -61,11 +61,11 @@ const levelLabel = (k) => ((INQ_LEVELS.find((l) => l.k === k) || {}).label || k)
 
 /* ---------- 출발점 — 내용이 아니라 들어가는 길만 다르게 ---------- */
 export const INQ_ROUTES = [
-  { k: "case", label: "사례에서", sub: "오늘 본 것 하나를 붙잡고 시작합니다", ph: "…을 보면," },
-  { k: "counter", label: "반례에서", sub: "이 물음이 맞지 않는 경우부터 찾습니다", ph: "…인 경우에는 그렇지 않다. 그렇다면" },
-  { k: "exp", label: "내 경험에서", sub: "내가 겪은 일에서 출발합니다", ph: "내가 …했을 때," },
-  { k: "word", label: "낱말을 따지며", sub: "물음 속 낱말 하나의 뜻을 먼저 정합니다", ph: "여기서 ‘…’은 …을 뜻한다고 치면," },
-  { k: "push", label: "끝까지 밀어서", sub: "물음을 극단까지 밀어 봅니다", ph: "만약 …이 전부라면," },
+  { k: "case", label: "사례에서", sub: "오늘 본 것 하나를 붙잡고 시작합니다", ph: "…을 보면 …" },
+  { k: "counter", label: "반례에서", sub: "이 물음이 맞지 않는 경우부터 찾습니다", ph: "…인 경우에는 그렇지 않다. 그렇다면 …" },
+  { k: "exp", label: "내 경험에서", sub: "내가 겪은 일에서 출발합니다", ph: "내가 …했을 때 …" },
+  { k: "word", label: "낱말을 따지며", sub: "물음 속 낱말 하나의 뜻을 먼저 정합니다", ph: "여기서 ‘…’은 …을 뜻한다고 치면 …" },
+  { k: "push", label: "끝까지 밀어서", sub: "물음을 극단까지 밀어 봅니다", ph: "만약 …이 전부라면 …" },
 ];
 
 /* ---------- 공통 되묻기 — 개념·설계에 두루 쓰는 것 ---------- */
@@ -97,7 +97,7 @@ export const INQ_STEMS = [
   "누구의 자리에서 보면 달라지는가",
   "…를 뒤집으면 무엇이 무너지는가",
   "내 답에서 가장 약한 곳은 어디인가",
-  "이 답은 어디까지 맞는가, 항상인가 대체로인가",
+  "이 답은 어디까지 맞는가(항상인가, 대체로인가)",
 ];
 
 /* ---------- 탐구 질문 정의 — SCHEMA_DEF의 q1~q8 자리에 들어간다 ----------
@@ -373,7 +373,7 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
   };
 
   const showRoutes = level === "full" || (level === "probe" && routesOpen);
-  const ph = route ? route.ph : (level === "self" ? "" : "먼저 씁니다. 틀려도 됩니다. 되묻기는 그다음에 옵니다.");
+  const ph = route ? route.ph : "물음을 읽고 지금 떠오르는 대로 씁니다. 틀려도 됩니다.";
   const changed = tr.v1 ? textSim(tr.v1, text) < 0.9 || Math.abs(text.trim().length - tr.v1.trim().length) > 8 : false;
 
   return (
@@ -402,20 +402,20 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
         <div className="inq-foot">
           {text.trim().length >= MIN_V1 ? (
             <button type="button" className="btn small" onClick={freeze}>
-              {level === "self" ? "첫 답 확정 → 스스로 되묻기" : "첫 답 확정 → 되묻기 받기"}
+              {level === "self" ? "첫 답을 확정하고 스스로 되묻기" : "첫 답을 확정하고 되묻기 받기"}
             </button>
           ) : null}
           <span className="hint">
-            {!text.trim() ? "먼저 씁니다. 다 쓰면 「첫 답 확정」으로 넘어갑니다."
-              : text.trim().length < MIN_V1 ? "조금 더 쓰면 첫 답을 확정할 수 있습니다."
-              : "확정하면 지금 글이 첫 답으로 남고, 그 뒤에 고친 것과 나란히 기록됩니다."}
+            {!text.trim() ? "다 쓰면 「첫 답 확정」 버튼이 나타납니다. 확정한 뒤에 되묻는 물음을 받고, 그 물음에 답하며 글을 고칩니다."
+              : text.trim().length < MIN_V1 ? "조금 더 쓰면(" + MIN_V1 + "자부터) 「첫 답 확정」 버튼이 나타납니다."
+              : "확정하면 지금 글이 첫 답으로 따로 남습니다. 그 뒤에 고친 글은 첫 답과 나란히 기록됩니다."}
           </span>
         </div>
       ) : (
         <div className="inq-probe">
           <div className="inq-pt">
             <span className="inq-acc">되묻기</span>
-            첫 답은 남았습니다 ({tr.v1.trim().length}자). 아래 물음에 답하며 <b>위 칸을 고칩니다</b>. 덧붙여도, 지워도, 뒤집어도 됩니다.
+            첫 답({tr.v1.trim().length}자)은 따로 남았습니다. 아래 물음에 답하면서 <b>위 칸의 글을 고칩니다</b>. 덧붙여도, 지워도, 뒤집어도 됩니다.
           </div>
           {level === "self" && <SelfQ level={level} value={tr.selfQ} onChange={(v) => setTr({ selfQ: v, selfQAt: now() })} />}
           {probes.length > 0 && (
@@ -431,7 +431,7 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
               </button>
             )}
             <button type="button" className="inq-link" onClick={() => setShowV1(!showV1)}>{showV1 ? "첫 답 접기" : "첫 답 보기"}</button>
-            <span className="hint">{changed ? "첫 답에서 움직였습니다." : "아직 첫 답 그대로입니다. 되묻기에 답할 곳이 없다면 왜 없는지도 답이 됩니다."}</span>
+            <span className="hint">{changed ? "첫 답에서 움직였습니다." : "아직 첫 답 그대로입니다. 되묻기에 고칠 곳이 없다면, 왜 없는지를 덧붙이는 것도 답이 됩니다."}</span>
           </div>
           {showV1 && <div className="inq-v1"><div className="inq-l">첫 답 · {fmtShort(tr.v1At)}</div>{tr.v1}</div>}
         </div>
