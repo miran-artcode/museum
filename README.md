@@ -133,7 +133,7 @@ git push -u origin main
 ```
 public/index.html      화면 뼈대
 public/app.js          앱 번들 (React + Firebase)
-public/img/lessons/    차시 읽기 자료 그림: L{n}_s*는 학생용 PPT에서 옮긴 도판, L{n}_w_*는 웹에서 구한 작품 사진(출처·라이선스는 SOURCES.md)
+public/img/lessons/    차시 읽기 자료 그림: 모두 L{n}_w_* 원본 출처 도판(미술관·작가 공식 사이트·위키미디어 공용, 출처·라이선스는 SOURCES.md). 옛 L{n}_s* PPT 도판은 2026-09-17에 모두 교체·삭제
 src-app.jsx            앱 소스
 src-lessons.jsx        차시별 수업 자료 원본 LESSONS_DEF (읽기 자료·발문·그림·작품 표)
 src-content.jsx        수업 내용 편집 계층 (발문·이론·그림·링크)

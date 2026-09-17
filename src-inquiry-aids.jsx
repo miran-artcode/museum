@@ -48,7 +48,15 @@ function shortLabel(cap) {
   return s.length > 32 ? s.slice(0, 31) + "…" : s;
 }
 
-/* 도판 캡션의 「작품명」으로 그 차시 작품표의 행을 찾아 작가·연도를 붙인다 */
+/* 도판 캡션의 「작품명」으로 그 차시 작품표의 행을 찾아 작가·연도를 붙인다.
+   같은 작품의 사진이 여러 장이면(설치 전경과 부분, 기록 사진 둘) 한 작품으로 묶어
+   조각 하나만 보이고, 크게 보기에서 사진을 모두 보여 준다. 묶는 열쇠는 캡션의
+   첫 「작품명」이고, 작품명이 없는 자료(도표·현장 사진)는 파일 하나가 한 자료다. */
+function workKey(im) {
+  const q = ((String(im.cap || "").match(/「([^」]+)」/) || [])[1] || "").replace(/\s*[(（][^)）]*[)）]\s*/g, "").trim();
+  return q ? "w:" + q : "s:" + im.src;
+}
+
 function buildItems(L) {
   if (!L || !Array.isArray(L.readings)) return [];
   const imgs = [], works = [];
@@ -56,18 +64,19 @@ function buildItems(L) {
     for (const im of (rd.images || [])) if (im && im.src) imgs.push(im);
     for (const w of (rd.works || [])) if (w) works.push(w);
   }
-  const seenSrc = new Set(), usedName = {}, out = [];
+  const seenSrc = new Set(), byKey = {}, out = [];
   for (const im of imgs) {
     if (seenSrc.has(im.src)) continue;
     seenSrc.add(im.src);
-    /* 「마지막 사진들(The Last Pictures)」처럼 괄호 안 원어가 붙은 제목은 조각에서 떼어 낸다 */
-    const q = ((String(im.cap || "").match(/「([^」]+)」/) || [])[1] || "").replace(/\s*[(（][^)）]*[)）]\s*/g, "").trim();
+    const key = workKey(im);
+    if (byKey[key]) { byKey[key].imgs.push(im); continue; }
+    const q = key.slice(0, 2) === "w:" ? key.slice(2) : "";
     const w = q ? works.find((x) => String(x.w).includes(q)) : null;
     let name = q ? "「" + q + "」" : shortLabel(im.cap);
     if (name.length > 24) name = name.slice(0, 23) + "…";
-    usedName[name] = (usedName[name] || 0) + 1;
-    if (usedName[name] > 1) name = name + " " + (["", "", "②", "③", "④"][Math.min(usedName[name], 4)]);
-    out.push({ img: im, name, sub: w ? w.a + " · " + w.y : "" });
+    const it = { key, imgs: [im], name, sub: w ? w.a + " · " + w.y : "" };
+    byKey[key] = it;
+    out.push(it);
   }
   return out;
 }
@@ -87,24 +96,25 @@ function LessonStrip({ L }) {
       </div>
       <div className="iaid-row">
         {items.map((it, i) => (
-          <button type="button" key={it.img.src + i} className={"iaid-tile " + (sel === i ? "on" : "")}
+          <button type="button" key={it.key} className={"iaid-tile " + (sel === i ? "on" : "")}
             aria-pressed={sel === i} onClick={() => setSel(sel === i ? -1 : i)}>
-            <div className="iaid-th"><AidImg img={it.img} alt={it.name} /></div>
-            <div className="iaid-nm">{it.name}</div>
+            <div className="iaid-th"><AidImg img={it.imgs[0]} alt={it.name} /></div>
+            <div className="iaid-nm">{it.name}{it.imgs.length > 1 ? " · 사진 " + it.imgs.length + "장" : ""}</div>
             {it.sub && <div className="iaid-sb">{it.sub}</div>}
           </button>
         ))}
       </div>
-      {cur && (
-        <div className="iaid-detail">
-          <div className="iaid-big"><AidImg img={cur.img} alt={cur.name} /></div>
+      {cur && cur.imgs.map((im, j) => (
+        <div className="iaid-detail" key={im.src}>
+          <div className="iaid-big"><AidImg img={im} alt={cur.name + (cur.imgs.length > 1 ? " " + (j + 1) : "")} /></div>
           <div className="iaid-cap">
-            {cur.img.cap}
-            {cur.img.credit && <span className="iaid-cr">{cur.img.credit}</span>}
-            {cur.img.link && <a href={cur.img.link} target="_blank" rel="noopener noreferrer">원본 보기 ↗</a>}
+            {im.cap}
+            {im.credit && <span className="iaid-cr">{im.credit}</span>}
+            {im.link && <a href={im.link} target="_blank" rel="noopener noreferrer">원본 보기 ↗</a>}
+            {im.srcPage && <a href={im.srcPage} target="_blank" rel="noopener noreferrer">파일 출처 ↗</a>}
           </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -232,7 +242,7 @@ export function InquirySource({ sec, ws, lessons, Thumb, owner, onGallery }) {
 .iaid-big img{max-width:100%;max-height:46vh;width:auto;height:auto;display:block}
 .iaid-cap{font-size:11.5px;color:var(--sub);line-height:1.65;padding-top:6px}
 .iaid-cr{display:block;font-family:var(--mono);font-size:10.5px;padding-top:3px}
-.iaid-cap a{display:inline-block;margin-top:4px;color:var(--seal)}
+.iaid-cap a{display:inline-block;margin-top:4px;margin-right:10px;color:var(--seal)}
 .iaid-load{font-size:11px;color:var(--sub)}
 .iaid-empty{font-size:11.5px;color:var(--sub);line-height:1.65}
 .iaid-go{border:1px solid var(--patina);background:var(--patina-bg);color:var(--patina);font-family:var(--sans);font-size:12.5px;padding:6px 12px;cursor:pointer}
