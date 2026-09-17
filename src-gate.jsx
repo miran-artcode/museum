@@ -15,7 +15,7 @@ export const GATE_SECTIONS = [
     en: "QUESTION",
     title: "무엇이 미술이 되는가",
     body: "레디메이드·개념미술·극사실주의 감상, 나의 미술 정의문 쓰기",
-    img: "/img/lessons/L1_s14_1.jpg",
+    img: "/img/lessons/L1_w_lewitt.jpg",
     alt: "솔 르윗의 흑백 줄무늬 벽화가 걸린 전시장",
   },
   {
@@ -24,7 +24,7 @@ export const GATE_SECTIONS = [
     en: "DESIGN",
     title: "문제 관찰과 유물 설계",
     body: "사회참여 미술 감상과 문제 관찰, 허구 유물의 세계관·화면 설계",
-    img: "/img/lessons/L4_s27_4.jpg",
+    img: "/img/lessons/L2_w_maebyeong.jpg",
     alt: "학 무늬가 상감된 청자 매병",
   },
   {
@@ -33,7 +33,7 @@ export const GATE_SECTIONS = [
     en: "GENERATE",
     title: "생성과 다듬기",
     body: "프롬프트 작성과 AI 이미지 생성·선별, 다듬기와 작품 캡션 문구",
-    img: "/img/lessons/L6_s30_3.jpg",
+    img: "/img/lessons/L6_w_kintsugi.jpg",
     alt: "금으로 이어 붙인 킨츠기 찻사발",
   },
   {
@@ -42,7 +42,7 @@ export const GATE_SECTIONS = [
     en: "EXHIBIT",
     title: "전시와 비평",
     body: "작품화와 전시 구성, 두 번의 관람과 상호 비평, 단원 성찰",
-    img: "/img/lessons/L3_s19_3.jpg",
+    img: "/img/lessons/L3_w_realpictures.jpg",
     alt: "어두운 전시장 바닥에서 빛을 받은 검은 인쇄물 더미",
   },
 ];
