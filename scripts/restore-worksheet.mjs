@@ -5,6 +5,8 @@
                                                        (백업 폴더 없이 Firestore 시점 복구에서 그 시점을 직접 읽는다. 최근 7일)
      npm run restore -- <백업 폴더> <학번> --to=<다른 학번>
                                                        백업의 학번 기록을 다른 학번에 넣는다 (학번을 잘못 쳐서 만든 계정의 기록을 옮길 때)
+     npm run restore -- <백업 폴더> <학번> --to=<다른 학번> --merge
+                                                       통째로 덮지 않고, 다른 학번의 빈 칸만 백업의 값으로 채운다 (두 학번에 모두 기록이 있을 때)
      끝에 --yes 를 붙이면 확인 질문 없이 실행한다.
 
    실행 순서: ① 지금 상태를 wsHistory/{학번}_r{시각} 사본으로 먼저 남긴다 (실패하면 중단)
@@ -18,6 +20,7 @@ import { accessToken, getDoc, putDoc, BACKUP_DIR, unwrap, summarize } from "./fs
 const args = process.argv.slice(2);
 const opt = (name) => { const a = args.find((x) => x.startsWith(name + "=")); return a ? a.slice(name.length + 1) : ""; };
 const yes = args.includes("--yes");
+const merge = args.includes("--merge");
 const at = opt("--at");
 const to = opt("--to");
 const rest = args.filter((a) => !a.startsWith("--"));
@@ -48,6 +51,18 @@ if (!fromWs || typeof fromWs !== "object") { console.error("되돌릴 기록이 
 
 const curDoc = await getDoc(token, "worksheets", target);
 const cur = curDoc ? unwrap(curDoc) : null;
+/* --merge: 대상의 빈 칸만 백업 값으로 채운다. 밑줄 키(보조 기록)는 대상에 없을 때만 가져온다 */
+const empty = (v) => v == null || v === "" || (Array.isArray(v) && v.length === 0) || (typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0);
+if (merge) {
+  const out = { ...(cur || {}) };
+  let filledN = 0;
+  for (const k of Object.keys(fromWs)) {
+    if (k.charAt(0) === "_") { if (!(k in out)) out[k] = fromWs[k]; continue; }
+    if (empty(out[k]) && !empty(fromWs[k])) { out[k] = fromWs[k]; filledN++; }
+  }
+  console.log(`--merge: 대상의 빈 칸 ${filledN}개를 백업 값으로 채웁니다 (대상에 이미 있는 칸은 그대로).`);
+  fromWs = out;
+}
 const a = summarize(cur), b = summarize(fromWs);
 console.log(`대상: worksheets/${target}${to ? ` (백업의 ${sid} 기록을 옮김)` : ""}`);
 console.log(`지금:   채운 칸 ${a.fields}개, ${a.chars.toLocaleString()}자 (마지막 저장 ${cur && cur._updatedAt || "없음"})`);
