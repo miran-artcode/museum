@@ -5756,7 +5756,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
             <div>
               {mgmtMsg && <div className="ok-note">{mgmtMsg}</div>}
 
-              <WsHistoryCard sid={sid} ws={ws} busy={busyMgmt} setMsg={setMgmtMsg} onRestored={(w) => setWs(w)} />
+              {!authApi.isViewer() && <WsHistoryCard sid={sid} ws={ws} busy={busyMgmt} setMsg={setMgmtMsg} onRestored={(w) => setWs(w)} />}
 
               <div className="card">
                 <div className="card-head"><span className="card-code">관리 1</span><span className="card-title">별명 변경</span></div>

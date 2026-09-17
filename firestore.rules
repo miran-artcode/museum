@@ -27,7 +27,9 @@ service cloud.firestore {
     function isOwner(id) {
       return signedIn() && uid() == id;
     }
-    // 보기 전용 교사 계정(viewer@museum.class, 관리자 코드 자리에 admin): 교사가 읽는 것은 다 읽되 아무것도 쓰지 못한다
+    // 보기 전용 교사 계정(viewer@museum.class, 관리자 코드 자리에 admin): 수업 참관자·공동 연구자에게 나눠 주는 코드다.
+    // 수업 기록(기록지·채점·설문·상호평가·응시 기록·은행)은 읽되 아무것도 쓰지 못하고, 여러 사람이 아는 코드이므로
+    // 정답 키(quizKeys)·연구 동의 대장(research)·기록지 시점 사본(wsHistory)·media 전체 목록은 교사(teacher)만 읽는다.
     function isViewer() {
       return signedIn() && uid() == 'viewer';
     }
@@ -90,7 +92,7 @@ service cloud.firestore {
       return request.resource.data.get('v', {}).get('sid', '') == uid();
     }
     match /wsHistory/{docId} {
-      allow read: if canView() || (signedIn() && docId.split('_')[0] == uid());
+      allow read: if isTeacher() || (signedIn() && docId.split('_')[0] == uid());
       allow create: if isTeacher() || (signedIn() && docId.split('_')[0] == uid() && enrolled(uid()) && wshSidOk());
       allow update: if isTeacher() || (signedIn() && docId.split('_')[0] == uid() && wshSidOk());
       allow delete: if isTeacher();
@@ -117,7 +119,7 @@ service cloud.firestore {
     // 컬렉션 전체 목록(list)은 교사만: 학생 화면은 문서 이름으로만 읽으므로 목록이 열리면 학급 전체 미디어를 내려받을 수 있다.
     match /media/{mediaId} {
       allow get: if signedIn();
-      allow list: if canView();
+      allow list: if isTeacher();
       allow create: if isTeacher() || (signedIn() && mediaId.split('_')[0] == uid() && enrolled(uid()) && mediaSizeOk());
       allow update: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher()) && mediaSizeOk();
       allow delete: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher());
@@ -230,7 +232,7 @@ service cloud.firestore {
       allow write: if isTeacher();
     }
     match /quizKeys/{docId} {
-      allow read: if canView();
+      allow read: if isTeacher();
       allow write: if isTeacher();
     }
     match /quiz/{sid} {
@@ -263,7 +265,7 @@ service cloud.firestore {
     // 명부(students)에 두지 않는 이유 — 명부는 로그인한 학생 모두가 읽으므로
     // 누가 연구에서 빠졌는지가 학생끼리 보이게 된다. 동의 여부는 학생 사이에 드러나서는 안 된다.
     match /research/{docId} {
-      allow read: if canView();
+      allow read: if isTeacher();
       allow write: if isTeacher();
     }
 
