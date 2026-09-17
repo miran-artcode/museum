@@ -15,8 +15,8 @@ export const GATE_SECTIONS = [
     en: "QUESTION",
     title: "무엇이 미술이 되는가",
     body: "레디메이드·개념미술·극사실주의 감상, 나의 미술 정의문 쓰기",
-    img: "/img/lessons/L1_w_lewitt.jpg",
-    alt: "솔 르윗의 흑백 줄무늬 벽화가 걸린 전시장",
+    img: "/img/lessons/L1_w_stieglitz.jpg",
+    alt: "마르셀 뒤샹의 「샘」(1917), 앨프리드 스티글리츠가 찍은 기록 사진",
   },
   {
     no: "02",
@@ -24,8 +24,8 @@ export const GATE_SECTIONS = [
     en: "DESIGN",
     title: "문제 관찰과 유물 설계",
     body: "사회참여 미술 감상과 문제 관찰, 허구 유물의 세계관·화면 설계",
-    img: "/img/lessons/L2_w_maebyeong.jpg",
-    alt: "학 무늬가 상감된 청자 매병",
+    img: "/img/lessons/L2_w_maebyeong_nmk.jpg",
+    alt: "청자 상감 구름 학무늬 매병(고려, 국립중앙박물관 소장)",
   },
   {
     no: "03",
