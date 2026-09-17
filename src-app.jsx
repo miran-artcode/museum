@@ -4852,7 +4852,7 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
         <span className="card-title">{sec.title}{sec.hw && <span className="hw-chip">한 주 과제</span>}</span>
         <span className="card-sess">{sec.session}</span>
       </div>
-      {sec.note && <div className="card-note">{sec.note}</div>}
+      {sec.note && sec.kind !== "inquiry" && <div className="card-note">{sec.note}</div>}
       <div className="card-body">
         {sec.intro && <LadderIntro sec={sec} />}
         {sec.ladder && <LadderRail sec={sec} ws={ws} />}
@@ -9708,7 +9708,7 @@ function DemoView({ onBack }) {
                   <span className="card-title">{sec.title}</span>
                   <span className="card-sess">{sec.session}</span>
                 </div>
-                {sec.note && <div className="card-note">{sec.note}</div>}
+                {sec.note && sec.kind !== "inquiry" && <div className="card-note">{sec.note}</div>}
                 <div className="card-body">
                   {sec.fields.map((f) => <FieldReader key={f.k} sec={sec} f={f} ws={DEMO_WS} />)}
                 </div>
