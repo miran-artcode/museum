@@ -4742,7 +4742,11 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
     const rec = roster[id];
     const name = (nick.trim() || (rec && rec.nick) || "").slice(0, 12);
     if (!name) { setBusy(false); await authApi.leave(); return setErr("처음 입장할 때는 별명을 함께 입력하세요. 실명은 쓰지 않습니다."); }
-    if (!rec || rec.nick !== name) await store.set("roster", { [id]: { nick: name } });
+    if (!rec || rec.nick !== name) {
+      // 명단 잠금(교사 설정 4)이 켜져 있으면 명부에 없는 학번의 쓰기를 규칙이 거부한다
+      const okR = await store.set("roster", { [id]: { nick: name } });
+      if (!okR) { setBusy(false); await authApi.leave(); return setErr("명단에 없는 학번이거나 저장하지 못했습니다. 선생님께 학번 등록을 요청하세요."); }
+    }
     setBusy(false);
     onStudent({ sid: id, nick: name });
   };
@@ -8616,6 +8620,17 @@ function TeacherApp({ onExit, onGallery }) {
     } else setMsg("설정 저장에 실패했습니다.");
   };
 
+  /* 명단 잠금 — 켜면 명부에 없는 학번이 명부 문서를 만들지 못한다 (firestore.rules rosterLocked) */
+  const rosterLockOn = !!(cfgAll && cfgAll.rosterLock === true);
+  const toggleRosterLock = async () => {
+    const next = !rosterLockOn;
+    const ok = await store.setT("config", { rosterLock: next, rosterLockUpdated: now() }, { merge: true });
+    if (ok) {
+      setCfgAll({ ...(cfgAll || {}), rosterLock: next });
+      setMsg(next ? "명단 잠금을 켰습니다. 명부에 없는 학번은 입장하지 못합니다." : "명단 잠금을 껐습니다. 새 학번도 별명을 적고 입장할 수 있습니다.");
+    } else setMsg("설정 저장에 실패했습니다.");
+  };
+
   const toggleSurvey = async (phase) => {
     const cur = svCfg || DEFAULT_SURVEY;
     const next = { ...cur, [phase]: !surveyOpen(cur, phase) };
@@ -9032,7 +9047,7 @@ function TeacherApp({ onExit, onGallery }) {
                 <div className="card">
                   <div className="card-head"><span className="card-code">설정 2</span><span className="card-title">학생 비밀번호 안내</span></div>
                   <div className="card-body">
-                    <p style={{ fontSize: 13 }}>학생 비밀번호는 학급 서버가 암호화해 보관하므로 교사도 볼 수 없고 이 화면에서 바꿀 수 없습니다. 잊어버린 학생이 있으면 Firebase 콘솔의 Authentication 목록에서 해당 학번 계정을 지우세요. 학생이 같은 학번으로 다시 입장하면 새 비밀번호로 등록되고, 기록은 학번에 남아 있으므로 그대로 이어집니다.</p>
+                    <p style={{ fontSize: 13 }}>학생 비밀번호는 학급 서버가 암호화해 보관하므로 교사도 볼 수 없고 이 화면에서 바꿀 수 없습니다. 잊어버린 학생이 있으면 Firebase 콘솔의 Authentication 목록에서 해당 학번 계정을 지우세요. 학생이 같은 학번으로 다시 입장하면 새 비밀번호로 등록되고, 기록은 학번에 남아 있으므로 그대로 이어집니다. 교사 계정(teacher)은 지우지 않습니다. 지운 뒤에는 다음에 입장하는 사람이 관리자 코드를 정하게 되므로, 코드를 잊었으면 콘솔에서 비밀번호를 바꿉니다.</p>
                   </div>
                 </div>
                                 <div className="card">
@@ -9047,6 +9062,16 @@ function TeacherApp({ onExit, onGallery }) {
                       else setMsg("코드를 바꾸지 못했습니다. 다시 로그인한 뒤 시도하세요.");
                     }}>코드 변경</button>
                     <p className="hint" style={{ marginTop: 10 }}>학생이 한 명도 입장하지 않은 동안에는 화면 구조를 살펴보도록 표본 학급 8명이 표시됩니다. 실제 학생이 입장하면 표본은 사라집니다.</p>
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-head"><span className="card-code">설정 4</span><span className="card-title">명단 잠금</span></div>
+                  <div className="card-body">
+                    <p style={{ fontSize: 13 }}>켜면 명부에 없는 학번은 새로 입장하지 못합니다. 학급 전원이 한 번씩 입장한 뒤에 켜 두면 엉뚱한 학번의 계정과 기록이 생기는 것을 막습니다. 전학생처럼 새 학번이 필요하면 아래 학생 관리에서 먼저 추가하거나 잠금을 잠시 끕니다.</p>
+                    <div className="seg" style={{ marginTop: 8 }}>
+                      <button className={rosterLockOn ? "on-ok" : ""} onClick={() => { if (!rosterLockOn) toggleRosterLock(); }}>켬</button>
+                      <button className={!rosterLockOn ? "on-no" : ""} onClick={() => { if (rosterLockOn) toggleRosterLock(); }}>끔</button>
+                    </div>
                   </div>
                 </div>
                 <RosterAdmin ids={ids} roster={roster} wsMap={wsMap} surveyMap={surveyMap}

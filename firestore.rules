@@ -5,12 +5,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // 로그인 확인은 이메일 도메인까지 본다. 이메일·비밀번호 가입은 도메인을 제한하지 않으므로
+    // 도메인을 안 보면 teacher@다른곳 계정으로 uid()가 teacher가 되어 교사 권한이 열린다 (2026-09-17 보안 검토 1번).
+    function emailParts() {
+      return request.auth.token.email.split('@');
+    }
     function signedIn() {
-      return request.auth != null;
+      return request.auth != null
+          && 'email' in request.auth.token
+          && request.auth.token.email is string
+          && emailParts().size() == 2
+          && emailParts()[1] == 'museum.class';
     }
     // 로그인한 계정의 아이디 (학번 또는 teacher)
     function uid() {
-      return request.auth.token.email.split('@')[0];
+      return emailParts()[0];
     }
     function isTeacher() {
       return signedIn() && uid() == 'teacher';
@@ -18,8 +27,27 @@ service cloud.firestore {
     function isOwner(id) {
       return signedIn() && uid() == id;
     }
-    function sizeOk() {
-      return request.resource.size() < 1000000;
+    // 문서 바이트 크기를 재는 함수는 규칙 언어에 없다(Firestore 자체 상한 1 MiB만 적용된다).
+    // 값이 문자열인 media만 길이로 잰다.
+    function mediaSizeOk() {
+      return request.resource.data.v is string && request.resource.data.v.size() < 1000000;
+    }
+    // 학급 설정 문서의 v (없으면 빈 맵)
+    function cfgV() {
+      return exists(/databases/$(database)/documents/meta/config)
+          ? get(/databases/$(database)/documents/meta/config).data.get('v', {}) : {};
+    }
+    // 명단 잠금: 교사가 켜면(설정 4) 명부에 없는 학번은 명부 문서를 만들 수 없다
+    function rosterLocked() {
+      return cfgV().get('rosterLock', false) == true;
+    }
+    // 명부에 있는 학번인가. 학생이 새 문서를 만들 때 요구해 명부 밖 계정의 문서 남발을 막는다
+    function enrolled(id) {
+      return exists(/databases/$(database)/documents/students/$(id));
+    }
+    // 학생이 자기 명부 문서에 쓰는 필드는 별명(12자 이내)과 시각뿐
+    function studentNickOk() {
+      return request.resource.data.get('nick', '') is string && request.resource.data.get('nick', '').size() <= 12;
     }
 
     // 차시 공개 설정: 로그인한 사람은 읽고, 교사만 쓴다
@@ -31,22 +59,33 @@ service cloud.firestore {
     // 학생 명부(학번과 별명만): 로그인한 사람은 읽고, 본인과 교사만 쓴다
     match /students/{sid} {
       allow read: if signedIn();
-      allow create, update: if isOwner(sid) || isTeacher();
+      allow create: if isTeacher()
+                    || (isOwner(sid) && !rosterLocked() && studentNickOk()
+                        && request.resource.data.keys().hasOnly(['nick', 'updatedAt']));
+      allow update: if isTeacher()
+                    || (isOwner(sid) && studentNickOk()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nick', 'updatedAt']));
       allow delete: if isTeacher();
     }
 
     // 창작 기록지: 본인과 교사만 읽는다. 쓰기는 본인, 그리고 학생 관리(학번 이관·전시 내리기)를 위한 교사
     match /worksheets/{sid} {
       allow read: if isOwner(sid) || isTeacher();
-      allow create, update: if (isOwner(sid) || isTeacher()) && sizeOk();
+      allow create: if isTeacher() || (isOwner(sid) && enrolled(sid));
+      allow update: if isOwner(sid) || isTeacher();
       allow delete: if isTeacher();
     }
 
     // 기록지 시점 사본: 문서 이름이 {학번}_{시간대}라 앞부분으로 소유자를 판별한다.
     // 학생 화면의 자동 저장이 만들고, 교사가 「관리」 탭에서 읽어 그 시점으로 되돌린다 (src-ws-history.jsx)
+    // 교사 화면은 v.sid로 조회하므로 학생 쓰기는 v.sid가 자기 학번이어야 한다 (다른 학생의 목록에 가짜 사본을 끼워 넣지 못하게)
+    function wshSidOk() {
+      return request.resource.data.get('v', {}).get('sid', '') == uid();
+    }
     match /wsHistory/{docId} {
       allow read: if isTeacher() || (signedIn() && docId.split('_')[0] == uid());
-      allow create, update: if signedIn() && (docId.split('_')[0] == uid() || isTeacher()) && sizeOk();
+      allow create: if isTeacher() || (signedIn() && docId.split('_')[0] == uid() && enrolled(uid()) && wshSidOk());
+      allow update: if isTeacher() || (signedIn() && docId.split('_')[0] == uid() && wshSidOk());
       allow delete: if isTeacher();
     }
 
@@ -59,16 +98,21 @@ service cloud.firestore {
     // 사전·사후 창의성 설문: 본인과 교사만 읽고, 본인만 쓴다 (연구용 수집 데이터)
     match /surveys/{sid} {
       allow read: if isOwner(sid) || isTeacher();
-      allow create, update: if isOwner(sid) && sizeOk();
+      allow create: if isOwner(sid) && enrolled(sid);
+      allow update: if isOwner(sid);
       allow delete: if isTeacher();
     }
 
     // 사진·음성: 문서 이름이 {소유자}_{필드}_{시각} 형식이므로 앞부분으로 소유자를 판별한다
     // 교사 쓰기는 학번 이관 때 미디어를 새 소유자 이름으로 복사하기 위한 것
     // 교사가 「수업 편집」에서 올린 수업 자료 그림도 teacher_ 로 시작하는 이름으로 여기 들어간다
+    // 기록지는 본인·교사만 읽지만 그 안의 사진·음성·영상은 전시를 위해 문서 이름을 아는 사람이 읽는다.
+    // 컬렉션 전체 목록(list)은 교사만: 학생 화면은 문서 이름으로만 읽으므로 목록이 열리면 학급 전체 미디어를 내려받을 수 있다.
     match /media/{mediaId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher()) && sizeOk();
+      allow get: if signedIn();
+      allow list: if isTeacher();
+      allow create: if isTeacher() || (signedIn() && mediaId.split('_')[0] == uid() && enrolled(uid()) && mediaSizeOk());
+      allow update: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher()) && mediaSizeOk();
       allow delete: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher());
     }
 
@@ -78,8 +122,8 @@ service cloud.firestore {
     // 해제는 교사만 한다 (locked:false를 써 넣으면 학생이 다시 고쳐 제출할 수 있다).
     match /submissions/{sid} {
       allow read: if signedIn();
-      allow create: if (isOwner(sid) || isTeacher()) && sizeOk();
-      allow update: if sizeOk() && (isTeacher() || (isOwner(sid) && resource.data.get('v', {}).get('locked', false) != true));
+      allow create: if isTeacher() || (isOwner(sid) && enrolled(sid));
+      allow update: if isTeacher() || (isOwner(sid) && resource.data.get('v', {}).get('locked', false) != true);
       allow delete: if isTeacher();
     }
 
@@ -97,9 +141,9 @@ service cloud.firestore {
     match /assess/{sid} {
       allow read: if isOwner(sid) || isTeacher();
       allow delete: if isTeacher();
-      allow create, update: if isTeacher() && sizeOk();
-      allow create: if isOwner(sid) && sizeOk() && !('result' in assessV(request.resource));
-      allow update: if isOwner(sid) && sizeOk()
+      allow create, update: if isTeacher();
+      allow create: if isOwner(sid) && enrolled(sid) && !('result' in assessV(request.resource));
+      allow update: if isOwner(sid)
                     && !assessV(request.resource).diff(assessV(resource)).affectedKeys().hasAny(['result'])
                     && s1Kept();
     }
@@ -118,7 +162,7 @@ service cloud.firestore {
       return res.data.get('v', {});
     }
     function quizCfg() {
-      return get(/databases/$(database)/documents/meta/config).data.get('v', {}).get('quiz', {});
+      return cfgV().get('quiz', {});
     }
     function quizStage() {
       return quizCfg().get('stage', 'closed');
@@ -184,8 +228,8 @@ service cloud.firestore {
     match /quiz/{sid} {
       allow read: if isOwner(sid) || isTeacher();
       allow delete: if isTeacher();
-      allow create, update: if isTeacher() && sizeOk();
-      allow create: if isOwner(sid) && sizeOk()
+      allow create, update: if isTeacher();
+      allow create: if isOwner(sid) && enrolled(sid)
                     && quizStartOpen()
                     && request.resource.data.startedAt == request.time
                     && !quizV(request.resource).keys().hasAny(quizTeacherKeys())
@@ -194,7 +238,7 @@ service cloud.firestore {
                     && quizV(request.resource).get('status', '') == 'running'
                     && quizV(request.resource).get('blocks', {}).size() == 0
                     && request.resource.data.get('lockedAt', null) == null;
-      allow update: if isOwner(sid) && sizeOk()
+      allow update: if isOwner(sid)
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['v', 'hb', 'lockedAt', 'updatedAt'])
                     && request.resource.data.startedAt == resource.data.startedAt
                     && quizLockedAtOk()
