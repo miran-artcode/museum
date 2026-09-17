@@ -27,6 +27,13 @@ service cloud.firestore {
     function isOwner(id) {
       return signedIn() && uid() == id;
     }
+    // 보기 전용 교사 계정(viewer@museum.class, 관리자 코드 자리에 admin): 교사가 읽는 것은 다 읽되 아무것도 쓰지 못한다
+    function isViewer() {
+      return signedIn() && uid() == 'viewer';
+    }
+    function canView() {
+      return isTeacher() || isViewer();
+    }
     // 문서 바이트 크기를 재는 함수는 규칙 언어에 없다(Firestore 자체 상한 1 MiB만 적용된다).
     // 값이 문자열인 media만 길이로 잰다.
     function mediaSizeOk() {
@@ -70,7 +77,7 @@ service cloud.firestore {
 
     // 창작 기록지: 본인과 교사만 읽는다. 쓰기는 본인, 그리고 학생 관리(학번 이관·전시 내리기)를 위한 교사
     match /worksheets/{sid} {
-      allow read: if isOwner(sid) || isTeacher();
+      allow read: if isOwner(sid) || canView();
       allow create: if isTeacher() || (isOwner(sid) && enrolled(sid));
       allow update: if isOwner(sid) || isTeacher();
       allow delete: if isTeacher();
@@ -83,7 +90,7 @@ service cloud.firestore {
       return request.resource.data.get('v', {}).get('sid', '') == uid();
     }
     match /wsHistory/{docId} {
-      allow read: if isTeacher() || (signedIn() && docId.split('_')[0] == uid());
+      allow read: if canView() || (signedIn() && docId.split('_')[0] == uid());
       allow create: if isTeacher() || (signedIn() && docId.split('_')[0] == uid() && enrolled(uid()) && wshSidOk());
       allow update: if isTeacher() || (signedIn() && docId.split('_')[0] == uid() && wshSidOk());
       allow delete: if isTeacher();
@@ -91,13 +98,13 @@ service cloud.firestore {
 
     // 채점 기록: 본인은 읽기만, 쓰기는 교사만
     match /grades/{sid} {
-      allow read: if isOwner(sid) || isTeacher();
+      allow read: if isOwner(sid) || canView();
       allow write: if isTeacher();
     }
 
     // 사전·사후 창의성 설문: 본인과 교사만 읽고, 본인만 쓴다 (연구용 수집 데이터)
     match /surveys/{sid} {
-      allow read: if isOwner(sid) || isTeacher();
+      allow read: if isOwner(sid) || canView();
       allow create: if isOwner(sid) && enrolled(sid);
       allow update: if isOwner(sid);
       allow delete: if isTeacher();
@@ -110,7 +117,7 @@ service cloud.firestore {
     // 컬렉션 전체 목록(list)은 교사만: 학생 화면은 문서 이름으로만 읽으므로 목록이 열리면 학급 전체 미디어를 내려받을 수 있다.
     match /media/{mediaId} {
       allow get: if signedIn();
-      allow list: if isTeacher();
+      allow list: if canView();
       allow create: if isTeacher() || (signedIn() && mediaId.split('_')[0] == uid() && enrolled(uid()) && mediaSizeOk());
       allow update: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher()) && mediaSizeOk();
       allow delete: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher());
@@ -139,7 +146,7 @@ service cloud.firestore {
       return before.get('submittedAt', null) == null || after == before;
     }
     match /assess/{sid} {
-      allow read: if isOwner(sid) || isTeacher();
+      allow read: if isOwner(sid) || canView();
       allow delete: if isTeacher();
       allow create, update: if isTeacher();
       allow create: if isOwner(sid) && enrolled(sid) && !('result' in assessV(request.resource));
@@ -219,14 +226,15 @@ service cloud.firestore {
       return after == before || after == request.time;
     }
     match /quizBank/{docId} {
-      allow read: if isTeacher() || (signedIn() && quizStage() != 'closed');
+      allow read: if canView() || (signedIn() && quizStage() != 'closed');
       allow write: if isTeacher();
     }
     match /quizKeys/{docId} {
-      allow read, write: if isTeacher();
+      allow read: if canView();
+      allow write: if isTeacher();
     }
     match /quiz/{sid} {
-      allow read: if isOwner(sid) || isTeacher();
+      allow read: if isOwner(sid) || canView();
       allow delete: if isTeacher();
       allow create, update: if isTeacher();
       allow create: if isOwner(sid) && enrolled(sid)
@@ -255,7 +263,8 @@ service cloud.firestore {
     // 명부(students)에 두지 않는 이유 — 명부는 로그인한 학생 모두가 읽으므로
     // 누가 연구에서 빠졌는지가 학생끼리 보이게 된다. 동의 여부는 학생 사이에 드러나서는 안 된다.
     match /research/{docId} {
-      allow read, write: if isTeacher();
+      allow read: if canView();
+      allow write: if isTeacher();
     }
 
     // 그 밖의 학급 공용 문서. 「수업 편집」 탭이 고친 차시별 발문·이론·그림·링크가

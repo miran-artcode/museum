@@ -42,6 +42,12 @@ const auth = getAuth(app);
 
 const DOMAIN = "@museum.class";
 const TEACHER_ID = "teacher";
+// 보기 전용 교사 계정: 관리자 코드 자리에 VIEWER_CODE를 넣으면 viewer@museum.class로 들어간다.
+// 규칙(firestore.rules)이 viewer의 쓰기를 전부 거부하고, 아래 쓰기 함수도 서버에 보내지 않고 false를 돌려준다.
+const VIEWER_ID = "viewer";
+const VIEWER_CODE = "admin";
+const idOfUser = (u) => (u && u.email ? String(u.email).split("@")[0] : "");
+export const isViewerNow = () => idOfUser(auth.currentUser) === VIEWER_ID;
 export const emailOf = (id) => id + DOMAIN;
 export const pwOf = (id, code) => id + "#" + code;
 
@@ -70,16 +76,21 @@ export const authApi = {
     }
   },
 
+  isViewer() { return isViewerNow(); },
+
+  /* 관리자 코드가 VIEWER_CODE면 보기 전용 계정(viewer), 아니면 교사 계정(teacher)으로 들어간다 */
   async teacherEnter(code) {
+    const id = code === VIEWER_CODE ? VIEWER_ID : TEACHER_ID;
+    const viewer = id === VIEWER_ID;
     try {
-      await signInWithEmailAndPassword(auth, emailOf(TEACHER_ID), pwOf(TEACHER_ID, code));
-      return { ok: true, isNew: false };
+      await signInWithEmailAndPassword(auth, emailOf(id), pwOf(id, code));
+      return { ok: true, isNew: false, viewer };
     } catch (e) {
       const c = e && e.code;
       if (c === "auth/invalid-credential" || c === "auth/wrong-password" || c === "auth/user-not-found") {
         try {
-          await createUserWithEmailAndPassword(auth, emailOf(TEACHER_ID), pwOf(TEACHER_ID, code));
-          return { ok: true, isNew: true };
+          await createUserWithEmailAndPassword(auth, emailOf(id), pwOf(id, code));
+          return { ok: true, isNew: true, viewer };
         } catch (e2) {
           if (e2.code === "auth/email-already-in-use") return { ok: false, reason: "wrong-code" };
           return { ok: false, reason: e2.code || "unknown" };
@@ -91,7 +102,7 @@ export const authApi = {
 
   async changeCode(newCode) {
     const u = auth.currentUser;
-    if (!u) return false;
+    if (!u || isViewerNow()) return false;
     const id = u.email.replace(DOMAIN, "");
     try { await updatePassword(u, pwOf(id, newCode)); return true; } catch (e) { return false; }
   },
@@ -171,6 +182,7 @@ export const fbStore = {
      설정 문서처럼 여러 화면·세션이 서로 다른 필드를 고치는 문서에서,
      읽기 실패 후의 전체 덮어쓰기와 동시 편집의 상호 삭제를 함께 막는다. */
   async set(key, value, opts) {
+    if (isViewerNow()) return false; // 보기 전용 계정
     try {
       const r = route(key);
       if (r.kind === "roster") {
@@ -201,6 +213,7 @@ export const fbStore = {
   },
 
   async remove(key) {
+    if (isViewerNow()) return false;
     try {
       const r = route(key);
       if (r.kind === "doc") await deleteDoc(doc(db, r.path[0], r.path[1]));
@@ -303,6 +316,7 @@ export const fbStore = {
 
   /* 교사용 학생 관리 — 명부 문서를 학번 지정으로 쓰고 지운다 (규칙이 교사만 허용) */
   async setStudent(sid, data) {
+    if (isViewerNow()) return false;
     try {
       await setDoc(doc(db, "students", safe(sid)), { ...data, updatedAt: Date.now() }, { merge: true });
       return true;
@@ -310,6 +324,7 @@ export const fbStore = {
   },
 
   async removeStudent(sid) {
+    if (isViewerNow()) return false;
     try { await deleteDoc(doc(db, "students", safe(sid))); return true; }
     catch (e) { console.error("removeStudent fail", sid, e); return false; }
   },
@@ -322,6 +337,7 @@ export const fbStore = {
   /* 응시 시작: 문서를 새로 만든다 (merge 없음). 이미 있는 문서에 다시 부르면 startedAt이 바뀌므로
      규칙이 학생의 재시작을 거부한다 — 이어 풀기는 quizPatch로 한다 */
   quizStart(sid, v) {
+    if (isViewerNow()) return Promise.resolve(false);
     const write = (async () => {
       try {
         await setDoc(doc(db, "quiz", safe(sid)), { v, startedAt: serverTimestamp(), hb: serverTimestamp(), lockedAt: null, updatedAt: Date.now() });
@@ -338,6 +354,7 @@ export const fbStore = {
      opts.noHb → hb 를 찍지 않는다. 교사 화면의 쓰기(결과·오탐·메모·시간 추가·세션 초기화·해제)에 쓴다.
        hb 는 학생 세션의 심장박동이라 교사가 갱신하면 「끊김」 표시와 학생 화면의 중복 접속 판정(hb 60초 안 + sess 다름)이 어긋난다 */
   quizPatch(sid, vPatch, opts) {
+    if (isViewerNow()) return Promise.resolve(false);
     const ms = (opts && opts.timeout) || 8000;
     const write = (async () => {
       try {

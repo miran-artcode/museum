@@ -4760,12 +4760,12 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
     const r = await authApi.teacherEnter(tpin);
     setBusy(false);
     if (!r.ok) return setErr(msgOf(r.reason));
-    if (r.isNew) {
+    if (r.isNew && !r.viewer) {
       // 병합 쓰기 — 계정만 다시 만든 경우나 읽기 실패 때 기존 설정 문서를 덮어쓰지 않는다
       const cfg = (await store.get("config")) || {};
       await store.set("config", { open: cfg.open || DEFAULT_OPEN, created: now() }, { merge: true });
     }
-    session.save({ role: "teacher" });
+    session.save({ role: "teacher", viewer: !!r.viewer });
     onTeacher();
   };
 
@@ -8741,7 +8741,7 @@ function TeacherApp({ onExit, onGallery }) {
     <div>
       <div className="topbar">
         <div className="topbar-in">
-          <div className="brand">허구의 아카이브 교사 대시보드<small>TEACHER CONSOLE</small></div>
+          <div className="brand">허구의 아카이브 교사 대시보드<small>{authApi.isViewer() ? "VIEW ONLY" : "TEACHER CONSOLE"}</small></div>
           <div className="top-right">
             <button className="btn small ghost" onClick={() => { if (confirmLoseEdit()) onGallery(); }}>전시장</button>
             <button className="btn small ghost" onClick={() => { if (confirmLoseEdit()) loadAll(); }}>새로고침</button>
@@ -8750,6 +8750,7 @@ function TeacherApp({ onExit, onGallery }) {
         </div>
       </div>
       <div className="wrap wide">
+        {authApi.isViewer() && <div className="sample-banner">보기 전용 계정으로 들어왔습니다. 모든 기록을 볼 수 있지만 채점·설정·수업 편집 등 어떤 것도 저장되지 않습니다. 고치려면 나간 뒤 관리자 코드로 다시 입장하세요.</div>}
         {sel ? (
           <div style={{ paddingTop: 18 }}>
             <TeacherStudentView key={sel} sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} surveyData={surveyMap[sel]} ids={ids} onSel={openStudent} initialTab={selTab}
@@ -9787,7 +9788,7 @@ function App() {
       done = true;
       const s = session.read();
       const id = u && u.email ? String(u.email).split("@")[0] : "";
-      if (s && s.role === "teacher" && id === "teacher") setView("teacher");
+      if (s && s.role === "teacher" && (id === "teacher" || id === "viewer")) setView("teacher");
       else if (s && s.role === "student" && s.sid && s.sid === id) { setMe({ sid: s.sid, nick: s.nick || "" }); setView("student"); }
       else session.clear();
       setRestoring(false);
