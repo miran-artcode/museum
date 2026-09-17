@@ -24,8 +24,8 @@ export const GATE_SECTIONS = [
     en: "DESIGN",
     title: "문제 관찰과 유물 설계",
     body: "사회참여 미술 감상과 문제 관찰, 허구 유물의 세계관·화면 설계",
-    img: "/img/lessons/L2_w_maebyeong_nmk.jpg",
-    alt: "청자 상감 구름 학무늬 매병(고려, 국립중앙박물관 소장)",
+    img: "/img/lessons/L2_w_maebyeong_nmk421.jpg",
+    alt: "청자 상감 구름 학 무늬 매병(고려, 뚜껑이 있는 매병, 국립중앙박물관 소장)",
   },
   {
     no: "03",
@@ -33,7 +33,7 @@ export const GATE_SECTIONS = [
     en: "GENERATE",
     title: "생성과 다듬기",
     body: "프롬프트 작성과 AI 이미지 생성·선별, 다듬기와 작품 캡션 문구",
-    img: "/img/lessons/L6_w_kintsugi.jpg",
+    img: "/img/lessons/L6_s30_3.jpg",
     alt: "금으로 이어 붙인 킨츠기 찻사발",
   },
   {
