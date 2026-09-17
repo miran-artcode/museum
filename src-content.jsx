@@ -654,7 +654,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                   </details>
                 );
               })}
-              <p className="hint">항목 이름(l1.q1 같은 것)은 기록이 저장되는 자리라 바뀌지 않습니다. 질문만 고쳐도 이미 저장된 학생 답은 그대로 남습니다. 화살표가 붙은 항목(유물 발상 단계 단계 3)은 오른쪽 키에 저장됩니다.</p>
+              <p className="hint">항목 이름(l1.q1 같은 것)은 기록이 저장되는 위치라 바뀌지 않습니다. 질문만 고쳐도 이미 저장된 학생 답은 그대로 남습니다. 화살표가 붙은 항목(유물 발상 단계 단계 3)은 오른쪽 키에 저장됩니다.</p>
             </div>
           </div>
 

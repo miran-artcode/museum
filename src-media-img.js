@@ -142,7 +142,7 @@ export function imgErrText(e) {
   }
   if (code === "small") {
     const p = e.preset || IMG_PRESETS.photo;
-    return `${p.name}${ga(p.name)} 너무 작습니다 (${e.srcW}×${e.srcH}px). 긴 변 ${p.minLong}px 이상인 원본을 올려 주세요 — 미리보기·썸네일이나 메신저로 받아 줄어든 사본이 아닌지 확인하세요.`;
+    return `${p.name}${ga(p.name)} 너무 작습니다 (${e.srcW}×${e.srcH}px). 긴 변 ${p.minLong}px 이상인 원본을 올려 주세요. 미리보기·썸네일이나 메신저로 받아 줄어든 사본이 아닌지 확인하세요.`;
   }
   if (code === "big") return "사진을 줄여도 저장 한도를 넘습니다. 다른 사진으로 시도해 주세요.";
   return "사진을 처리하지 못했습니다. 다른 파일로 다시 시도해 주세요.";
