@@ -81,7 +81,7 @@ const FIX_OPTS = ["재생성", "부분 수정", "화면 편집", "작품 캡션 
 const DISPLAY_OPTS = ["단독", "계열", "파편", "오분류", "복원 표시"];
 const INSPECT_ITEMS = [
   { k: "structure", label: "구조가 맞는가", hint: "부품이 서로 이어져 있고, 허공에 떠 있는 부분은 없는가" },
-  { k: "cause", label: "흔적과 쓰임이 맞는가", hint: "닳고 부서진 자리가 그 물건을 쓰던 방식과 이어지는가" },
+  { k: "cause", label: "흔적과 쓰임이 맞는가", hint: "닳고 부서진 부분이 그 물건을 쓰던 방식과 이어지는가" },
   { k: "light", label: "빛과 그림자", hint: "빛이 들어오는 방향이 하나로 맞춰져 있는가" },
   { k: "scale", label: "크기 짐작", hint: "크기를 가늠할 만한 것이 화면 안에 있는가" },
   { k: "text", label: "글자와 표시", hint: "뭉개진 글자나 뜻 없는 문자가 섞여 있지 않은가" },
@@ -91,9 +91,9 @@ const INSPECT_ITEMS = [
 ];
 const PEER_VIEWS = [
   { k: "blind", label: "작품 캡션을 가리고 봤을 때", hint: "이미지만 보고 무엇에 쓰는 물건인지, 어느 시대 물건인지 말할 수 있는가. 그렇게 보이게 한 곳 두 군데를 짚어 주세요" },
-  { k: "cause", label: "흔적과 쓰임이 맞는가", hint: "닳고 부서지고 고친 자리가 쓰던 방식과 이어지는가. 진짜 같은 부분과 의심스러운 부분을 하나씩 적어 주세요" },
+  { k: "cause", label: "흔적과 쓰임이 맞는가", hint: "닳고 부서지고 고친 부분이 쓰던 방식과 이어지는가. 진짜 같은 부분과 의심스러운 부분을 하나씩 적어 주세요" },
   { k: "labelwork", label: "작품 캡션을 읽은 뒤", hint: "작품 캡션을 읽고 나니 이미지가 다르게 보이는가. 달라진 부분을 짚어 주세요" },
-  { k: "problem", label: "어떤 문제로 읽히는가", hint: "어떤 사회문제로 보이는가. 고발·경고·공감·기록·질문 가운데 어떤 태도로 말하고 있는지" },
+  { k: "problem", label: "어떤 문제로 읽히는가", hint: "어떤 사회 문제로 보이는가. 고발·경고·공감·기록·질문 가운데 어떤 태도로 말하고 있는지" },
   { k: "artness", label: "무엇이 이것을 미술로 만드는가", hint: "이미지·제목·이름·작품 캡션·고지·의도·진열·해석 가운데 뜻을 만들어 내는 것은 무엇이고, 그렇게 본 근거는 무엇인지" },
 ];
 const OBS_ITEMS = [
@@ -101,11 +101,11 @@ const OBS_ITEMS = [
   "점검할 때 든 물리적 근거", "작품 캡션까지 생각한 판단", "짝이 읽어 준 내용을 다룬 방식",
 ];
 /* ============================================================
-   관찰 → 사물: 보이지 않는 것을 드러내는 일곱 계단 (계단 정의·학습지 카드는 src-ladder.jsx)
+   관찰 → 사물: 보이지 않는 것을 드러내는 일곱 단계 (단계 정의·학습지 카드는 src-ladder.jsx)
    ------------------------------------------------------------
-   사회문제를 관찰하고, 그 안에서 보이지 않는 대상을 골라, 실제로 그 자리에
-   놓여 있는 사물의 흔적으로 옮기기까지를 일곱 계단으로 나눈다.
-   계단마다 앞 계단의 답이 재료가 되고, 되돌아간 자리와 고쳐 쓴 문장이
+   사회 문제를 관찰하고, 그 안에서 보이지 않는 대상을 골라, 실제로 그 자리에
+   놓여 있는 유물(사물)에 드러난 사용 흔적으로 옮기기까지를 일곱 단계로 나눈다.
+   단계마다 앞 단계의 답이 재료가 되고, 되돌아간 자리와 고쳐 쓴 문장이
    그대로 사고의 발전·변화 자료가 된다.
    ============================================================ */
 
@@ -116,15 +116,15 @@ const SENSES = ["눈으로 본 것", "귀로 들은 것", "냄새로 맡은 것"
    이 표가 관찰에서 사물로 건너가는 다리 노릇을 한다. */
 const INVIS_TYPES = [
   { k: "time", label: "시간에 흩어져서", hint: "한 번에는 보이지 않고 여러 번 쌓여야 드러남",
-    find: "여러 번의 접촉이 겹쳐 남는 자리(닳음 · 눌림 · 색바램 · 손자국 광택)를 찾습니다",
+    find: "여러 번의 접촉이 겹쳐 남는 부분(닳음 · 눌림 · 색바램 · 손자국 광택)을 찾습니다",
     ex: "매일 반복되는 새벽 하역, 몇 년에 걸친 돌봄" },
-  { k: "place", label: "자리에 가려져서", hint: "벽 · 문 · 경계 뒤에 있어 바깥에서 볼 수 없음",
+  { k: "place", label: "장소에 가려져서", hint: "벽 · 문 · 경계 뒤에 있어 바깥에서 볼 수 없음",
     find: "평소 보이지 않는 면(안쪽 면 · 바닥 면 · 이음매 · 뒷면 · 밑동)을 찾습니다",
     ex: "셔터 내린 가게 안, 주방 뒤편, 기숙사 안" },
   { k: "record", label: "기록이 없어서", hint: "세지도 적지도 않아 숫자와 문서로 남지 않음",
     find: "누군가 임시로 남긴 표식(손으로 쓴 번호 · 눈금 · 표시 테이프 · 스티커)을 찾습니다",
     ex: "집계되지 않는 무급 노동, 신고되지 않은 사고" },
-  { k: "gone", label: "이미 사라져서", hint: "없어진 뒤라 지금은 자리만 남아 있음",
+  { k: "gone", label: "이미 사라져서", hint: "없어진 뒤라 지금은 흔적만 남아 있음",
     find: "없어진 것의 그림자(떼어 낸 자국 · 빈 나사 구멍 · 색이 다른 사각형)를 찾습니다",
     ex: "폐업한 가게의 간판 자리, 철거된 놀이터" },
   { k: "norm", label: "너무 당연해서", hint: "늘 그렇게 있어서 아무도 문제로 세지 않음",
@@ -140,31 +140,31 @@ const INVIS_TYPES = [
 
 const OBS_METHODS = [
   {
-    k: "drift", label: "표류", sub: "목적지 없이 걸으며 걸음이 느려지는 자리를 적는다",
+    k: "drift", label: "표류", sub: "목적지 없이 걸으며 걸음이 느려지는 곳을 적는다",
     from: "기 드보르 「표류의 이론」(1956) · 상황주의 인터내셔널의 심리지리",
     idea: "늘 다니는 길은 목적지로 가는 통로일 뿐이라 길 자체가 보이지 않습니다. 목적을 지우고 걸으면 도시가 다시 지형으로 보입니다.",
     how: [
       "평소 다니는 길에서 일부러 한 번씩 다른 쪽으로 꺾어 걷습니다. 30분에서 한 시간.",
-      "마음이 끌려 걸음이 느려지는 자리에서 멈춰 섭니다.",
-      "멈춘 자리와 무엇이 멈추게 했는지를 그 자리에서 적습니다. 해석하지 않고 본 것만.",
+      "마음이 끌려 걸음이 느려지는 곳에서 멈춰 섭니다.",
+      "멈춘 장소와 무엇이 멈추게 했는지를 그 즉시 적습니다. 해석하지 않고 본 것만.",
     ],
-    good: "문제가 어디 있는지 아직 모를 때. 익숙해서 안 보이던 자리를 다시 보게 합니다.",
+    good: "문제가 어디 있는지 아직 모를 때. 익숙해서 보이지 않던 곳을 다시 보게 합니다.",
     miss: "우연에 기대므로 같은 것을 다시 확인하기 어렵습니다. 반복해서 쌓이는 일과 정해진 시간에만 일어나는 일은 잘 잡히지 않습니다.",
-    col: { when: "걸은 때", where: "멈춰 선 자리", what: "무엇이 멈추게 했는가" },
+    col: { when: "걸은 때", where: "멈춰 선 곳", what: "무엇이 멈추게 했는가" },
     ph: { when: "토요일 오후 4시", where: "시장 뒷골목 끝", what: "가게 셔터에 겹겹이 붙었다 뜯긴 전단 자국" },
   },
   {
-    k: "fixed", label: "정점 관찰", sub: "한 자리에 서서 시간대를 바꿔 세 번 이상 본다",
+    k: "fixed", label: "정점 관찰", sub: "한 장소에 서서 시간대를 바꿔 세 번 이상 본다",
     from: "윌리엄 화이트 「작은 도시 공간의 사회적 삶」(1980)의 시간 표집 관찰",
-    idea: "같은 자리도 시간이 바뀌면 다른 사람이 오갑니다. 한 번 본 것은 인상이고, 시간을 바꿔 세 번 본 것은 자료가 됩니다.",
+    idea: "같은 장소도 시간이 바뀌면 다른 사람이 오갑니다. 한 번 본 것은 인상이고, 시간을 바꿔 세 번 본 것은 자료가 됩니다.",
     how: [
-      "한 자리를 정하고 설 위치까지 고정합니다. 매번 같은 곳에서 봅니다.",
+      "한 장소를 정하고 설 위치까지 고정합니다. 매번 같은 곳에서 봅니다.",
       "시간대를 바꿔 최소 세 번 봅니다. 아침·낮·밤처럼 성격이 다른 시간으로 고릅니다.",
       "볼 때마다 같은 형식으로 적습니다. 무엇이 있었고 누가 오갔고 무엇이 달라졌는지.",
     ],
-    good: "반복과 시간이 쌓여야 드러나는 일. 시간대에 따라 다른 사람이 오가는 자리.",
-    miss: "고른 한 자리 바깥은 보이지 않습니다. 자리를 잘못 고르면 세 번을 봐도 아무 일이 없습니다.",
-    col: { when: "관찰 시각", where: "고정한 자리", what: "그때 달라져 있던 것" },
+    good: "반복과 시간이 쌓여야 드러나는 일. 시간대에 따라 다른 사람이 오가는 장소.",
+    miss: "고른 장소 바깥은 보이지 않습니다. 장소를 잘못 고르면 세 번을 봐도 아무 일이 없습니다.",
+    col: { when: "관찰 시각", where: "고정한 장소", what: "그때 달라져 있던 것" },
     ph: { when: "수요일 07:10 / 15:40 / 23:00", where: "아파트 5동 앞 분리수거장", what: "밤에만 손수레가 세워져 있고 아침에는 없음" },
   },
   {
@@ -173,26 +173,26 @@ const OBS_METHODS = [
     idea: "내가 매일 지나는 길이 내가 볼 수 있는 세계의 크기입니다. 그 경계를 그려 놓으면 무엇을 못 보고 사는지가 보입니다.",
     how: [
       "집에서 학교까지, 하루 동안 지나는 길을 기억나는 대로 그립니다. 정확하지 않아도 됩니다.",
-      "그 위에 눈이 멈춘 자리를 표시합니다.",
-      "한 번도 들어가 본 적 없는 자리, 늘 지나치기만 한 자리도 다른 표시로 함께 적습니다.",
+      "그 위에 눈이 멈춘 지점을 표시합니다.",
+      "한 번도 들어가 본 적 없는 곳, 늘 지나치기만 한 곳도 다른 표시로 함께 적습니다.",
     ],
-    good: "문제와 내가 만나는 접점을 찾을 때. 경계 너머라 들어가 보지 못한 자리를 드러냅니다.",
+    good: "문제와 내가 만나는 접점을 찾을 때. 경계 너머라 들어가 보지 못한 곳을 드러냅니다.",
     miss: "내 동선 바깥의 일은 처음부터 지도에 없습니다. 내가 겪지 않는 문제는 잡히지 않습니다.",
-    col: { when: "지나는 때", where: "지도 위의 지점", what: "거기서 눈에 걸린 것" },
+    col: { when: "지나는 때", where: "지도 위의 지점", what: "거기서 눈에 띈 것" },
     ph: { when: "등굣길 07:40", where: "우리 동 입구 앞", what: "밤사이 놓이고 간 상자 두 개, 문틀 옆에 눌린 자국" },
   },
   {
-    k: "inventory", label: "사물 목록", sub: "한 자리에 있는 것을 판단하지 말고 빠짐없이 적는다",
+    k: "inventory", label: "사물 목록", sub: "한 장소에 있는 것을 판단하지 말고 빠짐없이 적는다",
     from: "조르주 페렉 「파리의 어느 장소에 대한 완전한 묘사 시도」(1975) · 마크 디온의 현장 수집",
     idea: "너무 당연히 있는 것은 눈이 그냥 지나칩니다. 목록으로 적어 글자로 만들어 놓으면 그때 이상함이 보입니다.",
     how: [
-      "한 자리를 정하고 20분 동안 머무릅니다.",
+      "한 장소를 정하고 20분 동안 머무릅니다.",
       "눈에 들어오는 것을 판단하지 말고 그냥 목록으로 적습니다. 예쁜 것만 고르지 않습니다.",
       "다 적은 뒤 목록을 소리 내어 읽으며 ‘왜 이것이 여기 있지?’ 싶은 항목에 표시합니다.",
     ],
     good: "너무 당연해서 아무도 세지 않는 것. 목록으로 적어 놓아야 이상함이 드러나는 사물.",
     miss: "목록은 지금 있는 것만 담습니다. 사라진 것과 오지 않는 사람은 목록에 없습니다.",
-    col: { when: "머무른 때", where: "머무른 자리", what: "목록에서 이상했던 항목" },
+    col: { when: "머무른 때", where: "머무른 장소", what: "목록에서 이상했던 항목" },
     ph: { when: "금요일 점심시간", where: "급식실 퇴식구 옆", what: "손잡이가 하나 없는 배식차, 바닥에 붙은 미끄럼 방지 테이프 세 겹" },
   },
   {
@@ -225,7 +225,7 @@ const ENGAGE_MODES = [
     fit: "당사자를 만나 이야기를 들을 수 있고, 그 말을 어떻게 쓸지 동의를 받을 수 있을 때",
   },
   {
-    k: "indirect", label: "가림과 우회", sub: "끔찍한 장면을 직접 보여 주지 않고 최소한만 남긴다",
+    k: "indirect", label: "가림과 우회", sub: "끔찍한 장면을 직접 보여 주지 않고 최소한만 보여 준다",
     works: "알프레도 자 「르완다 프로젝트」(1994~2000): 끔찍한 장면 대신 생존자의 눈만 촬영",
     does: "관람자가 빈자리를 스스로 채우게 된다. 보는 일 자체에 책임이 생긴다.",
     risk: "너무 가리면 아무것도 전달되지 않는다. 미학적 절제가 회피로 읽힐 수 있다.",
@@ -248,7 +248,7 @@ const ENGAGE_MODES = [
   {
     k: "forensic", label: "증거와 포렌식", sub: "물질의 흔적을 재구성해 사물이 사건을 말하게 한다",
     works: "포렌식 아키텍처: 건물의 파편과 영상의 그림자로 사건이 일어난 시각을 되짚음",
-    does: "사물이 증인이 된다. 사람의 증언이 닿지 못하는 자리를 물질이 대신 말한다.",
+    does: "사물이 증인이 된다. 사람의 증언이 닿지 못하는 부분을 물질이 대신 말한다.",
     risk: "흔적의 인과가 어긋나면 전부 무너진다. 증거의 형식을 갖췄다는 것이 진실을 보증하지는 않는다.",
     fit: "사람을 등장시키지 않고도 사물에 남은 자국으로 말할 수 있을 때",
   },
@@ -257,19 +257,19 @@ const ENGAGE_MODES = [
     works: "마르셀 브로타에스 「현대미술관, 독수리 부서」(1968) · 한스 하케 「샤폴스키 외…」(1971)",
     does: "관람자는 작품이 아니라 그것을 작품으로 만든 틀을 보게 된다.",
     risk: "미술 안쪽의 이야기에 머물면 바깥의 문제와 끊긴다.",
-    fit: "문제가 ‘무엇을 남길 가치가 있다고 정하는 권한’ 쪽에 있을 때",
+    fit: "문제가 ‘무엇을 보존할 가치가 있다고 정하는 권한’ 쪽에 있을 때",
   },
   {
     k: "intervene", label: "개입과 전술", sub: "공공장소와 일상의 절차에 끼어든다",
     works: "크지슈토프 보디치코의 건물 프로젝션: 기념비에 사람의 손과 목소리를 겹쳐 비춤",
     does: "평소 안 보이던 규칙이 어긋남으로 드러난다. 지나가던 사람이 관람자가 된다.",
-    risk: "놀라게 하는 데서 끝나면 문제는 남지 않는다. 허락 없는 개입은 다른 사람의 자리를 침범할 수 있다.",
-    fit: "문제가 특정한 장소·절차에 붙어 있어 그 자리에서만 드러날 때",
+    risk: "놀라게 하는 데서 끝나면 문제는 전달되지 않는다. 허락 없는 개입은 다른 사람의 영역을 침범할 수 있다.",
+    fit: "문제가 특정한 장소·절차에 붙어 있어 그곳에서만 드러날 때",
   },
   {
     k: "relational", label: "관계와 대화", sub: "사람들 사이에 일어나는 일 자체를 작품으로 삼는다",
     works: "요제프 보이스의 사회적 조각 · 니콜라 부리요 「관계미학」(1998) · 그랜트 케스터 「대화적 미술」(2004)",
-    does: "작품이 물건이 아니라 만남과 대화로 남는다. 관람자가 참여자가 된다.",
+    does: "작품이 물건이 아니라 만남과 대화 자체가 된다. 관람자가 참여자가 된다.",
     risk: "클레어 비숍이 「적대와 관계미학」(2004)에서 지적했듯, 화합만 남고 갈등이 지워지면 문제도 함께 지워진다.",
     fit: "문제의 핵심이 사람들 사이의 관계가 끊긴 데 있을 때",
   },
@@ -284,14 +284,14 @@ const cardLabel = (src, k) => (cardsOf(src).find((c) => c.k === k) || {}).label 
 /* 되돌려 읽기 — 짝의 읽기와 내 의도 사이의 거리 */
 const GAP_OPTS = ["거의 같게 읽음", "일부만 읽음", "다르게 읽음"];
 
-/* 일곱 계단(TRANSLATE_STAGES)은 src-ladder.jsx에서 온다. 저장 키 → 계단 코드 */const STAGE_OF_KEY = (() => {
+/* 일곱 단계(TRANSLATE_STAGES)은 src-ladder.jsx에서 온다. 저장 키 → 단계 코드 */const STAGE_OF_KEY = (() => {
   const m = {};
   TRANSLATE_STAGES.forEach((st) => st.keys.forEach((k) => { m[k] = st.key; }));
   return m;
 })();
 
 const RUBRIC = [
-  { std: "[12미02-01]", name: "다양한 발상 방법을 활용하여 주제 탐색하기", data: "문제·만나는 곳·번역 문장 (3차시)" },
+  { std: "[12미02-01]", name: "다양한 발상 방법을 활용하여 주제 탐색하기", data: "문제·만나는 곳·흔적 문장 (3차시)" },
   { std: "[12미02-03]", name: "표현 매체의 조합·응용·확장으로 표현 효과 탐색하기", data: "도구 선택·회차 기록·다듬기 (5~6차시)" },
   { std: "[12미02-04]", name: "표현 의도·과정·결과를 종합적으로 검토하기", data: "이중 점검·선별과 제외 근거 (5~6차시)" },
   { std: "[12미03-04]", name: "작품에 대한 견해 서술하기", data: "상호평가·비평과 성찰 (8차시)" },
@@ -352,7 +352,7 @@ const SCHEMA_DEF = [
         k: "q3", t: "area", label: "파라픽션(parafiction)과 위조의 차이를 ‘허구 고지’라는 말을 넣어 설명하기",
         steps: [
           "뜻 확인: 파라픽션과 위조가 각각 허구를 어떻게 다루는지 떠올리기",
-          "나누기: 둘을 나누는 자리에 ‘허구 고지’(허구임을 밝히는 표시)를 놓고 설명하기",
+          "나누기: 둘을 구분하는 기준으로 ‘허구 고지’(허구임을 밝히는 표시)를 두고 설명하기",
           "덧붙이기: 고지가 없으면 무엇이 달라지는지 한 줄 더 쓰기",
         ],
       },
@@ -366,18 +366,18 @@ const SCHEMA_DEF = [
       { k: "labelCmp", t: "area", label: "같은 이미지에 작품 캡션 두 장(아래 자료의 A · B)을 붙였을 때 읽기가 어떻게 달라졌는지 한 줄로 쓰기" },
     ],
   },
-  /* 번역 사다리 계단 1·2 (한 주 과제). 과제를 내는 2차시 탭에 둔다 */
+  /* 유물 발상 단계 단계 1·2 (한 주 과제). 과제를 내는 2차시 탭에 둔다 */
   ...LADDER_HW_SECTIONS,
   {
     id: "l3", session: "3차시", code: "3", kind: "learn", title: "사회참여 미술과 보이지 않는 것",
     note: "강의 노트 3차시를 읽고 작성합니다.",
     fields: [
       {
-        k: "q1", t: "area", label: "랑시에르의 ‘감각적인 것의 분배’를 내 주변의 예를 하나 들어 자기 말로 옮기기",
+        k: "q1", t: "area", label: "랑시에르의 ‘감각적인 것의 분배’를 내 주변의 예를 하나 들어 자기 말로 설명하기",
         steps: [
           "뜻 확인: ‘감각적인 것의 분배’는 무엇이 잘 보이고 누구의 이야기가 말해지는지가 미리 정해져 있다는 생각",
           "찾기: 내 주변에서 ‘잘 보이는 것’과 ‘잘 안 보이는 것’의 예를 하나씩 찾기",
-          "정리: 그 예를 들어 이 개념을 내 말로 옮기기",
+          "정리: 그 예를 들어 이 개념을 내 말로 설명하기",
         ],
       },
       {
@@ -389,23 +389,23 @@ const SCHEMA_DEF = [
         ],
       },
       {
-        k: "q3", t: "area", label: "얼굴을 모르는 사람을 상상해서 그릴 때 생기는 대리 재현의 문제와, 사물의 흔적으로 말할 때 그 문제가 줄어드는 이유를 쓰기",
+        k: "q3", t: "area", label: "얼굴을 모르는 사람을 상상해서 그릴 때 생기는 대리 재현의 문제와, 유물(사물)에 드러난 사용 흔적으로 말할 때 그 문제가 줄어드는 이유를 쓰기",
         steps: [
           "문제 확인: 본 적 없는 사람을 상상해 그리면 화면에 남는 것은 그 사람인가, 내 짐작인가",
-          "옮기기: 사물의 흔적으로 말하면 무엇이 남고 무엇이 사라지는지 나누기",
+          "비교: 유물(사물)에 드러난 사용 흔적으로 표현하면 무엇이 전달되고 무엇이 전달되지 않는지 구분하기",
           "정리: 대리 재현의 문제가 왜 줄어드는지 쓰기",
         ],
       },
     ],
   },
   INQUIRY_SECTIONS.q3,
-  /* 번역 사다리 계단 3~7과 돌아보기 (3차시 수업). 옛 요약 표(s3b)·드러내는 방법 카드(s3e)는 카드에서 빠졌고 값만 남는다 */
+  /* 유물 발상 단계 단계 3~7과 돌아보기 (3차시 수업). 옛 요약 표(s3b)·드러내는 방법 카드(s3e)는 카드에서 빠졌고 값만 남는다 */
   ...LADDER_CLASS_SECTIONS,  {
     id: "l4", session: "4차시", code: "4", kind: "learn", title: "박물관 장치와 발굴 기록 사진의 형식",
     note: "강의 노트 4차시를 읽고 작성합니다.",
     fields: [
       {
-        k: "q1", t: "area", label: "박물관화(musealization)의 뜻을 쓰고, 작품 캡션이 사물의 읽기에서 하는 일을 정리하기",
+        k: "q1", t: "area", label: "박물관화(musealization)의 뜻을 쓰고, 작품 캡션이 사물을 이해하는 데 어떤 역할을 하는지 정리하기",
         steps: [
           "뜻 확인: 박물관화는 쓰던 물건이 박물관에 들어가며 겪는 지위의 변화",
           "연결: 그 변화에서 작품 캡션이 맡는 일(이름 붙이기 · 설명하기 · 믿게 하기) 생각하기",
@@ -424,7 +424,7 @@ const SCHEMA_DEF = [
         steps: [
           "규칙 확인: 재질 + 특징 + 물건 종류의 순서 (예: 청동 녹슨 거울)",
           "지어 보기: 내 것이 아닌 가상 유물의 이름 하나 짓기",
-          "점검: 이름만 읽어도 물건의 모습이 그려지는지 확인하고, 안 그려지면 어느 자리가 모자란지 쓰기",
+          "점검: 이름만 읽어도 물건의 모습이 그려지는지 확인하고, 그려지지 않으면 어느 부분이 부족한지 쓰기",
         ],
       },
     ],
@@ -493,7 +493,7 @@ const SCHEMA_DEF = [
       { k: "genLinks", t: "links", opt: true, label: "생성 결과 공유 링크 (최대 3개): 도구가 만들어 준 공유 주소를 붙여 두면 원본 화질로 다시 볼 수 있습니다." },
     ],
   },
-  { id: "s5b", session: "5차시", code: "I", title: "생성 회차 기록", note: "1인 5회 이내로 생성합니다. 회차마다 결과 화면을 함께 올리면 판단이 어떻게 바뀌었는지 남습니다.", fields: [{ k: "rounds", t: "rounds" }] },
+  { id: "s5b", session: "5차시", code: "I", title: "생성 회차 기록", note: "1인 5회 이내로 생성합니다. 회차마다 결과 화면을 함께 올리면 판단이 어떻게 바뀌었는지 기록됩니다.", fields: [{ k: "rounds", t: "rounds" }] },
   { id: "s5c", session: "5차시", code: "J", title: "이중 점검표", note: "‘안 맞음’으로 표시한 항목에는 왜 그렇게 봤는지와 어떻게 고칠지를 적습니다.", fields: [{ k: "inspect", t: "inspect" }] },
   {
     id: "s5d", session: "5차시", code: "K", title: "고른 것과 제외한 것",
@@ -534,7 +534,7 @@ const SCHEMA_DEF = [
         k: "q2", t: "area", label: "재생성·부분 수정·화면 편집이 각각 화면의 무엇을 바꾸는지 구분해 쓰기",
         steps: [
           "나누기: 재생성(화면 전체를 새로), 부분 수정(한 부위만), 화면 편집(자르기 · 밝기 · 톤)",
-          "정리: 세 방법이 각각 화면의 무엇을 바꾸고 무엇을 남기는지 구분해 쓰기",
+          "정리: 세 방법이 각각 화면의 무엇을 바꾸고 무엇을 유지하는지 구분해 쓰기",
         ],
       },
     ],
@@ -594,9 +594,9 @@ const SCHEMA_DEF = [
     fields: [
       { k: "mode", t: "select", opts: DISPLAY_OPTS, label: "진열 방식" },
       { k: "modeWhy", t: "text", label: "그 방식을 고른 이유" },
-      { k: "layout", t: "area", label: "벽면 배치 계획, 작품 캡션의 서체 크기와 위치, 허구 고지의 자리" },
+      { k: "layout", t: "area", label: "벽면 배치 계획, 작품 캡션의 서체 크기와 위치, 허구 고지의 위치" },
       { k: "whyArt", t: "area", label: "“이 이미지가 왜 미술인지”를 한 문장으로 쓰기" },
-      { k: "note", t: "area", label: "작가 노트: 이 문제를 고른 이유, 사람을 그리지 않고 사물로 옮긴 이유, 흔적의 위치를 그 자리로 정한 근거", rows: 6 },
+      { k: "note", t: "area", label: "작가 노트: 이 문제를 고른 이유, 사람 대신 사물로 표현한 이유, 흔적의 위치를 그렇게 정한 근거", rows: 6 },
       { k: "installImg", t: "image", opt: true, label: "전시 설치 사진: 벽면에 걸린 상태", mm: true },
       { k: "installClip", t: "video", max: 10, opt: true, label: "전시 영상 (최대 10초): 관람자의 걸음으로 작품에 다가가는 화면을 담습니다. 사람의 얼굴이 담기지 않게 찍습니다.", mm: true },
     ],
@@ -665,12 +665,12 @@ const SCHEMA_DEF = [
       {
         k: "ownQ", t: "area", label: "다음 질문 만들기: 이 단원을 지나며 내 안에 새로 생긴, 더 파고들고 싶은 질문 하나를 만들어 쓰기",
         steps: [
-          "돌아보기: 여덟 차시 동안 답이 끝나지 않은 채 남아 있는 궁금함 떠올리기",
+          "돌아보기: 여덟 차시 동안 아직 답을 찾지 못한 궁금함 떠올리기",
           "다듬기: 그 궁금함을 ‘예·아니오로 끝나지 않는’ 질문 한 문장으로 다듬기",
           "덧붙이기: 이 질문에 답해 보려면 무엇을 보거나 만들어 봐야 할지 한 줄 쓰기",
         ],
       },
-      { k: "voice", t: "audio", opt: true, label: "구술 성찰 (최대 90초): 작품 앞에서 말로 남기는 성찰. 글로 옮기기 어려운 판단의 근거를 말합니다.", mm: true },
+      { k: "voice", t: "audio", opt: true, label: "구술 성찰 (최대 90초): 작품 앞에서 말로 하는 성찰. 글로 쓰기 어려운 판단의 근거를 말합니다.", mm: true },
     ],
   },
   { id: "s8b", session: "8차시", code: "Q", title: "상호평가 활동지 (관람자로서 작성)", note: "관람은 두 번 합니다. 처음에는 작품 캡션을 가리고, 두 번째에는 작품 캡션과 제목까지 봅니다. ●그렇다 ◐부분적으로 그렇다 ○아니다", fields: [{ k: "peer", t: "peer" }] },
@@ -824,9 +824,9 @@ function withRo(word) {
   return String(word) + (j === null || j === 0 || j === 8 ? "로" : "으로");
 }
 
-/* 필드의 저장 키. 대부분 "섹션.칸"이지만 key가 있으면 그 키에 저장한다 (계단 3 카드가 s3a.* 에 쓰는 장치) */
+/* 필드의 저장 키. 대부분 "섹션.칸"이지만 key가 있으면 그 키에 저장한다 (단계 3 카드가 s3a.* 에 쓰는 장치) */
 const fkey = (sec, f) => f.key || sec.id + "." + f.k;
-/* 저장 키 → { sec, f }. 시간 장부(_t)·계단 통계·피드백 앵커가 키 앞부분 대신 이 표로 섹션을 찾는다.
+/* 저장 키 → { sec, f }. 시간 장부(_t)·단계 통계·피드백 앵커가 키 앞부분 대신 이 표로 섹션을 찾는다.
    SCHEMA가 바뀔 때(수업 편집) 다시 만든다. */
 let FIELD_OF_KEY = {};
 function rebuildFieldIndex() {
@@ -860,7 +860,7 @@ function fieldProgress(f, v) {
       const p = (Array.isArray(v) ? v : [{}, {}]).slice(0, 2);
       return { total: 2, done: p.filter((b) => b && (filled(b.no) || filled(b.overall))).length };
     }
-    /* 번역 사다리. 필수 분량: 장면 3줄 · 안 보이는 것 2줄 · 물건 2줄+고름 · 흔적 1행 · 짝 1명 */
+    /* 유물 발상 단계. 필수 분량: 장면 3줄 · 안 보이는 것 2줄 · 물건 2줄+고름 · 흔적 1행 · 짝 1명 */
     case "scenes": return { total: 3, done: cnt(3, (r) => filled(r.what)) };
     case "invis": return { total: 2, done: cnt(2, (r) => filled(r.text) && filled(r.type)) };
     case "pickinv": return { total: 1, done: filled(v) ? 1 : 0 };
@@ -930,11 +930,11 @@ onContentChange(() => {
 
 const CHANGE_PAIRS = [
   {
-    dim: "보이지 않는 것의 번역",
-    label: "관찰한 문제를 사물의 흔적으로 옮긴 진술",
-    before: { k: "s3t3.stmt1", where: "3차시 계단 6 번역 문장(첫 번째)", kind: "stmt" },
-    after: { k: "s3t4.stmt2", where: "3차시 계단 7 번역 문장(마지막)", kind: "stmt" },
-    look: "짝에게 읽힌 뒤 큰 말(노동·시간·기억)이 자리·모양·동작의 말로 바뀌었는지, 자국이 생기는 되풀이가 문장 안에 들어왔는지 확인함.",
+    dim: "보이지 않는 것의 흔적 표현",
+    label: "관찰한 문제를 유물(사물)에 드러난 사용 흔적으로 옮긴 진술",
+    before: { k: "s3t3.stmt1", where: "3차시 단계 6 흔적 문장(첫 번째)", kind: "stmt" },
+    after: { k: "s3t4.stmt2", where: "3차시 단계 7 흔적 문장(마지막)", kind: "stmt" },
+    look: "짝에게 읽힌 뒤 큰 말(노동·시간·기억)이 자리·모양·동작의 말로 바뀌었는지, 자국이 생기는 반복이 문장 안에 들어왔는지 확인함.",
   },
   {
     dim: "미술 개념",
@@ -1030,7 +1030,7 @@ function creativityMetrics(ws) {
     { k: "peerSent", label: "동료에게 준 문장", v: peerSent, unit: "문장", hint: "타인의 작품을 읽은 양" },
     { k: "peerBack", label: "받은 의견을 어떻게 했는지", v: strLen(d["s8a.peerBack"]) > 20 ? 1 : 0, unit: "건", hint: "반영·미반영의 이유" },
     { k: "changed", label: "전후 답이 모두 있는 쌍", v: changed, unit: "/ " + CHANGE_PAIRS.length, hint: "변화를 볼 수 있는 자리" },
-    { k: "counter", label: "반대 근거를 쓴 논쟁 질문", v: counterDone, unit: "/ " + debateKeys.length, hint: "상대의 자리에서 생각한 횟수" },
+    { k: "counter", label: "반대 근거를 쓴 논쟁 질문", v: counterDone, unit: "/ " + debateKeys.length, hint: "상대의 입장에서 생각한 횟수" },
     { k: "debate", label: "③까지 채운 논쟁 질문", v: debateDone, unit: "/ " + debateKeys.length, hint: "반론을 알고도 세운 판단" },
   ];
 }
@@ -1134,10 +1134,10 @@ function overlapCoef(a, b) {
 const simText = (x, y) => jaccard(gramSet(x), gramSet(y));
 
 /* ---------- 어휘 다양성 ----------
-   "이 학생만 쓴 낱말 수"(hapax)는 글이 길수록 커진다. 짧은 글에서는 어휘가 아니라 길이를 재므로
+   "이 학생만 쓴 단어 수"(hapax)는 글이 길수록 커진다. 짧은 글에서는 어휘가 아니라 길이를 재므로
    주 지표로 쓸 수 없다. 길이에 견고한 두 지표를 함께 낸다.
    MATTR — 토큰 50개 창을 한 칸씩 밀며 잰 TTR의 평균.
-   HD-D  — 토큰 42개를 무작위로 뽑았을 때 각 낱말이 한 번이라도 나올 확률의 합을 42로 나눈 값.
+   HD-D  — 토큰 42개를 무작위로 뽑았을 때 각 단어가 한 번이라도 나올 확률의 합을 42로 나눈 값.
    둘 다 최소 토큰 수를 넘겨야 계산된다. 넘기지 못하면 null을 돌려주고 tokens_n을 함께 내보내
    분석에서 사전 등록한 포함 기준을 적용할 수 있게 한다. */
 const MATTR_WIN = 50;
@@ -1181,7 +1181,7 @@ function hdd(tokens, sample) {
   const lnAll = lnChoose(N, S);
   let sum = 0;
   cnt.forEach((c) => {
-    // 그 낱말이 표본에 한 번도 안 나올 확률
+    // 그 단어가 표본에 한 번도 안 나올 확률
     const lnAbsent = lnChoose(N - c, S);
     const pPresent = 1 - (lnAbsent === -Infinity ? 0 : Math.exp(lnAbsent - lnAll));
     sum += pPresent;
@@ -1190,7 +1190,7 @@ function hdd(tokens, sample) {
 }
 
 /* 글의 뼈대 — 어휘가 달라도 구조가 같은 경우를 잡는다.
-   학생은 AI 글을 그대로 내지 않고 고쳐서 낸다. 그러면 낱말은 바뀌지만
+   학생은 AI 글을 그대로 내지 않고 고쳐서 낸다. 그러면 단어는 바뀌지만
    문장 수 · 나열 표지 · 연결어의 배치는 남는다. 내용 유사도는 이것을 놓친다. */
 const STRUCT_MARKS = ["첫째", "둘째", "셋째", "먼저", "또한", "그리고", "하지만", "그러나", "따라서",
   "그래서", "마지막으로", "이러한", "때문에", "뿐만 아니라", "즉", "예를 들어", "결론적으로", "무엇보다"];
@@ -1212,7 +1212,7 @@ function structSig(s, tag) {
 }
 
 /* 학급 대조에 쓰는 서술형 칸 — 스키마의 긴 서술 칸(area)을 그대로 따른다 */
-/* 동질화·문체 비교의 대상: 서술 칸(area)과 사다리의 한 줄 까닭(max 100자 이상인 text) */
+/* 동질화·문체 비교의 대상: 서술 칸(area)과 발상 단계의 한 줄 이유(max 100자 이상인 text) */
 function simFields() {
   const out = [];
   for (const sec of SCHEMA) for (const f of sec.fields) if (f.t === "area" || (f.t === "text" && (f.max || 0) >= 100)) out.push(fkey(sec, f));
@@ -1358,7 +1358,7 @@ const median = (arr) => {
 
 /* ---------- 연구 참여 동의 ----------
    포괄 동의 한 장이 아니라 항목마다 따로 받는다 (개인정보보호법 제22조 제1항).
-   항목을 이렇게 나눈 까닭: 수업 산출물은 정규 평가 자료의 2차 이용으로 설명되지만,
+   항목을 이렇게 나눈 이유: 수업 산출물은 정규 평가 자료의 2차 이용으로 설명되지만,
    붙여넣기 기록과 활동 로그는 그 근거로 정당화되지 않아 별도 동의가 필요하다.
    동의하지 않은 항목은 내려받는 자료에서 그 학생의 해당 열만 비운다 —
    한 항목을 거부했다고 참여 전체가 빠지면 자료를 잃고, 학생에게도 불리하다. */
@@ -1392,7 +1392,7 @@ const consentAgreed = (raw, k) => (CONSENT_ON ? consentOf(raw)[k] === true : tru
 const consentAny = (raw) => (CONSENT_ON ? CONSENT_KEYS.some((k) => consentOf(raw)[k] === true) : true);
 const consentCount = (raw) => (CONSENT_ON ? CONSENT_KEYS.filter((k) => consentOf(raw)[k] === true).length : CONSENT_KEYS.length);
 
-const PASTE_MIN = 20; // 낱말 몇 개짜리 붙여넣기는 기록하지 않는다
+const PASTE_MIN = 20; // 단어 몇 개짜리 붙여넣기는 기록하지 않는다
 
 /* 붙여넣은 직후 학생에게 출처를 묻는다 — 교사가 「차시 공개」 탭에서 켜고 끈다.
    켜 두면 자료에 출처 자기보고가 남고, 학생은 자기가 무엇을 가져왔는지 한 번 짚게 된다.
@@ -1412,7 +1412,7 @@ const PASTE_SRC = [
 const DEFAULT_PASTE_ASK = true;
 const pasteAskOn = (cfg) => (cfg && cfg.pasteAsk !== undefined ? cfg.pasteAsk === true : DEFAULT_PASTE_ASK);
 
-/* 기록지 안에 학생이 쓴 글을 모두 훑는다 — 서술 칸뿐 아니라 표·사다리·점검표 안의 칸까지.
+/* 기록지 안에 학생이 쓴 글을 모두 훑는다 — 서술 칸뿐 아니라 표·발상 단계·점검표 안의 칸까지.
    표 안의 칸은 "필드키#속성행번호"로 가리킨다 (예: s5b.rounds#prompt2).
    붙여넣기가 어디서든 일어날 수 있으므로 전유율의 분모도 전 과정의 글이어야 한다. */
 function writtenTextAll(ws) {
@@ -1858,8 +1858,8 @@ function editTimeline(ws) {
 const SUB_LABELS = {
   prompt: "프롬프트", judge: "한 줄 판단", change: "고친 한 가지", tool: "사용 도구", no: "결과물 번호",
   note: "근거", fix: "수정 방법", status: "성립 여부",
-  obj: "물건", where: "있는 자리", whose: "닿는 몸", act: "동작", inv: "안 보이는 것",
-  spot: "흔적의 자리", shape: "자국의 모양", freq: "되풀이", span: "기간", read: "짝이 읽은 것", gap: "맞은 정도", fixed: "고친 것", text: "안 보이는 것", what: "본 것",
+  obj: "물건", where: "있는 곳", whose: "닿는 몸", act: "동작", inv: "안 보이는 것",
+  spot: "흔적의 위치", shape: "자국의 모양", freq: "반복", span: "기간", read: "짝이 읽은 것", gap: "맞은 정도", fixed: "고친 것", text: "안 보이는 것", what: "본 것",
   memo: "메모", sent: "보낸 말", overall: "종합 비평", swap: "작품 캡션 바꿔 달기",
   counter: "반론", hold: "그럼에도 남는 것", stand: "내 입장", url: "링크",
 };
@@ -1885,7 +1885,7 @@ function fieldMeta(key) {
   const base = hash >= 0 ? s0.slice(0, hash) : s0;
   const sub = hash >= 0 ? s0.slice(hash + 1) : "";
   const [sid0, fk0] = base.split(".");
-  // 저장 키가 재지정된 칸(s3a.problem → 계단 3 카드)은 표로 먼저 찾고, 없으면 키 앞부분으로 찾는다
+  // 저장 키가 재지정된 칸(s3a.problem → 단계 3 카드)은 표로 먼저 찾고, 없으면 키 앞부분으로 찾는다
   const hit = FIELD_OF_KEY[base];
   const sec = hit ? hit.sec : SCHEMA.find((s) => s.id === sid0);
   const f = hit ? hit.f : (sec ? sec.fields.find((x) => x.k === fk0) : null);
@@ -2045,14 +2045,14 @@ function fieldUnits(f, v) {
     }); break;
     case "traces": rows.forEach((r, i) => {
       if (!r) return;
-      push("흔적 " + (i + 1), [r.inv && "안 보이는 것: " + r.inv, r.spot && "자리: " + r.spot, r.shape && "자국: " + r.shape,
-        r.act && "동작: " + r.act, traceFreq(r) && "되풀이: " + traceFreq(r)].filter(Boolean).join(" / "));
+      push("흔적 " + (i + 1), [r.inv && "안 보이는 것: " + r.inv, r.spot && "위치: " + r.spot, r.shape && "자국: " + r.shape,
+        r.act && "동작: " + r.act, traceFreq(r) && "반복: " + traceFreq(r)].filter(Boolean).join(" / "));
     }); break;
-    case "stmt": stmtVersions(v).forEach((x, i, arr) => push(i === arr.length - 1 ? "번역 문장 (마지막)" : "번역 문장 v" + (i + 1), x.text)); break;
+    case "stmt": stmtVersions(v).forEach((x, i, arr) => push(i === arr.length - 1 ? "흔적 문장 (마지막)" : "흔적 문장 v" + (i + 1), x.text)); break;
     case "reverse": rows.forEach((r, i) => {
       if (!r) return;
       push("짝에게 읽히기 " + (i + 1), [r.shown && "보여 준 것: " + r.shown, r.read && "짝이 읽은 것: " + r.read, r.gap && "맞은 정도: " + r.gap,
-        r.backTo && "돌아간 계단: " + backLabel(r.backTo), r.fixed && "고친 것: " + r.fixed].filter(Boolean).join(" / "));
+        r.backTo && "돌아간 단계: " + backLabel(r.backTo), r.fixed && "고친 것: " + r.fixed].filter(Boolean).join(" / "));
     }); break;
     case "cards": push("고른 것", cardLabel(f.src, v)); break;
     case "image": case "images": case "audio": case "video": case "sketch": case "links": break;
@@ -2067,7 +2067,7 @@ function splitSentences(t) {
   return String(t || "").split(/[.!?…]\s+|[.!?…]$|\n+/).map((s) => s.trim()).filter((s) => s.length >= 5);
 }
 
-/* ---------- 사다리에서 값 끌어오기 ---------- */
+/* ---------- 발상 단계에서 값 끌어오기 ---------- */
 const rowsOf = (v) => (Array.isArray(v) ? v.filter(Boolean) : []);
 
 function ladderPick(ws) {
@@ -2081,7 +2081,7 @@ function ladderObject(ws) {
   const chosen = cs.find((c) => c.verdict === "고름" && filled(c.obj)) || cs.find((c) => filled(c.obj));
   return chosen ? chosen.obj || "" : "";
 }
-/* 옛 기록은 되풀이가 freq(횟수)·span(기간) 두 칸이었다. 새 칸은 freq 하나라 읽을 때 합친다 */
+/* 옛 기록은 반복이 freq(횟수)·span(기간) 두 칸이었다. 새 칸은 freq 하나라 읽을 때 합친다 */
 function traceFreq(t) {
   const f = String((t || {}).freq || "").trim(), s = String((t || {}).span || "").trim();
   if (!f) return s ? s + " 동안" : "";
@@ -2101,19 +2101,19 @@ function ladderSentence(ws) {
   const inv = ladderPick(d), obj = ladderObject(d);
   const t = rowsOf(d["s3t3.traces"])[0] || {};
   const slot = (v, name) => (filled(v) ? String(v).trim() : "「" + name + "」");
-  const spot = slot(t.spot, "어느 자리");
+  const spot = slot(t.spot, "어느 위치");
   const head = filled(obj) ? (filled(t.spot) && String(t.spot).includes(obj) ? "" : obj + "의 ") : "「물건」의 ";
   let shape = slot(t.shape, "어떤 자국");
   if (!/[.。]$/.test(shape)) shape += ".";
   let freq = traceFreq(t).replace(/\s*(되풀이|반복)(했다|해서|하기|함)?\s*$/, "");
   if (!freq) freq = "「하루 몇 번씩, 몇 년 동안」";
   const s1 = head + (filled(t.spot) ? josa(spot, "을", "를") : spot + "을(를)") + " 보면, " + shape;
-  const s2 = "이것은 " + (filled(t.act) ? josa(String(t.act).trim(), "을", "를") : "「어떤 동작」을(를)") + " " + freq + " 되풀이해서 생긴 자국이다.";
+  const s2 = "이것은 " + (filled(t.act) ? josa(String(t.act).trim(), "을", "를") : "「어떤 동작」을(를)") + " " + freq + " 반복해서 생긴 자국이다.";
   const s3 = "이 자국이 " + (filled(inv) ? josa(inv, "을", "를") : "「안 보이는 것」을(를)") + " 대신 보여 준다.";
   return s1 + " " + s2 + " " + s3;
 }
-/* 사다리의 결론 다섯 줄. 돌아보기의 「내 번역 한눈에」, 4차시 유물 설계, 창의성 지표가 모두 이 함수를 쓴다.
-   s3b.*는 학생이 직접 고친 값이 있으면 그 값, 없으면 사다리에서 끌어온 값이다. */
+/* 발상 단계의 결론 다섯 줄. 돌아보기의 「내 발상 한눈에」, 4차시 유물 설계, 창의성 지표가 모두 이 함수를 쓴다.
+   s3b.*는 학생이 직접 고친 값이 있으면 그 값, 없으면 앞 단계에서 끌어온 값이다. */
 function ladderSummary(ws) {
   const d = ws || {};
   return {
@@ -2126,13 +2126,13 @@ function ladderSummary(ws) {
     attitude: d["s3c.attitude"] || "",
   };
 }
-/* 요약 세 값(s3b.invisible·object·trace)을 사다리에서 다시 끌어온다.
+/* 요약 세 값(s3b.invisible·object·trace)을 앞 단계에서 다시 끌어온다.
    비어 있거나 마지막 자동값(_s3bAuto)과 같을 때만 덮어써, 학생이 손본 값과 옛 수기값은 남긴다.
    setField 안에서 next에 직접 쓰므로 고쳐 쓰기 이력·시간 장부·붙여넣기 기록은 건드리지 않는다. */
 function deriveSummary(next, prevWs) {
   const auto = { invisible: ladderPick(next), object: ladderObject(next), trace: ladderTrace(next) };
   const prev = (next && next._s3bAuto) || {};
-  // 옛 기록(_s3bAuto가 없음)은 직전 사다리 값과 같으면 자동값으로 본다. 옛 「가져오기」로 복사한 값이 「직접 고침」으로 굳지 않게
+  // 옛 기록(_s3bAuto가 없음)은 직전 단계 값과 같으면 자동값으로 본다. 옛 「가져오기」로 복사한 값이 「직접 고침」으로 굳지 않게
   const before = prevWs && !(next && next._s3bAuto) ? { invisible: ladderPick(prevWs), object: ladderObject(prevWs), trace: ladderTrace(prevWs) } : {};
   const norm = (s) => String(s || "").replace(/,\s+/g, " ").trim();
   const out = { ...next };
@@ -2143,14 +2143,14 @@ function deriveSummary(next, prevWs) {
   out._s3bAuto = auto;
   return out;
 }
-/* ---------- 계단별 도달과 사고의 두께 ---------- */
+/* ---------- 단계별 도달과 사고의 두께 ---------- */
 function stageStat(st, ws) {
   const d = ws || {};
   let total = 0, done = 0, chars = 0, units = 0, edits = 0;
   let first = null, last = null;
   const texts = [];
   st.keys.forEach((k) => {
-    // 저장 키로 칸을 찾는다. 계단 3(s3a.problem 등)은 표시 섹션이 s3p라 시간 장부도 s3p에서 읽는다
+    // 저장 키로 칸을 찾는다. 단계 3(s3a.problem 등)은 표시 섹션이 s3p라 시간 장부도 s3p에서 읽는다
     const hit = FIELD_OF_KEY[k];
     if (!hit) return;
     const { sec, f } = hit;
@@ -2178,7 +2178,7 @@ function stageStat(st, ws) {
   };
 }
 
-/* 한 학생의 번역 사고 프로파일 */
+/* 한 학생의 발상 과정 프로파일 */
 function translationMetrics(ws) {
   const d = ws || {};
   const scenes = rowsOf(d["s3a.scenes"]).filter((r) => filled(r.what));
@@ -2189,7 +2189,7 @@ function translationMetrics(ws) {
   const traces = rowsOf(d["s3t3.traces"]).filter((r) => filled(r.spot) || filled(r.shape));
   const causal = traces.filter((r) => filled(r.act) && (filled(r.freq) || filled(r.span)));
   const rev = rowsOf(d["s3t4.reverse"]).filter((r) => filled(r.read));
-  // 「거의 같게 읽음」 행은 돌아갈 계단이 숨겨지므로 되돌림으로 세지 않는다
+  // 「거의 같게 읽음」 행은 돌아갈 단계가 숨겨지므로 되돌림으로 세지 않는다
   const revisits = rev.filter((r) => r.gap !== GAP_OPTS[0] && normBack(r.backTo) !== "none");
 
   const s1 = stmtFirst(d["s3t3.stmt1"]);
@@ -2213,7 +2213,7 @@ function translationMetrics(ws) {
     stages, reached, depth,
     obsMethod,
     obsBlind: filled(d["s3o.blind"]) ? 1 : 0,
-    /* 가까운 방법: 사다리를 다 오른 뒤 돌아보기에서 짚는 사후 위치 짓기 */
+    /* 가까운 방법: 일곱 단계를 다 마친 뒤 돌아보기에서 짚는 사후 위치 짓기 */
     engageMode,
     engageWhy: filled(d["s3e.why"]) ? 1 : 0,
     engageInUnit: engageMode ? (UNIT_MODES.includes(engageMode) ? 1 : 0) : null,
@@ -2606,7 +2606,7 @@ body{background:var(--bg)}
 .sv-delta-dn{color:var(--seal);font-family:var(--mono)}
 .sv-delta-0{color:var(--sub);font-family:var(--mono)}
 
-/* 번역 사다리 — 학생 화면 */
+/* 유물 발상 단계 — 학생 화면 */
 .ladder{display:flex;gap:0;margin:0 0 14px;flex-wrap:wrap;border:1px solid var(--line);background:var(--card2)}
 .ld-step{flex:1 1 92px;min-width:92px;padding:8px 8px 9px;border:none;border-right:1px solid var(--line2);position:relative;text-align:center;background:transparent;font-family:inherit;color:inherit;cursor:pointer;display:block}
 .ld-step:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
@@ -2620,13 +2620,13 @@ body{background:var(--bg)}
 .ld-step.done .k{color:var(--patina)}
 .ld-hint{font-size:12px;color:var(--sub);margin:-8px 0 14px;line-height:1.6}
 
-/* 앞 계단에서 이어받은 값 */
+/* 앞 단계에서 이어받은 값 */
 .carry{border-left:3px solid var(--patina);background:var(--patina-bg);padding:8px 10px;margin:0 0 10px;font-size:12.5px;line-height:1.6}
 .carry b{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--patina);display:block;margin-bottom:3px}
 .carry .empty{color:var(--sub)}
 .carry-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 
-/* 사다리 표 공통 */
+/* 발상 단계 표 공통 */
 .lt{width:100%;border-collapse:collapse;font-size:13px}
 .lt th{background:var(--card2);border:1px solid var(--line);padding:6px 7px;font-size:11px;font-weight:700;text-align:left;color:var(--sub);white-space:nowrap}
 .lt td{border:1px solid var(--line2);padding:4px 5px;vertical-align:top}
@@ -2805,7 +2805,7 @@ function LessonPanel({ L, teacher, onReading }) {
         )}
         {L.readings.length > 1 && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
-            <span className="hint">읽기 자료 {L.readings.length}개. 수업 흐름 순서대로 놓여 있습니다.</span>
+            <span className="hint">읽기 자료 {L.readings.length}개입니다. 수업 진행 순서대로 정리되어 있습니다.</span>
             <button type="button" className="btn small ghost" onClick={expandAll}>모두 펼치기</button>
           </div>
         )}
@@ -2851,7 +2851,7 @@ function LessonPanel({ L, teacher, onReading }) {
           </details>
         )}
       </div>
-      {!teacher && <div className="lesson-guide">읽기 자료는 수업 흐름의 단계 순서로 놓여 있습니다. 읽은 뒤 「배움 확인 {L.n}」과 「탐구 질문 {L.n}」에 자기 말로 답합니다. 답은 자동 저장됩니다.</div>}
+      {!teacher && <div className="lesson-guide">읽기 자료를 읽은 뒤 「배움 확인 {L.n}」, 「탐구 질문 {L.n}」에 답합니다. 답은 자동으로 저장됩니다.</div>}
     </div>
   );
 }
@@ -2917,7 +2917,7 @@ function ThinkMeter({ text }) {
   if (!filled(text)) return null;
   const n = sentenceCount(text);
   if (n <= 1) return <span className="think-meter warn">한 문장 더. 왜 그렇게 생각했는지(“왜냐하면 …”)를 이어 붙여 보세요.</span>;
-  return <span className="think-meter ok">문장 {n}개. 생각의 과정이 남고 있습니다.</span>;
+  return <span className="think-meter ok">문장 {n}개. 생각의 과정이 기록되고 있습니다.</span>;
 }
 
 /* 생각 계단 — 큰 개념에서 작은 개념으로 내려오는 순서 안내 */
@@ -2931,25 +2931,25 @@ function ThinkSteps({ steps, title }) {
   );
 }
 
-/* ---------- 번역 사다리: 학생 화면 도우미 ---------- */
+/* ---------- 유물 발상 단계: 학생 화면 도우미 ---------- */
 
 /* 차시 탭 이동과 차시 공개 상태. StudentApp만 값을 넣는다.
    교사 미리보기·표본 화면에서는 null이라 다른 차시 탭으로 가는 버튼이 비활성이다. */
 const NavCtx = React.createContext(null);
 
-/* 「번역 사다리란」: 계단 1(2차시 탭)과 계단 3(3차시 탭) 카드 위에 한 번씩 */
+/* 「유물 발상 단계란」: 단계 1(2차시 탭)과 단계 3(3차시 탭) 카드 위에 한 번씩 */
 function LadderIntro({ sec }) {
   const hw = sec.session === "2차시";
   return (
     <div className="ld-intro">
-      <b>번역 사다리란</b>{LADDER_INTRO}
-      <small>{hw ? "계단 1·2는 한 주 과제, 계단 3~7은 3차시 수업에서 오릅니다." : "계단 1·2는 과제로 했고, 오늘은 계단 3부터 7까지 오릅니다."}</small>
+      <b>유물 발상 단계란</b>{LADDER_INTRO}
+      <small>{hw ? "단계 1·2는 한 주 과제이고, 단계 3~7은 3차시 수업에서 진행합니다." : "단계 1·2는 과제로 했고, 오늘은 단계 3부터 7까지 진행합니다."}</small>
     </div>
   );
 }
 
-/* 일곱 계단 표시줄. 지금 있는 칸과 계단마다의 채움 정도를 보여 주고, 누르면 그 계단의 카드로 간다.
-   계단 1·2(2차시 탭)와 3~7(3차시 탭)은 탭이 다르므로 탭을 옮긴 뒤 카드로 스크롤한다. */
+/* 일곱 단계 표시줄. 지금 있는 칸과 단계마다의 채움 정도를 보여 주고, 누르면 그 단계의 카드로 간다.
+   단계 1·2(2차시 탭)와 3~7(3차시 탭)은 탭이 다르므로 탭을 옮긴 뒤 카드로 스크롤한다. */
 function LadderRail({ sec, ws }) {
   const nav = React.useContext(NavCtx);
   const stats = TRANSLATE_STAGES.map((st) => stageStat(st, ws));
@@ -2969,7 +2969,7 @@ function LadderRail({ sec, ws }) {
     if (st.session === sec.session) { scrollTo(st.sec); return; }
     if (!nav) return;
     if (!isOpen(nav.openMap, st.session)) {
-      setNote(st.session === "2차시" ? "선생님이 2차시를 열어야 계단 1·2를 고칠 수 있습니다." : "계단 3부터는 3차시 수업에서 엽니다.");
+      setNote(st.session === "2차시" ? "선생님이 2차시를 열어야 단계 1·2를 고칠 수 있습니다." : "단계 3부터는 3차시 수업에서 엽니다.");
       return;
     }
     nav.go(st.session, st.sec);
@@ -2984,9 +2984,9 @@ function LadderRail({ sec, ws }) {
           return (
             <button type="button" key={st.key}
               className={"ld-step " + (here.includes(st.key) ? "now " : "") + (done ? "done " : "") + (later ? "later" : "")}
-              title={"계단 " + st.n + " " + st.name + ": " + st.ask + (later ? " (3차시 수업에서)" : "")}
+              title={"단계 " + st.n + " " + st.name + ": " + st.ask + (later ? " (3차시 수업에서)" : "")}
               onClick={() => go(st)}>
-              <div className="k">계단 {st.n}{done ? " ✓" : ""}</div>
+              <div className="k">단계 {st.n}{done ? " ✓" : ""}</div>
               <div className="nm">{st.name}</div>
               {st.hw && <span className="hw">과제</span>}
               <div className="bar"><i style={{ width: Math.round(s.ratio * 100) + "%" }} /></div>
@@ -2995,12 +2995,12 @@ function LadderRail({ sec, ws }) {
         })}
       </div>
       {note && <div className="ld-note" role="status">{note}</div>}
-      {cur && !note && <div className="ld-hint"><b>계단 {cur.n} · {cur.name}</b> {cur.ask}</div>}
+      {cur && !note && <div className="ld-hint"><b>단계 {cur.n} · {cur.name}</b> {cur.ask}</div>}
     </div>
   );
 }
 
-/* 앞 계단의 답을 그 자리에 다시 보여 준다. items로 보여 줄 줄을 고른다.
+/* 앞 단계의 답을 그 자리에 다시 보여 준다. items로 보여 줄 줄을 고른다.
    strong은 「읽어 줄 것」처럼 따로 강조할 한 줄, toLadder는 4차시에서 3차시 탭으로 가는 버튼. */
 const CARRY_DEFAULT = ["problem", "invisible", "object", "trace"];
 function Carry({ ws, items, strong, title, toLadder }) {
@@ -3026,9 +3026,9 @@ function Carry({ ws, items, strong, title, toLadder }) {
   const canGo = toLadder && nav && isOpen(nav.openMap, "3차시");
   return (
     <div className="carry">
-      <b>{title || "앞 계단에서 가져온 것"}</b>
+      <b>{title || "앞 단계에서 가져온 것"}</b>
       {rows.map(([k, l, v]) => <div className="cr" key={k}><span className="l">{l}</span><span className="v">{v}</span></div>)}
-      {strong && <div className="cr strong"><span className="l">읽어 줄 것</span><span className="v">{rows.length ? strong : "계단 5·6을 채우면 여기에 물건과 흔적이 뜹니다. 그 두 줄만 읽어 줍니다."}</span></div>}
+      {strong && <div className="cr strong"><span className="l">읽어 줄 것</span><span className="v">{rows.length ? strong : "단계 5·6을 채우면 여기에 물건과 흔적이 표시됩니다. 그 두 줄만 읽어 줍니다."}</span></div>}
       {toLadder && nav && (
         <div className="carry-row">
           <button type="button" className="btn small ghost" disabled={!canGo} onClick={() => nav.go("3차시", "s3c")}>3차시 탭에서 고치기</button>
@@ -3042,7 +3042,7 @@ function Carry({ ws, items, strong, title, toLadder }) {
 function ConcChip({ text, label }) {
   const c = concreteness(text);
   if (c == null) return null;
-  return <span className={"conc-chip " + (c >= 55 ? "hi" : c <= 30 ? "lo" : "")} title="위치·재질·변형·수량을 가리키는 말이 얼마나 들어 있는지 기계적으로 센 값입니다. 점수가 아니라 다시 볼 자리를 가리키는 표지입니다.">{label || "구체성"} {c}</span>;
+  return <span className={"conc-chip " + (c >= 55 ? "hi" : c <= 30 ? "lo" : "")} title="위치·재질·변형·수량을 가리키는 말이 얼마나 들어 있는지 기계적으로 센 값입니다. 점수가 아니라 다시 볼 부분을 가리키는 표지입니다.">{label || "구체성"} {c}</span>;
 }
 
 /* 여러 줄 표의 행 개수를 늘 일정하게 유지 */
@@ -3052,10 +3052,10 @@ function padRows(v, n, blank) {
   return rows;
 }
 
-/* ---------- 사다리 필드 렌더러 ---------- */
+/* ---------- 발상 단계 필드 렌더러 ---------- */
 
-/* 앞 계단에서 고른 것을 그 자리에 다시 펼쳐 준다.
-   까닭을 쓰는 칸 바로 위에 근거가 있어야 남 이야기가 아닌 자기 판단이 나온다.
+/* 앞 단계에서 고른 것을 그 자리에 다시 펼쳐 준다.
+   이유를 쓰는 칸 바로 위에 근거가 있어야 남 이야기가 아닌 자기 판단이 나온다.
    key는 표시 키(섹션.칸)다. 저장 키(fkey)와 다를 수 있으므로 값은 ws에서 저장 키로 읽는다. */
 function StageEcho({ sec, f, ws }) {
   const d = ws || {};
@@ -3085,7 +3085,7 @@ function StageEcho({ sec, f, ws }) {
   return null;
 }
 
-/* 계단 3 카드 맨 위: 계단 2에서 모아 온 장면을 읽기 전용으로 다시 보여 준다 (문제는 이 장면에서 나온다) */
+/* 단계 3 카드 맨 위: 단계 2에서 모아 온 장면을 읽기 전용으로 다시 보여 준다 (문제는 이 장면에서 나온다) */
 function ScenesEcho({ ws }) {
   const d = ws || {};
   const nav = React.useContext(NavCtx);
@@ -3094,15 +3094,15 @@ function ScenesEcho({ ws }) {
   const scenes = rowsOf(raw).filter((r) => filled(r.what));
   const canGo = nav && isOpen(nav.openMap, "2차시");
   return (
-    <div className="obs-echo"><b>계단 2에서 모아 온 장면</b>
+    <div className="obs-echo"><b>단계 2에서 모아 온 장면</b>
       {legacy ? <div style={{ whiteSpace: "pre-wrap" }}>{legacy}</div>
         : scenes.length ? <ol>{scenes.map((r, i) => <li key={i}>{[r.when, r.where, r.what].filter(filled).join(" · ")}</li>)}</ol>
         : <div>{canGo
-            ? "아직 장면이 없습니다. 2차시 탭 계단 2에 먼저 적습니다. 지금 급하면 계단 2에 한두 줄만 적고 여기로 돌아와 시작해도 됩니다."
-            : "아직 장면이 없습니다. 계단 2는 지금 닫혀 있으니 선생님께 열어 달라고 말합니다. 그동안은 기억나는 장면 하나(언제·어디서·무엇을)를 아래 「만나는 때와 곳」 칸에 적어 두고 시작해도 됩니다."}</div>}
+            ? "아직 장면이 없습니다. 2차시 탭 단계 2에 먼저 적습니다. 지금 급하면 단계 2에 한두 줄만 적고 여기로 돌아와 시작해도 됩니다."
+            : "아직 장면이 없습니다. 단계 2는 지금 닫혀 있으니 선생님께 열어 달라고 말합니다. 그동안은 기억나는 장면 하나(언제·어디서·무엇을)를 아래 「만나는 때와 곳」 칸에 적어 두고 시작해도 됩니다."}</div>}
       {nav && (
         <div className="carry-row">
-          <button type="button" className="btn small ghost" disabled={!canGo} onClick={() => nav.go("2차시", "s3a")}>고치려면 2차시 탭 계단 2로</button>
+          <button type="button" className="btn small ghost" disabled={!canGo} onClick={() => nav.go("2차시", "s3a")}>고치려면 2차시 탭 단계 2로</button>
           {!canGo && (legacy || scenes.length > 0) && <span className="hint" style={{ margin: 0 }}>2차시가 닫혀 있어 지금은 고칠 수 없습니다.</span>}
         </div>
       )}
@@ -3110,11 +3110,11 @@ function ScenesEcho({ ws }) {
   );
 }
 
-/* 계단 2: 장면 세 줄. 열 이름과 예시는 계단 1에서 고른 방법에 맞게 바뀐다 */
+/* 단계 2: 장면 세 줄. 열 이름과 예시는 단계 1에서 고른 방법에 맞게 바뀐다 */
 function ScenesField({ f, fieldKey, v, setField, ws }) {
   const d = ws || {};
   const m = OBS_METHODS.find((c) => c.k === d["s3o.method"]);
-  const col = (m && m.col) || { when: "언제", where: "어디서", what: "무엇을 보았나" };
+  const col = (m && m.col) || { when: "언제", where: "어디서", what: "무엇을 보았는지" };
   const ph = (m && m.ph) || { when: "밤 11시", where: "아파트 분리수거장", what: "상자 더미 옆 손수레, 오른쪽 손잡이에만 테이프" };
   const legacy = typeof v === "string" && v.trim() ? v : "";
   const blank = { when: "", where: "", what: "" };
@@ -3129,7 +3129,7 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
           <ol>{m.how.map((h, i) => <li key={i}>{h}</li>)}</ol>
         </div>
       ) : (
-        <div className="risk-echo"><b>먼저 할 일</b>계단 1에서 관찰 방법부터 고릅니다. 고르면 이 표의 칸 이름이 그 방법에 맞게 바뀝니다.</div>
+        <div className="risk-echo"><b>먼저 할 일</b>단계 1에서 관찰 방법부터 고릅니다. 고르면 이 표의 칸 이름이 그 방법에 맞게 바뀝니다.</div>
       )}
       <ThinkSteps steps={m ? f.steps : (f.steps || []).slice(1)} title={m ? "도움말: 쓰기 전에 두 가지" : "도움말: 쓰기 전에 한 가지"} />
       {legacy && (
@@ -3161,14 +3161,14 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
       </div>
       <span className="hint">
         {m && m.k === "sound"
-          ? "소리 산책이면 들린 것을 적습니다. 걷다가 눈에 걸린 것도 함께 적어 두세요."
+          ? "소리 산책이면 들린 것을 적습니다. 걷다가 눈에 띈 것도 함께 적어 두세요."
           : "세 줄이 차면 그만. 사진·소리는 있으면 아래에 올립니다."}
       </span>
     </div>
   );
 }
 
-/* 계단 4: 안 보이는 것과 그 까닭. 까닭을 고르면 다음 계단에서 찾을 곳이 뜬다 */
+/* 단계 4: 안 보이는 것과 그 이유. 이유를 고르면 다음 단계에서 찾을 곳이 뜬다 */
 const INVIS_PH = ["상자를 놓고 가는 사람의 몸과 시간", "한 사람이 하루에 옮기는 상자 수", "(있으면 하나 더)"];
 function InvisField({ f, fieldKey, v, setField, ws }) {
   const rows = padRows(v, 3, { text: "", type: "" });
@@ -3187,13 +3187,13 @@ function InvisField({ f, fieldKey, v, setField, ws }) {
       <div className="hint" style={{ marginBottom: 8 }}>{INVIS_TYPES.map((t) => t.label + ": " + t.hint).join(" · ")}</div>
       <div className="tbl-scroll">
         <table className="lt stack">
-          <thead><tr><th></th><th>안 보이는 것</th><th style={{ width: 176 }}>왜 안 보이나</th></tr></thead>
+          <thead><tr><th></th><th>안 보이는 것</th><th style={{ width: 176 }}>안 보이는 이유</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="rn">{i + 1}</td>
                 <td data-th="안 보이는 것"><textarea rows={2} value={r.text || ""} maxLength={150} placeholder={INVIS_PH[i] || ""} onChange={(e) => up(i, "text", e.target.value)} /></td>
-                <td data-th="왜 안 보이나">
+                <td data-th="안 보이는 이유">
                   <div className="ivt">
                     {INVIS_TYPES.map((t) => (
                       <button type="button" key={t.k} className={r.type === t.k ? "on" : ""} title={t.hint} aria-pressed={r.type === t.k}
@@ -3208,7 +3208,7 @@ function InvisField({ f, fieldKey, v, setField, ws }) {
       </div>
       {picked.length > 0 && (
         <div className="ivt-guide">
-          <div style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--sub)", letterSpacing: ".06em", marginBottom: 6 }}>이 까닭이면 다음 계단에서 이런 곳을 찾습니다</div>
+          <div style={{ fontSize: 11, fontFamily: "var(--mono)", color: "var(--sub)", letterSpacing: ".06em", marginBottom: 6 }}>이 이유라면 다음 단계에서 이런 곳을 찾습니다</div>
           {picked.map((k) => {
             const t = INVIS_TYPES.find((x) => x.k === k);
             if (!t) return null;
@@ -3216,7 +3216,7 @@ function InvisField({ f, fieldKey, v, setField, ws }) {
           })}
         </div>
       )}
-      <span className="hint">까닭이 두 가지 이상이면 문제를 여러 쪽에서 본 것입니다.</span>
+      <span className="hint">이유가 두 가지 이상이면 문제를 여러 각도에서 본 것입니다.</span>
     </div>
   );
 }
@@ -3242,13 +3242,13 @@ function PickInvField({ f, fieldKey, v, setField, ws }) {
         </div>
       )}
       <span className="hint">{list.length > 0 && !filled(v)
-        ? "위 목록 가운데 하나를 눌러 고릅니다. 고를 때까지는 1번이 다음 계단으로 넘어갑니다. 고르지 않은 것은 지우지 마세요. 무엇을 빼고 골랐는지가 기록입니다."
+        ? "위 목록 가운데 하나를 눌러 고릅니다. 고를 때까지는 1번이 다음 단계로 넘어갑니다. 고르지 않은 것은 지우지 마세요. 무엇을 빼고 골랐는지가 기록입니다."
         : "하나만 고릅니다. 고르지 않은 것은 지우지 마세요. 무엇을 빼고 골랐는지가 기록입니다."}</span>
     </div>
   );
 }
 
-/* 계단 5: 물건 후보. 몸이 닿는 동작을 못 쓰는 물건은 뺀다 */
+/* 단계 5: 물건 후보. 몸이 닿는 동작을 못 쓰는 물건은 뺀다 */
 const CAND_PH = [
   ["손수레 손잡이", "분리수거장 옆에 세워 둠", "배송 노동자가 한 손으로 비틀어 쥐고 끈다"],
   ["현관 앞 종이 상자", "우리 집 문 앞", "두 팔로 들어 올렸다 내려놓는다"],
@@ -3272,18 +3272,18 @@ function CandsField({ f, fieldKey, v, setField, ws }) {
       <ThinkSteps steps={f.steps} title="도움말: 쓰기 전에 두 가지" />
       <div className="tbl-scroll">
         <table className="lt stack">
-          <thead><tr><th></th><th style={{ width: 150 }}>물건</th><th style={{ width: 150 }}>어디에 있나</th><th>누가 어떻게 만지나</th><th style={{ width: 92 }}>고름 / 뺌</th></tr></thead>
+          <thead><tr><th></th><th style={{ width: 150 }}>물건</th><th style={{ width: 150 }}>어디에 있는지</th><th>누가 어떻게 만지는지</th><th style={{ width: 92 }}>선택 / 제외</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="rn">{i + 1}</td>
                 <td data-th="물건"><textarea rows={2} value={r.obj || ""} maxLength={60} placeholder={CAND_PH[i][0]} onChange={(e) => up(i, "obj", e.target.value)} /></td>
-                <td data-th="어디에 있나"><textarea rows={2} value={r.where || ""} maxLength={60} placeholder={CAND_PH[i][1]} onChange={(e) => up(i, "where", e.target.value)} /></td>
-                <td data-th="누가 어떻게 만지나"><textarea rows={2} value={r.act || ""} maxLength={120} placeholder={CAND_PH[i][2]} onChange={(e) => up(i, "act", e.target.value)} /></td>
-                <td data-th="고름 / 뺌">
+                <td data-th="어디에 있는지"><textarea rows={2} value={r.where || ""} maxLength={60} placeholder={CAND_PH[i][1]} onChange={(e) => up(i, "where", e.target.value)} /></td>
+                <td data-th="누가 어떻게 만지는지"><textarea rows={2} value={r.act || ""} maxLength={120} placeholder={CAND_PH[i][2]} onChange={(e) => up(i, "act", e.target.value)} /></td>
+                <td data-th="선택 / 제외">
                   <div className="seg" style={{ flexDirection: "column" }}>
-                    <button type="button" className={r.verdict === "고름" ? "on-ok" : ""} onClick={() => setVerdict(i, "고름")}>고름</button>
-                    <button type="button" className={r.verdict === "접음" ? "on-no" : ""} onClick={() => setVerdict(i, "접음")}>뺌</button>
+                    <button type="button" className={r.verdict === "고름" ? "on-ok" : ""} onClick={() => setVerdict(i, "고름")}>선택</button>
+                    <button type="button" className={r.verdict === "접음" ? "on-no" : ""} onClick={() => setVerdict(i, "접음")}>제외</button>
                   </div>
                 </td>
               </tr>
@@ -3292,13 +3292,13 @@ function CandsField({ f, fieldKey, v, setField, ws }) {
         </table>
       </div>
       {rows.some((r) => filled(r.obj)) && !rows.some((r) => r.verdict === "고름" && filled(r.obj)) && (
-        <span className="hint">아직 「고름」을 누른 물건이 없습니다. 누를 때까지는 1번 물건이 계단 6으로 넘어갑니다.</span>
+        <span className="hint">아직 「선택」을 누른 물건이 없습니다. 누를 때까지는 1번 물건이 단계 6으로 넘어갑니다.</span>
       )}
     </div>
   );
 }
 
-/* 계단 6: 흔적 네 칸(자리·자국·동작·되풀이). 표 대신 세로 칸 격자라 폰에서도 옆으로 밀지 않는다 */
+/* 단계 6: 흔적 네 칸(자리·자국·동작·반복). 표 대신 세로 칸 격자라 폰에서도 옆으로 밀지 않는다 */
 function TracesField({ f, fieldKey, v, setField, ws }) {
   const d = ws || {};
   const rows = padRows(v, 2, { spot: "", shape: "", act: "", freq: "" });
@@ -3306,7 +3306,7 @@ function TracesField({ f, fieldKey, v, setField, ws }) {
   const hasRow = (r) => r && (filled(r.spot) || filled(r.shape) || filled(r.act) || filled(r.freq));
   const [more, setMore] = useState(false);
   const show2 = more || hasRow(rows[1]);
-  // 상징어가 들어오면 알려 주되 막지는 않는다. 같은 말을 되풀이해 세지 않게 마지막 경고를 기억한다
+  // 상징어가 들어오면 알려 주되 막지는 않는다. 같은 말을 반복해 세지 않게 마지막 경고를 기억한다
   const warnRef = useRef("");
   const onShape = (i, val) => {
     up(i, "shape", val);
@@ -3327,17 +3327,17 @@ function TracesField({ f, fieldKey, v, setField, ws }) {
         {multi
           ? <textarea rows={2} value={r[k] || ""} maxLength={max} placeholder={i === 0 ? ph : ""} onChange={(e) => (k === "shape" ? onShape(i, e.target.value) : up(i, k, e.target.value))} />
           : <input value={r[k] || ""} maxLength={max} placeholder={i === 0 ? ph : ""} onChange={(e) => up(i, k, e.target.value)} />}
-        {sym && <span className="sym-warn">‘{sym}’은(는) 사진에 안 찍힙니다. 자리·모양·횟수로 바꿔 보세요.</span>}
+        {sym && <span className="sym-warn">‘{sym}’은(는) 사진에 찍히지 않습니다. 위치·모양·횟수로 바꿔 보세요.</span>}
         {k === "freq" && filled(r.span) && !String(r.freq || "").includes(r.span) && <span className="hint">옛 기록의 기간: {r.span}</span>}
       </div>
     );
   };
   const form = (i) => (
     <div className="trace-form" key={i}>
-      {cell(i, "spot", "어느 자리 (한 군데만)", "오른쪽 끝, 손바닥이 닿는 자리", 80, false)}
+      {cell(i, "spot", "어느 위치 (한 군데만)", "오른쪽 끝, 손바닥이 닿는 부분", 80, false)}
       {cell(i, "shape", "어떤 자국 (사진에 찍히는 말로, ‘…있다’로 끝맺기)", "고무가 벗겨져 쇠가 드러나 있고, 그 위에 천 테이프가 세 겹 감겨 있다", 200, true)}
       {cell(i, "act", "어떤 동작 (‘…하기’)", "한 손으로 비틀어 쥐고 끌기", 60, false)}
-      {cell(i, "freq", "하루 몇 번씩, 몇 년 동안 (모르면 어림해서)", "하루 200번씩 4년 동안", 40, false)}
+      {cell(i, "freq", "하루 몇 번씩, 몇 년 동안 (모르면 대략 짐작해서)", "하루 200번씩 4년 동안", 40, false)}
     </div>
   );
   return (
@@ -3353,7 +3353,7 @@ function TracesField({ f, fieldKey, v, setField, ws }) {
   );
 }
 
-/* 계단 6·7: 번역 문장. 계단 6은 문장 틀에서 시작하고, 계단 7은 계단 6의 첫 문장을 가져와 고쳐 쓴다.
+/* 단계 6·7: 흔적 문장. 단계 6은 문장 틀에서 시작하고, 단계 7은 단계 6의 첫 문장을 가져와 고쳐 쓴다.
    「이 문장으로 남기기」를 누를 때마다 그때의 문장이 따로 남아 사고의 이동 경로가 된다. */
 function StmtField({ f, fieldKey, v, setField, ws }) {
   const d = ws || {};
@@ -3370,7 +3370,7 @@ function StmtField({ f, fieldKey, v, setField, ws }) {
   // 쓰던 문장이 있으면 지우기 전에 한 번 묻는다 (남기지 않은 문장은 되돌릴 길이 없다)
   const put = (text) => {
     const c = String(cur || "").trim();
-    if (c && c !== String(text).trim() && !window.confirm("지금 쓰고 있는 문장을 지우고 넣습니다. 먼저 「이 문장으로 남기기」를 누르면 지금 문장이 남습니다. 그래도 넣을까요?")) return;
+    if (c && c !== String(text).trim() && !window.confirm("지금 쓰고 있는 문장을 지우고 넣습니다. 먼저 「이 문장 저장하기」를 누르면 지금 문장이 저장됩니다. 그래도 넣을까요?")) return;
     set(text);
   };
   const fix = () => {
@@ -3385,39 +3385,39 @@ function StmtField({ f, fieldKey, v, setField, ws }) {
       <label>{f.label}</label>
       {f.prev && (
         <div className="stmt-prev">
-          <b>계단 {prevN}에서 쓴 첫 문장</b>
-          {filled(prevText) ? <div>{prevText}</div> : <div style={{ color: "var(--sub)" }}>아직 첫 문장이 없습니다. 계단 {prevN}에서 먼저 씁니다.</div>}
+          <b>단계 {prevN}에서 쓴 첫 문장</b>
+          {filled(prevText) ? <div>{prevText}</div> : <div style={{ color: "var(--sub)" }}>아직 첫 문장이 없습니다. 단계 {prevN}에서 먼저 씁니다.</div>}
           {filled(prevText) && (
             <div className="carry-row">
               <button type="button" className="btn small ghost" onClick={() => put(prevText)}>이 문장을 아래로 가져오기</button>
-              <span className="hint" style={{ margin: 0 }}>가져온 뒤 ‘마모’·‘오래’·‘노동’ 같은 큰 말을 사진에 찍히는 말(자리·모양·횟수)로 바꿉니다.</span>
+              <span className="hint" style={{ margin: 0 }}>가져온 뒤 ‘마모’·‘오래’·‘노동’ 같은 추상적인 말을 사진에 찍히는 말(위치·모양·횟수)로 바꿉니다.</span>
             </div>
           )}
         </div>
       )}
       <div className="stmt-box">
         <div className="stmt-tpl">
-          <small>{f.prev ? "문장 틀 (계단 " + prevN + "의 흔적 칸으로 만든 문장. 막히면 이 틀을 써도 됩니다)" : (canTpl ? "문장 틀 (위 칸으로 만든 문장)" : "문장 틀 (위 칸을 채우면 여기에 문장이 만들어집니다)")}</small>
+          <small>{f.prev ? "문장 틀 (단계 " + prevN + "의 흔적 칸으로 만든 문장. 막히면 이 틀을 써도 됩니다)" : (canTpl ? "문장 틀 (위 칸으로 만든 문장)" : "문장 틀 (위 칸을 채우면 여기에 문장이 만들어집니다)")}</small>
           {tpl}
         </div>
         <div className="stmt-row" style={{ marginTop: 0, marginBottom: 8 }}>
           <button type="button" className="btn small ghost" disabled={!canTpl} onClick={() => put(tpl.replace(/「[^」]*」/g, "____"))}>이 틀을 아래에 넣기</button>
           <span className="hint" style={{ margin: 0 }}>
-            {canTpl ? "틀을 넣은 뒤 어색한 말을 내 말로 고칩니다. ____가 남았으면 그 자리를 채웁니다."
-              : (f.prev ? "계단 " + prevN + "의 흔적 칸(자리·자국·동작)을 채우면 문장 틀이 만들어집니다." : "위 흔적 칸(자리·자국·동작)을 채우면 문장 틀이 만들어집니다.")}
+            {canTpl ? "틀을 넣은 뒤 어색한 말을 내 말로 고칩니다. ____가 있으면 그 부분을 채웁니다."
+              : (f.prev ? "단계 " + prevN + "의 흔적 칸(위치·자국·동작)을 채우면 문장 틀이 만들어집니다." : "위 흔적 칸(위치·자국·동작)을 채우면 문장 틀이 만들어집니다.")}
           </span>
         </div>
-        <textarea rows={4} maxLength={1200} value={cur} placeholder="물건 · 자리 · 자국 · 동작 · 되풀이 · 안 보이는 것이 한 문단 안에 다 들어가게 씁니다."
+        <textarea rows={4} maxLength={1200} value={cur} placeholder="물건 · 위치 · 자국 · 동작 · 반복 · 안 보이는 것이 한 문단 안에 다 들어가게 씁니다."
           onChange={(e) => set(e.target.value)} />
         <div className="stmt-row">
           <span className="conc-chip">{String(cur || "").trim().length}자</span>
-          <span className="conc-chip">남긴 문장 {saved.length}개</span>
-          <button type="button" className="btn small" onClick={fix} disabled={!filled(cur)}>이 문장으로 남기기</button>
-          <span className="hint" style={{ margin: 0, flex: "1 1 180px" }}>다 썼으면 「이 문장으로 남기기」를 누릅니다. 고친 뒤 다시 누르면 앞 문장은 지워지지 않고 남아 고쳐 쓴 과정이 기록됩니다. 안 눌러도 지금 쓴 문장은 저장됩니다.</span>
+          <span className="conc-chip">저장한 문장 {saved.length}개</span>
+          <button type="button" className="btn small" onClick={fix} disabled={!filled(cur)}>이 문장 저장하기</button>
+          <span className="hint" style={{ margin: 0, flex: "1 1 180px" }}>다 썼으면 「이 문장 저장하기」를 누릅니다. 고친 뒤 다시 누르면 앞 문장은 지워지지 않고 보존되어 고쳐 쓴 과정이 기록됩니다. 안 눌러도 지금 쓴 문장은 저장됩니다.</span>
         </div>
         {vers.length > 0 && (
           <div className="stmt-vers">
-            <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--sub)", letterSpacing: ".06em", marginBottom: 5 }}>남긴 문장</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--sub)", letterSpacing: ".06em", marginBottom: 5 }}>저장한 문장</div>
             {vers.map((x, i) => (
               <div className={"v " + (i === vers.length - 1 ? "cur" : "")} key={i}>
                 <span className="n">{x.draft ? "지금" : "v" + (i + 1)}{x.at ? " " + fmtTime(x.at) : ""}</span>
@@ -3431,20 +3431,20 @@ function StmtField({ f, fieldKey, v, setField, ws }) {
   );
 }
 
-/* 계단 7: 짝에게 읽히기. 짝 한 명이 필수이고 둘째는 선택.
-   「거의 같게 읽음」이면 돌아갈 계단 칸이 접히고, 돌아갔다면 고친 것을 적어야 한 건으로 센다. */
+/* 단계 7: 짝에게 읽히기. 짝 한 명이 필수이고 둘째는 선택.
+   「거의 같게 읽음」이면 돌아갈 단계 칸이 접히고, 돌아갔다면 고친 것을 적어야 한 건으로 센다. */
 function ReverseField({ f, fieldKey, v, setField, ws }) {
   const rows = padRows(v, 2, { read: "", gap: "", backTo: "", fixed: "" });
   const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
   const [more, setMore] = useState(false);
   const has2 = rows[1] && (filled(rows[1].read) || filled(rows[1].gap));
   const show2 = more || has2;
-  const backOpts0 = [{ v: "none", l: "안 돌아감" }, ...TRANSLATE_STAGES.filter((s) => s.n >= 3 && s.n <= 6).map((s) => ({ v: s.key, l: "계단 " + s.n + " " + s.name }))];
+  const backOpts0 = [{ v: "none", l: "돌아가지 않음" }, ...TRANSLATE_STAGES.filter((s) => s.n >= 3 && s.n <= 6).map((s) => ({ v: s.key, l: "단계 " + s.n + " " + s.name }))];
   const form = (i) => {
     const r = rows[i];
     const same = r.gap === GAP_OPTS[0];
     const back = normBack(r.backTo);
-    // 옛 기록의 계단 1·2도 고를 수 있었으므로, 그 값이면 목록에 그대로 보여 준다
+    // 옛 기록의 단계 1·2도 고를 수 있었으므로, 그 값이면 목록에 그대로 보여 준다
     const backOpts = backOpts0.some((o) => o.v === back) ? backOpts0 : [...backOpts0, { v: back, l: backLabel(back) + " (옛 기록)" }];
     const backSt = TRANSLATE_STAGES.find((s) => s.key === back);
     return (
@@ -3454,25 +3454,25 @@ function ReverseField({ f, fieldKey, v, setField, ws }) {
           <textarea rows={2} value={r.read || ""} maxLength={300} placeholder={i === 0 ? "공사장에서 오래 쓴 공구 같다. 테이프를 보고 급하게 고쳐 쓴 물건이라고 했다" : ""} onChange={(e) => up(i, "read", e.target.value)} />
         </div>
         <div className="tf">
-          <span className="tf-l">얼마나 맞았나</span>
+          <span className="tf-l">얼마나 맞았는지</span>
           <div className="seg">
             {GAP_OPTS.map((o) => (
               <button type="button" key={o} className={r.gap === o ? (o === GAP_OPTS[0] ? "on-ok" : o === GAP_OPTS[2] ? "on-no" : "on-mid") : ""} aria-pressed={r.gap === o}
                 onClick={() => {
                   const nextGap = r.gap === o ? "" : o;
-                  // 「거의 같게 읽음」이면 돌아갈 계단이 없으니 앞서 고른 값을 지운다
+                  // 「거의 같게 읽음」이면 돌아갈 단계가 없으니 앞서 고른 값을 지운다
                   setField(fieldKey, rows.map((x, j) => (j === i ? { ...x, gap: nextGap, backTo: nextGap === GAP_OPTS[0] ? "none" : x.backTo } : x)));
                 }}>{o}</button>
             ))}
           </div>
         </div>
         <div className="tf">
-          <span className="tf-l">돌아가서 고칠 계단</span>
+          <span className="tf-l">돌아가서 고칠 단계</span>
           {same
             ? <div style={{ color: "var(--sub)", fontSize: 12.5, padding: "3px 2px" }}>거의 같게 읽혔으니 돌아가지 않아도 됩니다.</div>
             : <select value={back} onChange={(e) => up(i, "backTo", e.target.value)}>{backOpts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}</select>}
-          {!same && backSt && <span className="hint">위 계단 표시줄에서 「계단 {backSt.n}」을 눌러 고친 뒤 여기로 돌아옵니다.</span>}
-          {!same && filled(r.gap) && back === "none" && <span className="hint">어느 계단으로 돌아갈지 고릅니다. 정말 안 돌아가기로 했다면 「안 돌아감」을 그대로 둡니다.</span>}
+          {!same && backSt && <span className="hint">위 단계 표시줄에서 「단계 {backSt.n}」을 눌러 고친 뒤 여기로 돌아옵니다.</span>}
+          {!same && filled(r.gap) && back === "none" && <span className="hint">어느 단계로 돌아갈지 고릅니다. 돌아가지 않기로 했다면 「돌아가지 않음」을 그대로 둡니다.</span>}
         </div>
         {!same && back !== "none" && (
           <div className="tf wide">
@@ -3496,8 +3496,8 @@ function ReverseField({ f, fieldKey, v, setField, ws }) {
   );
 }
 
-/* 돌아보기 카드 맨 위의 「내 번역 한눈에」. 4차시 유물 설계가 읽는 다섯 줄.
-   안 보이는 것·물건·흔적은 사다리에서 자동으로 오고, 학생이 직접 고친 줄은 그대로 남는다. */
+/* 돌아보기 카드 맨 위의 「내 발상 한눈에」. 4차시 유물 설계가 읽는 다섯 줄.
+   안 보이는 것·물건·흔적은 앞 단계에서 자동으로 오고, 학생이 직접 고친 줄은 그대로 남는다. */
 function LadderSummaryBox({ ws, setField }) {
   const d = ws || {};
   const sum = ladderSummary(d);
@@ -3518,10 +3518,10 @@ function LadderSummaryBox({ ws, setField }) {
       {extra}
     </div>
   );
-  const restoreBtn = (x) => (edited(x) ? <button type="button" className="btn small ghost" onClick={() => restore(x)}>사다리 값으로 되돌리기</button> : null);
+  const restoreBtn = (x) => (edited(x) ? <button type="button" className="btn small ghost" onClick={() => restore(x)}>단계 값으로 되돌리기</button> : null);
   return (
     <div className="sum-box">
-      <span className="h">내 번역 한눈에</span>
+      <span className="h">내 발상 한눈에</span>
       {row("문제", null, sum.problem)}
       {row("안 보이는 것", "invisible", sum.invisible, restoreBtn("invisible"))}
       {row("물건", "object", sum.object, restoreBtn("object"))}
@@ -3530,17 +3530,17 @@ function LadderSummaryBox({ ws, setField }) {
           {restoreBtn("trace")}
           {filled(auto.trace) || filled(d["s3b.trace"])
             ? <button type="button" className="btn small ghost" onClick={() => setEditTrace((p) => !p)}>{editTrace ? "닫기" : "흔적 글 고치기"}</button>
-            : <span className="hint" style={{ margin: 0 }}>계단 6의 흔적 네 칸을 채우면 여기에 뜹니다.</span>}
+            : <span className="hint" style={{ margin: 0 }}>단계 6의 흔적 네 칸을 채우면 여기에 표시됩니다.</span>}
         </span>
       ))}
       {editTrace && (filled(auto.trace) || filled(d["s3b.trace"])) && (
         <textarea rows={3} maxLength={400} value={filled(d["s3b.trace"]) ? d["s3b.trace"] : (auto.trace || "")}
-          placeholder="4차시가 읽는 흔적 글입니다. 자리·자국·동작·되풀이가 다 들어가게 손봅니다."
+          placeholder="4차시가 읽는 흔적 글입니다. 위치·자국·동작·반복이 다 들어가게 고칩니다."
           onChange={(e) => setField("s3b.trace", e.target.value)} />
       )}
       {row("마지막 문장", null, sum.stmt)}
       {row("태도", null, sum.attitude)}
-      <div className="foot">4차시 유물 설계는 이 상자의 문제·안 보이는 것·물건·흔적·태도에서 시작합니다. 직접 고친 줄은 그대로 두고, 나머지는 사다리를 고치면 따라 바뀝니다.</div>
+      <div className="foot">4차시 유물 설계는 이 상자의 문제·안 보이는 것·물건·흔적·태도에서 시작합니다. 직접 고친 줄은 그대로 두고, 나머지는 앞 단계를 고치면 따라 바뀝니다.</div>
     </div>
   );
 }
@@ -3595,7 +3595,7 @@ function CardPick({ f, fieldKey, v, setField, ws }) {
   );
 }
 function FieldEditor({ sec, f, ws, setField, inq }) {
-  const key = fkey(sec, f);            // 저장 키. 계단 3 카드는 s3a.* 에 쓴다
+  const key = fkey(sec, f);            // 저장 키. 단계 3 카드는 s3a.* 에 쓴다
   const v = ws[key];
   // 사진 처리 오류를 alert 대신 그 칸 안에 보여 준다 — 모바일에서 alert은 맥락을 가린다
   const [imgErr, setImgErr] = useState("");
@@ -3615,7 +3615,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
   }
   if (f.t === "text" || f.t === "area") {
     const meter = f.t === "area" && (f.steps || sec.kind === "learn" || sec.kind === "inquiry");
-    // 사다리의 한 줄 까닭 칸(max 80자 이상)은 예시가 잘리지 않게 두 줄짜리 넓은 칸으로 그린다.
+    // 발상 단계의 한 줄 이유 칸(max 80자 이상)은 예시가 잘리지 않게 두 줄짜리 넓은 칸으로 그린다.
     // 옛 기록이 여러 줄이거나 상한을 넘으면 줄바꿈을 잃지 않게 넓은 칸에 상한 없이 보인다.
     const sv = String(v ?? "");
     const legacyLong = f.t === "text" && !!f.max && (sv.includes("\n") || sv.length > f.max);
@@ -3658,7 +3658,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
           </div>
           <div className="debate-cell">
             <div className="debate-l">② 반대 입장의 가장 강한 근거</div>
-            <textarea rows={3} maxLength={1500} value={m.counter || ""} onChange={(e) => up("counter", e.target.value)} placeholder="내 입장을 반박하는 쪽이 내놓을 가장 설득력 있는 근거를 그 사람의 자리에서 쓰기" />
+            <textarea rows={3} maxLength={1500} value={m.counter || ""} onChange={(e) => up("counter", e.target.value)} placeholder="내 입장을 반박하는 쪽이 내놓을 가장 설득력 있는 근거를 그 사람의 입장에서 쓰기" />
           </div>
           <div className="debate-cell">
             <div className="debate-l">③ 그 근거를 알고도 내 입장을 유지하는 이유 (입장을 바꿨다면 무엇이 바꿨는지)</div>
@@ -3674,7 +3674,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
     return <ReflectField f={f} fieldKey={key} m={m} ws={ws} setField={setField} />;
   }
   if (f.t === "toggle" || f.t === "select") {
-    // hints가 있으면 낱말 옆에 뜻을 붙여 세로로 쌓는다 (돌아보기의 태도 고르기)
+    // hints가 있으면 단어 옆에 뜻을 붙여 세로로 쌓는다 (돌아보기의 태도 고르기)
     const hints = f.hints || null;
     return (
       <div className={"field " + (hints ? "span2" : "")}>
@@ -4121,7 +4121,7 @@ function FieldReader({ sec, f, ws, owner }) {
       <div className="read-block">
         <div className="rl">{f.label}</div>
         <table className="tbl">
-          <thead><tr><th style={{ width: 26 }}></th><th>안 보이는 것</th><th style={{ width: 130 }}>안 보이는 까닭</th>{rows.some((r) => filled(r.why)) && <th style={{ width: 200 }}>고른 까닭 (옛 기록)</th>}</tr></thead>
+          <thead><tr><th style={{ width: 26 }}></th><th>안 보이는 것</th><th style={{ width: 130 }}>안 보이는 이유</th>{rows.some((r) => filled(r.why)) && <th style={{ width: 200 }}>고른 이유 (옛 기록)</th>}</tr></thead>
           <tbody>{rows.map((r, i) => {
             const t = INVIS_TYPES.find((x) => x.k === r.type);
             return <tr key={i}><td className="rn">{i + 1}</td><td>{r.text}</td>
@@ -4157,7 +4157,7 @@ function FieldReader({ sec, f, ws, owner }) {
       <div className="read-block">
         <div className="rl">{f.label}</div>
         <table className="tbl">
-          <thead><tr><th style={{ width: 26 }}></th>{rows.some((r) => filled(r.inv)) && <th style={{ width: 130 }}>안 보이는 것 (옛 기록)</th>}<th style={{ width: 120 }}>어느 자리</th><th>어떤 자국</th><th style={{ width: 120 }}>어떤 동작</th><th style={{ width: 120 }}>하루 몇 번씩, 몇 년 동안</th></tr></thead>
+          <thead><tr><th style={{ width: 26 }}></th>{rows.some((r) => filled(r.inv)) && <th style={{ width: 130 }}>안 보이는 것 (옛 기록)</th>}<th style={{ width: 120 }}>어느 위치</th><th>어떤 자국</th><th style={{ width: 120 }}>어떤 동작</th><th style={{ width: 120 }}>하루 몇 번씩, 몇 년 동안</th></tr></thead>
           <tbody>{rows.map((r, i) => (
             <tr key={i}><td className="rn">{i + 1}</td>{rows.some((x) => filled(x.inv)) && <td>{r.inv || "-"}</td>}<td>{r.spot || "-"}</td><td>{r.shape || "-"}</td>
               <td>{r.act || "-"}</td><td>{traceFreq(r) || "-"}</td></tr>
@@ -4191,7 +4191,7 @@ function FieldReader({ sec, f, ws, owner }) {
       <div className="read-block">
         <div className="rl">{f.label}</div>
         <table className="tbl">
-          <thead><tr><th style={{ width: 26 }}></th>{rows.some((r) => filled(r.shown)) && <th style={{ width: 130 }}>보여 준 것 (옛 기록)</th>}<th>짝이 읽은 것</th><th style={{ width: 105 }}>얼마나 맞았나</th><th style={{ width: 130 }}>돌아간 계단</th><th style={{ width: 170 }}>고친 것</th></tr></thead>
+          <thead><tr><th style={{ width: 26 }}></th>{rows.some((r) => filled(r.shown)) && <th style={{ width: 130 }}>보여 준 것 (옛 기록)</th>}<th>짝이 읽은 것</th><th style={{ width: 105 }}>얼마나 맞았나</th><th style={{ width: 130 }}>돌아간 단계</th><th style={{ width: 170 }}>고친 것</th></tr></thead>
           <tbody>{rows.map((r, i) => (
             <tr key={i}><td className="rn">{i + 1}</td>{rows.some((x) => filled(x.shown)) && <td>{r.shown || "-"}</td>}<td>{r.read}</td>
               <td style={{ color: r.gap === GAP_OPTS[2] ? "var(--seal)" : r.gap === GAP_OPTS[0] ? "var(--patina)" : "var(--sub)" }}>{r.gap || "-"}</td>
@@ -4847,7 +4847,7 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
     <div className="card" id={"sec-" + sec.id} style={{ scrollMarginTop: "var(--sv-top, 60px)" }}>
       {complete && <div className="stamp">기록됨</div>}
       <div className="card-head">
-        {/* 사다리 카드는 「계단 3」처럼 tag만 찍는다. 교사 화면·CSV는 code(B3)를 쓴다 */}
+        {/* 발상 단계 카드는 「단계 3」처럼 tag만 찍는다. 교사 화면·CSV는 code(B3)를 쓴다 */}
         <span className="card-code">{sectionHead(sec)}</span>
         <span className="card-title">{sec.title}{sec.hw && <span className="hw-chip">한 주 과제</span>}</span>
         <span className="card-sess">{sec.session}</span>
@@ -4858,8 +4858,8 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
         {sec.ladder && <LadderRail sec={sec} ws={ws} />}
         {sec.id === "s3p" && <ScenesEcho ws={ws} />}
         {sec.summary && <LadderSummaryBox ws={ws} setField={setField} />}
-        {/* 4차시 유물 설계는 3차시 사다리의 결론에서 시작한다 */}
-        {sec.carry && <Carry ws={ws} items={["problem", "invisible", "object", "trace", "attitude"]} title="3차시 번역 사다리에서 가져온 것" toLadder />}
+        {/* 4차시 유물 설계는 3차시 발상 단계의 결론에서 시작한다 */}
+        {sec.carry && <Carry ws={ws} items={["problem", "invisible", "object", "trace", "attitude"]} title="3차시 유물 발상 단계에서 가져온 것" toLadder />}
         {/* 탐구 질문은 앞에서 본 것을 근거로 삼는다 — 그 자료를 질문 위에 끌어온다 */}
         {sec.kind === "inquiry" && (
           <InquirySource sec={sec} ws={ws} lessons={LESSONS} Thumb={MediaThumb} owner={OWNER} onGallery={onGallery} />
@@ -4867,7 +4867,7 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
         {/* 3차시부터는 질문이 “내가 고른 문제·물건·흔적”을 전제한다 — 그 답을 여기 다시 놓는다 */}
         {sec.kind === "inquiry" && Number(sec.code) >= 3 && <Carry ws={ws} />}
         <div className="f-grid">
-          {/* 감싸는 칸마다 저장 키를 달아 둔다 — 표·사다리·점검표처럼 자체 입력칸을 가진
+          {/* 감싸는 칸마다 저장 키를 달아 둔다 — 표·발상 단계·점검표처럼 자체 입력칸을 가진
               자리에 붙여넣어도 어느 칸인지 알 수 있어야 전 과정의 붙여넣기가 빠짐없이 남는다.
               display:contents라 격자 배치에는 영향을 주지 않는다. */}
           {sec.fields.map((f) => (
@@ -5114,11 +5114,11 @@ function StudentApp({ me, onExit, onGallery }) {
         }
       }
       const t = { ...(p._t || {}) };
-      // 시간 장부는 표시 섹션 기준이다. 계단 3 카드(s3p)가 s3a.problem에 써도 s3p에 남는다
+      // 시간 장부는 표시 섹션 기준이다. 단계 3 카드(s3p)가 s3a.problem에 써도 s3p에 남는다
       const sid = (FIELD_OF_KEY[k] && FIELD_OF_KEY[k].sec.id) || String(k).split(".")[0];
       t[sid] = { first: (t[sid] && t[sid].first) || now(), last: now(), edits: ((t[sid] && t[sid].edits) || 0) + 1 };
       next._t = t;
-      // 사다리의 결론(s3b.*)은 학생이 다시 적지 않고 여기서 끌어온다
+      // 발상 단계의 결론(s3b.*)은 학생이 다시 적지 않고 여기서 끌어온다
       return DERIVE_KEYS.includes(k) ? deriveSummary(next, p) : next;
     });
     dirtyRef.current = true;
@@ -5174,7 +5174,7 @@ function StudentApp({ me, onExit, onGallery }) {
     timer.current = setTimeout(doSave, 400);
     setPasteAsk(null);
   };
-  // 교사가 도중에 끄면 떠 있던 물음도 함께 걷는다
+  // 교사가 도중에 끄면 떠 있던 질문도 함께 걷는다
   useEffect(() => { if (!pasteAskOn(cfgAll) && pasteAsk) setPasteAsk(null); }, [cfgAll]);
 
   useEffect(() => {
@@ -5321,7 +5321,7 @@ function StudentApp({ me, onExit, onGallery }) {
   const pct = overallProgress(ws);
   const secs = SCHEMA.filter((s) => s.session === tab);
 
-  /* 사다리 표시줄·계단 3 카드가 다른 차시 탭의 카드로 갈 때 쓴다: 탭을 옮긴 뒤 그 카드로 스크롤 */
+  /* 단계 표시줄·단계 3 카드가 다른 차시 탭의 카드로 갈 때 쓴다: 탭을 옮긴 뒤 그 카드로 스크롤 */
   const navGo = (session, secId) => {
     if (!isOpen(openMap, session)) return;
     if (session !== tab) switchTab(session);
@@ -5717,7 +5717,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
       </div>
 
       <div className="t-tabs">
-        {["기록 열람", "번역 사고", "사고 변화", "채점", "관리"].map((t) => (
+        {["기록 열람", "발상 과정", "사고 변화", "채점", "관리"].map((t) => (
           <button key={t} className={"btn small " + (subTab === t ? "" : "ghost")} onClick={() => setSubTab(t)}>{t}{t === "채점" && gradeDirty ? " ●" : ""}</button>
         ))}
       </div>
@@ -5880,7 +5880,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
         </div>
       )}
 
-      {subTab === "번역 사고" ? <LadderMap ws={ws} /> : null}
+      {subTab === "발상 과정" ? <LadderMap ws={ws} /> : null}
 
       {subTab === "사고 변화" ? (
         <div>
@@ -5932,7 +5932,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
         <div className="f-grid">
           <div className="field"><label>서면 피드백 ① 조형 기준 질문 (형태·빛·질감·스케일 중)</label>
             <input value={grade.fbForm || ""} onChange={(e) => upGrade({ ...grade, fbForm: e.target.value })} /></div>
-          <div className="field"><label>서면 피드백 ② 작품 개념 질문 (사회문제·유물의 기능·미술 맥락 중)</label>
+          <div className="field"><label>서면 피드백 ② 작품 개념 질문 (사회 문제·유물의 기능·미술 맥락 중)</label>
             <input value={grade.fbConcept || ""} onChange={(e) => upGrade({ ...grade, fbConcept: e.target.value })} /></div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -6391,14 +6391,14 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
           <AxisStripRow axis={{ key: "peerSim", name: "학급 평균 유사도", desc: "내 서술이 나머지 학생 서술과 얼마나 겹치는가 (높을수록 무난함)" }}
             rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).peerSim }))}
             hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
-          <AxisStripRow axis={{ key: "structSim", name: "구조 유사도", desc: "낱말이 달라도 문장 수·나열 표지·연결어의 뼈대가 같은 정도" }}
+          <AxisStripRow axis={{ key: "structSim", name: "구조 유사도", desc: "단어가 달라도 문장 수·나열 표지·연결어의 뼈대가 같은 정도" }}
             rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).structSim }))}
             hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
-          <AxisStripRow axis={{ key: "mattr", name: "어휘 다양성", desc: "토큰 50개 창을 밀며 잰 TTR의 평균(MATTR). 글 길이에 견고해 '나만 쓴 낱말 수'보다 신뢰할 수 있다. 토큰 50개를 못 채우면 계산하지 않는다" }} first
+          <AxisStripRow axis={{ key: "mattr", name: "어휘 다양성", desc: "토큰 50개 창을 밀며 잰 TTR의 평균(MATTR). 글 길이에 견고해 '나만 쓴 단어 수'보다 신뢰할 수 있다. 토큰 50개를 못 채우면 계산하지 않는다" }} first
             rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).mattr }))}
             hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
           <p className="hint" style={{ marginTop: 8 }}>
-            <b>구조 유사도를 함께 보는 이유.</b> 학생은 가져온 글을 그대로 내지 않고 고쳐서 냅니다. 그러면 낱말은 바뀌지만 뼈대는 남습니다.
+            <b>구조 유사도를 함께 보는 이유.</b> 학생은 가져온 글을 그대로 내지 않고 고쳐서 냅니다. 그러면 단어는 바뀌지만 뼈대는 남습니다.
             서술 유사도는 낮은데 구조 유사도만 높은 학생이 있다면 그 자리를 먼저 읽어 보십시오.
           </p>
           <p className="hint" style={{ marginTop: 6, color: "var(--seal)" }}>
@@ -6412,7 +6412,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
         <div className="card-head"><span className="card-code">읽는 법</span><span className="card-title">이 지표가 재는 것과 재지 못하는 것</span></div>
         <div className="card-body" style={{ fontSize: 13 }}>
           <p>이 화면의 숫자는 기록의 <b>양과 폭</b>을 셉니다. 답이 좋은지는 재지 못하므로, 점수는 어느 학생의 기록부터 읽을지 고르는 입구로만 쓰고 판단은 본문을 읽고 내립니다.</p>
-          <p style={{ marginTop: 6 }}>남다름은 학급 안 낱말 비교라 같은 문제를 다른 말로 쓴 학생이 높게 나올 수 있고, 학급이 바뀌면 점수도 바뀝니다. 채집의 폭은 기기·촬영 환경의 영향을 받으므로 성적에 직접 반영하지 않고 격려와 관찰에 씁니다.</p>
+          <p style={{ marginTop: 6 }}>남다름은 학급 안 단어 비교라 같은 문제를 다른 말로 쓴 학생이 높게 나올 수 있고, 학급이 바뀌면 점수도 바뀝니다. 채집의 폭은 기기·촬영 환경의 영향을 받으므로 성적에 직접 반영하지 않고 격려와 관찰에 씁니다.</p>
           <p style={{ marginTop: 6 }}>축마다 성격과 만점 기준이 달라 여섯 축을 하나의 점수로 합치지 않습니다. 「축 평균」은 정렬과 산점도를 위한 참고값입니다.</p>
           <p style={{ marginTop: 6 }}><b>붙여넣기 지표</b>는 외부 글이 들어온 시점과 분량을 알려 줄 뿐 <b>출처를 알려 주지 않습니다.</b> 학생이 고른 출처 표시가 없으면 AI인지 검색 결과인지 자기가 앞서 쓴 글인지 구분되지 않습니다. 전유율은 붙인 앞 120자가 최종문에 남았는지로 어림한 값이라 긴 글에서는 거칠게 나옵니다.</p>
           <p style={{ marginTop: 6 }}><b>유사도 지표</b>는 학급을 규준으로 한 상대값입니다. 학급이 바뀌면 값도 바뀌고, 같은 과제를 성실히 수행한 학생끼리 높게 나오는 것이 정상입니다. 표절 판정이나 징계의 근거로 쓸 수 없습니다.</p>
@@ -6762,35 +6762,35 @@ function TeacherGuide() {
       <div className="card">
         <div className="card-body">
           <details>
-            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>번역 사다리 운영: 일곱 계단과 돌아보기를 수업 시간에 어떻게 굴리는가</summary>
+            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>유물 발상 단계 운영: 일곱 단계와 돌아보기를 수업 시간에 어떻게 굴리는가</summary>
             <div style={{ fontSize: 13, lineHeight: 1.8, marginTop: 10 }}>
               <p style={{ marginBottom: 10 }}>
-                「번역 사다리」는 눈에 안 보이는 사회문제를 그 자리에 실제로 있는 물건에 남은 자국으로 옮겨 적는 일곱 계단입니다.
-                계단 1·2(관찰 방법 고르기 · 장면 모으기)는 2차시 탭 맨 아래에 있는 한 주 과제이고, 계단 3~7과 「돌아보기」는 3차시 탭에서 수업 중에 채웁니다.
-                계단 사이의 논리는 한 줄입니다. 방법(1) → 그 방법으로 본 장면(2) → 장면이 가리키는 문제(3) → 문제에서 안 보이는 것과 그 까닭(4) → 까닭이 정해 준 곳에서 몸이 닿는 물건(5) → 물건에 남는 자국과 그것을 만든 되풀이(6) → 남이 읽는지 확인하고 고쳐 마지막 문장(7).
-                학생 화면에는 계단 표시줄이 늘 떠 있고, 카드마다 앞 계단의 답이 「앞 계단에서 가져온 것」 상자로 다시 뜹니다.
+                「유물 발상 단계」는 관찰한 사회 문제나 사회 현상을 그 장소에 실제로 있는 유물(사물)에 드러난 사용 흔적으로 시각화하는 일곱 단계입니다.
+                단계 1·2(관찰 방법 고르기 · 장면 모으기)는 2차시 탭 맨 아래에 있는 한 주 과제이고, 단계 3~7과 「돌아보기」는 3차시 탭에서 수업 중에 채웁니다.
+                단계 사이의 논리는 한 줄입니다. 방법(1) → 그 방법으로 본 장면(2) → 장면이 가리키는 문제(3) → 문제에서 안 보이는 것과 그 이유(4) → 이유가 정해 준 곳에서 몸이 닿는 물건(5) → 물건에 남는 자국과 그것을 만든 반복(6) → 남이 읽는지 확인하고 고쳐 마지막 문장(7).
+                학생 화면에는 단계 표시줄이 늘 떠 있고, 카드마다 앞 단계의 답이 「앞 단계에서 가져온 것」 상자로 다시 뜹니다.
               </p>
               <p className="warn-note" style={{ marginBottom: 10 }}>
-                수업용 PPT(ppt/3차시)는 아직 옛 번호(T3~T9, 모둠 활동, 학습지 3 ①②③)를 씁니다. 수업에서는 앱의 「계단 3~7 + 돌아보기」 순서를 따르세요.
+                수업용 PPT(ppt/3차시)는 아직 옛 번호(T3~T9, 모둠 활동, 학습지 3 ①②③)를 씁니다. 수업에서는 앱의 「단계 3~7 + 돌아보기」 순서를 따르세요.
               </p>
               <table className="match-tbl">
-                <thead><tr><th style={{ width: 70 }}>계단</th><th style={{ width: 120 }}>이름</th><th>학생이 답하는 물음</th><th style={{ width: 190 }}>교사가 보는 곳</th></tr></thead>
+                <thead><tr><th style={{ width: 70 }}>단계</th><th style={{ width: 120 }}>이름</th><th>학생이 답하는 질문</th><th style={{ width: 190 }}>교사가 보는 곳</th></tr></thead>
                 <tbody>
                   {TRANSLATE_STAGES.map((st) => (
                     <tr key={st.key}>
-                      <td className="mono">계단 {st.n}{st.hw ? " (과제)" : ""}</td>
+                      <td className="mono">단계 {st.n}{st.hw ? " (과제)" : ""}</td>
                       <td>{st.name}</td>
                       <td>{st.ask}</td>
                       <td>{st.look}</td>
                     </tr>
                   ))}
-                  <tr><td className="mono">돌아보기</td><td>태도 · 가까운 방법</td><td>이 자국으로 보는 사람에게 무엇을 하려 하고, 내 작업은 여덟 방법 중 어디에 가장 가까운가</td><td>까닭이 한 줄이라도 있는지</td></tr>
+                  <tr><td className="mono">돌아보기</td><td>태도 · 가까운 방법</td><td>이 자국으로 보는 사람에게 무엇을 하려 하고, 내 작업은 여덟 방법 중 어디에 가장 가까운가</td><td>이유가 한 줄이라도 있는지</td></tr>
                 </tbody>
               </table>
               <p style={{ margin: "12px 0 10px" }}>
-                <b>계단 1은 2차시 끝 8분 안에 교실에서 고르게 하고, 계단 2는 한 주 과제입니다.</b> 다섯 가지 관찰 방법을 1분씩 훑고 학생이 그 자리에서 하나를 고르고 나갑니다.
+                <b>단계 1은 2차시 끝 8분 안에 교실에서 고르게 하고, 단계 2는 한 주 과제입니다.</b> 다섯 가지 관찰 방법을 1분씩 훑고 학생이 그 자리에서 하나를 고르고 나갑니다.
                 방법마다 잘 잡히는 것과 놓치는 것이 다르므로, 학급 안에서 방법이 갈리면 3차시 도입에서 같은 동네인데 다른 것이 모였다는 사실을 바로 보여 줄 수 있습니다.
-                <b> 3차시 수업이 끝날 때까지 2차시 탭을 닫지 마세요.</b> 학생이 계단 3에서 문제를 정하며 장면을 고치러 돌아갑니다.
+                <b> 3차시 수업이 끝날 때까지 2차시 탭을 닫지 마세요.</b> 학생이 단계 3에서 문제를 정하며 장면을 고치러 돌아갑니다.
                 과제를 못 해 온 학생은 도입 8분 동안 장면 한두 줄만 적게 하고 시작합니다.
               </p>
               <table className="match-tbl">
@@ -6802,17 +6802,17 @@ function TeacherGuide() {
                 </tbody>
               </table>
               <p style={{ margin: "12px 0 10px" }}>
-                <b>여덟 방법은 감상에서 작품으로 익히고, 돌아보기에서 가장 가까운 방법과 까닭 한 줄만 받습니다.</b> 이 단원의 결과물(실재한 적 없는 유물의 기록 사진과 작품 캡션)은
+                <b>여덟 방법은 감상에서 작품으로 익히고, 돌아보기에서 가장 가까운 방법과 이유 한 줄만 받습니다.</b> 이 단원의 결과물(실재한 적 없는 유물의 기록 사진과 작품 캡션)은
                 가림과 우회 · 허구와 파라픽션 · 증거와 포렌식을 겹친 형식이라는 사실을 감상 시간에 미리 밝히세요. 형식을 감춘 채 고르라고 하면 학생은 교사가 원하는 답을 짐작합니다.
-                그래서 방법 고르기는 사다리 앞이 아니라 뒤에 둡니다. 흔적이라는 구체 재료가 생긴 뒤에 자기 작업의 자리를 짚는 사후 위치 짓기입니다.
+                그래서 방법 고르기는 발상 단계 앞이 아니라 뒤에 둡니다. 흔적이라는 구체 재료가 생긴 뒤에 자기 작업의 자리를 짚는 사후 위치 짓기입니다.
                 돌아보기 8분이 모자라면 「가까운 방법」은 4차시 도입 5분으로 미뤄도 됩니다.
               </p>
               <p style={{ margin: "12px 0 10px" }}>
-                <b>계단 4의 다섯 까닭이 이 사다리의 심장입니다.</b> 보이지 않는 것을 곧바로 그리라고 하면 대부분 상징(눈물·사슬·시든 꽃)으로 도망갑니다.
-                ‘무엇이 보이지 않는가’ 대신 ‘왜 보이지 않는가’를 먼저 묻고, 그 까닭에 따라 찾을 곳을 정해 줍니다.
+                <b>단계 4의 다섯 이유가 이 활동의 핵심입니다.</b> 보이지 않는 것을 곧바로 그리라고 하면 대부분 상징(눈물·사슬·시든 꽃)으로 도망갑니다.
+                ‘무엇이 보이지 않는가’ 대신 ‘왜 보이지 않는가’를 먼저 묻고, 그 이유에 따라 찾을 곳을 정해 줍니다.
               </p>
               <table className="match-tbl">
-                <thead><tr><th style={{ width: 110 }}>까닭</th><th style={{ width: 180 }}>뜻</th><th>다음 계단에서 찾는 것</th><th style={{ width: 150 }}>이런 경우</th></tr></thead>
+                <thead><tr><th style={{ width: 110 }}>이유</th><th style={{ width: 180 }}>뜻</th><th>다음 단계에서 찾는 것</th><th style={{ width: 150 }}>이런 경우</th></tr></thead>
                 <tbody>
                   {INVIS_TYPES.map((t) => (
                     <tr key={t.k}><td>{t.label}</td><td>{t.hint}</td><td>{t.find}</td><td>{t.ex}</td></tr>
@@ -6820,23 +6820,23 @@ function TeacherGuide() {
                 </tbody>
               </table>
               <p style={{ margin: "12px 0 10px" }}>
-                <b>순회 지도의 순서.</b> ① 계단 3에서 「직접 본 게 있나요?」 없으면 문제를 바꾸게 합니다.
-                ② 계단 4에서 까닭이 모두 같은 학생에게는 다른 까닭의 예를 하나 들어 주고 한 줄만 더 찾게 합니다.
-                ③ 계단 5에서 ‘누가 어떻게 만지나’를 못 채운 학생에게는 그 물건은 자국이 생기지 않으므로 빼게 합니다.
-                ④ 계단 6에서 자국 칸에 마음·의미·상징의 말을 쓴 학생에게는 “그것을 사진으로 찍으면 무엇이 찍히나요”라고 되묻고(화면에도 경고가 뜹니다),
+                <b>순회 지도의 순서.</b> ① 단계 3에서 「직접 본 게 있나요?」 없으면 문제를 바꾸게 합니다.
+                ② 단계 4에서 이유가 모두 같은 학생에게는 다른 이유의 예를 하나 들어 주고 한 줄만 더 찾게 합니다.
+                ③ 단계 5에서 ‘누가 어떻게 만지나’를 못 채운 학생에게는 그 물건은 자국이 생기지 않으므로 빼게 합니다.
+                ④ 단계 6에서 자국 칸에 마음·의미·상징의 말을 쓴 학생에게는 “그것을 사진으로 찍으면 무엇이 찍히나요”라고 되묻고(화면에도 경고가 뜹니다),
                 ‘하루 몇 번씩, 몇 년 동안’ 칸이 빈 학생에게는 “하루 몇 번, 몇 년이면 그 자국이 생길까요”로 어림해 보게 합니다. 6차시의 ‘낡음과 낡을 이유의 차이’가 여기서 갈립니다.
               </p>
               <p style={{ marginBottom: 10 }}>
-                <b>계단 7은 반드시 짝 활동으로 합니다. 서로 4분씩.</b> 문제 이름을 감추고 물건과 흔적 두 줄만 읽어 주게 하세요. 다르게 읽히는 것이 정상이며,
-                그때 어느 계단으로 돌아갈지 정하고 실제로 돌아가 고치는 일이 이 단원에서 가장 값진 기록입니다.
-                되돌아간 계단과 고친 내용은 「사고 과정」 탭과 학생 상세의 「번역 사고」 탭에 그대로 쌓입니다.
-                시간이 남는 학생만 「짝 한 명 더」를 씁니다. 시간이 모자라면 감상 끝 3분 예행, 「짝 한 명 더」·「자국 하나 더」, 계단 4·5의 셋째 줄 순서로 버립니다.
+                <b>단계 7은 반드시 짝 활동으로 합니다. 서로 4분씩.</b> 문제 이름을 감추고 물건과 흔적 두 줄만 읽어 주게 하세요. 다르게 읽히는 것이 정상이며,
+                그때 어느 단계로 돌아갈지 정하고 실제로 돌아가 고치는 일이 이 단원에서 가장 값진 기록입니다.
+                되돌아간 단계와 고친 내용은 「사고 과정」 탭과 학생 상세의 「발상 과정」 탭에 그대로 쌓입니다.
+                시간이 남는 학생만 「짝 한 명 더」를 씁니다. 시간이 모자라면 감상 끝 3분 예행, 「짝 한 명 더」·「자국 하나 더」, 단계 4·5의 셋째 줄 순서로 버립니다.
               </p>
               <p>
-                <b>문장은 「이 문장으로 남기기」로 남깁니다.</b> 학생이 문장을 고쳐 쓴 뒤 이 버튼을 누르면 그때의 문장이 따로 저장됩니다.
-                계단 6의 첫 문장과 계단 7의 마지막 문장을 나란히 놓은 것이 이 단원의 사전·사후 자료가 되고, 그 사이의 문장들이 사고의 이동 경로가 됩니다.
+                <b>문장은 「이 문장 저장하기」로 저장합니다.</b> 학생이 문장을 고쳐 쓴 뒤 이 버튼을 누르면 그때의 문장이 따로 저장됩니다.
+                단계 6의 첫 문장과 단계 7의 마지막 문장을 나란히 놓은 것이 이 단원의 사전·사후 자료가 되고, 그 사이의 문장들이 사고의 이동 경로가 됩니다.
                 수업 중에 “지금 문장으로 한 번 남겨 두세요”라고 한 번만 말해 주면 자료가 훨씬 두꺼워집니다.
-                사다리의 결론(문제·안 보이는 것·물건·흔적·태도)은 돌아보기의 「내 번역 한눈에」에 자동으로 모이고, 4차시 유물 설계 카드 맨 위에 다시 뜹니다.
+                발상 단계의 결론(문제·안 보이는 것·물건·흔적·태도)은 돌아보기의 「내 발상 한눈에」에 자동으로 모이고, 4차시 유물 설계 카드 맨 위에 다시 뜹니다.
               </p>
             </div>
           </details>
@@ -6856,9 +6856,9 @@ function TeacherGuide() {
                 <tbody>
                   <tr><td>참여자 단위 CSV</td><td>참여자 1명</td><td>기술통계, 상관분석, 사전·사후 비교. 통계 프로그램에 그대로 올립니다.</td></tr>
                   <tr><td>붙여넣기 단위 CSV</td><td>붙여넣기 1건</td><td>가져온 글의 양·출처 자기보고·정착 시간을 다루는 결과 절. 전유 분석의 원자료입니다.</td></tr>
-                  <tr><td>계단 단위 CSV</td><td>참여자 × 일곱 계단</td><td>계단별 도달률과 사고의 두께를 시간 축으로 보는 결과 절. 반복측정 구조의 자료입니다.</td></tr>
-                  <tr><td>질적 코딩 시트 CSV</td><td>참여자 × 항목 × 문장</td><td>질적 분석. 계단·구체어 적중 같은 1차 자동 표지가 붙어 있고 code_1·code_2·memo 열은 연구자가 채웁니다.</td></tr>
-                  <tr><td>사전·사후 텍스트 쌍 CSV</td><td>참여자 × 비교 쌍</td><td>같은 물음에 두 번 답한 자리의 원문을 나란히 인용하는 결과 절.</td></tr>
+                  <tr><td>단계 단위 CSV</td><td>참여자 × 일곱 단계</td><td>단계별 도달률과 사고의 두께를 시간 축으로 보는 결과 절. 반복측정 구조의 자료입니다.</td></tr>
+                  <tr><td>질적 코딩 시트 CSV</td><td>참여자 × 항목 × 문장</td><td>질적 분석. 단계·구체어 적중 같은 1차 자동 표지가 붙어 있고 code_1·code_2·memo 열은 연구자가 채웁니다.</td></tr>
+                  <tr><td>사전·사후 텍스트 쌍 CSV</td><td>참여자 × 비교 쌍</td><td>같은 질문에 두 번 답한 자리의 원문을 나란히 인용하는 결과 절.</td></tr>
                   <tr><td>기술통계.md</td><td>-</td><td>표 1~6을 마크다운 표로. 논문 편집기에 붙이면 표가 그대로 살아납니다.</td></tr>
                   <tr><td>변수사전.md</td><td>-</td><td>연구 방법의 측정 도구 절. 모든 변수의 조작적 정의와 구체성 지수의 산출식.</td></tr>
                   <tr><td>원고초안.md</td><td>-</td><td>연구 방법과 결과의 사실 서술을 수치까지 채운 초안. 해석·논의는 「연구자 서술」 자리로 비어 있습니다.</td></tr>
@@ -6867,7 +6867,7 @@ function TeacherGuide() {
               <p style={{ margin: "12px 0 10px" }}>
                 <b>수치를 읽을 때 지켜야 할 것.</b> 구체성 지수는 위치·재질·변형·수량을 가리키는 말을 어휘 사전으로 세는 간이 지표이며,
                 형태소 분석이나 문맥 판단을 하지 않습니다. 논문에 실을 때는 코딩 시트에서 표본을 뽑아 사람이 교차 검토하고 그 신뢰도를 함께 보고해야 합니다.
-                계단의 완료 판정도 항목이 채워졌는지만 보고 내용의 질은 보지 않습니다. 앱이 내는 수치는 어디를 들여다볼지 가리키는 표지이지 결론이 아닙니다.
+                단계의 완료 판정도 항목이 채워졌는지만 보고 내용의 질은 보지 않습니다. 앱이 내는 수치는 어디를 들여다볼지 가리키는 표지이지 결론이 아닙니다.
               </p>
               <p>
                 <b>통계 처리.</b> 한 학급 단일 집단 자료이므로 유의확률을 산출하지 않습니다. 사전·사후 표의 t 값과 효과크기(Cohen d<sub>z</sub>)는 참고 계산이며,
@@ -6930,7 +6930,7 @@ function download(name, text, mime) {
   URL.revokeObjectURL(url);
 }
 
-/* ---------- 교사: 학생 한 명의 번역 사고 과정 ---------- */
+/* ---------- 교사: 학생 한 명의 발상 과정 과정 ---------- */
 
 function LadderMap({ ws }) {
   const d = ws || {};
@@ -6942,13 +6942,13 @@ function LadderMap({ ws }) {
     <div>
       <div className="metrics">
         {[
-          { v: tm.depth, u: "/ 7", l: "연속 도달 계단", h: "끊기지 않고 채운 마지막 계단" },
+          { v: tm.depth, u: "/ 7", l: "연속 도달 단계", h: "끊기지 않고 채운 마지막 단계" },
           { v: tm.invN, u: "가지", l: "안 보이는 것", h: "적어 놓은 항목 수" },
-          { v: tm.invTypeN, u: "가지", l: "안 보이는 까닭", h: "여러 각도에서 보았는가" },
+          { v: tm.invTypeN, u: "가지", l: "안 보이는 이유", h: "여러 각도에서 보았는가" },
           { v: tm.candN, u: "개", l: "물건 후보", h: "비교해 본 물건의 수" },
-          { v: tm.causalN, u: "행", l: "되풀이까지 적은 흔적", h: "동작과 횟수·기간까지 적은 흔적" },
-          { v: tm.revisitN, u: "회", l: "되돌아간 횟수", h: "읽히지 않아 앞 계단으로 간 횟수" },
-          { v: tm.stmtVers, u: "회", l: "문장 남김", h: "번역 문장을 남긴 횟수" },
+          { v: tm.causalN, u: "행", l: "반복까지 적은 흔적", h: "동작과 횟수·기간까지 적은 흔적" },
+          { v: tm.revisitN, u: "회", l: "되돌아간 횟수", h: "읽히지 않아 앞 단계로 간 횟수" },
+          { v: tm.stmtVers, u: "회", l: "문장 저장", h: "흔적 문장을 저장한 횟수" },
           { v: tm.concGain == null ? "-" : (tm.concGain > 0 ? "+" : "") + tm.concGain, u: "", l: "구체성 변화", h: "첫 문장 → 마지막 문장" },
         ].map((m, i) => (
           <div className="metric" key={i}>
@@ -6960,7 +6960,7 @@ function LadderMap({ ws }) {
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">선택</span><span className="card-title">세 번의 선택과 태도, 그 까닭</span></div>
+        <div className="card-head"><span className="card-code">선택</span><span className="card-title">세 번의 선택과 태도, 그 이유</span></div>
         <div className="card-body">
           {(() => {
             const obs = OBS_METHODS.find((x) => x.k === tm.obsMethod);
@@ -6971,21 +6971,21 @@ function LadderMap({ ws }) {
             return (
               <div>
                 <div className="read-block">
-                  <div className="rl" style={{ color: "var(--seal)" }}>관찰 방법 (계단 1 · T1)</div>
+                  <div className="rl" style={{ color: "var(--seal)" }}>관찰 방법 (단계 1 · T1)</div>
                   {obs ? (
                     <div>
                       <div className="rv"><b>{obs.label}</b>: {obs.sub}<div className="hint" style={{ marginTop: 4 }}>놓치는 것: {obs.miss}</div></div>
-                      {line("고른 까닭", d["s3o.methodWhy"])}
+                      {line("고른 이유", d["s3o.methodWhy"])}
                       {filled(d["s3o.blind"]) && line("놓칠 것 같은 것 (선택)", d["s3o.blind"])}
                     </div>
                   ) : <div className="rv empty">아직 고르지 않음</div>}
                 </div>
                 <div className="read-block">
-                  <div className="rl" style={{ color: "var(--seal)" }}>안 보이는 까닭 (계단 4 · T4)</div>
+                  <div className="rl" style={{ color: "var(--seal)" }}>안 보이는 이유 (단계 4 · T4)</div>
                   {filled(d["s3t1.pick"]) ? (
                     <div>
                       <div className="rv"><b>{d["s3t1.pick"]}</b>{pickType ? <span style={{ color: "var(--sub)" }}> · {pickType.label}</span> : null}</div>
-                      {line("고른 까닭", d["s3t1.pickWhy"])}
+                      {line("고른 이유", d["s3t1.pickWhy"])}
                     </div>
                   ) : <div className="rv empty">아직 고르지 않음</div>}
                 </div>
@@ -6994,7 +6994,7 @@ function LadderMap({ ws }) {
                   {mode ? (
                     <div>
                       <div className="rv"><b>{mode.label}</b>: {mode.sub}<div className="hint" style={{ marginTop: 4 }}>이 방법의 위험: {mode.risk}</div></div>
-                      {line("맞는 까닭", d["s3e.why"])}
+                      {line("맞는 이유", d["s3e.why"])}
                     </div>
                   ) : <div className="rv empty">아직 고르지 않음</div>}
                 </div>
@@ -7003,7 +7003,7 @@ function LadderMap({ ws }) {
                   {filled(d["s3c.attitude"]) ? (
                     <div>
                       <div className="rv"><b>{d["s3c.attitude"]}</b>{ATTITUDE_HINTS[d["s3c.attitude"]] ? <span style={{ color: "var(--sub)" }}> · {ATTITUDE_HINTS[d["s3c.attitude"]]}</span> : null}</div>
-                      {line("정한 까닭", d["s3c.attWhy"])}
+                      {line("정한 이유", d["s3c.attWhy"])}
                     </div>
                   ) : <div className="rv empty">아직 고르지 않음</div>}
                 </div>
@@ -7014,7 +7014,7 @@ function LadderMap({ ws }) {
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">계단</span><span className="card-title">일곱 계단의 오르기</span></div>
+        <div className="card-head"><span className="card-code">단계</span><span className="card-title">일곱 단계의 오르기</span></div>
         <div className="card-body">
           <div className="funnel">
             {tm.stages.map((s) => {
@@ -7028,24 +7028,24 @@ function LadderMap({ ws }) {
               );
             })}
           </div>
-          <p className="hint" style={{ marginTop: 10 }}>초록은 그 계단을 다 채운 상태, 흐린 색은 채우는 중입니다. 글자 수와 구체성은 그 계단에 남긴 글 전체를 대상으로 셉니다.</p>
+          <p className="hint" style={{ marginTop: 10 }}>초록은 그 단계를 다 채운 상태, 흐린 색은 채우는 중입니다. 글자 수와 구체성은 그 단계에 남긴 글 전체를 대상으로 셉니다.</p>
         </div>
       </div>
 
       <div className="pair">
         <div className="pair-head">
-          <span className="pair-dim">번역 문장</span>
-          <span className="pair-label">첫 문장(계단 6)에서 마지막 문장(계단 7)으로</span>
+          <span className="pair-dim">흔적 문장</span>
+          <span className="pair-label">첫 문장(단계 6)에서 마지막 문장(단계 7)으로</span>
         </div>
         <div className="pair-body">
           <div className="pair-cell">
-            <div className="pair-where">계단 6 흔적 정하기 · 첫 문장</div>
+            <div className="pair-where">단계 6 흔적 정하기 · 첫 문장</div>
             <div className={"pair-text " + (filled(tm.stmt1) ? "" : "empty")}>{tm.stmt1 || "미기록"}</div>
             {tm.conc1 != null && <div style={{ marginTop: 6 }}><ConcChip text={tm.stmt1} /></div>}
           </div>
           <div className="pair-arrow">→</div>
           <div className="pair-cell after">
-            <div className="pair-where">계단 7 짝에게 읽힌 뒤 · 마지막 문장</div>
+            <div className="pair-where">단계 7 짝에게 읽힌 뒤 · 마지막 문장</div>
             <div className={"pair-text " + (filled(tm.stmt2) ? "" : "empty")}>{tm.stmt2 || "미기록"}</div>
             {tm.conc2 != null && <div style={{ marginTop: 6 }}><ConcChip text={tm.stmt2} /></div>}
           </div>
@@ -7057,7 +7057,7 @@ function LadderMap({ ws }) {
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">되돌림</span><span className="card-title">읽히지 않아 되돌아간 자리</span></div>
+        <div className="card-head"><span className="card-code">되돌림</span><span className="card-title">읽히지 않아 되돌아간 단계</span></div>
         <div className="card-body">
           {tm.reverseN === 0 ? <p className="hint">아직 짝에게 읽힌 기록이 없습니다.</p> : (
             <div>
@@ -7082,7 +7082,7 @@ function LadderMap({ ws }) {
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">기록</span><span className="card-title">사다리에 남은 글 전체</span></div>
+        <div className="card-head"><span className="card-code">기록</span><span className="card-title">발상 단계에 기록된 글 전체</span></div>
         <div className="card-body">
           {SCHEMA.filter((sec) => sec.ladder || sec.summary).map((sec) => (
             <div key={sec.id} style={{ marginBottom: 16 }}>
@@ -7105,7 +7105,7 @@ function ConcSlope({ rows, onSel }) {
   const x1 = pad + 70, x2 = W - pad - 70;
   return (
     <div>
-      <svg className="slope" viewBox={"0 0 " + W + " " + H} preserveAspectRatio="xMidYMid meet" role="img" aria-label="번역 문장 구체성의 첫 문장 대비 마지막 문장 변화">
+      <svg className="slope" viewBox={"0 0 " + W + " " + H} preserveAspectRatio="xMidYMid meet" role="img" aria-label="흔적 문장 구체성의 첫 문장 대비 마지막 문장 변화">
         <line className="ax" x1={x1} y1={pad} x2={x1} y2={H - pad} />
         <line className="ax" x1={x2} y1={pad} x2={x2} y2={H - pad} />
         {[0, 25, 50, 75, 100].map((v) => (
@@ -7114,10 +7114,10 @@ function ConcSlope({ rows, onSel }) {
             <text x={x1 - 8} y={y(v) + 3} textAnchor="end">{v}</text>
           </g>
         ))}
-        {/* 값의 출처는 s3t3.stmt1(T7)과 s3t4.stmt2(T9) — 축 이름이 실제 계단과 다르면
-            엉뚱한 계단의 발문을 보강하게 된다 (LadderMap·원고 초안의 계단 6→7 표기와 일치시킴) */}
-        <text x={x1} y={pad - 12} textAnchor="middle">계단 6 첫 문장</text>
-        <text x={x2} y={pad - 12} textAnchor="middle">계단 7 마지막 문장</text>
+        {/* 값의 출처는 s3t3.stmt1(T7)과 s3t4.stmt2(T9) — 축 이름이 실제 단계와 다르면
+            엉뚱한 단계의 질문을 보강하게 된다 (LadderMap·원고 초안의 단계 6→7 표기와 일치시킴) */}
+        <text x={x1} y={pad - 12} textAnchor="middle">단계 6 첫 문장</text>
+        <text x={x2} y={pad - 12} textAnchor="middle">단계 7 마지막 문장</text>
         <text x={x1 - 8} y={pad - 24} textAnchor="end" fontSize={9} fill="var(--sub)">구체성 0~100</text>
         {pts.map((r) => {
           const up = r.tm.conc2 > r.tm.conc1, dn = r.tm.conc2 < r.tm.conc1;
@@ -7164,14 +7164,14 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
   return (
     <div>
       <div className="kpis">
-        <div className="kpi"><div className="n">{r2(mean(rows.map((r) => r.tm.depth)))}</div><div className="l">평균 도달 계단 (7 만점)</div></div>
-        <div className="kpi"><div className="n">{rows.filter((r) => r.tm.depth >= 7).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">일곱 계단을 다 오른 학생</div></div>
+        <div className="kpi"><div className="n">{r2(mean(rows.map((r) => r.tm.depth)))}</div><div className="l">평균 도달 단계 (7 만점)</div></div>
+        <div className="kpi"><div className="n">{rows.filter((r) => r.tm.depth >= 7).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">일곱 단계를 다 오른 학생</div></div>
         <div className="kpi"><div className="n">{rows.reduce((a, r) => a + r.tm.revisitN, 0)}</div><div className="l">학급 전체 되돌림 횟수</div></div>
         <div className="kpi"><div className="n">{st.n ? (st.diffM > 0 ? "+" : "") + r2(st.diffM) : "-"}</div><div className="l">구체성 평균 변화 (첫 문장 → 마지막 문장)</div></div>
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">과정 1</span><span className="card-title">계단별 도달률</span></div>
+        <div className="card-head"><span className="card-code">과정 1</span><span className="card-title">단계별 도달률</span></div>
         <div className="card-body">
           <div className="funnel">
             {TRANSLATE_STAGES.map((s, i) => {
@@ -7189,14 +7189,14 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
               );
             })}
           </div>
-          <p className="hint" style={{ marginTop: 10 }}>완료가 급격히 줄어드는 계단이 이 학급이 막힌 자리입니다. 그 계단의 발문을 다음 차시 도입에서 다시 다룹니다.</p>
+          <p className="hint" style={{ marginTop: 10 }}>완료가 급격히 줄어드는 단계가 이 학급이 막힌 지점입니다. 그 단계의 질문을 다음 차시 도입에서 다시 다룹니다.</p>
         </div>
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">과정 2</span><span className="card-title">관찰 방법(계단 1)과 가까운 방법(돌아보기)</span></div>
+        <div className="card-head"><span className="card-code">과정 2</span><span className="card-title">관찰 방법(단계 1)과 가까운 방법(돌아보기)</span></div>
         <div className="card-body">
-          <h4 className="serif" style={{ fontSize: 13.5, marginBottom: 8 }}>관찰 방법 (계단 1)</h4>
+          <h4 className="serif" style={{ fontSize: 13.5, marginBottom: 8 }}>관찰 방법 (단계 1)</h4>
           {obsTotal === 0 ? <p className="hint">아직 관찰 방법을 고른 학생이 없습니다.</p> : (
             <div className="funnel">
               {OBS_METHODS.map((m) => {
@@ -7215,7 +7215,7 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
             한 방법에 몰려 있으면 학급 전체가 같은 종류의 장면만 모은 것입니다. 방법마다 놓치는 것이 다르므로,
             비어 있는 방법을 다음 시간 도입에서 한 번 시연해 보이면 모으는 폭이 넓어집니다.
           </p>
-          <h4 className="serif" style={{ fontSize: 13.5, marginBottom: 8 }}>가까운 방법 (돌아보기 · 사다리를 다 오른 뒤 짚는 사후 위치 짓기)</h4>
+          <h4 className="serif" style={{ fontSize: 13.5, marginBottom: 8 }}>가까운 방법 (돌아보기 · 일곱 단계를 다 마친 뒤 짚는 사후 위치 짓기)</h4>
           {modeTotal === 0 ? <p className="hint">아직 가까운 방법을 짚은 학생이 없습니다.</p> : (
             <div className="funnel">
               {ENGAGE_MODES.map((m) => {
@@ -7231,14 +7231,14 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
             </div>
           )}
           <div className="kpis" style={{ marginTop: 12 }}>
-            <div className="kpi"><div className="n">{rows.filter((r) => r.tm.engageWhy).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">가까운 방법의 까닭을 쓴 학생</div></div>
+            <div className="kpi"><div className="n">{rows.filter((r) => r.tm.engageWhy).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">가까운 방법의 이유를 쓴 학생</div></div>
             <div className="kpi"><div className="n">{rows.filter((r) => r.tm.attitude).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">태도를 정한 학생</div></div>
-            <div className="kpi"><div className="n">{rows.filter((r) => r.tm.attWhy).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">태도의 까닭을 쓴 학생</div></div>
+            <div className="kpi"><div className="n">{rows.filter((r) => r.tm.attWhy).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">태도의 이유를 쓴 학생</div></div>
             <div className="kpi"><div className="n">{rows.filter((r) => r.tm.obsBlind).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">관찰 방법이 놓칠 것을 적은 학생 (선택 칸)</div></div>
           </div>
           <p className="hint" style={{ marginTop: 10 }}>
-            방법을 고르기만 하고 까닭이 비어 있으면 아직 고른 것이 아니라 찍은 것입니다.
-            여덟 방법은 감상에서 작품으로 익히고, 돌아보기에서는 가장 가까운 것 하나와 까닭 한 줄만 받습니다.
+            방법을 고르기만 하고 이유가 비어 있으면 아직 고른 것이 아니라 찍은 것입니다.
+            여덟 방법은 감상에서 작품으로 익히고, 돌아보기에서는 가장 가까운 것 하나와 이유 한 줄만 받습니다.
           </p>
         </div>
       </div>
@@ -7246,7 +7246,7 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
       <div className="card">
         <div className="card-head"><span className="card-code">과정 3</span><span className="card-title">무엇 때문에 보이지 않는다고 보았는가</span></div>
         <div className="card-body">
-          {typeTotal === 0 ? <p className="hint">아직 까닭을 고른 기록이 없습니다.</p> : (
+          {typeTotal === 0 ? <p className="hint">아직 이유를 고른 기록이 없습니다.</p> : (
             <div className="funnel">
               {INVIS_TYPES.map((t) => {
                 const c = typeCount[t.k] || 0;
@@ -7260,12 +7260,12 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
               })}
             </div>
           )}
-          <p className="hint" style={{ marginTop: 10 }}>한 까닭에 몰려 있으면 학급 전체가 같은 각도에서만 문제를 본 것입니다. 비어 있는 까닭을 예시로 들어 주면 물건 후보가 넓어집니다.</p>
+          <p className="hint" style={{ marginTop: 10 }}>한 이유에 몰려 있으면 학급 전체가 같은 각도에서만 문제를 본 것입니다. 비어 있는 이유를 예시로 들어 주면 물건 후보가 넓어집니다.</p>
         </div>
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">과정 4</span><span className="card-title">번역 문장의 구체성 변화 (첫 문장 → 마지막 문장)</span></div>
+        <div className="card-head"><span className="card-code">과정 4</span><span className="card-title">흔적 문장의 구체성 변화 (첫 문장 → 마지막 문장)</span></div>
         <div className="card-body">
           <ConcSlope rows={rows} onSel={onSel} />
           <p className="hint" style={{ marginTop: 8 }}>
@@ -7276,9 +7276,9 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">과정 5</span><span className="card-title">되돌아간 계단</span></div>
+        <div className="card-head"><span className="card-code">과정 5</span><span className="card-title">되돌아간 단계</span></div>
         <div className="card-body">
-          {Object.keys(backCount).length === 0 ? <p className="hint">아직 되돌아간 기록이 없습니다. 짝에게 읽히기(계단 7)를 수업에서 함께 해 보세요.</p> : (
+          {Object.keys(backCount).length === 0 ? <p className="hint">아직 되돌아간 기록이 없습니다. 짝에게 읽히기(단계 7)를 수업에서 함께 해 보세요.</p> : (
             <div className="funnel">
               {Object.keys(backCount).sort().map((k) => (
                 <div className="fr" key={k}>
@@ -7299,7 +7299,7 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
           <div className="tbl-scroll">
             <table className="roster">
               <thead><tr>
-                <th>학번</th><th>별명</th><th>도달</th><th>관찰 방법</th><th>가까운 방법</th><th>태도</th><th>안 보이는 것</th><th>까닭</th><th>물건 후보</th><th>되풀이</th><th>되돌림</th><th>구체성 첫→마지막</th><th></th>
+                <th>학번</th><th>별명</th><th>도달</th><th>관찰 방법</th><th>가까운 방법</th><th>태도</th><th>안 보이는 것</th><th>이유</th><th>물건 후보</th><th>반복</th><th>되돌림</th><th>구체성 첫→마지막</th><th></th>
               </tr></thead>
               <tbody>
                 {rows.map((r) => (
@@ -7332,7 +7332,7 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
    연구 자료 변환 — 수업 기록을 논문 작성용 자료로 옮긴다
    ------------------------------------------------------------
    1) 익명 참여자 번호를 붙이고 (학번·별명은 내보내지 않음)
-   2) 참여자 단위·계단 단위·문장 단위의 세 가지 자료 구조로 펼치고
+   2) 참여자 단위·단계 단위·문장 단위의 세 가지 자료 구조로 펼치고
    3) 사전·사후 대응 자료와 기술통계 표를 만들고
    4) 연구 방법·결과의 사실 서술만 채운 원고 초안을 낸다.
    해석과 논의는 초안에 「연구자 서술」 자리로 비워 둔다.
@@ -7343,36 +7343,36 @@ const GRADE_NUM = { "상": 3, "중": 2, "하": 1 };
 /* 변수 사전 — 내보내기·기술통계·코드북이 이 한 벌을 함께 쓴다 */
 const RESEARCH_VARS = [
   { k: "progress_pct", name: "전체 기록률", unit: "%", def: "기록지 전체 필수 항목 가운데 채운 비율", get: (c) => overallProgress(c.ws) },
-  { k: "stage_depth", name: "연속 도달 계단", unit: "0–7", def: "계단 1(T1)부터 끊기지 않고 모두 채운 마지막 계단의 번호. 2026-09 개정으로 계단 9→7 (옛 T5→4, T6→5, T7→6, T8·T9→7, T4는 돌아보기로)", get: (c) => c.tm.depth },
-  { k: "stage_reached", name: "완료 계단 수", unit: "0–7", def: "순서와 무관하게 필수 항목을 모두 채운 계단의 개수", get: (c) => c.tm.reached },
-  { k: "obs_method", name: "관찰 방법", unit: "명목", def: "계단 1(T1)에서 고른 관찰 방법 (표류 · 정점 관찰 · 동선 지도 · 사물 목록 · 소리 산책)", get: (c) => cardLabel("obs", c.tm.obsMethod), text: true },
-  { k: "obs_blind", name: "관찰 방법이 놓칠 것", unit: "0/1", def: "계단 1의 선택 칸에 이 방법이 놓칠 것 같은 것을 한 줄 적었으면 1", get: (c) => c.tm.obsBlind },
-  { k: "scenes_n", name: "관찰 장면 수", unit: "개", def: "계단 2(T2)에서 ‘무엇을’ 칸을 채운 행의 수", get: (c) => c.tm.scenes },
-  { k: "engage_mode", name: "가까운 방법", unit: "명목", def: "돌아보기에서 자기 작업에 가장 가깝다고 짚은 사회참여 미술의 방법 (사다리를 다 오른 뒤의 사후 위치 짓기)", get: (c) => cardLabel("engage", c.tm.engageMode), text: true },
-  { k: "engage_why", name: "가까운 방법의 까닭", unit: "0/1", def: "그 방법이 내 문제와 맞는 까닭을 한 줄 적었으면 1", get: (c) => c.tm.engageWhy },
+  { k: "stage_depth", name: "연속 도달 단계", unit: "0–7", def: "단계 1(T1)부터 끊기지 않고 모두 채운 마지막 단계의 번호. 2026-09 개정으로 단계 9→7 (옛 T5→4, T6→5, T7→6, T8·T9→7, T4는 돌아보기로)", get: (c) => c.tm.depth },
+  { k: "stage_reached", name: "완료 단계 수", unit: "0–7", def: "순서와 무관하게 필수 항목을 모두 채운 단계의 개수", get: (c) => c.tm.reached },
+  { k: "obs_method", name: "관찰 방법", unit: "명목", def: "단계 1(T1)에서 고른 관찰 방법 (표류 · 정점 관찰 · 동선 지도 · 사물 목록 · 소리 산책)", get: (c) => cardLabel("obs", c.tm.obsMethod), text: true },
+  { k: "obs_blind", name: "관찰 방법이 놓칠 것", unit: "0/1", def: "단계 1의 선택 칸에 이 방법이 놓칠 것 같은 것을 한 줄 적었으면 1", get: (c) => c.tm.obsBlind },
+  { k: "scenes_n", name: "관찰 장면 수", unit: "개", def: "단계 2(T2)에서 ‘무엇을’ 칸을 채운 행의 수", get: (c) => c.tm.scenes },
+  { k: "engage_mode", name: "가까운 방법", unit: "명목", def: "돌아보기에서 자기 작업에 가장 가깝다고 짚은 사회참여 미술의 방법 (일곱 단계를 다 마친 뒤의 사후 위치 짓기)", get: (c) => cardLabel("engage", c.tm.engageMode), text: true },
+  { k: "engage_why", name: "가까운 방법의 이유", unit: "0/1", def: "그 방법이 내 문제와 맞는 이유를 한 줄 적었으면 1", get: (c) => c.tm.engageWhy },
   { k: "engage_in_unit", name: "단원 형식과의 일치", unit: "0/1", def: "가까운 방법이 이 단원이 쓰는 세 방법(가림과 우회 · 파라픽션 · 포렌식)에 드는가", get: (c) => c.tm.engageInUnit },
   { k: "attitude", name: "말하는 태도", unit: "명목", def: "돌아보기에서 고른 태도 (고발 · 경고 · 공감 · 기록 · 질문)", get: (c) => c.tm.attitude, text: true },
-  { k: "att_why", name: "태도의 까닭", unit: "0/1", def: "태도를 정한 까닭을 한 줄 적었으면 1", get: (c) => c.tm.attWhy },
-  { k: "invis_n", name: "안 보이는 것 수", unit: "개", def: "계단 4(T4)에서 내용을 채운 항목의 수", get: (c) => c.tm.invN },
-  { k: "invis_type_n", name: "안 보이는 까닭 수", unit: "0–5", def: "계단 4에서 고른 서로 다른 까닭의 수", get: (c) => c.tm.invTypeN },
-  { k: "invis_type_main", name: "주된 까닭", unit: "명목", def: "계단 4에서 가장 자주 고른 까닭", get: (c) => (INVIS_TYPES.find((t) => t.k === c.tm.invTypeMain) || {}).label || "", text: true },
-  { k: "cand_n", name: "물건 후보 수", unit: "개", def: "계단 5(T5)에서 물건 이름을 채운 행의 수", get: (c) => c.tm.candN },
-  { k: "cand_drop_n", name: "뺀 후보 수", unit: "개", def: "계단 5에서 ‘뺌’으로 판정한 후보의 수 (저장값 ‘접음’)", get: (c) => c.tm.dropN },
-  { k: "drop_reason", name: "뺀 까닭 기록", unit: "0/1", def: "뺀 물건의 까닭을 한 줄 적었으면 1", get: (c) => c.tm.dropWhy },
-  { k: "trace_n", name: "흔적 행 수", unit: "개", def: "계단 6(T6)에서 자리 또는 자국을 채운 행의 수", get: (c) => c.tm.traceN },
-  { k: "causal_n", name: "되풀이까지 적은 흔적 수", unit: "개", def: "계단 6에서 동작과 되풀이(하루 몇 번씩, 몇 년 동안)를 함께 적은 행의 수", get: (c) => c.tm.causalN },
-  { k: "reverse_n", name: "짝에게 읽힌 건수", unit: "0–2", def: "계단 7(T7)에서 짝의 읽기를 기록한 건수", get: (c) => c.tm.reverseN },
-  { k: "gap_same", name: "의도대로 읽힌 건수", unit: "건", def: "계단 7에서 ‘거의 같게 읽음’으로 판정한 건수", get: (c) => c.tm.gapSame },
-  { k: "gap_diff", name: "다르게 읽힌 건수", unit: "건", def: "계단 7에서 ‘다르게 읽음’으로 판정한 건수", get: (c) => c.tm.gapDiff },
-  { k: "revisit_n", name: "되돌아간 횟수", unit: "회", def: "계단 7에서 앞 계단으로 되돌아가 고쳤다고 기록한 횟수 (옛 기록의 계단 이름은 LEGACY_BACK 대응표로 새 계단에 집계. 「거의 같게 읽음」 행은 세지 않음)", get: (c) => c.tm.revisitN },
-  { k: "stmt_versions", name: "문장 남김 횟수", unit: "회", def: "계단 6·7의 번역 문장을 「이 문장으로 남기기」로 남긴 누적 횟수", get: (c) => c.tm.stmtVers },
-  { k: "conc_pre", name: "구체성(첫 문장)", unit: "0–100", def: "계단 6에서 처음 남긴 번역 문장의 관찰어 지수", get: (c) => c.tm.conc1 },
-  { k: "conc_post", name: "구체성(마지막 문장)", unit: "0–100", def: "계단 7 번역 문장(마지막)의 관찰어 지수", get: (c) => c.tm.conc2 },
+  { k: "att_why", name: "태도의 이유", unit: "0/1", def: "태도를 정한 이유를 한 줄 적었으면 1", get: (c) => c.tm.attWhy },
+  { k: "invis_n", name: "안 보이는 것 수", unit: "개", def: "단계 4(T4)에서 내용을 채운 항목의 수", get: (c) => c.tm.invN },
+  { k: "invis_type_n", name: "안 보이는 이유 수", unit: "0–5", def: "단계 4에서 고른 서로 다른 이유의 수", get: (c) => c.tm.invTypeN },
+  { k: "invis_type_main", name: "주된 이유", unit: "명목", def: "단계 4에서 가장 자주 고른 이유", get: (c) => (INVIS_TYPES.find((t) => t.k === c.tm.invTypeMain) || {}).label || "", text: true },
+  { k: "cand_n", name: "물건 후보 수", unit: "개", def: "단계 5(T5)에서 물건 이름을 채운 행의 수", get: (c) => c.tm.candN },
+  { k: "cand_drop_n", name: "뺀 후보 수", unit: "개", def: "단계 5에서 ‘뺌’으로 판정한 후보의 수 (저장값 ‘접음’)", get: (c) => c.tm.dropN },
+  { k: "drop_reason", name: "뺀 이유 기록", unit: "0/1", def: "뺀 물건의 이유를 한 줄 적었으면 1", get: (c) => c.tm.dropWhy },
+  { k: "trace_n", name: "흔적 행 수", unit: "개", def: "단계 6(T6)에서 자리 또는 자국을 채운 행의 수", get: (c) => c.tm.traceN },
+  { k: "causal_n", name: "반복까지 적은 흔적 수", unit: "개", def: "단계 6에서 동작과 반복(하루 몇 번씩, 몇 년 동안)을 함께 적은 행의 수", get: (c) => c.tm.causalN },
+  { k: "reverse_n", name: "짝에게 읽힌 건수", unit: "0–2", def: "단계 7(T7)에서 짝의 읽기를 기록한 건수", get: (c) => c.tm.reverseN },
+  { k: "gap_same", name: "의도대로 읽힌 건수", unit: "건", def: "단계 7에서 ‘거의 같게 읽음’으로 판정한 건수", get: (c) => c.tm.gapSame },
+  { k: "gap_diff", name: "다르게 읽힌 건수", unit: "건", def: "단계 7에서 ‘다르게 읽음’으로 판정한 건수", get: (c) => c.tm.gapDiff },
+  { k: "revisit_n", name: "되돌아간 횟수", unit: "회", def: "단계 7에서 앞 단계로 되돌아가 고쳤다고 기록한 횟수 (옛 기록의 단계 이름은 LEGACY_BACK 대응표로 새 단계에 집계. 「거의 같게 읽음」 행은 세지 않음)", get: (c) => c.tm.revisitN },
+  { k: "stmt_versions", name: "문장 저장 횟수", unit: "회", def: "단계 6·7의 흔적 문장을 「이 문장 저장하기」로 저장한 누적 횟수", get: (c) => c.tm.stmtVers },
+  { k: "conc_pre", name: "구체성(첫 문장)", unit: "0–100", def: "단계 6에서 처음 저장한 흔적 문장의 관찰어 지수", get: (c) => c.tm.conc1 },
+  { k: "conc_post", name: "구체성(마지막 문장)", unit: "0–100", def: "단계 7 흔적 문장(마지막)의 관찰어 지수", get: (c) => c.tm.conc2 },
   { k: "conc_gain", name: "구체성 변화량", unit: "점", def: "마지막 문장 − 첫 문장", get: (c) => c.tm.concGain },
   { k: "lex_overlap", name: "첫·마지막 문장 어휘 겹침", unit: "%", def: "두 문장의 어절 자카드 유사도", get: (c) => c.tm.overlap },
-  { k: "len_pre", name: "문장 길이(첫 문장)", unit: "자", def: "계단 6에서 처음 남긴 문장의 글자 수", get: (c) => c.tm.len1 },
-  { k: "len_post", name: "문장 길이(마지막 문장)", unit: "자", def: "계단 7 마지막 문장의 글자 수", get: (c) => c.tm.len2 },
-  { k: "sym_warn_n", name: "상징어 경고 횟수", unit: "회", def: "계단 6 자국 칸에 상징어(눈물·사슬·마음 등)가 들어와 경고가 뜬 횟수 (막지 않고 기록만)", get: (c) => c.tm.symWarnN },  { k: "cr_fluency", name: "창의성:시도의 양", unit: "0–100", def: "생성 회차·명칭 후보·에스키스의 가짓수", get: (c) => c.ax.fluency },
+  { k: "len_pre", name: "문장 길이(첫 문장)", unit: "자", def: "단계 6에서 처음 저장한 문장의 글자 수", get: (c) => c.tm.len1 },
+  { k: "len_post", name: "문장 길이(마지막 문장)", unit: "자", def: "단계 7 마지막 문장의 글자 수", get: (c) => c.tm.len2 },
+  { k: "sym_warn_n", name: "상징어 경고 횟수", unit: "회", def: "단계 6 자국 칸에 상징어(눈물·사슬·마음 등)가 들어와 경고가 뜬 횟수 (막지 않고 기록만)", get: (c) => c.tm.symWarnN },  { k: "cr_fluency", name: "창의성:시도의 양", unit: "0–100", def: "생성 회차·명칭 후보·에스키스의 가짓수", get: (c) => c.ax.fluency },
   { k: "cr_flexibility", name: "창의성:방법 바꾸기", unit: "0–100", def: "다듬기 방법·수정 방법·도구를 옮겨 다닌 폭", get: (c) => c.ax.flexibility },
   { k: "cr_originality", name: "창의성:남다름", unit: "0–100", def: "문제·유물명·태도·진열 선택의 학급 내 희소도", get: (c) => c.ax.originality },
   { k: "cr_elaboration", name: "창의성:설정의 촘촘함", unit: "0–100", def: "흔적·일대기·출토 맥락·작품 캡션의 세부 밀도", get: (c) => c.ax.elaboration },
@@ -7383,7 +7383,7 @@ const RESEARCH_VARS = [
   /* 탐구 질문의 되묻기 — 첫 답을 굳힌 뒤 답이 움직였는가 */
   { k: "inq_frozen_n", name: "탐구 첫 답 확정 수", unit: "개", def: "탐구 질문(개념·설계 16칸) 가운데 첫 답을 확정해 되묻기 단계에 들어간 칸의 수", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => r.v1).length },
   { k: "inq_moved_n", name: "되묻기 뒤 움직인 수", unit: "개", def: "첫 답을 확정한 칸 가운데 고친 답이 첫 답과 달라진 수 (글자 2그램 겹침 < .90 또는 길이 차 > 8자)", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => r.v1 && ((r.sim != null && r.sim < 0.9) || Math.abs(r.final.trim().length - r.v1.trim().length) > 8)).length },
-  { k: "inq_selfq_n", name: "스스로 쓴 물음 수", unit: "개", def: "되묻기 단계에서 학생이 자기 답에 던진 물음을 쓴 칸의 수", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => filled(r.selfQ)).length },
+  { k: "inq_selfq_n", name: "스스로 쓴 질문 수", unit: "개", def: "되묻기 단계에서 학생이 자기 답에 던진 질문을 쓴 칸의 수", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => filled(r.selfQ)).length },
   { k: "dwell_min", name: "머문 시간", unit: "분", def: "창에 초점이 있고 30초 안에 움직임·2분 안에 클릭·키·스크롤이 있던 5초 단위의 합", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60) },
   { k: "read_min", name: "읽기 자료 열람", unit: "분", def: "강의 노트를 펼쳐 둔 채 머문 시간(같은 판정)", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.readSec || 0), 0) / 60) },
   { k: "idle_min", name: "켜 둔 채 비활동", unit: "분", def: "창은 보이고 초점도 있으나 조작 조건에 못 미친 5초 단위의 합. 머문 시간에서 걸러 낸 양", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.idleSec || 0), 0) / 60) },
@@ -7431,16 +7431,16 @@ const RESEARCH_VARS = [
   { k: "nn_sim", name: "최근접 유사도", unit: "%", def: "가장 비슷한 한 명과의 유사도", get: (c) => c.sim.nnSim },
   { k: "struct_sim", name: "구조 유사도", unit: "%", def: "문장 수·나열 표지·연결어의 뼈대가 학급과 얼마나 겹치는가", get: (c) => c.sim.structSim },
   { k: "mattr", name: "어휘 다양성 MATTR", unit: "0–100", def: "토큰 " + MATTR_WIN + "개 창을 한 칸씩 밀며 잰 TTR의 평균. 글 길이에 견고하다. 토큰이 " + MATTR_WIN + "개 미만이면 빈칸", get: (c) => c.sim.mattr },
-  { k: "hdd", name: "어휘 다양성 HD-D", unit: "0–100", def: "토큰 " + HDD_SAMPLE + "개를 뽑았을 때 각 낱말이 한 번이라도 나올 확률의 합 ÷ " + HDD_SAMPLE + ". 토큰이 " + HDD_SAMPLE + "개 미만이면 빈칸", get: (c) => c.sim.hdd },
+  { k: "hdd", name: "어휘 다양성 HD-D", unit: "0–100", def: "토큰 " + HDD_SAMPLE + "개를 뽑았을 때 각 단어가 한 번이라도 나올 확률의 합 ÷ " + HDD_SAMPLE + ". 토큰이 " + HDD_SAMPLE + "개 미만이면 빈칸", get: (c) => c.sim.hdd },
   { k: "tokens_n", name: "서술 토큰 수", unit: "개", def: "서술 칸 전체의 어절 토큰 수(조사·어미 제거 후). 어휘 다양성 지표의 포함 기준 판정에 쓴다", get: (c) => c.sim.tokensN },
   /* hapax는 글이 길수록 커져 짧은 글에서는 어휘가 아니라 길이를 잰다 — 보조로만 둔다 */
-  { k: "hapax", name: "나만 쓴 낱말 (보조)", unit: "개", def: "학급 전체에서 이 학생만 사용한 어휘의 수. 길이 편향이 있어 주 지표로 쓰지 않으며 tokens_n과 함께 볼 때에만 해석한다", get: (c) => c.sim.hapax },
+  { k: "hapax", name: "나만 쓴 단어 (보조)", unit: "개", def: "학급 전체에서 이 학생만 사용한 어휘의 수. 길이 편향이 있어 주 지표로 쓰지 않으며 tokens_n과 함께 볼 때에만 해석한다", get: (c) => c.sim.hapax },
 ];
 
 /* 사전·사후 대응 자료 */
 const RESEARCH_PAIRS = [
-  { k: "conc", name: "번역 문장의 구체성", pre: "conc_pre", post: "conc_post", preWhere: "3차시 계단 6 첫 문장", postWhere: "3차시 계단 7 마지막 문장" },
-  { k: "len", name: "번역 문장의 길이", pre: "len_pre", post: "len_post", preWhere: "3차시 계단 6 첫 문장", postWhere: "3차시 계단 7 마지막 문장" },
+  { k: "conc", name: "흔적 문장의 구체성", pre: "conc_pre", post: "conc_post", preWhere: "3차시 단계 6 첫 문장", postWhere: "3차시 단계 7 마지막 문장" },
+  { k: "len", name: "흔적 문장의 길이", pre: "len_pre", post: "len_post", preWhere: "3차시 단계 6 첫 문장", postWhere: "3차시 단계 7 마지막 문장" },
   { k: "survey", name: "창의성 인식 설문 전체", pre: "survey_pre", post: "survey_post", preWhere: "단원 시작 전", postWhere: "단원 종료 후" },
 ];
 
@@ -7620,7 +7620,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     download("연구자료_붙여넣기단위" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
   };
 
-  /* ---------- 2. 계단 단위 (long) ---------- */
+  /* ---------- 2. 단계 단위 (long) ---------- */
   const exportLong = () => {
     const head = ["pid", "stage_key", "stage_order", "stage_name", "stage_full", "items_total", "items_done",
       "completion", "text_chars", "text_units", "sentences", "concreteness", "edits", "first_edit_at", "last_edit_at"];
@@ -7633,7 +7633,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
           s.conc == null ? "" : s.conc, s.edits, s.first || "", s.last || ""]);
       });
     });
-    download("연구자료_계단단위" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
+    download("연구자료_단계단위" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
   };
 
   /* ---------- 3. 질적 코딩 시트 (문장 단위) ---------- */
@@ -7677,7 +7677,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
         filled(pt) && filled(ot) ? Math.round(jaccard(tokSet(pt), tokSet(ot)) * 100) : ""]);
     };
     cases.forEach((c) => {
-      add(c, "translate_stmt", "번역 문장", "3차시 계단 6 첫 문장", c.tm.stmt1, "3차시 계단 7 마지막 문장", c.tm.stmt2);
+      add(c, "translate_stmt", "흔적 문장", "3차시 단계 6 첫 문장", c.tm.stmt1, "3차시 단계 7 마지막 문장", c.tm.stmt2);
       const vs = stmtVersions(c.ws["s3t3.stmt1"]).concat(stmtVersions(c.ws["s3t4.stmt2"]));
       vs.forEach((x, i) => { if (i > 0) add(c, "stmt_v" + i + "_v" + (i + 1), "진술 버전 이동", "v" + i, vs[i - 1].text, "v" + (i + 1), x.text); });
       CHANGE_PAIRS.forEach((p, i) => {
@@ -7697,8 +7697,8 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
   };
 
   /* ---------- 4-2. 탐구 되묻기 단위 ----------
-     탐구 질문(개념·설계)마다 첫 답과 고친 답, 받은 되묻기, 스스로 쓴 물음을 한 행에 담는다.
-     되묻기 뒤에 답이 움직였는지(changed)가 이 파일의 물음이다. */
+     탐구 질문(개념·설계)마다 첫 답과 고친 답, 받은 되묻기, 스스로 쓴 질문을 한 행에 담는다.
+     되묻기 뒤에 답이 움직였는지(changed)가 이 파일의 질문이다. */
   const exportInquiry = () => {
     const head = ["pid", "session", "field_key", "qtype", "question", "support_level", "route",
       "v1_text", "final_text", "v1_chars", "final_chars", "char_overlap", "lexical_overlap",
@@ -7734,22 +7734,22 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push(mdHead(["변수", "코드", "단위", "n", "M", "SD", "Mdn", "Min", "Max"]));
     desc.forEach((d) => L.push(mdRow([d.v.name, d.v.k, d.v.unit, d.n, r2(d.m), r2(d.sd), r2(d.md), r2(d.mn), r2(d.mx)])));
     L.push("");
-    L.push("## 표 2. 계단별 도달률");
+    L.push("## 표 2. 단계별 도달률");
     L.push("");
-    L.push(mdHead(["계단", "내용", "완료 n", "완료 %", "평균 글자 수", "평균 구체성"]));
+    L.push(mdHead(["단계", "내용", "완료 n", "완료 %", "평균 글자 수", "평균 구체성"]));
     TRANSLATE_STAGES.forEach((st, i) => {
       const full = cases.filter((c) => c.tm.stages[i].ratio >= 0.999).length;
-      L.push(mdRow(["계단 " + st.n + " (" + st.key + ")", st.name, full, N ? Math.round((full / N) * 100) : 0,
+      L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, full, N ? Math.round((full / N) * 100) : 0,
         r2(mean(cases.map((c) => c.tm.stages[i].chars))),
         r2(mean(cases.map((c) => c.tm.stages[i].conc)))]));
     });
     L.push("");
-    L.push("## 표 3. 안 보이는 까닭의 선택 분포");
+    L.push("## 표 3. 안 보이는 이유의 선택 분포");
     L.push("");
     const tc = {};
     cases.forEach((c) => Object.keys(c.tm.invTypeFreq || {}).forEach((k) => { tc[k] = (tc[k] || 0) + c.tm.invTypeFreq[k]; }));
     const tt = Object.values(tc).reduce((a, b) => a + b, 0);
-    L.push(mdHead(["까닭", "설명", "선택 건수", "%"]));
+    L.push(mdHead(["이유", "설명", "선택 건수", "%"]));
     INVIS_TYPES.forEach((t) => L.push(mdRow([t.label, t.hint, tc[t.k] || 0, tt ? Math.round(((tc[t.k] || 0) / tt) * 100) : 0])));
     L.push("");
     L.push("## 표 4. 관찰 방법의 선택과 가까운 방법·태도의 분포");
@@ -7763,7 +7763,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     const ot = Object.values(oc).reduce((a, b) => a + b, 0);
     const mt = Object.values(mc).reduce((a, b) => a + b, 0);
     const at = Object.values(ac).reduce((a, b) => a + b, 0);
-    L.push("4-1. 관찰 방법 (계단 1)");
+    L.push("4-1. 관찰 방법 (단계 1)");
     L.push("");
     L.push(mdHead(["방법", "이론적 출처", "고른 n", "%", "이 방법이 놓치는 것"]));
     OBS_METHODS.forEach((m) => L.push(mdRow([m.label, m.from, oc[m.k] || 0, ot ? Math.round(((oc[m.k] || 0) / ot) * 100) : 0, m.miss])));
@@ -7778,10 +7778,10 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push(mdHead(["태도", "고른 n", "%"]));
     ATTITUDES.forEach((a) => L.push(mdRow([a, ac[a] || 0, at ? Math.round(((ac[a] || 0) / at) * 100) : 0])));
     L.push("");
-    L.push("4-4. 선택에 딸린 까닭의 기록률");
+    L.push("4-4. 선택에 딸린 이유의 기록률");
     L.push("");
-    L.push(mdHead(["까닭 칸", "기록한 n", "%"]));
-    [["관찰 방법이 놓칠 것 (선택 칸)", "obsBlind"], ["가까운 방법의 까닭", "engageWhy"], ["태도의 까닭", "attWhy"], ["뺀 물건의 까닭", "dropWhy"]].forEach((x) => {
+    L.push(mdHead(["이유 칸", "기록한 n", "%"]));
+    [["관찰 방법이 놓칠 것 (선택 칸)", "obsBlind"], ["가까운 방법의 이유", "engageWhy"], ["태도의 이유", "attWhy"], ["뺀 물건의 이유", "dropWhy"]].forEach((x) => {
       const n = cases.filter((c) => c.tm[x[1]] === 1).length;
       L.push(mdRow([x[0], n, N ? Math.round((n / N) * 100) : 0]));
     });
@@ -7855,7 +7855,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       ["head_text", "가져온 문장의 앞 120자"],
     ].forEach((r) => L.push(mdRow(r)));
     L.push("");
-    L.push("수집 범위는 기록지의 모든 입력 칸입니다. 서술 칸뿐 아니라 표·사다리·점검표 안의 칸에 붙여넣은 것도 같은 방식으로 남습니다. 20자 미만의 붙여넣기는 기록하지 않습니다.");
+    L.push("수집 범위는 기록지의 모든 입력 칸입니다. 서술 칸뿐 아니라 표·발상 단계·점검표 안의 칸에 붙여넣은 것도 같은 방식으로 남습니다. 20자 미만의 붙여넣기는 기록하지 않습니다.");
     L.push("");
     L.push("## 구체성 지수의 산출식");
     L.push("");
@@ -7867,13 +7867,13 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 8자 미만의 글은 측정하지 않고 결측으로 둡니다.");
     L.push("- 형태소 분석이 아니라 어간 문자열 일치로 세는 간이 지표입니다. 연구에 쓸 때는 코딩 시트로 표본을 뽑아 사람이 교차 검토한 뒤 신뢰도를 보고해야 합니다.");
     L.push("");
-    L.push("## 계단과 기록 칸의 대응");
+    L.push("## 단계와 기록 칸의 대응");
     L.push("");
-    L.push("2026-09 개정으로 계단은 아홉에서 일곱이 되었다. 옛 코드 대응: T5→계단 4, T6→계단 5, T7→계단 6, T8·T9→계단 7, 옛 T4(드러내는 방법)는 돌아보기의 「가까운 방법」으로 옮겼다. 개정 전 기록의 계단 2·3 편집 시각은 s3a에 합쳐져 있고, 개정 뒤 계단 3의 시각은 s3p에 남는다. 사다리의 한 줄 까닭(max 100자 이상)은 서술 칸과 함께 동질화 지표에 들어간다.");
+    L.push("2026-09 개정으로 단계는 아홉에서 일곱이 되었다. 옛 코드 대응: T5→단계 4, T6→단계 5, T7→단계 6, T8·T9→단계 7, 옛 T4(드러내는 방법)는 돌아보기의 「가까운 방법」으로 옮겼다. 개정 전 기록의 단계 2·3 편집 시각은 s3a에 합쳐져 있고, 개정 뒤 단계 3의 시각은 s3p에 남는다. 발상 단계의 한 줄 이유(max 100자 이상)은 서술 칸과 함께 동질화 지표에 들어간다.");
     L.push("");
-    L.push(mdHead(["계단", "이름", "해당 기록 칸", "학생이 하는 일", "내놓을 것"]));
-    TRANSLATE_STAGES.forEach((st) => L.push(mdRow(["계단 " + st.n + " (" + st.key + ")", st.name, st.keys.join(" / "), st.ask, st.out])));
-    L.push(mdRow(["돌아보기", "태도 · 가까운 방법", REFLECT_KEYS.join(" / "), "이 자국으로 보는 사람에게 무엇을 하려 하고, 내 작업은 여덟 방법 중 어디에 가까운가", "태도와 까닭, 가까운 방법과 까닭"]));
+    L.push(mdHead(["단계", "이름", "해당 기록 칸", "학생이 하는 일", "내놓을 것"]));
+    TRANSLATE_STAGES.forEach((st) => L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, st.keys.join(" / "), st.ask, st.out])));
+    L.push(mdRow(["돌아보기", "태도 · 가까운 방법", REFLECT_KEYS.join(" / "), "이 자국으로 보는 사람에게 무엇을 하려 하고, 내 작업은 여덟 방법 중 어디에 가까운가", "태도와 이유, 가까운 방법과 이유"]));
     L.push("");
     return L.join("\n");
   };
@@ -7906,7 +7906,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("「연구자 서술: 연구 목적과 방법을 3~4문장으로」");
     L.push("");
-    L.push("주요어: 사회참여 미술, 비가시성, 사물의 흔적, 생성형 AI, 창작 과정 기록, 미술과 평가");
+    L.push("주요어: 사회참여 미술, 비가시성, 유물(사물)에 드러난 사용 흔적, 생성형 AI, 창작 과정 기록, 미술과 평가");
     L.push("");
     L.push("## 1. 서론");
     L.push("");
@@ -7916,9 +7916,9 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("연구 문제");
     L.push("");
-    L.push("1. 학생들은 사회문제를 어떤 관찰 방법으로 모으며, 방법의 선택은 모이는 장면을 어떻게 달라지게 하는가.");
-    L.push("2. 흔적을 설계한 뒤 학생들은 자기 작업이 사회참여 미술의 어느 방법에 가장 가깝다고 짚으며, 그 까닭을 어떻게 대는가.");
-    L.push("3. 보이지 않는 대상을 사물의 흔적으로 옮기는 동안 학생의 진술은 어떻게 달라지는가.");
+    L.push("1. 학생들은 사회 문제를 어떤 관찰 방법으로 모으며, 방법의 선택은 모이는 장면을 어떻게 달라지게 하는가.");
+    L.push("2. 흔적을 설계한 뒤 학생들은 자기 작업이 사회참여 미술의 어느 방법에 가장 가깝다고 짚으며, 그 이유를 어떻게 대는가.");
+    L.push("3. 보이지 않는 대상을 유물(사물)에 드러난 사용 흔적으로 옮기는 동안 학생의 진술은 어떻게 달라지는가.");
     L.push("4. 짝에게 읽히기에서 의도와 다른 읽기를 만난 학생은 사고를 어떻게 고치는가.");
     L.push("");
     L.push("## 2. 연구 방법");
@@ -7931,31 +7931,31 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("단원은 「실재한 적 없는 유물 이미지로 구성한 허구의 아카이브 전시」이며 8차시(차시당 120분)로 구성했다. 1~2차시는 레디메이드·개념미술·제도비평·파라픽션 감상, 3차시는 사회참여 미술과 관찰, 4차시는 박물관 장치와 유물 개념 설계, 5~6차시는 생성형 AI를 사용한 이미지 제작과 다듬기, 7차시는 전시 구성, 8차시는 상호평가와 비평이다.");
     L.push("");
-    L.push("이 연구가 초점을 둔 곳은 2~3차시에 배치한 「번역 사다리」다. 사회문제 관찰에서 사물의 흔적 설계까지를 일곱 계단으로 나누고, 각 계단이 앞 계단의 산출물을 재료로 삼도록 구성했다. 계단 1·2는 2차시 끝에 안내한 한 주 과제이고, 계단 3~7과 돌아보기는 3차시 수업 안에서 이루어진다.");
+    L.push("이 연구가 초점을 둔 곳은 2~3차시에 배치한 「유물 발상 단계」다. 사회 문제 관찰에서 유물(사물)에 드러난 사용 흔적 설계까지를 일곱 단계로 나누고, 각 단계가 앞 단계의 산출물을 재료로 삼도록 구성했다. 단계 1·2는 2차시 끝에 안내한 한 주 과제이고, 단계 3~7과 돌아보기는 3차시 수업 안에서 이루어진다.");
     L.push("");
-    L.push(mdHead(["계단", "이름", "학생이 하는 일", "내놓을 것", "교사가 보는 곳"]));
-    TRANSLATE_STAGES.forEach((st) => L.push(mdRow(["계단 " + st.n + " (" + st.key + ")", st.name, st.ask, st.out, st.look])));
+    L.push(mdHead(["단계", "이름", "학생이 하는 일", "내놓을 것", "교사가 보는 곳"]));
+    TRANSLATE_STAGES.forEach((st) => L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, st.ask, st.out, st.look])));
     L.push("");
-    L.push("사다리에는 세 번의 선택 지점이 있다. 계단 1의 관찰 방법, 계단 4의 안 보이는 까닭, 그리고 사다리를 다 오른 뒤 돌아보기에서 짚는 가까운 방법(사회참여 미술의 여덟 방법 가운데 하나)이다. 세 지점 모두 고르기만 하는 것이 아니라 고른 까닭을 한 줄 적게 했다. 가까운 방법은 사전 설계 선택이 아니라 사후 위치 짓기다. 이 단원의 결과물 형식이 이미 정해져 있는 조건에서 사전 선택은 교사의 답을 짐작하는 일이 되기 쉬우므로, 흔적이라는 구체 재료가 생긴 뒤에 자기 작업의 자리를 짚게 했다.");
+    L.push("발상 단계에는 세 번의 선택 지점이 있다. 단계 1의 관찰 방법, 단계 4의 안 보이는 이유, 그리고 일곱 단계를 다 마친 뒤 돌아보기에서 짚는 가까운 방법(사회참여 미술의 여덟 방법 가운데 하나)이다. 세 지점 모두 고르기만 하는 것이 아니라 고른 이유를 한 줄 적게 했다. 가까운 방법은 사전 설계 선택이 아니라 사후 위치 짓기다. 이 단원의 결과물 형식이 이미 정해져 있는 조건에서 사전 선택은 교사의 답을 짐작하는 일이 되기 쉬우므로, 흔적이라는 구체 재료가 생긴 뒤에 자기 작업의 자리를 짚게 했다.");
     L.push("");
-    L.push("계단 1에서 학생은 다섯 가지 관찰 방법 가운데 하나를 고른다. ‘잘 살펴보라’는 지시만으로는 자료가 모이지 않으므로 방법을 명시하고, 방법마다 잘 잡히는 것과 놓치는 것을 함께 제시했다. 놓칠 것 같은 것을 적는 칸은 선택으로 두었다.");
+    L.push("단계 1에서 학생은 다섯 가지 관찰 방법 가운데 하나를 고른다. ‘잘 살펴보라’는 지시만으로는 자료가 모이지 않으므로 방법을 명시하고, 방법마다 잘 잡히는 것과 놓치는 것을 함께 제시했다. 놓칠 것 같은 것을 적는 칸은 선택으로 두었다.");
     L.push("");
     L.push(mdHead(["관찰 방법", "이론적 출처", "잘 잡아내는 것", "놓치는 것"]));
     OBS_METHODS.forEach((m) => L.push(mdRow([m.label, m.from, m.good, m.miss])));
     L.push("");
-    L.push("돌아보기에서 학생은 사회참여 미술이 사회를 드러내 온 여덟 가지 방법 가운데 자기 작업과 가장 가까운 것 하나를 짚고 그 까닭을 한 줄 적는다. 여덟 방법은 3차시 감상에서 작품으로 익힌다. 이 단원의 결과물 자체는 가림과 우회 · 허구와 파라픽션 · 증거와 포렌식 세 방법을 겹쳐 놓은 형식이며, 이 사실을 학생에게 미리 밝힌다. 같은 자리에서 말하는 태도(고발·경고·공감·기록·질문)와 그 까닭도 정하며, 이것이 4차시 캡션의 말투와 7차시 진열의 기준이 된다.");
+    L.push("돌아보기에서 학생은 사회참여 미술이 사회를 드러내 온 여덟 가지 방법 가운데 자기 작업과 가장 가까운 것 하나를 짚고 그 이유를 한 줄 적는다. 여덟 방법은 3차시 감상에서 작품으로 익힌다. 이 단원의 결과물 자체는 가림과 우회 · 허구와 파라픽션 · 증거와 포렌식 세 방법을 겹쳐 놓은 형식이며, 이 사실을 학생에게 미리 밝힌다. 같은 자리에서 말하는 태도(고발·경고·공감·기록·질문)와 그 이유도 정하며, 이것이 4차시 캡션의 말투와 7차시 진열의 기준이 된다.");
     L.push("");
     L.push(mdHead(["방법", "대표 작업", "관람자가 하게 되는 일", "이 방법의 위험"]));
     ENGAGE_MODES.forEach((m) => L.push(mdRow([m.label + (UNIT_MODES.includes(m.k) ? " (단원 형식)" : ""), m.works, m.does, m.risk])));
     L.push("");
-    L.push("계단 4에서 학생은 안 보이는 까닭을 다섯 가지(" + INVIS_TYPES.map((t) => t.label).join(" · ") + ")로 나눈다. 까닭마다 다음 계단에서 찾을 물건과 자국의 종류가 달라지도록 안내문을 연결해 두었다.");
+    L.push("단계 4에서 학생은 안 보이는 이유를 다섯 가지(" + INVIS_TYPES.map((t) => t.label).join(" · ") + ")로 나눈다. 이유마다 다음 단계에서 찾을 물건과 자국의 종류가 달라지도록 안내문을 연결해 두었다.");
     L.push("");
     L.push("### 2.3 자료 수집");
     L.push("");
     L.push("자료는 수업용 웹 애플리케이션이 학생의 기록 저장 시점에 자동으로 남긴 값이다. 별도의 검사 시간을 두지 않았다. 수집한 자료는 다음과 같다.");
     L.push("");
-    L.push("- 기록지의 모든 서술문과 표 입력값 (계단·차시·항목 단위로 구분됨)");
-    L.push("- 번역 문장을 남긴 이력 (학생이 「이 문장으로 남기기」를 누를 때마다 그 시점의 문장이 따로 저장됨)");
+    L.push("- 기록지의 모든 서술문과 표 입력값 (단계·차시·항목 단위로 구분됨)");
+    L.push("- 흔적 문장을 저장한 이력 (학생이 「이 문장 저장하기」를 누를 때마다 그 시점의 문장이 따로 저장됨)");
     L.push("- 고쳐 쓰기 이력 (앞선 기록에서 2분 이상 지난 뒤 길이가 8자를 넘게 달라지거나 어휘 겹침이 0.6 미만으로 떨어지면 이전 문장을 보관. 길이는 그대로인 채 내용만 바뀐 개작을 놓치지 않기 위해 두 조건을 함께 둔다)");
     L.push("- 붙여넣기 기록 (기록 칸에 20자 이상이 붙여넣어진 시각·칸·글자 수·UTF-8 바이트 수·붙이기 직전 그 칸의 길이·앞 120자. 클립보드 전문은 저장하지 않으며, 출처는 수집하지 않는다)");
     L.push("- 생성 회차마다 실제로 사용한 프롬프트 전문");
@@ -7997,7 +7997,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     ["paste_n", "paste_bytes", "written_bytes", "byte_ratio", "src_ratio", "approp", "paste_settle", "ai_type", "rewrite_depth", "rewrite_deep_n", "prompt_n", "prompt_growth", "prompt_step", "prompt_even", "plan_gap", "peer_sim", "nn_sim", "struct_sim", "mattr", "hdd", "tokens_n", "hapax"]
       .forEach((k) => { const v = RESEARCH_VARS.find((x) => x.k === k); if (v) L.push(mdRow([v.name + " (" + v.k + ")", v.unit, v.def])); });
     L.push("");
-    L.push("구조 유사도를 내용 유사도와 따로 둔 까닭은, 학생이 가져온 글을 그대로 제출하지 않고 고쳐 쓰는 경우 어휘는 달라지지만 문장 수·나열 표지·연결어의 배치는 남기 때문이다. 내용 유사도만 보면 이 경우를 놓친다. 다만 본 연구의 구조 유사도는 문장 수·나열 표지·연결어·문말 어미의 일치를 세는 표층 지표이며, 품사 태그열의 압축비로 구조 다양성을 재는 방식과는 다르다. 후자는 형태소 분석을 전제하므로 수집 도구 안에서 계산하지 않고 별도 처리 단계로 남긴다. 「연구자 서술: 구조 다양성 지표의 선택과 그 한계」");
+    L.push("구조 유사도를 내용 유사도와 따로 둔 이유는, 학생이 가져온 글을 그대로 제출하지 않고 고쳐 쓰는 경우 어휘는 달라지지만 문장 수·나열 표지·연결어의 배치는 남기 때문이다. 내용 유사도만 보면 이 경우를 놓친다. 다만 본 연구의 구조 유사도는 문장 수·나열 표지·연결어·문말 어미의 일치를 세는 표층 지표이며, 품사 태그열의 압축비로 구조 다양성을 재는 방식과는 다르다. 후자는 형태소 분석을 전제하므로 수집 도구 안에서 계산하지 않고 별도 처리 단계로 남긴다. 「연구자 서술: 구조 다양성 지표의 선택과 그 한계」");
     L.push("");
     L.push("어휘 다양성은 MATTR(창 " + MATTR_WIN + ")과 HD-D(표본 " + HDD_SAMPLE + ")로 잰다. 두 지표 모두 글의 길이에 견고하다. 참여자별 토큰 수(tokens_n)를 함께 보고하며, 창 또는 표본 크기에 미치지 못하는 참여자는 해당 지표를 결측으로 둔다. 최소 토큰 수에 따른 포함 기준은 분석 전에 정한다. 「연구자 서술: 사전 등록한 포함 기준」");
     L.push("");
@@ -8013,7 +8013,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("### 2.5 분석 방법");
     L.push("");
-    L.push("참여자 단위(wide), 계단 단위(long), 붙여넣기 단위(long), 문장 단위(코딩 시트)의 네 가지 구조로 자료를 펼쳤다. 붙여넣기 단위 자료는 가져온 문장 한 건을 한 행으로 삼아 그 문장이 놓인 칸·분량·학생의 출처 자기보고·붙인 뒤 손댄 시간·최종문에서의 잔존율을 함께 담으며, 참여자 단위의 집계값은 이 표에서 산출한 것이다. 양적 자료는 기술통계로 요약하고 사전·사후 대응 비교를 함께 보았다. 사전·사후 비교에서는 차이점수 대신 사후 점수를 종속변수로, 사전 점수를 공변량으로 투입한 공분산분석을 사용해 평균 회귀의 영향을 줄였다. 여러 척도와 축을 동시에 대조하므로 다중비교에는 위양성 발견율(FDR) 보정을 적용하였다. 「연구자 서술: 적용한 보정 절차와 유의수준」");
+    L.push("참여자 단위(wide), 단계 단위(long), 붙여넣기 단위(long), 문장 단위(코딩 시트)의 네 가지 구조로 자료를 펼쳤다. 붙여넣기 단위 자료는 가져온 문장 한 건을 한 행으로 삼아 그 문장이 놓인 칸·분량·학생의 출처 자기보고·붙인 뒤 손댄 시간·최종문에서의 잔존율을 함께 담으며, 참여자 단위의 집계값은 이 표에서 산출한 것이다. 양적 자료는 기술통계로 요약하고 사전·사후 대응 비교를 함께 보았다. 사전·사후 비교에서는 차이점수 대신 사후 점수를 종속변수로, 사전 점수를 공변량으로 투입한 공분산분석을 사용해 평균 회귀의 영향을 줄였다. 여러 척도와 축을 동시에 대조하므로 다중비교에는 위양성 발견율(FDR) 보정을 적용하였다. 「연구자 서술: 적용한 보정 절차와 유의수준」");
     L.push("");
     L.push("동질화 지표는 분석 단위가 둘로 나뉜다. 학생 한 명이 학급의 나머지와 얼마나 겹치는가(개인 수준)와 학급 전체의 어휘 풀·선택 분포가 얼마나 좁아졌는가(학급 수준)는 서로 다른 질문이며, 두 수준의 결론이 엇갈릴 수 있다. 두 수준을 함께 보고한다.");
     L.push("");
@@ -8023,7 +8023,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("설계상 단일집단이고 무작위 배정이 없으므로 생성형 도구의 사용과 창의성 지표 사이의 관계는 인과로 해석하지 않는다. 창의적 자기효능감이 낮은 학생이 애초에 도구에 더 기댔을 가능성(역방향의 설명)을 배제할 수 없어, 사전 자기효능감을 공변량으로 통제한 뒤에도 남는 관계만을 보고한다.");
     L.push("");
-    L.push("단일 학급 자료이므로 통계적 일반화 대신 기술통계와 사례 서술을 중심에 두었다. 질적 자료는 문장 단위 코딩 시트에 1차 자동 표지(계단·항목·구체어 적중 수)를 붙인 뒤 「연구자 서술: 코딩 절차와 범주 생성 방식」");
+    L.push("단일 학급 자료이므로 통계적 일반화 대신 기술통계와 사례 서술을 중심에 두었다. 질적 자료는 문장 단위 코딩 시트에 1차 자동 표지(단계·항목·구체어 적중 수)를 붙인 뒤 「연구자 서술: 코딩 절차와 범주 생성 방식」");
     L.push("");
     L.push("## 3. 결과");
     L.push("");
@@ -8054,17 +8054,17 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       L.push("「연구자 서술: 사용량과 전유율의 관계, 그리고 유형별 사례 대조」");
       L.push("");
     }
-    L.push("### 3.1 계단의 도달");
+    L.push("### 3.1 단계의 도달");
     L.push("");
-    L.push("참여자 " + N + "명의 연속 도달 계단은 평균 " + say("stage_depth") + "이었고, 일곱 계단을 모두 채운 학생은 " + fullCount + "명(" + (N ? Math.round((fullCount / N) * 100) : 0) + "%)이었다. 계단별 완료 비율은 다음과 같다.");
+    L.push("참여자 " + N + "명의 연속 도달 단계는 평균 " + say("stage_depth") + "이었고, 일곱 단계를 모두 채운 학생은 " + fullCount + "명(" + (N ? Math.round((fullCount / N) * 100) : 0) + "%)이었다. 단계별 완료 비율은 다음과 같다.");
     L.push("");
-    L.push(mdHead(["계단", "내용", "완료 n", "완료 %"]));
+    L.push(mdHead(["단계", "내용", "완료 n", "완료 %"]));
     TRANSLATE_STAGES.forEach((st, i) => {
       const full = cases.filter((c) => c.tm.stages[i].ratio >= 0.999).length;
-      L.push(mdRow(["계단 " + st.n + " (" + st.key + ")", st.name, full, N ? Math.round((full / N) * 100) : 0]));
+      L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, full, N ? Math.round((full / N) * 100) : 0]));
     });
     L.push("");
-    L.push("「연구자 서술: 도달이 급격히 줄어드는 계단에 대한 해석」");
+    L.push("「연구자 서술: 도달이 급격히 줄어드는 단계에 대한 해석」");
     L.push("");
     L.push("### 3.2 관찰 방법의 선택과 가까운 방법 짚기");
     L.push("");
@@ -8088,29 +8088,29 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push(mdHead(["방법", "짚은 n", "%"]));
     ENGAGE_MODES.forEach((m) => L.push(mdRow([m.label, mc2[m.k] || 0, mt2 ? Math.round(((mc2[m.k] || 0) / mt2) * 100) : 0])));
     L.push("");
-    L.push("선택에 딸린 까닭의 기록률은 다음과 같다. 가까운 방법의 까닭 " + cases.filter((c) => c.tm.engageWhy).length + "명, 태도 " + cases.filter((c) => c.tm.attitude).length + "명, 태도의 까닭 " + cases.filter((c) => c.tm.attWhy).length + "명, 관찰 방법이 놓칠 것(선택 칸) " + cases.filter((c) => c.tm.obsBlind).length + "명 (모두 N = " + N + ").");
+    L.push("선택에 딸린 이유의 기록률은 다음과 같다. 가까운 방법의 이유 " + cases.filter((c) => c.tm.engageWhy).length + "명, 태도 " + cases.filter((c) => c.tm.attitude).length + "명, 태도의 이유 " + cases.filter((c) => c.tm.attWhy).length + "명, 관찰 방법이 놓칠 것(선택 칸) " + cases.filter((c) => c.tm.obsBlind).length + "명 (모두 N = " + N + ").");
     L.push("");
-    L.push("「연구자 서술: 선택의 까닭을 코딩 시트에서 인용해 유형화. 방법을 고르기만 한 경우와 까닭까지 쓴 경우의 차이」");
+    L.push("「연구자 서술: 선택의 이유를 코딩 시트에서 인용해 유형화. 방법을 고르기만 한 경우와 이유까지 쓴 경우의 차이」");
     L.push("");
     L.push("### 3.3 보이지 않는 것을 가르는 방식");
     L.push("");
-    L.push("학생들이 적어 놓은 안 보이는 것은 1인당 평균 " + say("invis_n", "개") + "였고, 서로 다른 까닭의 수는 평균 " + say("invis_type_n", "가지") + "였다. 전체 " + tt + "건의 까닭 선택 가운데 가장 많이 고른 까닭은 ‘" + topLabel + "’" + josaRo(topLabel) + " " + (tc[topType] || 0) + "건(" + (tt ? Math.round(((tc[topType] || 0) / tt) * 100) : 0) + "%)이었다.");
+    L.push("학생들이 적어 놓은 안 보이는 것은 1인당 평균 " + say("invis_n", "개") + "였고, 서로 다른 이유의 수는 평균 " + say("invis_type_n", "가지") + "였다. 전체 " + tt + "건의 이유 선택 가운데 가장 많이 고른 이유는 ‘" + topLabel + "’" + josaRo(topLabel) + " " + (tc[topType] || 0) + "건(" + (tt ? Math.round(((tc[topType] || 0) / tt) * 100) : 0) + "%)이었다.");
     L.push("");
-    L.push(mdHead(["까닭", "선택 건수", "%"]));
+    L.push(mdHead(["이유", "선택 건수", "%"]));
     INVIS_TYPES.forEach((t) => L.push(mdRow([t.label, tc[t.k] || 0, tt ? Math.round(((tc[t.k] || 0) / tt) * 100) : 0])));
     L.push("");
-    L.push("「연구자 서술: 까닭 분포가 뜻하는 바」");
+    L.push("「연구자 서술: 이유 분포가 뜻하는 바」");
     L.push("");
-    L.push("### 3.4 물건 후보와 흔적으로의 번역");
+    L.push("### 3.4 물건 후보와 흔적으로의 표현");
     L.push("");
-    L.push("물건 후보는 1인당 평균 " + say("cand_n", "개") + " 나왔고, 흔적 네 칸에서 동작과 되풀이(하루 몇 번씩, 몇 년 동안)까지 적은 행은 평균 " + say("causal_n", "행") + "이었다. 뺀 물건의 까닭을 적은 학생은 " + cases.filter((c) => c.tm.dropWhy === 1).length + "명이었다.");
+    L.push("물건 후보는 1인당 평균 " + say("cand_n", "개") + " 나왔고, 흔적 네 칸에서 동작과 반복(하루 몇 번씩, 몇 년 동안)까지 적은 행은 평균 " + say("causal_n", "행") + "이었다. 뺀 물건의 이유를 적은 학생은 " + cases.filter((c) => c.tm.dropWhy === 1).length + "명이었다.");
     L.push("");
     L.push("「연구자 서술: 대표 사례 인용. 코딩 시트에서 pid와 문장을 골라 붙입니다」");
     L.push("");
     L.push("### 3.5 진술의 변화");
     L.push("");
     if (concSt.n) {
-      L.push("번역 문장을 첫 문장(계단 6)과 마지막 문장(계단 7) 모두 쓴 학생은 " + concSt.n + "명이었다. 구체성 지수는 첫 문장 " + r2(concSt.preM) + " (SD = " + r2(concSt.preSD) + ")에서 마지막 문장 " + r2(concSt.postM) + " (SD = " + r2(concSt.postSD) + ")으로 평균 " + r2(concSt.diffM) + "점 " + (concSt.diffM >= 0 ? "높아졌다" : "낮아졌다") + " (차이의 SD = " + r2(concSt.diffSD) + ", d = " + dTxt(concSt) + ").");
+      L.push("흔적 문장을 첫 문장(단계 6)과 마지막 문장(단계 7) 모두 쓴 학생은 " + concSt.n + "명이었다. 구체성 지수는 첫 문장 " + r2(concSt.preM) + " (SD = " + r2(concSt.preSD) + ")에서 마지막 문장 " + r2(concSt.postM) + " (SD = " + r2(concSt.postSD) + ")으로 평균 " + r2(concSt.diffM) + "점 " + (concSt.diffM >= 0 ? "높아졌다" : "낮아졌다") + " (차이의 SD = " + r2(concSt.diffSD) + ", d = " + dTxt(concSt) + ").");
       L.push("");
       L.push("두 문장의 어휘 겹침은 평균 " + say("lex_overlap", "%") + "였고, 문장 길이는 첫 문장 " + say("len_pre", "자") + "에서 마지막 문장 " + say("len_post", "자") + "로 바뀌었다.");
     } else {
@@ -8121,12 +8121,12 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("### 3.6 짝에게 읽히기와 수정");
     L.push("");
-    L.push("짝에게 읽힌 기록은 모두 " + cases.reduce((a, c) => a + c.tm.reverseN, 0) + "건이었다. 의도와 거의 같게 읽힌 경우가 " + cases.reduce((a, c) => a + c.tm.gapSame, 0) + "건, 다르게 읽힌 경우가 " + cases.reduce((a, c) => a + c.tm.gapDiff, 0) + "건이었다. 앞 계단으로 되돌아가 고친 기록은 " + revisitTotal + "회이며 " + revisitAny + "명(" + (N ? Math.round((revisitAny / N) * 100) : 0) + "%)에게서 나타났다.");
+    L.push("짝에게 읽힌 기록은 모두 " + cases.reduce((a, c) => a + c.tm.reverseN, 0) + "건이었다. 의도와 거의 같게 읽힌 경우가 " + cases.reduce((a, c) => a + c.tm.gapSame, 0) + "건, 다르게 읽힌 경우가 " + cases.reduce((a, c) => a + c.tm.gapDiff, 0) + "건이었다. 앞 단계로 되돌아가 고친 기록은 " + revisitTotal + "회이며 " + revisitAny + "명(" + (N ? Math.round((revisitAny / N) * 100) : 0) + "%)에게서 나타났다.");
     L.push("");
     const bc = {};
     cases.forEach((c) => c.tm.backStages.forEach((b) => { bc[b] = (bc[b] || 0) + 1; }));
     if (Object.keys(bc).length) {
-      L.push(mdHead(["되돌아간 계단", "횟수"]));
+      L.push(mdHead(["되돌아간 단계", "횟수"]));
       Object.keys(bc).sort().forEach((k) => L.push(mdRow([backLabel(k), bc[k]])));
       L.push("");
     }
@@ -8156,7 +8156,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 한 학급 " + N + "명의 단일 집단 자료이므로 결과를 다른 학교·학년으로 일반화할 수 없다.");
     L.push("- 구체성 지수는 어휘 사전에 기반한 간이 지표이며 형태소 분석이나 문맥 판단을 하지 않는다.");
     L.push("- 머문 시간은 조작이 있는 동안만 누적하므로 화면을 보며 생각한 시간은 과소 집계될 수 있다. 화면을 켜 둔 채 자리를 비우는 일이 잦아 부풀리는 쪽보다 줄이는 쪽을 택했으며, 걸러 낸 양은 「켜 둔 채 비활동」으로 함께 보고한다.");
-    L.push("- 계단의 완료 판정은 항목이 채워졌는지만 보고 내용의 질을 보지 않는다.");
+    L.push("- 단계의 완료 판정은 항목이 채워졌는지만 보고 내용의 질을 보지 않는다.");
     L.push("- 관찰 방법과 가까운 방법의 선택 분포는 교사가 제시한 다섯 방법·여덟 방법 안에서만 나온 것이므로, 선택지를 달리 짜면 분포도 달라진다.");
     L.push("- 사전·사후 비교의 t 값과 효과크기는 참고 계산이며 유의확률을 산출하지 않았다.");
     L.push("- 붙여넣기 기록은 외부 텍스트가 들어온 시점과 분량을 알려 줄 뿐 출처를 알려 주지 않는다. 출처를 수집하지 않으므로 생성형 도구에서 온 것인지, 검색 결과인지, 본인이 앞 차시에 쓴 글을 옮긴 것인지 자료만으로는 구분되지 않는다. 붙여넣기 관련 지표를 생성형 도구 의존의 지표로 읽지 않는다.");
@@ -8177,10 +8177,10 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("- 연구자료_참여자단위.csv: 참여자 1명이 1행. 변수 " + RESEARCH_VARS.length + "개.");
     L.push("- 연구자료_붙여넣기단위.csv: 가져온 문장 1건이 1행 (" + pasteTotal + "건). 칸·시각·분량·출처 자기보고·손댄 시간·잔존율과 문구 앞 120자.");
-    L.push("- 연구자료_계단단위.csv: 참여자 × 계단이 1행. 계단별 도달·글자 수·구체성·편집 시각.");
+    L.push("- 연구자료_단계단위.csv: 참여자 × 단계가 1행. 단계별 도달·글자 수·구체성·편집 시각.");
     L.push("- 연구자료_코딩시트.csv: 참여자 × 항목 × 문장이 1행. code_1·code_2·memo 열은 연구자가 채우는 빈칸.");
-    L.push("- 연구자료_사전사후쌍.csv: 같은 물음에 두 번 답한 자리의 텍스트 쌍과 지표 차이.");
-    L.push("- 연구자료_탐구되묻기.csv: 참여자 × 탐구 질문이 1행. 첫 답·고친 답·받은 되묻기·스스로 쓴 물음.");
+    L.push("- 연구자료_사전사후쌍.csv: 같은 질문에 두 번 답한 자리의 텍스트 쌍과 지표 차이.");
+    L.push("- 연구자료_탐구되묻기.csv: 참여자 × 탐구 질문이 1행. 첫 답·고친 답·받은 되묻기·스스로 쓴 질문.");
     L.push("- 기술통계.md: 표 1~6.");
     L.push("- 변수사전.md: 전체 변수의 조작적 정의와 산출식.");
     L.push("");
@@ -8202,18 +8202,18 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       p: "참여자 1명이 1행. 사고 과정·창의성·활동 시간·루브릭·설문을 합쳐 변수 " + RESEARCH_VARS.length + "개를 담습니다. 통계 프로그램에 그대로 올릴 수 있습니다.", go: exportWide },
     { k: "paste", h: "붙여넣기 단위 자료", fn: "연구자료_붙여넣기단위" + tag + "_" + stamp + ".csv",
       p: "가져온 문장 1건이 1행. 전 과정 어느 칸에 언제 몇 자를 붙였는지, 학생이 고른 출처, 붙인 뒤 그 칸을 손댄 시간, 그리고 그 문장이 최종문에 얼마나 남았는지를 문구 앞 120자와 함께 담습니다. 지금 " + pasteTotal + "건.", go: exportPaste },
-    { k: "long", h: "계단 단위 자료", fn: "연구자료_계단단위" + tag + "_" + stamp + ".csv",
-      p: "참여자 × 일곱 계단이 1행. 계단별 도달률·글자 수·문장 수·구체성·편집 시각을 담아 사고의 진행을 시간 축으로 볼 수 있습니다.", go: exportLong },
+    { k: "long", h: "단계 단위 자료", fn: "연구자료_단계단위" + tag + "_" + stamp + ".csv",
+      p: "참여자 × 일곱 단계가 1행. 단계별 도달률·글자 수·문장 수·구체성·편집 시각을 담아 사고의 진행을 시간 축으로 볼 수 있습니다.", go: exportLong },
     { k: "coding", h: "질적 코딩 시트", fn: "연구자료_코딩시트" + tag + "_" + stamp + ".csv",
-      p: "참여자 × 항목 × 문장이 1행. 1차 자동 표지(계단·구체어 적중)를 붙여 두고 code_1·code_2·memo 열은 연구자가 채우도록 비워 둡니다.", go: exportCoding },
+      p: "참여자 × 항목 × 문장이 1행. 1차 자동 표지(단계·구체어 적중)를 붙여 두고 code_1·code_2·memo 열은 연구자가 채우도록 비워 둡니다.", go: exportCoding },
     { k: "pairs", h: "사전·사후 텍스트 쌍", fn: "연구자료_사전사후쌍" + tag + "_" + stamp + ".csv",
-      p: "번역 문장의 첫 문장과 마지막 문장, 남긴 문장 사이의 이동, 단원 안의 사고 변화 쌍 " + CHANGE_PAIRS.length + "종을 텍스트와 지표 차이로 나란히 담습니다.", go: exportPairs },
+      p: "흔적 문장의 첫 문장과 마지막 문장, 저장한 문장 사이의 이동, 단원 안의 사고 변화 쌍 " + CHANGE_PAIRS.length + "종을 텍스트와 지표 차이로 나란히 담습니다.", go: exportPairs },
     { k: "inquiry", h: "탐구 되묻기 단위 자료", fn: "연구자료_탐구되묻기" + tag + "_" + stamp + ".csv",
-      p: "참여자 × 탐구 질문(개념·설계)이 1행. 출발점, 첫 답과 고친 답, 겹침·구체성 차이, 받은 되묻기와 스스로 쓴 물음, 확정 뒤 고친 시간을 담습니다. 되묻기 뒤에 답이 움직였는지가 이 파일의 물음입니다.", go: exportInquiry },
+      p: "참여자 × 탐구 질문(개념·설계)이 1행. 출발점, 첫 답과 고친 답, 겹침·구체성 차이, 받은 되묻기와 스스로 쓴 질문, 확정 뒤 고친 시간을 담습니다. 되묻기 뒤에 답이 움직였는지가 이 파일의 질문입니다.", go: exportInquiry },
     { k: "desc", h: "기술통계 표", fn: "기술통계" + tag + "_" + stamp + ".md",
-      p: "표 1 기술통계, 표 2 계단 도달, 표 3 안 보이는 까닭 분포, 표 4 선택 분포, 표 5 사전·사후 비교, 표 6 상관. 마크다운 표라 논문 편집기에 그대로 붙습니다.", go: () => download("기술통계" + tag + "_" + stamp + ".md", descriptivesMD(), "text/markdown") },
+      p: "표 1 기술통계, 표 2 단계 도달, 표 3 안 보이는 이유 분포, 표 4 선택 분포, 표 5 사전·사후 비교, 표 6 상관. 마크다운 표라 논문 편집기에 그대로 붙습니다.", go: () => download("기술통계" + tag + "_" + stamp + ".md", descriptivesMD(), "text/markdown") },
     { k: "codebook", h: "변수 사전", fn: "변수사전" + tag + "_" + stamp + ".md",
-      p: "모든 변수의 조작적 정의, 구체성 지수의 산출식, 계단과 기록 칸의 대응표. 연구 방법 절의 측정 도구 서술에 씁니다.", go: () => download("변수사전" + tag + "_" + stamp + ".md", codebookMD(), "text/markdown") },
+      p: "모든 변수의 조작적 정의, 구체성 지수의 산출식, 단계와 기록 칸의 대응표. 연구 방법 절의 측정 도구 서술에 씁니다.", go: () => download("변수사전" + tag + "_" + stamp + ".md", codebookMD(), "text/markdown") },
     { k: "manuscript", h: "원고 초안", fn: "원고초안" + tag + "_" + stamp + ".md",
       p: "연구 방법과 결과의 사실 서술을 수치까지 채워 넣은 초안. 해석·논의는 「연구자 서술」 자리로 비워 둡니다.", go: () => download("원고초안" + tag + "_" + stamp + ".md", manuscriptMD(), "text/markdown") },
   ];
@@ -8823,9 +8823,9 @@ function TeacherApp({ onExit, onGallery }) {
                       </tbody>
                     </table></div>
                     <p className="hint" style={{ marginTop: 10 }}>차시를 닫아도 학생이 이미 작성한 내용은 저장된 상태로 남고, 교사 화면에서는 계속 열람과 채점이 됩니다.</p>
-                    <p className="hint" style={{ marginTop: 6 }}>2차시는 3차시 수업이 끝날 때까지 열어 두세요. 번역 사다리의 계단 1·2(한 주 과제)가 2차시 탭에 있어, 학생이 3차시에 문제를 정하며 장면을 고치러 돌아갑니다.</p>
+                    <p className="hint" style={{ marginTop: 6 }}>2차시는 3차시 수업이 끝날 때까지 열어 두세요. 유물 발상 단계의 단계 1·2(한 주 과제)가 2차시 탭에 있어, 학생이 3차시에 문제를 정하며 장면을 고치러 돌아갑니다.</p>
                     {isOpen(openMap, "3차시") && !isOpen(openMap, "2차시") && (
-                      <p className="warn-note" style={{ marginTop: 8 }}>2차시가 닫혀 있습니다. 학생이 번역 사다리의 계단 1·2(관찰 방법·장면)를 고칠 수 없습니다.</p>
+                      <p className="warn-note" style={{ marginTop: 8 }}>2차시가 닫혀 있습니다. 학생이 유물 발상 단계의 단계 1·2(관찰 방법·장면)를 고칠 수 없습니다.</p>
                     )}
                   </div>
                 </div>
@@ -9121,7 +9121,7 @@ function ChangeMap({ ws, owner }) {
       })}
 
       <div className="card">
-        <div className="card-head"><span className="card-code">고쳐 쓴 자리</span><span className="card-title">기록 수정 이력</span></div>
+        <div className="card-head"><span className="card-code">고쳐 쓴 곳</span><span className="card-title">기록 수정 이력</span></div>
         <div className="card-body">
           {tl.length === 0 ? (
             <p className="hint">아직 고쳐 쓴 기록이 없습니다. 학생이 답을 다시 쓰면 이전 문장이 여기에 시간순으로 쌓입니다.</p>
@@ -9173,12 +9173,12 @@ function ChangeMap({ ws, owner }) {
 /* ---------- 표본 학급 자료 (화면을 살펴보기 위한 가상 자료) ---------- */
 
 /* 표본 학급의 말투 네 종류 — 두 번째 종류는 나열 표지가 많은 뼈대라
-   낱말이 달라도 구조 유사도가 높게 잡히는 경우를 화면에서 확인할 수 있다. */
+   단어가 달라도 구조 유사도가 높게 잡히는 경우를 화면에서 확인할 수 있다. */
 const SAMPLE_STYLES = [
   [
-    "{R}에는 {P}의 시간이 자국으로 남아 있다. 나는 그 자국이 어느 자리에 생기는지부터 찾았다.",
-    "이 흔적은 하루에도 여러 번 같은 자리에 힘이 실릴 때 생긴다. 한 번의 사건이 아니라 반복이 만든 모양이다.",
-    "관람자가 화면에서 가장 먼저 그 자리를 보게 만들고 싶었다. 그래서 다른 부분은 일부러 어둡게 두었다.",
+    "{R}에는 {P}의 시간이 자국으로 남아 있다. 나는 그 자국이 어느 위치에 생기는지부터 찾았다.",
+    "이 흔적은 하루에도 여러 번 같은 부분에 힘이 실릴 때 생긴다. 한 번의 사건이 아니라 반복이 만든 모양이다.",
+    "관람자가 화면에서 가장 먼저 그 부분을 보게 만들고 싶었다. 그래서 다른 부분은 일부러 어둡게 두었다.",
   ],
   [
     "첫째, {R}은 오래 사용된 물건이다. 둘째, 특정 부위에만 마모가 집중되어 있다. 따라서 사용자의 동작을 추정할 수 있다.",
@@ -9186,13 +9186,13 @@ const SAMPLE_STYLES = [
     "결론적으로 이 유물은 {P}을 증언한다. 이러한 증언은 물리적 흔적에 근거하기 때문에 설득력이 있다.",
   ],
   [
-    "{P}을 겪는 사람의 손이 {R}에 닿는 자리를 먼저 찾았다. 몸이 닿지 않으면 흔적도 생기지 않는다.",
+    "{P}을 겪는 사람의 손이 {R}에 닿는 부분을 먼저 찾았다. 몸이 닿지 않으면 흔적도 생기지 않는다.",
     "덧감은 자국이 수리의 시간을 말해 준다. 버리지 않고 고쳐 쓴 사람이 있었다는 뜻이다.",
     "관람자가 이 유물을 진짜라고 믿었다가 고지문을 읽고 한 번 멈추기를 바랐다. 그 멈춤이 이 작업의 목적이다.",
   ],
   [
     "{R}을 고른 이유는 아무도 눈여겨보지 않는 물건이기 때문이다. 눈에 띄지 않는 것에 오래된 시간이 붙는다.",
-    "{P}은 크게 말해지지만 그 자국은 아주 작은 자리에 남는다. 나는 그 작은 자리를 크게 찍기로 했다.",
+    "{P}은 크게 말해지지만 그 자국은 아주 작은 부분에 남는다. 나는 그 작은 부분을 크게 찍기로 했다.",
     "이름을 먼저 읽은 사람과 화면을 먼저 본 사람이 다른 것을 찾는다는 점이 흥미로웠다.",
   ],
 ];
@@ -9230,7 +9230,7 @@ const SAMPLE_SEEDS = [
     st1: "폭우가 잦아진 것은 우산에 남는다.", problem: "폭우와 침수", title: "", relic: "", no: "", show: false, grade: { r0: "하", rm0: "문제 선정의 근거가 아직 한 줄" } },
 ];
 
-/* 사다리 기록 칸의 순서 — 표본 학생마다 여기까지만 남겨 계단 도달을 다르게 만든다 (일곱 계단 16칸).
+/* 발상 단계 기록 칸의 순서 — 표본 학생마다 여기까지만 남겨 단계 도달을 다르게 만든다 (일곱 단계 16칸).
    돌아보기 네 칸(REFLECT_KEYS)은 ldr와 무관하게 seed의 mode 유무로 넣는다. */
 const LADDER_KEYS = ["s3o.method", "s3o.methodWhy", "s3o.blind",
   "s3a.scenes", "s3a.problem", "s3a.contact", "s3a.why",
@@ -9250,16 +9250,16 @@ function buildSampleClass() {
   SAMPLE_SEEDS.forEach((s, i) => {
     const w = {};
     keys.slice(0, s.upto).forEach((k) => { w[k] = DEMO_WS[k]; });
-    // 사다리는 seed의 ldr 만큼만 남긴다 (0이면 아직 시작하지 않은 상태)
+    // 발상 단계는 seed의 ldr 만큼만 남긴다 (0이면 아직 시작하지 않은 상태)
     LADDER_KEYS.forEach((k, j) => {
       if (j < (s.ldr == null ? LADDER_KEYS.length : s.ldr)) w[k] = DEMO_WS[k];
       else delete w[k];
     });
     if (s.obs && w["s3o.method"]) w["s3o.method"] = s.obs;
-    // 돌아보기(태도·가까운 방법)는 사다리 밖의 카드라 seed의 mode 유무로 넣는다
+    // 돌아보기(태도·가까운 방법)는 일곱 단계 밖의 카드라 seed의 mode 유무로 넣는다
     REFLECT_KEYS.forEach((k) => { if (s.mode) w[k] = DEMO_WS[k]; else delete w[k]; });
     if (s.mode) w["s3e.mode"] = s.mode;
-    // 요약 세 값은 사다리에서 다시 끌어온 값과 같게 맞춘다 (돌아보기의 「직접 고침」 표시가 뜨지 않게)
+    // 요약 세 값은 앞 단계에서 다시 끌어온 값과 같게 맞춘다 (돌아보기의 「직접 고침」 표시가 뜨지 않게)
     ["s3b.invisible", "s3b.object", "s3b.trace"].forEach((k) => { delete w[k]; });
     Object.assign(w, deriveSummary(w));
     if (s.ivt && w["s3t1.list"]) w["s3t1.list"] = w["s3t1.list"].map((r, j) => ({ ...r, type: s.ivt[j] || r.type }));
@@ -9293,7 +9293,7 @@ function buildSampleClass() {
           .replace(/\{R\}/g, s.relic || s.nick)
           .replace(/\{P\}/g, s.problem || "이 문제")
           .replace(/\{N\}/g, s.nick);
-        // 사다리의 한 줄 까닭 칸은 글자 수 상한이 있으니 그 길이로 자른다
+        // 발상 단계의 한 줄 이유 칸은 글자 수 상한이 있으니 그 길이로 자른다
         const max = FIELD_OF_KEY[k] && FIELD_OF_KEY[k].f.max;
         w[k] = max ? txt.slice(0, max) : txt;
       });
@@ -9504,7 +9504,7 @@ function Gallery({ onBack, backLabel }) {
 /* ---------- 예시 기록지 (자료집 예시 작품 A 「오른손」, 읽기 전용) ---------- */
 
 const DEMO_WS = {
-  "l1.q1": "뒤샹이 직접 만든 것: 없음(소변기는 공장 기성품). 직접 고른 것: 사물, 제목 「샘」, 서명, 전시라는 자리. 사물을 작품으로 만든 것은 선택과 명명과 전시의 결합이라고 정리함.",
+  "l1.q1": "뒤샹이 직접 만든 것: 없음(소변기는 공장 기성품). 직접 고른 것: 사물, 제목 「샘」, 서명, 전시라는 장소. 사물을 작품으로 만든 것은 선택과 명명과 전시의 결합이라고 정리함.",
   "l1.q2": "셋이 함께 의자를 만든다고 생각한다. 실물은 쓰임을, 사진은 겉모습을, 정의는 개념을 보여 주는데, 관람자가 셋을 잇는 순간 의자라는 관념이 완성되기 때문이다.",
   "l1.q3": "표면의 정보량. 모공과 흉터까지 그린 척 클로스의 화면처럼, 세부가 사진의 밀도에 이르면 관람자는 화면 속 대상이 실재한다고 잠시 믿는다.",
   "l2.q1": "박물관이 팻말과 진열로 사물에 권위를 주는 과정을 뒤집어 보여 주기 위해서라고 추론한다. 팻말이 미술이라고 말하면 미술이 되는 구조를, 그 반대 문장으로 노출했다.",
@@ -9512,7 +9512,7 @@ const DEMO_WS = {
   "l2.q3": "위조는 허구임을 감추어 이익을 얻고, 파라픽션은 허구 고지처럼 허구임을 알 수 있는 길을 작품 안에 남겨 둔다. 「오른손」의 작품 캡션 맨 아래 고지가 그 길이다.",
   "l3.q1": "우리 동네 편의점 야간 노동은 매일 있지만 뉴스 화면에는 좀처럼 등장하지 않는다. 사회가 보이게 하는 것과 보이지 않게 두는 것의 나뉨이 감각적인 것의 분배다.",
   "l3.q2": "끔찍한 장면을 찍은 사진은 보는 사람을 무디게 만들고 피해자를 구경거리로 만들 수 있어서, 자는 생존자의 눈이라는 최소한의 이미지로 관람자가 그 시선을 마주 보게 했다.",
-  "l3.q3": "본 적 없는 배송 기사의 얼굴을 상상해 그리면 내 짐작이 그 사람의 자리를 차지한다. 손잡이에 남은 마모라면 짐작 없이도 그 사람의 노동 조건을 전달할 수 있다.",
+  "l3.q3": "본 적 없는 배송 기사의 얼굴을 상상해 그리면 내 짐작이 그 사람의 위치를 차지한다. 손잡이에 남은 마모라면 짐작 없이도 그 사람의 노동 조건을 전달할 수 있다.",
   "l4.q1": "박물관화는 일상의 사물이 보존·분류·전시의 대상이 되는 과정이다. 작품 캡션은 관람자가 사물을 읽는 틀을 몇 줄의 기록으로 정한다.",
   "l4.q2": "중립 회색 배경, 균일한 확산광, 눈높이 정면 시점, 크기를 알려 주는 스케일 바.",
   "l4.q3": "유약 균열 잔존 급식 식판 파편",
@@ -9532,29 +9532,29 @@ const DEMO_WS = {
     { k: "s5d.selWhy", at: "2026-03-19T04:40:00.000Z", prev: "제일 마음에 들어서 골랐다." },
     { k: "s8a.q3", at: "2026-04-02T02:50:00.000Z", prev: "AI로 만들었지만 전시했으니까 미술이다." },
   ],
-  "q1.concept": "「샘」과 「하나 그리고 세 개의 의자」 모두 전시라는 자리와 이름이 먼저 있었다. 사물이 오기 전에 그것을 받아들일 틀이 있어야 했다.",
+  "q1.concept": "「샘」과 「하나 그리고 세 개의 의자」 모두 전시라는 장소와 이름이 먼저 있었다. 사물이 오기 전에 그것을 받아들일 틀이 있어야 했다.",
   "q1.design": "코수스의 의자를 교실 뒤 사물함 앞에 놓겠다. 매일 쓰는 의자 옆이라 실물·사진·정의의 비교가 더 이상하게 느껴질 것 같아서다.",
   "q1.debate": { pos: "관람자에게 가장 많다. 아무도 미술로 읽지 않으면 선언은 남지 않는다.", counter: "뒤샹의 「샘」은 당시 관람자 대부분이 거부했지만 지금 미술사에 남았다. 관람자의 몫이 크다면 그때 사라졌어야 한다.", hold: "입장을 조금 바꿨다. 당대 관람자가 거부해도 이후의 관람자가 다시 읽을 수 있으니, 권한은 한 시점의 관람자보다 시간을 두고 쌓이는 읽기에 있다고 고쳐 쓴다." },
   "q3.concept": "손잡이의 마모는 오래 쥐었다는 사실을 말하지만 그 사람이 그 일을 어떻게 여겼는지는 말하지 못한다. 자의 작품에서 생존자의 눈도 겪은 일은 증언하지만 지금의 마음까지 보여 주지는 못했다.",
   "q3.design": "찍을 수 있는 것: 현관의 상자, 닳은 손수레. 찍을 수 없는 것: 새벽의 하역 자체, 그 사람의 피로.",
-  "q3.debate": { pos: "관찰과 조사를 거쳤다면 정당하다. 다만 당사자를 대신해 말한다고 주장하는 순간 선을 넘는다.", counter: "관찰과 조사도 바깥의 시선이다. 당사자가 원하지 않는 방식으로 자기 삶이 작품이 될 수 있다.", hold: "그 근거를 알고도 유지한다. 대신 인물을 그리지 않고 사물의 흔적으로 좁힌 이 단원의 방법이 그 위험을 줄이는 장치라고 생각한다." },
+  "q3.debate": { pos: "관찰과 조사를 거쳤다면 정당하다. 다만 당사자를 대신해 말한다고 주장하는 순간 선을 넘는다.", counter: "관찰과 조사도 바깥의 시선이다. 당사자가 원하지 않는 방식으로 자기 삶이 작품이 될 수 있다.", hold: "그 근거를 알고도 유지한다. 대신 인물을 그리지 않고 유물(사물)에 드러난 사용 흔적으로 좁힌 이 단원의 방법이 그 위험을 줄이는 장치라고 생각한다." },
   "q5.concept": "빛이었다. 광원이 하나로 정리된 4회차 화면은 구조가 같은 2회차보다 훨씬 진짜처럼 보였다.",
   "q5.design": "고른 한 점은 광택이 손바닥 너비에 머물렀고 버린 네 점은 광택이 그립 전체에 퍼져 있었다. 남는 차이는 흔적의 인과다.",
   "q5.debate": { pos: "발견이다. 우연을 알아보는 눈도 판단이다.", counter: "의도가 먼저 없었다면 무엇이든 골랐을 것이다. 사후에 이유를 붙이는 것은 자기합리화와 구분되지 않는다.", hold: "유지하되 조건을 붙인다. 우연을 받아들인 이유를 설계표의 언어로 설명할 수 있을 때만 발견이라 부르겠다." },
   "q5.reflect": { pos: "기록 사진의 형식을 갖추고 흔적의 인과가 맞으면 믿게 되는 것 같다.", at: "2026-03-19T03:05:00.000Z" },
-  "q8.concept": "우리 반은 작품 캡션 쪽에 몰려 있었다. 1차 관람에서 반쯤 읽히던 작품들이 2차 관람에서 전부 사회문제로 읽혔다.",
+  "q8.concept": "우리 반은 작품 캡션 쪽에 몰려 있었다. 1차 관람에서 반쯤 읽히던 작품들이 2차 관람에서 전부 사회 문제로 읽혔다.",
   "q8.design": "공사장 물건으로 읽힌 오독은 그대로 두겠다. 작품 캡션이 바로잡아 주는 과정 자체가 이 작품의 내용이 되었기 때문이다. 대신 테이프 방향의 오류는 고치겠다.",
   "q8.debate": { pos: "의도다. 고지는 의도를 보여 주는 표시일 뿐이다.", counter: "의도는 바깥에서 확인할 수 없다. 확인 가능한 것은 고지와 결과뿐이므로 기준은 고지여야 한다.", hold: "반은 바꿨다. 판단의 기준은 고지로 두되, 고지를 붙이고도 속이려는 사용이 가능하므로 결과까지 함께 봐야 한다고 쓰겠다." },
   "q8.reflect": { pos: "5차시에는 형식과 인과가 믿음을 만든다고 썼다. 지금은 하나를 더한다. 믿고 싶은 이야기일 때 우리는 형식을 덜 따진다. 관람자들이 내 유물을 배송 노동으로 읽고 싶어 했다는 것을 전시에서 봤다.", at: "2026-04-02T03:20:00.000Z" },
-  "s12.def": "작가의 선택과 이름 붙이기, 그리고 그것을 전시라는 자리에 놓는 일",
+  "s12.def": "작가의 선택과 이름 붙이기, 그리고 그것을 전시라는 장소에 놓는 일",
   "s12.labelCmp": "같은 파이프 사진이 한쪽 작품 캡션에서는 공구 파편으로, 다른 쪽에서는 노동의 기록으로 읽혔다.",
   "s3o.method": "map",
-  "s3o.methodWhy": "새벽에 오가는 사람을 볼 수 없으니, 내가 다니는 길을 그려 놓고 상자가 놓이는 자리부터 표시해 보려고",
+  "s3o.methodWhy": "새벽에 오가는 사람을 볼 수 없으니, 내가 다니는 길을 그려 놓고 상자가 놓이는 곳부터 표시해 보려고",
   "s3o.blind": "새벽에 오는 사람은 내 동선에 없어서 지도에 안 잡힌다. 밤 11시에 한 번 소리 산책을 곁들였다",
   "s3a.scenes": [
     { when: "새벽 6시 20분", where: "우리 집 현관 앞", what: "밤사이 놓이고 간 상자 두 개와 문틀 옆에 눌린 자국" },
     { when: "밤 11시", where: "아파트 분리수거장", what: "상자 더미 옆에 세워 둔 손수레, 오른쪽 손잡이에만 테이프가 감겨 있음" },
-    { when: "새벽 5시 40분", where: "동 입구 계단", what: "바퀴가 계단 턱에 부딪히는 소리가 창문 너머로 들림" },
+    { when: "새벽 5시 40분", where: "동 입구 단계", what: "바퀴가 단계 턱에 부딪히는 소리가 창문 너머로 들림" },
   ],
   "s3a.problem": "새벽 배송 노동",
   "s3a.contact": "밤 11시 아파트 분리수거장, 그리고 매일 아침 우리 집 현관 앞",
@@ -9562,7 +9562,7 @@ const DEMO_WS = {
   "s3t1.list": [
     { text: "상자를 놓고 가는 사람의 몸과 시간", type: "time" },
     { text: "한 사람이 하루에 옮기는 상자의 개수", type: "record" },
-    { text: "엘리베이터가 없는 동에서 계단을 오르내리는 일", type: "place" },
+    { text: "엘리베이터가 없는 동에서 단계를 오르내리는 일", type: "place" },
   ],
   "s3t1.pick": "상자를 놓고 가는 사람의 몸과 시간",
   "s3t1.pickWhy": "상자 수는 숫자라 자국이 없지만, 몸과 시간은 손잡이에 닳음으로 남는다",
@@ -9573,7 +9573,7 @@ const DEMO_WS = {
   ],
   "s3t2.dropWhy": "종이 상자: 며칠이면 버려져서 몇 년치 자국이 쌓이지 않는다",
   "s3t3.traces": [
-    { spot: "오른쪽 끝, 손바닥이 닿는 자리", shape: "합성고무가 벗겨져 금속이 드러나 있고 그 위에 직물 테이프가 세 겹 감겨 있다. 테이프 아래 금속면은 손바닥 너비만큼 광택이 남아 있다", act: "한 손으로 비틀어 쥐고 끌기", freq: "하루 200번씩 4년 동안" },
+    { spot: "오른쪽 끝, 손바닥이 닿는 부분", shape: "합성고무가 벗겨져 금속이 드러나 있고 그 위에 직물 테이프가 세 겹 감겨 있다. 테이프 아래 금속면은 손바닥 너비만큼 광택이 남아 있다", act: "한 손으로 비틀어 쥐고 끌기", freq: "하루 200번씩 4년 동안" },
   ],
   "s3t3.stmt1": {
     text: "새벽에 상자를 옮기는 사람의 반복된 노동은 손수레 손잡이의 오른쪽에 마모로 남는다. 이 흔적은 한 손으로 끄는 동작을 오래 반복했을 때 생긴다.",
@@ -9587,11 +9587,11 @@ const DEMO_WS = {
     { read: "공사장에서 오래 쓴 공구 같다고 했다. 테이프를 감은 걸 보고 현장에서 급하게 고쳐 쓴 물건이라고 읽었다.", gap: "다르게 읽음", backTo: "T6", fixed: "흔적을 손바닥 너비의 광택으로 좁히고, 테이프를 감은 방향을 끄는 방향과 맞춰 다시 적었다" },
   ],
   "s3t4.stmt2": {
-    text: "손수레 손잡이의 오른쪽 끝, 손바닥이 닿는 자리를 보면 합성고무가 벗겨져 금속이 드러나 있고 그 위에 직물 테이프가 세 겹 감겨 있다. 이것은 한 손으로 손잡이를 비틀어 쥐고 끄는 동작을 하루 200번씩 4년 동안 되풀이해서 생긴 자국이다. 이 자국이 새벽마다 상자를 놓고 가는 사람의 몸과 시간을 대신 보여 준다.",
+    text: "손수레 손잡이의 오른쪽 끝, 손바닥이 닿는 부분을 보면 합성고무가 벗겨져 금속이 드러나 있고 그 위에 직물 테이프가 세 겹 감겨 있다. 이것은 한 손으로 손잡이를 비틀어 쥐고 끄는 동작을 하루 200번씩 4년 동안 반복해서 생긴 자국이다. 이 자국이 새벽마다 상자를 놓고 가는 사람의 몸과 시간을 대신 보여 준다.",
     at: "2026-03-12T05:10:00.000Z",
     versions: [
       { at: "2026-03-12T04:35:00.000Z", text: "새벽 배송 노동은 손수레 오른쪽 손잡이에 고무가 벗겨지고 테이프를 감은 모양으로 남는다. 한 손으로 끄는 동작을 여러 해 반복했을 때 생긴다." },
-      { at: "2026-03-12T05:10:00.000Z", text: "손수레 손잡이의 오른쪽 끝, 손바닥이 닿는 자리를 보면 합성고무가 벗겨져 금속이 드러나 있고 그 위에 직물 테이프가 세 겹 감겨 있다. 이것은 한 손으로 손잡이를 비틀어 쥐고 끄는 동작을 하루 200번씩 4년 동안 되풀이해서 생긴 자국이다. 이 자국이 새벽마다 상자를 놓고 가는 사람의 몸과 시간을 대신 보여 준다." },
+      { at: "2026-03-12T05:10:00.000Z", text: "손수레 손잡이의 오른쪽 끝, 손바닥이 닿는 부분을 보면 합성고무가 벗겨져 금속이 드러나 있고 그 위에 직물 테이프가 세 겹 감겨 있다. 이것은 한 손으로 손잡이를 비틀어 쥐고 끄는 동작을 하루 200번씩 4년 동안 반복해서 생긴 자국이다. 이 자국이 새벽마다 상자를 놓고 가는 사람의 몸과 시간을 대신 보여 준다." },
     ],
   },
   "s3c.attitude": "기록",
@@ -9605,10 +9605,10 @@ const DEMO_WS = {
   "s4a.struct": "절단된 파이프 양 끝에 고무 그립이 감긴 구조",
   "s4a.wear": "오른쪽 그립만 고무가 벗겨져 금속이 드러남",
   "s4a.break": "파이프가 중간에서 절단됨",
-  "s4a.repair": "벗겨진 자리에 직물 테이프를 여러 겹 감음",
+  "s4a.repair": "벗겨진 부분에 직물 테이프를 여러 겹 감음",
   "s4a.stain": "표면의 녹과 때",
   "s4a.discard": "손수레 본체가 폐기되며 손잡이만 분리되어 남음",
-  "s4a.context": "물류 창고 하역장 자리로 추정되는 지층에서 절단된 상태로 수습. 같은 형태의 도구가 다수 발굴되었으나 모두 오른쪽에만 마모가 집중됨.",
+  "s4a.context": "물류 창고 하역장 터로 추정되는 지층에서 절단된 상태로 수습. 같은 형태의 도구가 다수 발굴되었으나 모두 오른쪽에만 마모가 집중됨.",
   "s4b.n1": "합성고무 그립 마모 손수레 손잡이 파편",
   "s4b.n2": "직물 테이프 수리 강철 손잡이",
   "s4b.n3": "편마모 하역 도구 파편",
@@ -9654,7 +9654,7 @@ const DEMO_WS = {
   "s6b.era": "2020년대 전반",
   "s6b.mat": "강철 파이프, 합성고무 그립, 직물 테이프",
   "s6b.size": "길이 24cm, 지름 3.2cm",
-  "s6b.context": "물류 창고 하역장 자리로 추정되는 지층에서 파이프가 절단된 상태로 수습되었다. 오른쪽 그립만 고무가 벗겨져 금속이 드러나 있고, 벗겨진 자리에는 직물 테이프를 여러 겹 감아 수리한 흔적이 남아 있다.",
+  "s6b.context": "물류 창고 하역장 터로 추정되는 지층에서 파이프가 절단된 상태로 수습되었다. 오른쪽 그립만 고무가 벗겨져 금속이 드러나 있고, 벗겨진 자리에는 직물 테이프를 여러 겹 감아 수리한 흔적이 남아 있다.",
   "s6b.coll": "○○고등학교 2학년 ○반 가상 컬렉션",
   "s6b.aiScope": "이미지 생성 및 부분 수정, 화면 편집. 작품 캡션 문구와 작가 노트는 학생이 작성함.",
   "s6b.notice": "이 이미지는 생성형 AI로 제작한, 실재한 적 없는 유물입니다.",

@@ -54,7 +54,7 @@ export const STANCE_SCALES = [
   { k: "asi", name: "미술 자기정체성", src: "Grassini 외(2024) 창의적 자기정체성 참조" },
 ];
 
-/* t 없는 문항은 5점 리커트. one=하나 고르기, many=모두 고르기, grid=낱말표
+/* t 없는 문항은 5점 리커트. one=하나 고르기, many=모두 고르기, grid=단어표
    rev=역문항(6-x로 뒤집어 채점, 학생 화면에는 표시하지 않는다)
    short=시간이 부족할 때 남기는 단축형 23문항 */
 export const STANCE_ITEMS = [
@@ -111,7 +111,7 @@ export const STANCE_ITEMS = [
   { k: "b32", b: "art", t: "grid", w: ART_WORDS, o: KNOW4, base: 1, short: 1, text: "다음 말을 어느 정도 알고 있나요?" },
 ];
 
-/* 사후에 다시 묻는 문항 — 태도·느낌·신념(b2~b24)과 낱말표.
+/* 사후에 다시 묻는 문항 — 태도·느낌·신념(b2~b24)과 단어표.
    예술 관심(u8~u10)은 "최근 1년" 기준이라 8주 만에 다시 물을 수 없어 뺀다. */
 export const STANCE_POST_KEYS = STANCE_ITEMS
   .map((it) => it.k)
@@ -123,7 +123,7 @@ export const stanceItemsFor = (phase) =>
 
 export const stanceDone = (block) => !!(block && block.submittedAt);
 
-/* 한 문항이 답해졌는가 — 격자는 낱말이 모두 차야 하고, 느낌표는 0도 답이다 */
+/* 한 문항이 답해졌는가 — 격자는 단어가 모두 차야 하고, 느낌표는 0도 답이다 */
 export function itemAnswered(it, v) {
   if (it.t === "grid") return !!v && it.w.every((w) => typeof v[w] === "number");
   if (it.t === "many") return Array.isArray(v) && v.length > 0;
@@ -430,7 +430,7 @@ const fmtT = (iso) => {
 /* ---------- 화면 스타일 ----------
    거대한 CSS 상수를 건드리지 않도록 따로 내보낸다 (src-content.jsx의 선례).
    응답 버튼·미응답 표시·건너뛰기 강조는 src-survey-ui.jsx의 규칙을 그대로 쓰고,
-   여기서는 s1에만 있는 것(묶음 고정 표시줄·보기 버튼·낱말표)만 더한다. */
+   여기서는 s1에만 있는 것(묶음 고정 표시줄·보기 버튼·단어표)만 더한다. */
 
 const STANCE_CSS = `
 /* 뼈대(.sv-stickybar)와 진행률(.sv-prog*)은 src-survey-ui.jsx에 있다.
@@ -469,7 +469,7 @@ const STANCE_CSS = `
 .st-opts button.on{background:var(--patina);border-color:var(--patina);color:#fff}
 .st-many button.on{background:var(--patina-bg);border-color:var(--patina);color:var(--patina)}
 
-/* 낱말표 */
+/* 단어표 */
 .st-grid{width:100%;border:1px solid var(--line2);background:var(--card2);padding:10px 12px}
 .st-grid-key{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--sub);
   padding-bottom:8px;margin-bottom:2px;border-bottom:1px dashed var(--line)}

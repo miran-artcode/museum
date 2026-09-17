@@ -7,7 +7,7 @@
      · 120분 수업 흐름 (단계 · 시간 · 활동)
      · 읽기 자료(이론) — 소제목, 본문, 단계별 발문, 그림, 작품·자료 표
      · 작품·자료마다 붙는 설명 사이트 링크
-     · 학습지 발문 (배움 확인의 물음과 생각 단계 · 탐구 질문의 물음과 되묻기)
+     · 학습지 발문 (배움 확인의 질문과 생각 단계 · 탐구 질문의 질문과 되묻기)
      · 설계 근거(교사용)
 
    저장 방식
@@ -29,7 +29,7 @@ const pick = (o, k, d) => (o && o[k] != null ? o[k] : d);
 
 const emptyContent = () => ({ lessons: {}, secs: {}, fields: {} });
 
-/* 번역 사다리 카드(REV_SECTIONS)는 2026-09에 문항이 통째로 바뀌었다.
+/* 유물 발상 단계 카드(REV_SECTIONS)는 2026-09에 문항이 통째로 바뀌었다.
    그 전에 저장된 덮어쓰기(rev가 다른 것)는 새 문안을 가리므로 읽을 때 버린다.
    교사가 다시 고치면 setSec·setFld가 지금 rev를 붙여 저장한다. */
 function dropStale(obj, secOf) {
@@ -199,7 +199,7 @@ export function LessonAsks({ asks }) {
   if (!xs.length) return null;
   return (
     <div className="lz-asks">
-      <div className="lz-asks-h">생각해 볼 물음</div>
+      <div className="lz-asks-h">생각해 볼 질문</div>
       <ul>{xs.map((a, i) => <li key={i}>{a}</li>)}</ul>
     </div>
   );
@@ -211,7 +211,7 @@ export function LessonNotice({ text }) {
   const lines = String(text).split("\n").filter((l) => l.trim());
   return (
     <div className="lz-notice">
-      <span className="lz-notice-tag">오늘의 발문</span>
+      <span className="lz-notice-tag">오늘의 질문</span>
       {lines.map((l, i) => <p key={i}>{l}</p>)}
     </div>
   );
@@ -419,7 +419,7 @@ function ReadingEditor({ rd, i, count, n, onPatch, onMove, onDel }) {
         </div>
         <EdArea label="이론·설명 본문" hint="빈 줄 하나로 문단을 나눕니다." min={6} max={40}
           value={arrToParas(rd.p)} onChange={(v) => onPatch(i, { p: parasToArr(v) })} />
-        <EdArea label="이 단계에서 던질 발문" hint="한 줄에 하나씩. 학생 화면에 「생각해 볼 물음」 상자로 보입니다. 비워 두면 상자가 나타나지 않습니다." min={2} max={12}
+        <EdArea label="이 단계에서 던질 발문" hint="한 줄에 하나씩. 학생 화면에 「생각해 볼 질문」 상자로 보입니다. 비워 두면 상자가 나타나지 않습니다." min={2} max={12}
           value={arrToLines(rd.asks)} onChange={(v) => onPatch(i, { asks: linesToArr(v) })} />
         <div className="ed-f"><label>그림·사진</label>
           <ImageEditor images={rd.images} slot={"L" + n + "r" + i} onChange={(v) => onPatch(i, { images: v })} /></div>
@@ -637,10 +637,10 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                         return (
                           <div className="ed-fld" key={f.k}>
                             <div className="ed-fld-h"><span className="mono">{sec.id}.{f.k}{f.key ? " → 저장 " + f.key : ""}</span>{f.qtype && <span className="ed-qtype">{f.qtype}</span>}</div>
-                            <EdArea label="발문 (학생에게 보이는 물음)" min={2} max={8} value={label} onChange={(v) => setFld(sec.id, f.k, { label: v })} />
+                            <EdArea label="발문 (학생에게 보이는 질문)" min={2} max={8} value={label} onChange={(v) => setFld(sec.id, f.k, { label: v })} />
                             {isInq ? (
                               /* 탐구 질문은 생각 계단 대신 되묻기를 쓴다 — 첫 답을 굳힌 뒤 학생마다 다른 줄이 배정된다 */
-                              <EdArea label="되묻기 (첫 답을 확정한 뒤 배정되는 물음, 한 줄에 하나씩)"
+                              <EdArea label="되묻기 (첫 답을 확정한 뒤 배정되는 질문, 한 줄에 하나씩)"
                                 hint="답의 보기를 나열하지 말고, 학생이 쓴 것을 가리키는 한 문장으로 씁니다. 학생마다 다른 줄이 배정되므로 다섯 줄쯤 둡니다. 비워 두면 원본으로 돌아갑니다."
                                 min={3} max={10} value={arrToLines(probes)} onChange={(v) => setFld(sec.id, f.k, { probes: linesToArr(v) })} />
                             ) : (
@@ -654,7 +654,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                   </details>
                 );
               })}
-              <p className="hint">항목 이름(l1.q1 같은 것)은 기록이 저장되는 자리라 바뀌지 않습니다. 물음만 고쳐도 이미 저장된 학생 답은 그대로 남습니다. 화살표가 붙은 항목(번역 사다리 계단 3)은 오른쪽 키에 저장됩니다.</p>
+              <p className="hint">항목 이름(l1.q1 같은 것)은 기록이 저장되는 자리라 바뀌지 않습니다. 질문만 고쳐도 이미 저장된 학생 답은 그대로 남습니다. 화살표가 붙은 항목(유물 발상 단계 단계 3)은 오른쪽 키에 저장됩니다.</p>
             </div>
           </div>
 

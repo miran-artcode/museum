@@ -806,7 +806,7 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
           <h2 id="qz-y-h" className="qz-cover-h">{yielded === "dup" ? "다른 곳에서 응시 중입니다." : "선생님이 이 접속을 초기화했습니다."}</h2>
           <p>{yielded === "dup"
             ? "같은 학번이 다른 브라우저에서 시험을 보고 있어 이 화면은 멈췄습니다. 선생님이 「세션 초기화」를 누르면 여기서 이어 풀 수 있습니다."
-            : "「이어서 풀기」를 누르면 이 자리에서 같은 블록을 이어 풉니다. 고른 답은 저장되어 있습니다."}</p>
+            : "「이어서 풀기」를 누르면 여기에서 같은 블록을 이어 풉니다. 고른 답은 저장되어 있습니다."}</p>
           {submitErr && <div className="warn-note" role="alert">{submitErr}</div>}
           {pastGrace && <p className="hint">시간이 끝나 이어 풀 수 없습니다. 아래 버튼으로 제출 처리하고 선생님께 알려 주세요.</p>}
           <button type="button" className="btn qz-big" disabled={(!canBack && !pastGrace) || busy} onClick={reclaim}>{busy ? "잇는 중…" : pastGrace ? "제출 처리" : "이어서 풀기"}</button>
@@ -819,7 +819,7 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
         <div className="qz-cover-in">
           <div className="qz-cover-k">잠금 {lockCountRef.current}회 · 경고 {warn}회</div>
           <h2 id="qz-l-h" className="qz-cover-h">시험이 잠겼습니다. 선생님을 불러 주세요.</h2>
-          <p>남은 시간은 멈춰 있습니다. 선생님이 풀어 주면 이 자리에서 이어 풉니다. 고른 답은 저장되어 있습니다.</p>
+          <p>남은 시간은 멈춰 있습니다. 선생님이 풀어 주면 여기에서 이어 풉니다. 고른 답은 저장되어 있습니다.</p>
           <p className="hint">남은 시간 {fmtMMSS(Math.max(0, remain))} (정지)</p>
         </div>
       </div>
@@ -866,7 +866,7 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
         <div className="qz-main qz-done">
           <div className="qz-cover-k">제출 완료</div>
           <h2 className="qz-cover-h">제출되었습니다.</h2>
-          <p>점수와 급 경로는 선생님이 결과를 공개하면 이 자리에 나타납니다. 고맙습니다.</p>
+          <p>점수와 급 경로는 선생님이 결과를 공개하면 여기에 나타납니다. 고맙습니다.</p>
           {submitErr && <div className="warn-note" role="alert">{submitErr}</div>}
           <button type="button" className="btn" onClick={() => { exitFs(); if (typeof onDone === "function") onDone(); }}>닫기</button>
         </div>
@@ -1237,7 +1237,7 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
       <div className="card qz-card">
         <div className="card-head"><span className="card-code">쪽지시험</span><span className="card-title">{cfg.title || "쪽지시험"}</span><span className="card-sess">{fmtT(lv.finishedAt)} 제출</span></div>
         <div className="card-body">
-          <div className="ok-note" role="status">제출되었습니다. 점수와 급 경로는 선생님이 결과를 공개하면 이 자리에 나타납니다.</div>
+          <div className="ok-note" role="status">제출되었습니다. 점수와 급 경로는 선생님이 결과를 공개하면 여기에 나타납니다.</div>
           {err && <div className="warn-note" role="alert">{err}</div>}
         </div>
       </div>

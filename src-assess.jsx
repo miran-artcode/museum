@@ -112,14 +112,14 @@ function reencode(dataURL) {
 
 /* 지금 할 일이 없을 때의 안내 — 교사 단계별로 무엇을 기다리는지 말해 준다 */
 export function waitNote({ stage, roster, pairs, s2Done, noWork }) {
-  if (stage === "submit") return "제출을 마쳤습니다. 자기평가는 선생님이 열면 이 자리에 나타납니다.";
-  if (stage === "self1") return noWork ? "제출을 건너뛰었습니다. 동료 비교는 선생님이 열면 이 자리에 나타납니다." : "자기평가 ①을 제출했습니다. 동료 비교는 선생님이 열면 이 자리에 나타납니다.";
+  if (stage === "submit") return "제출을 마쳤습니다. 자기평가는 선생님이 열면 여기에 나타납니다.";
+  if (stage === "self1") return noWork ? "제출을 건너뛰었습니다. 동료 비교는 선생님이 열면 여기에 나타납니다." : "자기평가 ①을 제출했습니다. 동료 비교는 선생님이 열면 여기에 나타납니다.";
   if (stage === "peer") {
     if (!roster) return "비교 명단이 아직 확정되지 않았습니다. 선생님이 명단을 확정하면 비교할 쌍이 여기에 나타납니다.";
     if (!pairs.length) return "이번 회차에 배정된 비교 쌍이 없습니다. 선생님께 알려 주세요.";
-    return noWork ? "동료 비교를 마쳤습니다. 제출한 작품이 없어 자기평가와 내 작품 결과는 없습니다." : "동료 비교를 마쳤습니다. 자기평가 ②는 선생님이 열면 이 자리에 나타납니다.";
+    return noWork ? "동료 비교를 마쳤습니다. 제출한 작품이 없어 자기평가와 내 작품 결과는 없습니다." : "동료 비교를 마쳤습니다. 자기평가 ②는 선생님이 열면 여기에 나타납니다.";
   }
-  if (stage === "self2") return noWork ? "동료 비교를 마쳤습니다. 제출한 작품이 없어 자기평가와 내 작품 결과는 없습니다." : s2Done ? "자기평가 ②를 제출했습니다. 결과는 선생님이 공개하면 이 자리에 나타납니다." : "지금 할 일이 없습니다.";
+  if (stage === "self2") return noWork ? "동료 비교를 마쳤습니다. 제출한 작품이 없어 자기평가와 내 작품 결과는 없습니다." : s2Done ? "자기평가 ②를 제출했습니다. 결과는 선생님이 공개하면 여기에 나타납니다." : "지금 할 일이 없습니다.";
   if (stage === "result") return noWork ? "제출한 작품이 없어 내 작품 결과는 없습니다. 판정에 참여해 주어 고맙습니다." : "공개된 결과가 아직 없습니다. 선생님이 집계를 마치고 공개하면 이 자리에 나타납니다.";
   return "지금 할 일이 없습니다. 다음 단계는 선생님이 열면 나타납니다.";
 }
@@ -322,7 +322,7 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
               <dl className="as-dl">{plateRows(sub.plate)}</dl>
             </div>
           </div>
-          {stage === "submit" && <p className="hint" style={{ marginTop: 12 }}>자기평가는 선생님이 열면 이 자리에 나타납니다.</p>}
+          {stage === "submit" && <p className="hint" style={{ marginTop: 12 }}>자기평가는 선생님이 열면 여기에 나타납니다.</p>}
         </div>
       </div>
     );
@@ -437,7 +437,7 @@ export function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sa
     if (!answered) return "다섯 문항에 모두 답해 주세요.";
     if (why.trim().length < SELF_MIN_WHY) return "근거를 " + SELF_MIN_WHY + "자 이상 적어 주세요.";
     if (n == null) return subFail ? "우리 반 작품 목록을 불러오지 못해 등수 예측을 받을 수 없습니다. 「다시 불러오기」를 눌러 주세요." : "우리 반 작품 수를 세는 중입니다. 잠시 뒤 다시 눌러 주세요.";
-    if (nOk && rank == null) return "등수 예측 슬라이더를 움직여 자리를 정해 주세요.";
+    if (nOk && rank == null) return "등수 예측 슬라이더를 움직여 위치를 정해 주세요.";
     return "";
   };
   const body = () => ({
@@ -574,7 +574,7 @@ export function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sa
               <span className="as-rv">{n}</span>
             </div>
             <div className={"as-rank-txt" + (rank == null ? " dim" : "")} aria-live="polite">
-              {rank == null ? "슬라이더를 움직여 자리를 정하세요" : "우리 반 " + n + "점 가운데 " + rankShown + "번째쯤"}
+              {rank == null ? "슬라이더를 움직여 위치를 정하세요" : "우리 반 " + n + "점 가운데 " + rankShown + "번째쯤"}
             </div>
           </div>
         )}
@@ -918,7 +918,7 @@ export function ResultScreen({ cfg, result, self }) {
   const predWord = (pp) => {
     if (typeof pp !== "number" || typeof r.pct !== "number") return null;
     const d = pp - r.pct;
-    return Math.abs(d) < 0.15 ? "예측과 비슷한 자리" : d > 0 ? "예측보다 아래쪽" : "예측보다 위쪽";
+    return Math.abs(d) < 0.15 ? "예측과 비슷한 위치" : d > 0 ? "예측보다 아래쪽" : "예측보다 위쪽";
   };
   const pp1 = typeof r.predPct1 === "number" ? r.predPct1 : self && self.s1 ? self.s1.predPct : null;
   const pp2 = typeof r.predPct2 === "number" ? r.predPct2 : self && self.s2 ? self.s2.predPct : null;
@@ -935,7 +935,7 @@ export function ResultScreen({ cfg, result, self }) {
     <div className="card as-card">
       <div className="card-head"><span className="card-code">결과</span><span className="card-title">내 작품 {r.no ? "(" + r.no + ")" : ""}이 놓인 자리</span>
         <span className="card-sess">{fmtT(r.aggAt)} 집계</span></div>
-      <div className="card-note">같은 반 친구들이 두 작품씩 견주며 남긴 판단을 모은 것입니다. 누가 어떻게 판정했는지는 나오지 않습니다. 이유를 먼저 읽고, 자리는 그 뒤에 봅니다.</div>
+      <div className="card-note">같은 반 친구들이 두 작품씩 비교하며 기록한 판단을 모은 것입니다. 누가 어떻게 판정했는지는 나오지 않습니다. 이유를 먼저 읽고, 위치는 그 뒤에 봅니다.</div>
       <div className="card-body">
         {tagLine && <p className="as-plays">심사자들이 결정적이었다고 고른 것: {tagLine}</p>}
         <div className="as-h">이 작품을 고른 판정의 이유 ({won.length})</div>
@@ -947,7 +947,7 @@ export function ResultScreen({ cfg, result, self }) {
           <button type="button" className="btn small ghost" onClick={() => setShowPos(true)}>자리 보기</button>
         ) : (
           <div>
-            {pos ? <div className="as-pos">{pos}</div> : <div className="hint" style={{ marginBottom: 8 }}>이 작품은 아직 비교된 적이 없어 자리를 말할 수 없습니다.</div>}
+            {pos ? <div className="as-pos">{pos}</div> : <div className="hint" style={{ marginBottom: 8 }}>이 작품은 아직 비교된 적이 없어 위치를 말할 수 없습니다.</div>}
             {pos && reveal !== "band" && (
               <p className="as-plays">
                 이 작품은 {typeof r.plays === "number" ? r.plays + "번" : "여러 번"} 비교되었고,
@@ -959,11 +959,11 @@ export function ResultScreen({ cfg, result, self }) {
                 내 예측과 견주면 {w1 ? "자기평가 ①의 " + w1 : ""}{w1 && w2 ? ", " : ""}{w2 ? "자기평가 ②의 " + w2 : ""}입니다.
               </p>
             )}
-            {r.caution && <p className="hint">이번 심사는 판정 수가 넉넉하지 않아 자리의 폭이 넓습니다. 한 칸 위아래는 같은 자리로 읽어도 됩니다.</p>}
+            {r.caution && <p className="hint">이번 심사는 판정 수가 넉넉하지 않아 위치의 폭이 넓습니다. 한 칸 위아래는 같은 위치로 읽어도 됩니다.</p>}
           </div>
         )}
         <div className="as-fixed">
-          이 자리는 오늘 이 심사에서 작품이 놓인 위치이며 점수가 아닙니다. 비교 횟수가 많지 않아 자리는 넉넉한 폭으로 읽어야 하고,
+          이 위치는 오늘 이 심사에서 작품이 놓인 순서이며 점수가 아닙니다. 비교 횟수가 많지 않아 위치는 넉넉한 폭으로 읽어야 하고,
           한 판정자의 문장보다 여러 문장이 겹치는 지점이 내 작품을 다시 보는 실마리입니다.
         </div>
       </div>
