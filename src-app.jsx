@@ -24,6 +24,8 @@ import { LabelCompare } from "./src-label-compare.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
 import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, InquiryStyle, inquiryTraceRows } from "./src-inquiry.jsx";
 import { makeSnapshotter, WsHistoryCard } from "./src-ws-history.jsx";
+import { makeDirtyTracker, changedKeys, mergeRemote, buildPatch } from "./src-ws-sync.mjs";
+import { LegacyEcho } from "./src-legacy-fields.jsx";
 import {
   ATTITUDES, ATTITUDE_HINTS, LADDER_INTRO, TRANSLATE_STAGES, REFLECT_KEYS, DERIVE_KEYS,
   LEGACY_BACK, normBack, backLabel, SYMBOL_WORDS, findSymbol, SCHEMA_REV, REV_SECTIONS,
@@ -51,6 +53,7 @@ const store = {
   getSafe: (k) => fbStore.getSafe(k), // "없음"과 "읽기 실패"를 구분 — 실패를 빈 문서로 오인해 덮어쓰지 않기 위함
   set: (k, v, opts) => fbStore.set(k, v, opts),     // opts.merge — 준 필드만 갱신 (config처럼 나눠 쓰는 문서용)
   setT: (k, v, opts) => fbStore.setT(k, v, opts),   // 8초 안에 서버 확인이 없으면 false — 오프라인 무한 대기 방지
+  updateFieldsT: (k, patch, opts) => fbStore.updateFieldsT(k, patch, opts), // 문서의 준 키만 갱신 (학생 기록지 칸 단위 저장). true·false·"missing"
 };
 
 /* 미디어(사진·음성·스케치·영상) 저장 계층 — Firestore media 컬렉션.
@@ -4864,6 +4867,7 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
         {sec.intro && <LadderIntro sec={sec} />}
         {sec.ladder && <LadderRail sec={sec} ws={ws} />}
         {sec.id === "s3p" && <ScenesEcho ws={ws} />}
+        {sec.id === "s3c" && <LegacyEcho ws={ws} obs={OBS_METHODS} engage={ENGAGE_MODES} />}
         {sec.summary && <LadderSummaryBox ws={ws} setField={setField} />}
         {/* 4차시 유물 설계는 3차시 발상 단계의 결론에서 시작한다 */}
         {sec.carry && <Carry ws={ws} items={["problem", "invisible", "object", "trace", "attitude"]} title="3차시 유물 발상 단계에서 가져온 것" toLadder />}
@@ -4894,6 +4898,9 @@ function StudentApp({ me, onExit, onGallery }) {
   useEffect(() => watchContent(), []);
   const WSKEY = "ws:" + me.sid;
   const snapWs = useRef(makeSnapshotter(me.sid)); // 저장 성공 때마다 1시간 단위 사본 (src-ws-history.jsx)
+  const dirtyKeys = useRef(makeDirtyTracker()).current; // 고치는 중·저장 중인 키. 바뀐 키만 저장하고, 서버 값을 받을 때 이 키는 지킨다 (src-ws-sync.mjs)
+  const docExistsRef = useRef(false);   // 서버에 기록지 문서가 있는가. 없으면 첫 저장만 통째로 만든다
+  const lastSavedAtRef = useRef(null);  // 이 탭이 마지막으로 저장한 _updatedAt. 구독이 되돌려 준 자기 저장분을 가려낸다
   const [ws, setWs] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [readErr, setReadErr] = useState(false); // 최초 로드 실패 — 덮어쓰기를 막으려 학습지를 잠근다
@@ -4973,9 +4980,10 @@ function StudentApp({ me, onExit, onGallery }) {
         last: now(),
       };
     }
-    const merged = { ...wsRef.current, _act: a };
+    const base = wsRef.current;
+    const merged = { ...base, _act: a };
     wsRef.current = merged;
-    setWs(merged);
+    setWs((p) => (p === base ? merged : { ...p, _act: a })); // 대기 중인 키 입력이 있으면 그 위에 얹는다
     return merged;
   };
 
@@ -5019,7 +5027,8 @@ function StudentApp({ me, onExit, onGallery }) {
     // 오프라인에서도 이어 쓰게 하는 것이 지속 캐시를 켠 이유다. 다른 기기를 오간 학생만 위험하다).
     setStaleWarn(!!(res.fromCache || svRes.fromCache));
     const saved = res.data;
-    if (saved) { setWs(saved); wsRef.current = saved; setSavedAt(saved._updatedAt || null); }
+    docExistsRef.current = !!saved;
+    if (saved) { setWs(saved); wsRef.current = saved; setSavedAt(saved._updatedAt || null); lastSavedAtRef.current = saved._updatedAt || null; }
     setSurvey(svRes.data || {});
     if (gRes.ok) setGrade(gRes.data);
     const cfg = cfgRes.ok ? cfgRes.data : null;
@@ -5039,6 +5048,37 @@ function StudentApp({ me, onExit, onGallery }) {
   };
   useEffect(() => { loadAll(); }, []);
 
+  /* 자기 기록지를 구독해 다른 기기·탭이 쓴 값과 교사의 되돌리기를 화면에 받는다 (src-ws-sync.mjs).
+     캐시 사본(fromCache)은 서버보다 오래됐을 수 있어 건너뛰고, 이 탭이 고치는 중·저장 중인 키는 서버 값으로 덮지 않는다. */
+  useEffect(() => {
+    if (!loaded) return;
+    const un = fbStore.watchDocMeta(WSKEY, (s) => {
+      if (s.fromCache) return;
+      if (!s.exists) {
+        // 선생님이 기록을 초기화했거나 다른 학번으로 옮겼다. 빈 기록지에서 다시 시작한다 (옛 사본으로 문서를 되살리지 않는다).
+        // 이 기기의 미전송 쓰기가 섞인 스냅샷(hasPendingWrites)은 서버 확인이 아니므로 건너뛴다
+        if (!docExistsRef.current || s.hasPendingWrites) return;
+        docExistsRef.current = false;
+        dirtyKeys.clear();
+        wsRef.current = {};
+        setWs({});
+        setCloseNote("선생님이 이 학번의 기록을 초기화하거나 다른 학번으로 옮겼습니다. 계속 쓰면 새 기록지에 저장됩니다. 학번을 잘못 입력했다면 나가서 다시 들어오세요.");
+        return;
+      }
+      docExistsRef.current = true;
+      const remote = s.data || {};
+      if (remote._updatedAt && remote._updatedAt === lastSavedAtRef.current) return; // 이 탭이 방금 저장한 그대로
+      // 함수형 갱신: 아직 화면에 반영되지 않은 키 입력(대기 중인 갱신)이 있어도 그 위에 합쳐진다
+      setWs((p) => {
+        const merged = mergeRemote(p, remote, dirtyKeys.all());
+        if (merged !== p) wsRef.current = merged;
+        return merged;
+      });
+      if (!dirtyRef.current && !savingRef.current && remote._updatedAt) setSavedAt(remote._updatedAt);
+    });
+    return un;
+  }, [loaded]);
+
   // 차시 공개 설정과 교사 피드백을 실시간으로 받음
   useEffect(() => {
     const un1 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); if (cfg) setCfgAll(cfg); if (cfg) setAnCfg(cfg.anchor || DEFAULT_ANCHOR); });
@@ -5051,22 +5091,40 @@ function StudentApp({ me, onExit, onGallery }) {
     savingRef.current = true;
     dirtyRef.current = false;
     setSaveState("saving");
+    const before = wsRef.current;
     const data = pruneTrace({ ...drainAct(), _updatedAt: now() });
-    // 오프라인이면 setDoc이 거부되지 않고 미해결로 남아 "저장 중…"에 영원히 갇힌다.
+    // 바뀐 키만 보낸다: 고치던 칸 + 저장 직전에 바뀐 보조 키(_act·_updatedAt·덜어 낸 _log 등).
+    // 문서를 통째로 쓰면 다른 탭·기기가 그 사이에 쓴 칸을 이 탭의 옛 사본으로 지운다 (src-ws-sync.mjs).
+    // 오프라인이면 쓰기가 거부되지 않고 미해결로 남아 "저장 중…"에 영원히 갇힌다.
     // 8초 안에 답이 없으면 실패로 치고 재시도 루프에 태운다 (늦게 성공해도 같은 내용이라 무해).
-    const ok = await store.setT(WSKEY, data);
+    const patch = buildPatch(before, data, dirtyKeys.take());
+    let ok = false;
+    if (docExistsRef.current) {
+      ok = await store.updateFieldsT(WSKEY, patch);
+      if (ok === "missing") { docExistsRef.current = false; ok = false; }
+    }
+    if (!ok && !docExistsRef.current) {
+      // 서버에 문서가 없을 때(첫 저장)만 통째로 만든다
+      ok = await store.setT(WSKEY, data);
+      if (ok) docExistsRef.current = true;
+    }
     savingRef.current = false;
     if (ok) {
-      // 덜어 낸 것이 있으면 화면의 기록도 저장된 것과 같게 맞춘다
+      dirtyKeys.done();
+      lastSavedAtRef.current = data._updatedAt;
+      // 덜어 낸 것이 있으면 화면의 기록도 저장된 것과 같게 맞춘다. 아니면 저장 시각만 맞춘다
       if (data._pruned && data._pruned !== (wsRef.current._pruned || 0)) {
         wsRef.current = data;
-        setWs(data);
+        setWs((p) => (p === before ? data : { ...p, _log: data._log, _paste: data._paste, _pruned: data._pruned, _updatedAt: data._updatedAt }));
+      } else {
+        setWs((p) => (p._updatedAt === data._updatedAt ? p : { ...p, _updatedAt: data._updatedAt }));
       }
       setSavedAt(data._updatedAt);
       snapWs.current(data);
       if (dirtyRef.current) { setSaveState("dirty"); doSave(); }
       else setSaveState("saved");
     } else {
+      dirtyKeys.fail();
       dirtyRef.current = true;
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         // 오프라인 시간 초과는 실패가 아니라 대기다 — 내용은 이 기기 큐에 담겨 있고
@@ -5088,7 +5146,7 @@ function StudentApp({ me, onExit, onGallery }) {
 
   const setField = (k, v) => {
     if (!loaded) return;
-    setWs((p) => {
+    const upd = (p) => {
       const next = { ...p, [k]: v };
       // 밑줄 키(_inq 같은 보조 기록)는 고쳐 쓰기 이력·붙여넣기·차시 시각 장부를 건드리지 않는다
       if (String(k).charAt(0) === "_") return next;
@@ -5127,7 +5185,8 @@ function StudentApp({ me, onExit, onGallery }) {
       next._t = t;
       // 발상 단계의 결론(s3b.*)은 학생이 다시 적지 않고 여기서 끌어온다
       return DERIVE_KEYS.includes(k) ? deriveSummary(next, p) : next;
-    });
+    };
+    setWs((p) => { const out = upd(p); dirtyKeys.mark(changedKeys(p, out)); return out; }); // 바뀐 키만 저장 대상에 올린다
     dirtyRef.current = true;
     setSaveState("dirty");
     if (timer.current) clearTimeout(timer.current);
@@ -5163,6 +5222,7 @@ function StudentApp({ me, onExit, onGallery }) {
         base: strLen(readAt(wsRef.current, k)),
       };
       setWs((p) => ({ ...p, _paste: [...(Array.isArray(p._paste) ? p._paste : []), entry].slice(-200) }));
+      dirtyKeys.mark(["_paste"]);
       dirtyRef.current = true;
       setSaveState("dirty");
       if (timer.current) clearTimeout(timer.current);
@@ -5175,6 +5235,7 @@ function StudentApp({ me, onExit, onGallery }) {
 
   const setPasteSrc = (at, src) => {
     setWs((p) => ({ ...p, _paste: (Array.isArray(p._paste) ? p._paste : []).map((e) => (e.at === at ? { ...e, src } : e)) }));
+    dirtyKeys.mark(["_paste"]);
     dirtyRef.current = true;
     setSaveState("dirty");
     if (timer.current) clearTimeout(timer.current);
@@ -5329,6 +5390,7 @@ function StudentApp({ me, onExit, onGallery }) {
     if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
     wsRef.current = { ...wsRef.current, _lastTab: s }; // 다음 입장 때 이 차시로 이어서 연다
     setWs(wsRef.current);
+    dirtyKeys.mark(["_lastTab"]);
     dirtyRef.current = true; // flush가 _lastTab까지 함께 저장하도록
     flush();
     accAct(s, { visits: 1 });
@@ -5996,6 +6058,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
                 </div>
                 <div className="card-body">
                   {sec.fields.map((f) => <FieldReader key={f.k} sec={sec} f={f} ws={ws} owner={isPreview ? "preview" : sid} />)}
+                  {sec.id === "s3c" && <LegacyEcho ws={ws} obs={OBS_METHODS} engage={ENGAGE_MODES} />}
                 </div>
               </div>
             );

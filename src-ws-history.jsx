@@ -19,6 +19,11 @@ import { fbStore } from "./src-fb.js";
 
    접근 규칙 (firestore.rules /wsHistory)
      문서 이름 앞부분이 학번이라 본인이 만들고, 읽기·되돌리기는 교사가 한다.
+
+   되돌린 뒤 학생 화면
+     학생 화면은 자기 기록지를 구독하므로(src-ws-sync.mjs) 접속 중이어도 되돌린 내용을 바로 받는다.
+     그 순간 학생이 고치고 있던 칸(저장 대기·저장 중)만 학생 쪽 값이 남는다.
+     더 오래된 시점은 scripts/restore-worksheet.mjs(PITR·PC 백업)로 되돌린다 (README §10.1).
    ============================================================ */
 
 const GAP_MS = 120000;
@@ -83,7 +88,7 @@ export function WsHistoryCard({ sid, ws, busy, onRestored, setMsg }) {
     const s = summarize(row.ws);
     const msg = sid + " 학생의 기록지를 " + fmt(row.at) + " 상태로 되돌립니다.\n" +
       "지금: 채운 칸 " + cur.fields + "개 · " + cur.chars.toLocaleString() + "자 → 되돌린 뒤: 채운 칸 " + s.fields + "개 · " + s.chars.toLocaleString() + "자\n\n" +
-      "되돌리기 직전 상태도 사본으로 남기므로 다시 되돌릴 수 있습니다.\n학생이 접속 중이면 학생 화면의 자동 저장이 되돌린 기록을 다시 덮을 수 있으니, 접속 중이 아닐 때 실행하세요.\n진행할까요?";
+      "되돌리기 직전 상태도 사본으로 남기므로 다시 되돌릴 수 있습니다.\n학생이 접속 중이면 학생 화면도 되돌린 내용을 바로 받습니다. 학생이 그 순간 고치고 있던 칸만 학생 쪽 값이 남습니다.\n진행할까요?";
     if (!window.confirm(msg)) return;
     setWorking(true);
     const nowIso = new Date().toISOString();

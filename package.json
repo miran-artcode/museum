@@ -6,7 +6,9 @@
   "scripts": {
     "build": "esbuild src-app.jsx --bundle --jsx=automatic --loader:.jsx=jsx --minify --format=iife --outfile=public/app.js",
     "deploy": "npm run build && npx firebase-tools deploy --only hosting",
-    "test": "node --test src-assess-core.test.mjs src-quiz-core.test.mjs"
+    "test": "node --test src-assess-core.test.mjs src-quiz-core.test.mjs src-ws-sync.test.mjs",
+    "backup": "node scripts/backup-firestore.mjs",
+    "restore": "node scripts/restore-worksheet.mjs"
   },
   "repository": {
     "type": "git",

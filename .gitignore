@@ -12,3 +12,4 @@ drive*.mjs
 quiz-bank/bank.json
 quiz-bank/items/
 public/quiz-bank/
+.backup/

@@ -141,6 +141,11 @@ src-card-media.jsx     관찰 방법·드러내는 방법 카드에 붙는 작�
 src-ladder.jsx         유물 발상 단계: 일곱 단계 정의(TRANSLATE_STAGES)·학습지 카드(단계 1~7·돌아보기)·옛 기록 대응표(LEGACY_BACK)·상징어 목록·스타일
 src-inquiry.jsx        탐구 질문 정의(q1~q8)와 먼저 쓰기→되묻기→고치기 흐름, 교사 지원 수준 설정, 되묻기 CSV 행
 src-ws-history.jsx     기록지 시점 사본(1시간 단위)과 교사 「관리 0: 기록 되돌리기」 카드
+src-ws-sync.mjs        기록지 칸 단위 저장과 다른 기기 기록 받기: 바뀐 키 추적·서버 사본 병합·저장 조각 (npm test)
+src-legacy-fields.jsx  2026-09-12 개정으로 화면에서 빠진 옛 칸(드러내는 방법 T4 등)의 기록을 돌아보기 카드 아래 읽기 전용으로 표시
+scripts/backup-firestore.mjs   수업 뒤 백업 (npm run backup). 직전 백업과 견줘 바뀐 학생·줄어든 기록을 알림. --at=시각으로 PITR 시점 읽기
+scripts/restore-worksheet.mjs  한 학생 기록지를 백업·PITR 시점으로 되돌림 (npm run restore). 되돌리기 전 상태는 wsHistory 사본으로
+scripts/fs-admin.mjs           위 두 스크립트의 Firestore REST 공용 함수 (Firebase CLI 로그인 사용)
 src-dwell.js           살펴본 시간 판정기 (초점·움직임·분명한 조작 조건, 켜 둔 채 비활동 분리)
 src-media-img.js       학생 사진 업로드 규정: 항목별 해상도 하한·저장 상한(IMG_PRESETS), 고품질 축소, 흐림 경고
 src-assess-core.mjs    상호평가(쌍대비교) 핵심 계산: 배정·Bradley–Terry·신뢰도·적합도·CSV (npm test)
@@ -169,7 +174,7 @@ npx esbuild src-app.jsx --bundle --jsx=automatic --loader:.jsx=jsx --minify --fo
 |---|---|---|---|
 | `meta` | `config` | 차시 공개 설정 | 읽기: 로그인 사용자 / 쓰기: 교사 |
 | `students` | 학번 | 별명 | 읽기: 로그인 사용자 / 쓰기: 본인·교사 |
-| `worksheets` | 학번 | 기록지 전체, 수정 이력, 차시별 활동 시간 `_act` (`sec` 살펴본 시간, `readSec` 읽기 자료 열람, `idleSec` 켜 둔 채 비활동, `opens`·`visits`), 탐구 질문 되묻기 흔적 `_inq` (칸별 첫 답·받은 되묻기·스스로 쓴 질문) | 본인과 교사만 |
+| `worksheets` | 학번 | 기록지 전체(2026-09-17부터 자동 저장은 바뀐 칸만 `updateDoc`으로 갱신하고 문서가 없을 때만 통째로 만든다. 학생 화면은 자기 문서를 구독해 다른 기기·탭이 쓴 값과 교사의 되돌리기를 실시간으로 받는다. `src-ws-sync.mjs`), 수정 이력, 차시별 활동 시간 `_act` (`sec` 살펴본 시간, `readSec` 읽기 자료 열람, `idleSec` 켜 둔 채 비활동, `opens`·`visits`), 탐구 질문 되묻기 흔적 `_inq` (칸별 첫 답·받은 되묻기·스스로 쓴 질문) | 본인과 교사만 |
 | `wsHistory` | 학번_시간대(YYYYMMDDHH) | 기록지 시점 사본. 자동 저장이 성공할 때마다 그 시간대 문서를 덮어써 시간대마다 마지막 상태 하나가 남는다(같은 시간대 안에서는 2분에 한 번). 교사가 학생 상세 「관리」 탭에서 그 시점으로 되돌리며, 되돌리기 직전 상태도 `학번_r시각` 사본으로 남는다 | 읽기: 본인·교사 / 쓰기: 본인·교사 / 삭제: 교사 |
 | `grades` | 학번 | 루브릭·관찰·피드백 | 읽기: 본인·교사 / 쓰기: 교사 |
 | `surveys` | 학번 | 사전·사후 창의성 설문 (응답·제출 시각·소요 시간) | 본인과 교사만 읽기 / 쓰기: 본인 |
@@ -227,6 +232,36 @@ npx esbuild src-app.jsx --bundle --jsx=automatic --loader:.jsx=jsx --minify --fo
 - 확정 성적은 학교 시스템에 별도로 입력하고, 이 앱은 수업 기록과 채점 보조 용도로 씁니다.
 - 학생이 비밀번호를 잊으면 Firebase 콘솔 Authentication 목록에서 해당 학번 계정을 삭제합니다. 같은 학번으로 다시 입장하면 새 비밀번호로 등록되고 기록은 학번에 남아 이어집니다.
 - Firestore 무료 한도는 하루 읽기 5만 건, 쓰기 2만 건입니다. 한 학급 25명 기준으로 여유가 있습니다.
+
+### 10.1 백업과 되돌리기
+
+기록이 사라지는 사고에 대비해 네 겹으로 보관합니다 (2026-09-17 설정).
+
+| 겹 | 무엇이 | 얼마나 | 되돌리는 방법 |
+|---|---|---|---|
+| 시점 사본 `wsHistory` | 학생 기록지, 1시간 단위 | 계속 쌓임 | 교사 화면 → 학생 상세 → 「관리」 탭 맨 위 「기록 되돌리기」 카드 |
+| Firestore 시점 복구(PITR) | 데이터베이스 전체, 1분 단위 | 최근 7일 | 아래 `npm run backup -- --at=…` 또는 `npm run restore -- --at=…` |
+| Firestore 자동 백업 | 데이터베이스 전체, 매일 | 4주 | Google Cloud 콘솔 → Firestore → 백업에서 새 데이터베이스로 복원 (최후 수단) |
+| 이 PC의 백업 폴더 `.backup/` | 컬렉션 전체 JSON | 지우기 전까지 | `npm run restore -- <폴더> <학번>` |
+
+수업이 끝날 때마다 한 번 실행합니다.
+
+```bash
+npm run backup                          # 지금 상태를 .backup/YYYY-MM-DD_HHMM/ 에 저장하고 직전 백업과 견줘 바뀐 학생·줄어든 기록을 알림
+npm run backup -- 4반수업뒤              # 폴더 이름에 표시를 붙임
+npm run backup -- --at=2026-09-17T01:30:00Z   # 그 시점(UTC, 최근 7일 안)의 상태를 저장. 한국 시간 10:30은 01:30Z
+npm run backup -- --with-media          # 사진·녹음·스케치까지 (용량이 커서 기본은 뺌)
+```
+
+학생 한 명을 되돌릴 때는 먼저 교사 화면의 「기록 되돌리기」 카드를 씁니다(시간대별 사본을 보고 고름). 그 카드에 없는 시점이면 스크립트로 되돌립니다.
+
+```bash
+npm run restore -- 2026-09-17_1830 20420                 # 백업 폴더의 상태로
+npm run restore -- --at=2026-09-17T01:30:00Z 20420       # PITR에서 그 시점을 읽어 되돌림
+npm run restore -- 2026-09-17_1830 2023 --to=20223       # 학번을 잘못 쳐서 만든 계정(2023)의 기록을 20223에 넣음
+```
+
+되돌리기 전 상태는 자동으로 `wsHistory/{학번}_r{시각}` 사본으로 남으므로 되돌리기 자체를 되돌릴 수 있습니다. 학생이 접속 중이면 학생 화면도 되돌린 내용을 바로 받습니다(그 순간 고치고 있던 칸만 학생 쪽 값이 남습니다). `.backup/`은 학생 개인 기록이라 `.gitignore`에 있어 GitHub에 올라가지 않습니다. 두 스크립트 모두 `firebase login`의 계정으로 동작합니다.
 
 ## 11. 최종 작품 상호평가: 쌍대비교(비교판단)
 

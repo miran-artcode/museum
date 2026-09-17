@@ -9,6 +9,7 @@ import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, getDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc, query, where,
   serverTimestamp, arrayUnion, getDocFromServer, getDocsFromServer,
+  updateDoc, deleteField, FieldPath,
 } from "firebase/firestore";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -200,6 +201,38 @@ export const fbStore = {
     } catch (e) { console.error("write fail", key, e); return false; }
   },
 
+  /* 문서의 v 안에서 준 키만 바꾼다 (다른 키는 손대지 않는다). 학생 기록지의 칸 단위 자동 저장용 (src-ws-sync.mjs).
+     키 이름에 점이 있어(l1.q1) 문자열 경로가 아니라 FieldPath로 가리킨다. 값이 undefined인 키는 지운다.
+     문서가 없으면 updateDoc이 거부되므로 "missing"을 돌려주고, 부른 쪽이 통째 쓰기(set)로 만든다.
+     돌려주는 값: true(성공) · false(실패) · "missing"(문서 없음) */
+  async updateFields(key, patch) {
+    if (isViewerNow()) return false; // 보기 전용 계정
+    try {
+      const r = route(key);
+      if (r.kind !== "doc") return false;
+      const args = [];
+      for (const k of Object.keys(patch || {})) {
+        args.push(new FieldPath("v", k), patch[k] === undefined ? deleteField() : patch[k]);
+      }
+      args.push(new FieldPath("updatedAt"), Date.now());
+      await updateDoc(doc(db, r.path[0], r.path[1]), ...args);
+      return true;
+    } catch (e) {
+      if (e && e.code === "not-found") return "missing";
+      console.error("update fail", key, e);
+      return false;
+    }
+  },
+
+  /* updateFields의 제한 시간판 (setT와 같은 이유) */
+  updateFieldsT(key, patch, opts) {
+    const ms = (opts && opts.timeout) || 8000;
+    return Promise.race([
+      this.updateFields(key, patch),
+      new Promise((res) => setTimeout(() => res(false), ms)),
+    ]);
+  },
+
   /* set과 같으나 제한 시간 안에 서버 확인이 없으면 false로 끝낸다.
      오프라인이면 setDoc이 거부되지 않고 영원히 미해결로 남아 await가 안 풀리기 때문 —
      저장·제출처럼 결과를 사용자에게 알려야 하는 모든 경로는 이것을 쓴다.
@@ -230,6 +263,20 @@ export const fbStore = {
       const data = s.data();
       cb(data && data.v !== undefined ? data.v : data);
     }, () => {});
+  },
+
+  /* watchDoc과 같으나 문서 유무와 출처(캐시 사본인지, 이 기기의 미전송 쓰기가 섞였는지)를 함께 준다.
+     학생 화면이 자기 기록지를 구독해 다른 기기가 쓴 값을 받을 때 쓴다 (src-ws-sync.mjs):
+     fromCache 사본은 로드 때 이미 반영됐고 서버보다 오래됐을 수 있어 부른 쪽이 건너뛴다. */
+  watchDocMeta(key, cb) {
+    const r = route(key);
+    if (r.kind !== "doc") return () => {};
+    return onSnapshot(doc(db, r.path[0], r.path[1]), (s) => {
+      const m = s.metadata || {};
+      if (!s.exists()) return cb({ exists: false, data: null, fromCache: !!m.fromCache, hasPendingWrites: !!m.hasPendingWrites });
+      const data = s.data();
+      cb({ exists: true, data: data && data.v !== undefined ? data.v : data, fromCache: !!m.fromCache, hasPendingWrites: !!m.hasPendingWrites });
+    }, (e) => { console.error("watch fail", key, e); });
   },
 
   /* 한 학생의 기록지 시점 사본 목록. 실패와 없음을 구분한다 (되돌리기 화면이 빈 목록을 "없음"으로 보이면 안 되므로) */
