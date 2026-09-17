@@ -92,7 +92,10 @@ test("shuffled·optionOrder: 같은 seed면 같은 순서, 문항이 다르면 �
   const orders = new Set();
   for (let i = 1; i <= 40; i += 1) orders.add(optionOrder(123, mk("Q31A" + String(i).padStart(2, "0"))).join(""));
   assert.ok(orders.size > 5, "문항마다 보기 순서가 달라야 한다");
-  assert.notDeepEqual(optionOrder(1, mk("Q31A01")), optionOrder(2, mk("Q31A01")).concat(["zzz"]));
+  const bySeed = new Set();
+  for (let s = 1; s <= 40; s += 1) bySeed.add(optionOrder(s, mk("Q31A01")).join(""));
+  assert.ok(bySeed.size > 5, "seed(학생)마다 보기 순서가 달라야 한다");
+  assert.notDeepEqual(optionOrder(1, mk("Q31A01")), optionOrder(2, mk("Q31A01")));
 });
 
 /* ---------- 좌석·반 ---------- */

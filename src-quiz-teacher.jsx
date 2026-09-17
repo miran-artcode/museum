@@ -23,7 +23,7 @@ import {
   LEVELS, BLOCKS, BLOCK_SIZE, LEVEL_NAMES, LEVEL_WORDS, AREAS, AREA_MIX, CELL_MIN, LEVEL_SEC, BLOCK_END_MIN,
   LEVEL_TARGET_P, LEVEL_P_RANGE, ITEM_STAT_MIN_N, ITEM_FLAG_MIN_N, TWIN_DIFF, SHORT_BLUR_N, MIN_ANSWERED, MAX_EVENTS,
   RULE_SENTENCES, SCORE_ROWS, SCORE_BOUNDS, FLAG_LABELS, RELIABILITY_NOTE, QUIZ_STAGES, quizCfg,
-  parseSeatGrid, halfOf, moveOf, wilson, recompute, resultItems, itemStats, twinStats, levelMonotonic, reliabilityStats, recordSheet,
+  parseSeatGrid, halfOf, moveOf, optionOrder, eventLabel, wilson, recompute, resultItems, itemStats, twinStats, levelMonotonic, reliabilityStats, recordSheet,
   csvAttempts, csvResponses, csvEvents, csvItems, validateBank, splitBank, remainingSec, buildSampleQuiz, fmtMMSS,
 } from "./src-quiz-core.mjs";
 
@@ -39,9 +39,23 @@ const ITEM_FLAG_LABELS = {
 };
 const STATUS_LABEL = { none: "미시작", running: "진행", locked: "잠김", done: "완료" };
 
+/* 응시 기록표 인쇄: 카드 안의 표를 새 창에 옮겨 인쇄한다(페이지 안에서 body 를 가리는 인쇄 규칙은 상위 요소의 overflow 에 잘려 빈 장이 나온다) */
+function printSheet(el) {
+  if (!el || typeof window === "undefined") return;
+  const w = window.open("", "_blank", "width=900,height=700");
+  if (!w) return;
+  const css = "body{font-family:'Noto Sans KR',sans-serif;font-size:12px;color:#111;margin:16px}table{border-collapse:collapse;width:100%;margin:8px 0}th,td{border:1px solid #999;padding:3px 6px;text-align:left;vertical-align:top}"
+    + ".hint{color:#555;font-size:11px}.kpis{display:flex;flex-wrap:wrap;gap:10px}.kpi{border:1px solid #ccc;padding:6px 10px}.kpi .n{font-size:18px;font-weight:700}.kpi .l{font-size:11px;color:#555}"
+    + ".qt-noprint,button,input{display:none!important}.qt-sheet-cols{display:block}h3,b{font-weight:700}";
+  w.document.write("<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\"><title>응시 기록표</title><style>" + css + "</style></head><body>" + el.outerHTML + "</body></html>");
+  w.document.close();
+  w.focus();
+  setTimeout(() => { try { w.print(); } catch (e) {} }, 300);
+}
+
 /* 단계를 바꾸기 전에 띄우는 확인 문장 — 학생 화면에 무엇이 나타나는지를 말한다 */
 const STAGE_CONFIRM = {
-  closed: "「닫힘」으로 바꿉니다. 학생 화면에서 쪽지시험 탭이 사라지고 은행을 읽을 수 없게 됩니다. 진행 중인 학생이 있으면 누르지 마세요.",
+  closed: "「닫힘」으로 바꿉니다. 학생 화면에서 쪽지시험 탭이 사라지고 은행도 읽을 수 없습니다. 진행 중인 학생이 있으면 누르지 마세요.",
   open: "「열기」로 바꿉니다. 지금부터 시작 마감 시간 안에 학생이 「시험 시작」을 누를 수 있습니다. 여는 시각이 기록되므로 학생이 모두 준비된 뒤에 누르세요.",
   ended: "「시작 마감」으로 바꿉니다. 새로 시작할 수 없고, 이미 시작한 학생은 자기 남은 시간까지 계속 풉니다.",
   published: "「결과 공개」로 바꿉니다. 저장된 결과가 있는 학생에게 점수·급 경로·문항별 정답과 해설·이탈 기록이 보입니다.",
@@ -246,6 +260,10 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
   const [keysLive, setKeysLive] = useState(null);
   const [apiErr, setApiErr] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  /* 서버 시각 − 이 PC 시각의 추정치(ms). 응시 문서의 서버 시각 필드(hb·lockedAt·startedAt)가 도착할 때마다
+     (서버 시각 − 받은 시각)을 재고 최댓값을 둔다(표본마다 전달 지연만큼 작게 나오므로 최댓값이 참값에 가깝다).
+     교사 시계가 어긋나도 남은 시간·끊김·보전 초를 서버 기준으로 세기 위한 것 */
+  const offRef = useRef(null);
   useEffect(() => {
     if (sampleMode) return undefined;
     const missing = ["quizWatchAll", "quizAllServer", "quizPatch"].filter((k) => typeof fbStore[k] !== "function");
@@ -254,21 +272,47 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
       fbStore.watchDoc("quizBank", (v) => setBankLive(v || null)),
       fbStore.watchDoc("quizKeys", (v) => setKeysLive(v || null)),
     ];
-    if (typeof fbStore.quizWatchAll === "function") offs.push(fbStore.quizWatchAll((m) => setLiveAll(m || {})));
+    if (typeof fbStore.quizWatchAll === "function") {
+      offs.push(fbStore.quizWatchAll((m) => {
+        const t = Date.now();
+        let best = -Infinity;
+        Object.values(m || {}).forEach((e) => {
+          [e && e.hbMs, e && e.lockedAtMs, e && e.startedAtMs].forEach((x) => { if (Number.isFinite(x)) best = Math.max(best, x - t); });
+        });
+        if (best > -Infinity && (offRef.current == null || best > offRef.current)) offRef.current = best;
+        setLiveAll(m || {});
+      }));
+    }
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => { clearInterval(tick); offs.forEach((f) => { try { if (typeof f === "function") f(); } catch (e) {} }); };
   }, [sampleMode]);
 
   const cfg = sampleMode ? quizCfg({ quiz: (sample && sample.cfg) || {} }) : quizCfg(cfgAll);
-  const bank = sampleMode ? (sample && sample.bank) || null : bankLive;
-  const keysDoc = sampleMode ? (sample && sample.keysDoc) || null : keysLive;
+  /* 파일을 고르면 올리기 전에도 그 파일로 문항을 열람·검토할 수 있다(은행은 배포본에 넣지 않는다: 문두가 공개되면 시험 전에 읽힌다).
+     올린 은행이 있으면 그것이 우선이다 */
+  const [bankFile, setBankFile] = useState(null);    // { name, data, report }
+  const fileBank = bankFile && bankFile.data ? bankFile.data : null;
+  const bank = sampleMode ? (sample && sample.bank) || null : (bankLive || fileBank);
+  const bankIsFile = !sampleMode && !bankLive && !!fileBank;
+  const fileKeys = useMemo(() => { try { return bankIsFile && fileBank ? splitBank(fileBank).keys : null; } catch (e) { return null; } }, [bankIsFile, fileBank]);
+  const keysDoc = sampleMode ? (sample && sample.keysDoc) || null : keysLive || fileKeys;
   /* attempts: { sid: v }, meta: { sid: { startedAtMs, hbMs, lockedAtMs } } */
-  const { attempts, meta } = useMemo(() => {
+  const { attempts: attemptsRaw, meta } = useMemo(() => {
     if (sampleMode) return { attempts: (sample && sample.attempts) || {}, meta: (sample && sample.meta) || {} };
     const a = {}, m = {};
     Object.keys(liveAll || {}).forEach((sid) => { const e = liveAll[sid]; if (!e || !e.v) return; a[sid] = e.v; m[sid] = { startedAtMs: e.startedAtMs, hbMs: e.hbMs, lockedAtMs: e.lockedAtMs }; });
     return { attempts: a, meta: m };
   }, [sampleMode, sample, liveAll]);
+  /* 실제로 적용된 시간 배수는 설정(cfg.timeMult)이 우선이다(규칙도 설정을 읽는다): 기록표·CSV 에는 그 값을 쓴다 */
+  const attempts = useMemo(() => {
+    const out = {};
+    Object.keys(attemptsRaw || {}).forEach((sid) => {
+      const v = attemptsRaw[sid];
+      const m = cfg.timeMult && Number(cfg.timeMult[sid]) > 0 ? Number(cfg.timeMult[sid]) : Number(v && v.timeMult) > 0 ? Number(v.timeMult) : 1;
+      out[sid] = v && v.timeMult !== m ? { ...v, timeMult: m } : v;
+    });
+    return out;
+  }, [attemptsRaw, cfg.timeMult]);
   const resultsMap = useMemo(() => {
     if (sampleMode) return (sample && sample.results) || {};
     const r = {};
@@ -276,6 +320,9 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     return r;
   }, [sampleMode, sample, attempts]);
   const nowMs = sampleMode ? (sample && sample.cfg ? Date.parse(sample.cfg.updatedAt) : now) : now;
+  /* 서버 기준 「지금」. 서버 시각 필드(startedAt·hb·lockedAt)와 견줄 때만 쓴다. openedAtMs·pausedAtMs 는 교사 시계 값이므로 nowMs 그대로 */
+  const clockOff = sampleMode || offRef.current == null ? 0 : offRef.current;
+  const srvNowMs = nowMs + clockOff;
 
   /* ---- 설정 편집: 키 입력마다 서버에 쓰지 않고 0.8초 쉬면 모아 보낸다 (AssessPanel과 같은 규약) ---- */
   const [draft, setDraft] = useState(null);
@@ -384,7 +431,6 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
   };
 
   /* ---- 문항 은행 파일 ---- */
-  const [bankFile, setBankFile] = useState(null);    // { name, data, report }
   const [bankBusy, setBankBusy] = useState(false);
   const [bankErr, setBankErr] = useState("");
   const onBankFile = (e) => {
@@ -406,7 +452,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     if (sampleMode || bankBusy || !bankFile || !bankFile.report.ok) return;
     const started = Object.keys(attempts).length;
     let msg = "은행 「" + bankFile.data.ver + "」(" + (bankFile.data.items || []).length + "문항)을 올립니다.";
-    if (bankOk && bank.ver !== bankFile.data.ver) msg += "\n\n지금 올라가 있는 은행(" + bank.ver + ")을 덮어씁니다.";
+    if (bankLive && bankLive.ver !== bankFile.data.ver) msg += "\n\n지금 올라가 있는 은행(" + bankLive.ver + ")을 덮어씁니다.";
     if (started) msg += "\n\n주의: 응시 문서가 " + started + "건 있습니다. 은행이 바뀌면 이미 시작한 학생의 추출 재현·채점이 어긋납니다.";
     msg += "\n\n계속할까요?";
     if (!window.confirm(msg)) return;
@@ -416,7 +462,9 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     catch (e) { setBankErr("은행을 나누지 못했습니다: " + ((e && e.message) || e)); setBankBusy(false); return; }
     const ok1 = await fbStore.setT("quizBank", split.pub, { timeout: 15000 });
     if (!ok1) { setBankErr("공개부(quizBank)를 저장하지 못했습니다. 연결을 확인하고 다시 누르세요."); setBankBusy(false); return; }
-    const ok2 = await fbStore.setT("quizKeys", split.keys, { timeout: 15000 });
+    /* 정정 목록은 은행을 다시 올려도 남긴다(새 은행에 없는 문항 id 의 정정만 뺀다) */
+    const keep = (keysLive && Array.isArray(keysLive.corrections) ? keysLive.corrections : []).filter((c) => c && split.keys.items && split.keys.items[c.itemId]);
+    const ok2 = await fbStore.setT("quizKeys", { ...split.keys, corrections: keep }, { timeout: 15000 });
     if (!ok2) { setBankErr("정답부(quizKeys)를 저장하지 못했습니다. 공개부는 올라갔으니 같은 파일로 다시 누르세요."); setBankBusy(false); return; }
     const ok3 = await saveNow({ bankVer: split.pub.ver });
     setBankBusy(false);
@@ -436,6 +484,18 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
       && (!t || String(it.id).toLowerCase().includes(t) || String(it.spec || "").toLowerCase().includes(t) || String(it.stem || "").toLowerCase().includes(t)));
   }, [bank, fLevel, fArea, fHalf, fText]);
   const answerOf = (id) => (keysDoc && keysDoc.items && keysDoc.items[id] ? keysDoc.items[id].answer : null);
+  /* 문항 미리보기: 학생 화면과 같은 보기 순서(optionOrder)로 보인다. seed 를 바꾸면 다른 학생의 순서를 볼 수 있다 */
+  const [previewId, setPreviewId] = useState(null);
+  const [previewSeed, setPreviewSeed] = useState(20260915);
+  const previewItem = previewId && bank ? (bank.items || []).find((it) => String(it.id) === String(previewId)) : null;
+  const previewKey = previewItem && keysDoc && keysDoc.items ? keysDoc.items[previewItem.id] || null : null;
+  const previewOptions = previewItem ? optionOrder(previewSeed, previewItem).map((id) => (previewItem.options || []).find((o) => o.id === id)).filter(Boolean) : [];
+  useEffect(() => {
+    if (!previewId) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") setPreviewId(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [previewId]);
   const exportReview = () => {
     if (!bank || !keysDoc) return;
     const head = ["item_id", "level", "area", "half", "spec", "stem", "a", "b", "c", "d", "answer", "expl", "src", "image", "neg", "disabled"];
@@ -455,10 +515,10 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     const ans = answeredOf(v);
     let remain = null;
     if (v && st !== "done" && Number.isFinite(m.startedAtMs)) {
-      const at = st === "locked" ? lockedMsOf(v, m) : cfg.paused && cfg.pausedAtMs ? cfg.pausedAtMs : nowMs;
-      remain = remainingSec({ nowMs: Number.isFinite(at) ? at : nowMs, startedAtMs: m.startedAtMs, cfg, v, sid: id });
+      const at = st === "locked" ? lockedMsOf(v, m) : cfg.paused && cfg.pausedAtMs ? cfg.pausedAtMs + clockOff : srvNowMs;
+      remain = remainingSec({ nowMs: Number.isFinite(at) ? at : srvNowMs, startedAtMs: m.startedAtMs, cfg, v, sid: id });
     }
-    const hbAge = Number.isFinite(m.hbMs) ? Math.max(0, Math.round((nowMs - m.hbMs) / 1000)) : null;
+    const hbAge = Number.isFinite(m.hbMs) ? Math.max(0, Math.round((srvNowMs - m.hbMs) / 1000)) : null;
     const nEv = eventsOf(v).length;
     return {
       id, nick: nickOf(id), v, m, st, cur: v ? v.cur || 1 : null, ans, remain,
@@ -484,8 +544,8 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     if (sampleMode || rowBusy) return;
     const keep = keepMap[r.id] !== false;
     const lockedMs = lockedMsOf(r.v, r.m);
-    // 멈춘 초 = 교사 브라우저 시각 − 잠근 서버 시각. 교사 시계가 크게 어긋나도 제한 시간(배수 최대 2) 밖의 값은 주지 않는다
-    const add = keep && Number.isFinite(lockedMs) ? Math.min(cfg.durationSec * 2, Math.max(0, Math.round((Date.now() - lockedMs) / 1000))) : 0;
+    // 멈춘 초 = 서버 기준 지금(교사 시각 + 추정 오프셋) − 잠근 서버 시각. 그래도 제한 시간(배수 최대 2) 밖의 값은 주지 않는다
+    const add = keep && Number.isFinite(lockedMs) ? Math.min(cfg.durationSec * 2, Math.max(0, Math.round((Date.now() + clockOff - lockedMs) / 1000))) : 0;
     if (!window.confirm(r.id + "의 잠금을 풉니다. " + (keep ? "멈춘 " + fmtMMSS(add) + "을 남은 시간에 더합니다(시간 보전)." : "시간을 보전하지 않습니다.") + " 계속할까요?")) return;
     setRowBusy(r.id);
     const ok = await patchV(r.id, { status: "running", pausedTotalSec: (Number(r.v.pausedTotalSec) || 0) + add }, { unlock: true });
@@ -494,12 +554,19 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
   };
   const doResetSess = async (r) => {
     if (sampleMode || rowBusy) return;
-    if (!window.confirm(r.id + "의 접속 세션을 초기화합니다. 「다른 곳에서 응시 중」으로 막힌 학생이 다시 들어올 수 있게 됩니다. 계속할까요?")) return;
+    if (!window.confirm(r.id + "의 접속 세션을 초기화합니다. 「다른 곳에서 응시 중」으로 막힌 학생이 다시 들어올 수 있습니다. 계속할까요?")) return;
     setRowBusy(r.id);
     const ok = await patchV(r.id, { sess: null });
     setRowBusy("");
     setNote(ok ? { kind: "ok", text: r.id + "의 세션을 초기화했습니다." } : { kind: "warn", text: "세션을 초기화하지 못했습니다." });
   };
+  /* 완료된 학생을 다시 열었을 때 남을 초(서버 기준 지금, 추가 분 반영). 완료 행은 remain 을 계산하지 않으므로 여기서 직접 센다.
+     기술 장애로 완료 처리된 학생은 이미 시간이 끝난 상태라, 잃은 시간을 더하지 않고 열면 학생 화면이 곧바로 다시 제출 처리한다 */
+  const RESUME_MARGIN_SEC = 60;
+  const resumeRemain = (r, addMin) => (Number.isFinite(r.m.startedAtMs)
+    ? remainingSec({ nowMs: srvNowMs, startedAtMs: r.m.startedAtMs, cfg, v: { ...r.v, extraSec: (Number(r.v.extraSec) || 0) + (addMin || 0) * 60 }, sid: r.id })
+    : null);
+  const resumeNeedMin = (r) => { const rem = resumeRemain(r, 0); return rem == null ? 0 : Math.max(0, Math.ceil((RESUME_MARGIN_SEC - rem) / 60)); };
   const submitRowAct = async () => {
     if (!rowAct || sampleMode || rowBusy) return;
     const r = rows.find((x) => x.id === rowAct.sid);
@@ -509,12 +576,24 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     if (rowAct.kind === "extra" && min <= 0) { setNote({ kind: "warn", text: "추가할 분을 1 이상 넣으세요." }); return; }
     const extraSec = (Number(r.v.extraSec) || 0) + min * 60;
     const extraReason = [r.v.extraReason, reason ? "+" + min + "분: " + reason : min ? "+" + min + "분" : ""].filter(Boolean).join(" / ").slice(0, 400);
+    let remAfter = null;
+    if (rowAct.kind === "resume") {
+      remAfter = resumeRemain(r, min);
+      if (remAfter == null) { setNote({ kind: "warn", text: r.id + "의 시작 시각이 서버에 없어 남은 시간을 셀 수 없습니다. 잠시 뒤 다시 누르세요." }); return; }
+      if (remAfter <= RESUME_MARGIN_SEC) {
+        const need = resumeNeedMin(r);
+        setNote({ kind: "warn", text: r.id + "의 시간이 이미 끝났습니다(" + (min ? min + "분을 더해도 " : "") + "남은 시간 " + fmtMMSS(Math.max(0, remAfter)) + "). 잃은 시간을 " + need + "분 이상 넣어야 학생이 이어 풀 수 있습니다." });
+        return;
+      }
+    }
     const msg = rowAct.kind === "extra"
       ? r.id + "에게 " + min + "분을 더합니다(누적 " + Math.round(extraSec / 60) + "분). 계속할까요?"
-      : r.id + "의 응시를 다시 엽니다. 완료 표시가 풀리고 같은 문항·순서로 남은 블록을 이어 풉니다" + (min ? ". 잃은 시간 " + min + "분을 더합니다" : "") + ". 제출된 블록은 바뀌지 않습니다. 계속할까요?";
+      : r.id + "의 응시를 다시 엽니다. 완료 표시가 풀리고 같은 문항·순서로 남은 블록을 이어 풉니다" + (min ? ". 잃은 시간 " + min + "분을 더합니다" : "") + ". 다시 연 뒤 남은 시간은 " + fmtMMSS(remAfter) + "입니다. 제출된 블록은 바뀌지 않습니다"
+        + (r.v.result ? ". 저장된 결과는 지우므로 학생이 끝낸 뒤 「재계산」을 다시 누르세요" : "") + ". 계속할까요?";
     if (!window.confirm(msg)) return;
     setRowBusy(r.id);
-    const patch = rowAct.kind === "extra" ? { extraSec, extraReason } : { finishedAt: null, status: "running", resumeOk: true, extraSec, extraReason };
+    /* 다시 열면 이전 완료 시점의 결과는 낡은 값이 되므로 지운다(남겨 두면 공개 단계에서 학생이 끝내자마자 옛 점수가 보인다) */
+    const patch = rowAct.kind === "extra" ? { extraSec, extraReason } : { finishedAt: null, status: "running", resumeOk: true, extraSec, extraReason, ...(r.v.result ? { result: null } : {}) };
     const ok = await patchV(r.id, patch);
     setRowBusy("");
     if (ok) { setRowAct(null); setNote({ kind: "ok", text: r.id + (rowAct.kind === "extra" ? "에게 " + min + "분을 더했습니다." : "의 응시를 다시 열었습니다.") }); }
@@ -556,13 +635,21 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
   const [pubBusy, setPubBusy] = useState(false);
   const doPublish = async () => {
     if (sampleMode || pubBusy || stageBusy) return;
-    const withRes = Object.keys(resultsMap);
+    if (calcBusy) { setNote({ kind: "warn", text: "재계산이 끝난 뒤에 공개하세요." }); return; }
+    /* 완료된 응시의, 완료 뒤에 계산한 결과만 공개한다: 진행 중에 계산한 결과는 부분 점수라 학생이 끝내자마자 옛 점수가 보인다 */
+    const stale = Object.keys(resultsMap).filter((sid) => {
+      const v = attempts[sid] || {}, r = resultsMap[sid] || {};
+      const fin = v.finishedAt || null;
+      return !(v.status === "done" || fin) || (fin && r.computedAt && Date.parse(r.computedAt) < Date.parse(fin));
+    });
+    const withRes = Object.keys(resultsMap).filter((sid) => !stale.includes(sid));
     const noRes = Object.keys(attempts).filter((sid) => !resultsMap[sid]);
     const unpub = withRes.filter((sid) => !resultsMap[sid].published);
     // 이미 공개된 뒤에도 다시 누를 수 있다 — 별도 응시·재계산으로 뒤늦게 생긴 결과에 공개 표시를 쓰기 위해서다
-    let msg = (cfg.stage === "published" ? "공개 표시를 다시 씁니다. 아직 공개 표시가 없는 결과 " + unpub.length + "건이 학생에게 보이게 됩니다." : STAGE_CONFIRM.published)
+    let msg = (cfg.stage === "published" ? "공개 표시를 다시 씁니다. 아직 공개 표시가 없는 결과 " + unpub.length + "건이 학생에게 보입니다." : STAGE_CONFIRM.published)
       + "\n\n결과가 있는 학생 " + withRes.length + "명에게 공개 표시를 씁니다.";
     if (noRes.length) msg += "\n\n주의: 응시했지만 결과가 없는 학생 " + noRes.length + "명(" + noRes.slice(0, 6).join(", ") + (noRes.length > 6 ? " 외" : "") + "). 먼저 「재계산」을 누르세요.";
+    if (stale.length) msg += "\n\n건너뜀: 아직 진행 중이거나 완료 뒤에 재계산하지 않은 학생 " + stale.length + "명(" + stale.slice(0, 6).join(", ") + (stale.length > 6 ? " 외" : "") + "). 완료 뒤 「재계산」을 다시 누르고 공개하세요.";
     const mism = withRes.filter((sid) => (resultsMap[sid].flags || []).includes("mismatch"));
     if (mism.length) msg += "\n\n주의: 불일치 표시 학생 " + mism.length + "명(" + mism.join(", ") + "). 원응답을 먼저 확인하세요.";
     msg += "\n\n계속할까요?";
@@ -874,10 +961,10 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
             </div>
           )}
 
-          <div className="sv-block-t">올린 은행</div>
+          <div className="sv-block-t">{bankIsFile ? "고른 파일의 은행 (검토용, 아직 올리지 않음)" : "올린 은행"}</div>
           {!bankOk ? <p className="hint">아직 올린 은행이 없습니다.</p> : (
             <p className="hint">
-              공개부 {bank.ver} · 문항 {bank.itemCount || (bank.items || []).length} · 연습 {(bank.practice || []).length} ·
+              {bankIsFile ? "파일 " + bank.ver + " (올리기 전)" : "공개부 " + bank.ver} · 문항 {bank.itemCount || (bank.items || []).length} · 연습 {(bank.practice || []).length} ·
               정답부 {keysDoc ? (keysMatch ? keysDoc.ver + " (일치)" : (keysDoc.ver || "?") + " (버전 불일치)") : "읽지 못함"} ·
               정정 {corrections.length}건 · 설정 bankVer {cfg.bankVer || "(없음)"}{bankMatch ? "" : " (불일치)"} · 비활성 {disabledList.length}
             </p>
@@ -894,7 +981,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
               </div>
               <div className="tbl-scroll qt-scroll">
                 <table className="roster qt-tbl">
-                  <thead><tr><th>id</th><th>spec</th><th>급</th><th>영역</th><th>반</th><th>문두</th><th>정답</th><th>이미지</th><th>비활성</th></tr></thead>
+                  <thead><tr><th>id</th><th>spec</th><th>급</th><th>영역</th><th>반</th><th>문두</th><th>정답</th><th>이미지</th><th>미리보기</th><th>비활성</th></tr></thead>
                   <tbody>
                     {bankItems.map((it) => {
                       const ans = answerOf(it.id);
@@ -909,15 +996,38 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
                           <td>{trunc(it.stem, 60)}{it.neg ? <span className="hint"> (부정)</span> : null}</td>
                           <td className="mono">{ans || <span className="hint">키 없음</span>}</td>
                           <td>{it.image ? "있음" : "-"}</td>
+                          <td><button type="button" className="btn small ghost" onClick={() => setPreviewId(it.id)}>열기</button></td>
                           <td>
                             <button type="button" className={"btn small ghost" + (off ? " qt-btn-on" : "")} disabled={sampleMode} title={wr} aria-pressed={off} onClick={() => setDisabled(it.id, !off)}>{off ? "비활성" : "활성"}</button>
                           </td>
                         </tr>
                       );
                     })}
-                    {bankItems.length === 0 && <tr><td colSpan={9} className="hint">조건에 맞는 문항이 없습니다.</td></tr>}
+                    {bankItems.length === 0 && <tr><td colSpan={10} className="hint">조건에 맞는 문항이 없습니다.</td></tr>}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+          {previewItem && (
+            <div className="qt-preview" role="dialog" aria-modal="true" aria-labelledby="qt-pv-h">
+              <div className="qt-preview-in">
+                <div className="qt-preview-bar">
+                  <b id="qt-pv-h">미리보기 <span className="mono">{previewItem.id}</span> · {previewItem.level}급 · 영역 {AREA_MARK[previewItem.area]} · {previewItem.half}반{previewItem.neg ? " · 부정 문두" : ""}</b>
+                  <label className="hint">seed <input type="number" value={previewSeed} onChange={(e) => setPreviewSeed(Number(e.target.value) || 0)} style={{ width: 110 }} /></label>
+                  <button type="button" className="btn small ghost" onClick={() => setPreviewId(null)}>닫기</button>
+                </div>
+                <div className="qt-preview-stem">{previewItem.stem}</div>
+                {previewItem.image && previewItem.image.src && <figure className="qt-preview-fig"><img src={previewItem.image.src} alt={previewItem.image.alt || ""} /></figure>}
+                <ol className="qt-preview-opts">
+                  {previewOptions.map((o, j) => (
+                    <li key={o.id} className={previewKey && previewKey.answer === o.id ? "ans" : ""}>
+                      <span className="mono">{["①", "②", "③", "④"][j]}</span> {o.text}{previewKey && previewKey.answer === o.id ? <span className="qt-tag">정답</span> : null}
+                    </li>
+                  ))}
+                </ol>
+                {previewKey && previewKey.expl && <p className="hint">해설: {previewKey.expl}</p>}
+                {previewKey && previewKey.src && <p className="hint">근거: {previewKey.src.lesson}차시 「{previewKey.src.h}」 {previewKey.src.quote ? "“" + previewKey.src.quote + "”" : ""}</p>}
               </div>
             </div>
           )}
@@ -1010,7 +1120,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
               {calcBusy ? "재계산 중… " + (calcProg ? calcProg.done + "/" + calcProg.total : "") : "재계산"}
             </button>
             <button type="button" className="btn" disabled={sampleMode || calcBusy || pubBusy || stageBusy || !Object.keys(resultsMap).length} title={wr} onClick={doPublish}>
-              {pubBusy ? "공개 중…" : cfg.stage === "published" ? "공개 표시 다시 쓰기" : "결과 공개"}
+              {pubBusy ? "공개 중…" : calcBusy ? "재계산 중…" : cfg.stage === "published" ? "공개 표시 다시 쓰기" : "결과 공개"}
             </button>
             {cfg.stage === "published" && Object.values(resultsMap).some((r) => !r.published) && <span className="hint qt-warn">공개 표시가 없는 결과 {Object.values(resultsMap).filter((r) => !r.published).length}건</span>}
             {calcProg && !calcBusy && <span className="hint">{calcProg.done}/{calcProg.total} 저장{calcProg.fail ? " · 실패 " + calcProg.fail : ""}</span>}
@@ -1069,7 +1179,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
                   </div>
                 </div>
                 <div className="qt-noprint">
-                  <button type="button" className="btn small ghost" onClick={() => window.print()}>인쇄</button>
+                  <button type="button" className="btn small ghost" onClick={(e) => printSheet(e.currentTarget.closest(".qt-sheet"))}>인쇄</button>
                 </div>
               </div>
               <div className="kpis qt-sheet-kpis">
@@ -1126,7 +1236,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
                   <tbody>
                     {sheet.events.map((e) => (
                       <tr key={e.i} className={e.falsePos ? "qt-row-fp" : ""}>
-                        <td className="mono">{e.i + 1}</td><td className="mono">{e.t ? fmtHMS(Date.parse(e.t)) : "-"}</td><td className="mono">{e.type}{e.mlb ? " (마우스 이탈 뒤)" : ""}</td>
+                        <td className="mono">{e.i + 1}</td><td className="mono">{e.t ? fmtHMS(Date.parse(e.t)) : "-"}</td><td>{eventLabel(e.type)} <span className="mono hint">{e.type}</span>{e.mlb ? " (마우스 이탈 뒤)" : ""}{e.cover ? " (안내 화면 중)" : ""}</td>
                         <td className="mono">{e.ms != null ? sec(e.ms) : "-"}</td><td className="mono">{e.block != null ? e.block : "-"}</td><td className="mono">{e.item != null ? e.item : "-"}</td>
                         <td className="mono">{e.key || e.action || "-"}</td><td className="mono">{e.warn != null ? e.warn : "-"}</td><td>{e.prep ? "준비 구간" : "-"}</td>
                         <td><input type="checkbox" checked={!!e.falsePos} disabled={sampleMode || !!rowBusy} aria-label={"이벤트 " + (e.i + 1) + " 오탐"} onChange={() => toggleFalsePos(e.i)} /></td>
@@ -1439,6 +1549,14 @@ const QUIZ_TEACHER_CSS = `
 .qt-rules li{margin:3px 0}
 .qt-design caption{caption-side:top;text-align:left;font-size:12px;color:var(--sub);padding:2px 0 4px}
 .qt-panel .btn:disabled,.qt-panel .seg button:disabled{opacity:.45;cursor:default}
+.qt-preview{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.qt-preview-in{background:var(--card);color:var(--ink);max-width:720px;width:100%;max-height:90vh;overflow:auto;padding:18px 20px;border-top:3px solid var(--patina)}
+.qt-preview-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-bottom:12px}
+.qt-preview-stem{font-size:16px;line-height:1.6;margin-bottom:10px}
+.qt-preview-fig{margin:0 0 10px}.qt-preview-fig img{max-width:100%;height:auto}
+.qt-preview-opts{list-style:none;margin:0;padding:0}.qt-preview-opts li{padding:6px 8px;border:1px solid var(--line);margin-bottom:6px;font-size:14px}
+.qt-preview-opts li.ans{border-color:var(--patina);background:var(--patina-bg)}
+.qt-tag{font-size:11px;margin-left:6px;color:var(--patina);font-weight:700}
 @media print{
   body *{visibility:hidden}
   .qt-sheet,.qt-sheet *{visibility:visible}

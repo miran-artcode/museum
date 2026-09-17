@@ -100,8 +100,11 @@ service cloud.firestore {
     // 은행 공개부에는 정답이 없고(keyHash만) 교사가 시험을 연 뒤(stage != closed)에만 학생이 읽는다. 정답 키는 교사만 읽고 쓴다.
     // 응시 문서 quiz/{학번}은 본인·교사만 읽는다. 학생은 시작 마감 안에 startedAt을 서버 시각으로 만들고,
     // 끝내기(finishedAt) 전까지, 제한 시간(배수·보전·추가·전체 정지 + 60초 유예) 안에서만 진행 필드를 고친다.
+    // 만들 때 v.sid는 문서 이름, status는 running, blocks는 비어 있고, lockedAt은 null이어야 한다.
     // 시작 시각·반·seed·은행 버전과 교사 필드(pausedTotalSec·extraSec·result 등)는 학생이 바꾸지 못하고,
-    // 제출한 블록(blocks)·이미 연 블록의 문항(served)은 그대로여야 하며, 이벤트 목록(events)은 줄어들지 않는다.
+    // 제출한 블록(blocks)·이미 연 블록의 문항(served)은 그대로여야 하며, 이벤트 목록(events)은 앞부분이 그대로인 채
+    // 늘어나기만 하고(추가 전용), 경고 수(warn)·잠금 수(lock.count)는 줄지 않는다.
+    // 잠금 시각(lockedAt)은 그대로 두거나 서버 시각으로만 쓸 수 있다(교사 해제의 보전 시간이 이 값에서 나온다).
     // 시간이 끝난 뒤에는 마무리 필드(status·finishedAt·clientScore·events·lock·warn·cur)만 쓸 수 있다.
     function quizV(res) {
       return res.data.get('v', {});
@@ -143,8 +146,25 @@ service cloud.firestore {
       let b = quizV(resource).get('served', {});
       return !quizV(request.resource).get('served', {}).diff(b).affectedKeys().hasAny(b.keys());
     }
+    // 이벤트 목록은 앞부분이 그대로인 채 늘어나기만 한다 (arrayUnion 추가는 통과, 기존 항목 바꿔치기는 거부)
     function quizEventsGrow() {
-      return quizV(request.resource).get('events', []).size() >= quizV(resource).get('events', []).size();
+      let before = quizV(resource).get('events', []);
+      let after = quizV(request.resource).get('events', []);
+      return after.size() >= before.size()
+          && (before.size() == 0 || after[0:before.size()] == before);
+    }
+    // 경고 수·잠금 수는 줄지 않는다
+    function quizCountersKept() {
+      let b = quizV(resource);
+      let a = quizV(request.resource);
+      return a.get('warn', 0) >= b.get('warn', 0)
+          && a.get('lock', {}).get('count', 0) >= b.get('lock', {}).get('count', 0);
+    }
+    // 잠금 시각은 그대로 두거나 서버 시각으로만 쓴다 (학생이 지난 시각을 꾸며 넣거나 지우지 못한다)
+    function quizLockedAtOk() {
+      let before = resource.data.get('lockedAt', null);
+      let after = request.resource.data.get('lockedAt', null);
+      return after == before || after == request.time;
     }
     match /quizBank/{docId} {
       allow read: if isTeacher() || (signedIn() && quizStage() != 'closed');
@@ -161,14 +181,19 @@ service cloud.firestore {
                     && quizStartOpen()
                     && request.resource.data.startedAt == request.time
                     && !quizV(request.resource).keys().hasAny(quizTeacherKeys())
-                    && quizV(request.resource).get('finishedAt', null) == null;
+                    && quizV(request.resource).get('finishedAt', null) == null
+                    && quizV(request.resource).get('sid', '') == sid
+                    && quizV(request.resource).get('status', '') == 'running'
+                    && quizV(request.resource).get('blocks', {}).size() == 0
+                    && request.resource.data.get('lockedAt', null) == null;
       allow update: if isOwner(sid) && sizeOk()
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['v', 'hb', 'lockedAt', 'updatedAt'])
                     && request.resource.data.startedAt == resource.data.startedAt
+                    && quizLockedAtOk()
                     && quizV(resource).get('finishedAt', null) == null
                     && !quizV(request.resource).diff(quizV(resource)).affectedKeys().hasAny(quizTeacherKeys())
                     && !quizV(request.resource).diff(quizV(resource)).affectedKeys().hasAny(quizFixedKeys())
-                    && quizBlocksKept() && quizServedKept() && quizEventsGrow()
+                    && quizBlocksKept() && quizServedKept() && quizEventsGrow() && quizCountersKept()
                     && (quizWithinTime(sid)
                         || quizV(request.resource).diff(quizV(resource)).affectedKeys()
                              .hasOnly(['status', 'finishedAt', 'clientScore', 'events', 'lock', 'warn', 'cur']));

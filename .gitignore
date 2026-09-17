@@ -7,3 +7,8 @@ probe*.js
 probe*.jsx
 probe*.mjs
 drive*.mjs
+
+# 쪽지시험 문항 은행(정답 포함)은 공개 저장소에 올리지 않는다. 교사 PC와 Firestore(quizBank·quizKeys)에만 둔다
+quiz-bank/bank.json
+quiz-bank/items/
+public/quiz-bank/

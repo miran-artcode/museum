@@ -19,14 +19,15 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
 import {
-  QUIZ_VER, BLOCKS, BLOCK_SIZE, START_LEVEL, BLOCK_END_MIN, MAX_EVENTS, RULE_SENTENCES, SCORE_ROWS, MIN_ANSWERED, quizCfg,
+  QUIZ_VER, BLOCKS, BLOCK_SIZE, START_LEVEL, BLOCK_END_MIN, MAX_EVENTS, SCORE_ROWS, MIN_ANSWERED, quizCfg, ruleSentences, eventLabel,
   deriveSeed, halfOf, drawBlock, usedOf, routeNext, isCorrect, optionOrder, clientScoreOf, scoreRowIndex, remainingSec, fmtMMSS, buildSampleQuiz,
 } from "./src-quiz-core.mjs";
 
 /* ---------- 상수 (쪽지시험_구현_근거.md §7.2~§7.5) ---------- */
 
-const HB_SEC = 20;               // 심장박동 주기
-const HB_STALE_SEC = 60;         // 이보다 오래된 심장박동은 끊긴 세션으로 본다(중복 접속 판정)
+const HB_SEC = 30;               // 심장박동 주기(무료 한도: 박동마다 쓰기 1·읽기 2~3이 든다)
+const HB_SYNC_EVERY = 2;         // 이 박동마다 한 번만 서버를 되읽어 시각을 다시 맞춘다
+const HB_STALE_SEC = 90;         // 이보다 오래된 심장박동은 끊긴 세션으로 본다(중복 접속 판정)
 const BLUR_WARN_MS = 2000;       // 이탈 지속이 이 이상이면 경고, 미만이면 「짧은 이탈」 기록만
 const FS_GRACE_MS = 10000;       // 전체화면 복귀 유예
 const PREP_MS = 30000;           // 시작 뒤 준비 구간(이탈을 기록만 한다)
@@ -132,7 +133,7 @@ export function useLockdown({ active, suspended, prepUntilMs, onEvent }) {
   useEffect(() => {
     if (!active || typeof document === "undefined") return undefined;
     /* st: 리스너 사이에 공유하는 상태. incident 는 「blur 와 전체화면 이탈이 1초 안에 함께 온 한 사건」 */
-    const st = { away: null, awayInc: null, awayMlb: false, incident: null, fsOutAt: null, fsInc: null, fsTimer: null, mouseLeftAt: 0, last: {}, small: false, resizeTimer: null };
+    const st = { away: null, awayInc: null, awayMlb: false, awaySus: false, incident: null, fsOutAt: null, fsInc: null, fsTimer: null, mouseLeftAt: 0, last: {}, small: false, resizeTimer: null };
     const now = () => Date.now();
     const cur = () => ref.current;
     /* 같은 신호가 MERGE_MS 안에 다시 오면 한 건으로 합친다(일부 브라우저는 fullscreenchange 를 두 번 낸다) */
@@ -149,20 +150,24 @@ export function useLockdown({ active, suspended, prepUntilMs, onEvent }) {
     };
 
     /* 탭·창 전환: hidden 과 blur 가 겹치면 먼저 온 것만 시작으로 삼고, 돌아올 때 지속 시간으로 판정한다 */
+    /* 덮개(경고·잠금·정지)가 떠 있는 동안에도 이탈은 기록한다(경고는 아님): 경고 화면을 띄운 채 오래 나가 있는 것도 교사가 보아야 한다 */
     const awayStart = () => {
-      if (cur().suspended || st.away != null) return;
+      if (st.away != null) return;
       st.away = now();
+      st.awaySus = !!cur().suspended;
       st.awayMlb = st.mouseLeftAt > 0 && st.away - st.mouseLeftAt < MLB_MS;
-      st.awayInc = incidentOf();
+      st.awayInc = st.awaySus ? null : incidentOf();
     };
     const awayEnd = () => {
       if (st.away == null) return;
       const ms = now() - st.away;
       const inc = st.awayInc, mlb = st.awayMlb;
       st.away = null; st.awayInc = null; st.awayMlb = false;
-      if (cur().suspended) return;
+      /* 덮개가 뜨기 전에 시작된 이탈은 돌아올 때 기록만 남긴다(경고 없음). 지속 시간이 교사의 「오탐」 판단 자료라 버리지 않는다 */
+      const sus = cur().suspended || st.awaySus;
+      st.awaySus = false;
       if (ms < BLUR_WARN_MS) emit("blur_short", { ms, ...(mlb ? { mlb: true } : {}) }, false, null);
-      else emit("blur", { ms, ...(mlb ? { mlb: true } : {}) }, true, inc);
+      else emit("blur", { ms, ...(mlb ? { mlb: true } : {}), ...(sus ? { cover: true } : {}) }, !sus, inc);
     };
     const onVis = () => { if (document.visibilityState === "hidden") awayStart(); else awayEnd(); };
     const onBlur = () => awayStart();
@@ -180,8 +185,7 @@ export function useLockdown({ active, suspended, prepUntilMs, onEvent }) {
           if (st.fsOutAt == null || fsEl()) return;
           const inc = st.fsInc;
           st.fsOutAt = null; st.fsInc = null;
-          if (cur().suspended) return;
-          emit("fs_exit", { ms: FS_GRACE_MS, over: true }, true, inc);
+          emit("fs_exit", { ms: FS_GRACE_MS, over: true }, !cur().suspended, inc);
         }, FS_GRACE_MS);
       } else {
         setFsOut(false);
@@ -189,7 +193,7 @@ export function useLockdown({ active, suspended, prepUntilMs, onEvent }) {
           const ms = now() - st.fsOutAt;
           st.fsOutAt = null; st.fsInc = null;
           if (st.fsTimer) { clearTimeout(st.fsTimer); st.fsTimer = null; }
-          if (!cur().suspended) emit("fs_exit", { ms }, false, null);
+          emit("fs_exit", { ms }, false, null);
         }
       }
     };
@@ -221,13 +225,14 @@ export function useLockdown({ active, suspended, prepUntilMs, onEvent }) {
       st.mouseLeftAt = now();
       if (!cur().suspended && !merged("mouseleave")) emit("mouseleave", {}, false, null);
     };
-    /* 창 크기: 화면의 90% 미만으로 「작아지는 순간」만 기록한다(도킹된 개발자 도구·창 축소 의심) */
+    /* 창 크기: 전체화면 상태에서 뷰포트가 화면의 90% 미만으로 「작아지는 순간」만 기록한다(도킹된 개발자 도구·창 축소 의심).
+       전체화면 밖의 뷰포트는 원래 작으므로(브라우저 UI·작업 표시줄) 보지 않는다. 그 이탈은 fs_exit 가 이미 기록한다 */
     const onResize = () => {
       if (st.resizeTimer) clearTimeout(st.resizeTimer);
       st.resizeTimer = setTimeout(() => {
         st.resizeTimer = null;
         const sw = (window.screen && window.screen.width) || 0, sh = (window.screen && window.screen.height) || 0;
-        const small = !!(sw && sh) && (window.innerWidth < sw * RESIZE_RATIO || window.innerHeight < sh * RESIZE_RATIO);
+        const small = !!fsEl() && !!(sw && sh) && (window.innerWidth < sw * RESIZE_RATIO || window.innerHeight < sh * RESIZE_RATIO);
         if (small && !st.small && !cur().suspended) emit("resize", { w: window.innerWidth, h: window.innerHeight }, false, null);
         st.small = small;
       }, 500);
@@ -299,11 +304,14 @@ function WarnCover({ n, limit, ev, demo, onBack }) {
   useEffect(() => { if (btn.current) btn.current.focus(); }, []);
   /* 잠금 뒤에도 경고 수는 이어지므로(§7.3: 3·6·9회에 잠김) 다음 잠금까지 남은 횟수는 한도로 나눈 나머지로 센다 */
   const lim = Math.max(1, Number(limit) || 3);
-  const left = Math.max(0, lim - ((Number(n) || 0) % lim));
+  const nn = Number(n) || 0;
+  const left = Math.max(0, lim - (nn % lim));
+  /* 머리글은 이번 주기 안의 자리(1~한도)로 보이고, 잠금 뒤에는 누적 횟수를 덧붙인다(「경고 4 / 3」이 되지 않게) */
+  const pos = nn > 0 ? ((nn - 1) % lim) + 1 : 0;
   return (
     <div className="qz-cover" role="alertdialog" aria-modal="true" aria-labelledby="qz-warn-h">
       <div className="qz-cover-in">
-        <div className="qz-cover-k">{demo ? "경고 화면 체험" : "경고 " + n + " / " + limit}</div>
+        <div className="qz-cover-k">{demo ? "경고 화면 체험" : nn > lim ? "경고 " + pos + " / " + lim + " (누적 " + nn + "회)" : "경고 " + nn + " / " + lim}</div>
         <h2 id="qz-warn-h" className="qz-cover-h">{warnText(ev)}</h2>
         {demo
           ? <p>본시험에서 다른 창으로 나가거나 전체화면을 벗어나면 이 화면이 나타나고 기록됩니다. 「돌아가기」를 누르면 시험 화면으로 돌아갑니다. 지금은 연습이라 아무것도 기록되지 않습니다.</p>
@@ -360,7 +368,7 @@ function ItemImage({ image }) {
 }
 
 /* 시험 문항 하나. 보기 순서는 optionOrder(seed, 문항)로 학생마다 다르고 재접속해도 같다 */
-function ItemCard({ it, idx, seed, pick, onPick, missing }) {
+function ItemCard({ it, idx, seed, pick, onPick, missing, disabled }) {
   const hid = "qz-q-" + idx;
   if (missing) {
     return (
@@ -377,7 +385,7 @@ function ItemCard({ it, idx, seed, pick, onPick, missing }) {
       <div className="qz-item-n">문항 {idx + 1}{it.neg && <span className="qz-negtag">부정 문두</span>}{it.image && <span className="qz-negtag">도판</span>}</div>
       <h3 id={hid} className="qz-stem"><Stem text={it.stem} neg={it.neg} /></h3>
       <ItemImage image={it.image} />
-      <OptionGroup options={opts} pick={pick} onPick={onPick} labelledBy={hid} />
+      <OptionGroup options={opts} pick={pick} onPick={onPick} labelledBy={hid} disabled={disabled} />
     </section>
   );
 }
@@ -437,7 +445,7 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
   const [served, setServed] = useState(v0.served || {});
   const [blocks, setBlocks] = useState(v0.blocks || {});
   const [draft, setDraft] = useState(v0.draft || {});
-  const [pickMs, setPickMs] = useState({});
+  const [pickMs, setPickMs] = useState(v0.pickMs || {});   // draft 와 함께 저장하므로 재접속해도 선택 시각이 남는다
   const [warn, setWarn] = useState(Number(v0.warn) || 0);
   const [status, setStatus] = useState(v0.status === "locked" ? "locked" : "running");
   const [overlay, setOverlay] = useState(null);      // { kind: "warn", ev, n } | { kind: "resume", text }
@@ -474,6 +482,7 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
   const timeUpRef = useRef(0);          // 시간이 끝난 서버 시각(유예 계산용)
   const draftTimer = useRef(null);
   const draftBuf = useRef({});
+  const pickBuf = useRef({});
   const alerted = useRef(null);
   const rootRef = useRef(null);
 
@@ -502,6 +511,20 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
     return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
   }, []);
   useEffect(() => () => { exitFs(); if (retryTimer.current) clearTimeout(retryTimer.current); if (draftTimer.current) clearTimeout(draftTimer.current); }, []);
+  /* 시험 중에는 앱의 상단 표시줄·차시 탭을 숨긴다(body 클래스 + QuizStyle 의 CSS): Tab 키로 초점이 시험 화면 밖으로 나가 Enter 로 탭이 바뀌는 일을 막는다.
+     초점이 어떤 이유로든 밖에 있으면 시험 화면 안으로 되돌린다 */
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    document.body.classList.add("qz-exam-on");
+    const onFocusIn = (e) => {
+      const root = rootRef.current;
+      if (!root || root.contains(e.target)) return;
+      const first = root.querySelector("button:not([disabled]), [tabindex]:not([tabindex='-1'])");
+      if (first) first.focus();
+    };
+    document.addEventListener("focusin", onFocusIn);
+    return () => { document.body.classList.remove("qz-exam-on"); document.removeEventListener("focusin", onFocusIn); };
+  }, []);
 
   /* ---- 이벤트 큐: 한 번에 하나씩 quizPatch(arrayUnion 은 패치당 하나). 실패하면 남겨 두었다가 다음 심장박동에 다시 보낸다 ---- */
   const flushQueue = async () => {
@@ -510,6 +533,12 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
     try {
       while (queueRef.current.length) {
         const it = queueRef.current[0];
+        if (it.opts && it.opts.lock && it.tried) {
+          /* 잠금 패치를 다시 보낼 때: 첫 전송이 실제로 들어갔으면 lockedAt 을 다시 찍지 않는다(교사 보전 시간이 줄어든다) */
+          const r = await fbStore.quizReadServer(sid);
+          if (r && r.ok && r.data && Number.isFinite(r.data.lockedAtMs)) it.opts = {};
+        }
+        it.tried = true;
         const ok = await fbStore.quizPatch(sid, it.vPatch, it.opts);
         if (!ok) break;
         queueRef.current.shift();
@@ -521,11 +550,14 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
   /* ---- 심장박동: hb 를 쓰고 되읽어 서버 시각을 다시 맞춘다. sess 가 바뀌었으면 이 세션은 물러난다 ---- */
   useEffect(() => {
     if (status === "done") return undefined;
+    let n = 0;
     const beat = async () => {
       if (doneRef.current || yieldRef.current) return;
       await flushQueue();
       const ok = await fbStore.quizPatch(sid, {});
       if (!ok) return;
+      n += 1;
+      if (n % HB_SYNC_EVERY !== 0) return;   // 되읽기는 격박동으로(읽기 한도 절약). 중복 접속 판정도 그때 한다
       const r = await fbStore.quizReadServer(sid);
       if (!r || !r.ok || !r.data) return;
       if (Number.isFinite(r.data.hbMs)) offsetRef.current = r.data.hbMs - Date.now();
@@ -604,18 +636,20 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
 
   /* ---- 답 선택: 화면에 바로 반영하고 300ms 뒤 draft 에 모아 저장한다(실패해도 화면의 답은 남는다) ---- */
   const onPick = (itemId, idx, optId) => {
-    if (statusRef.current !== "running" || busyRef.current) return;
+    if (statusRef.current !== "running" || busyRef.current || pendingRef.current) return;
     const k = stRef.current.cur;
     const t0 = blockStartMs(k, stRef.current.served[String(k)]);
     lastItemRef.current = idx + 1;
     setDraft((d) => ({ ...d, [itemId]: optId }));
     setPickMs((m) => ({ ...m, [itemId]: Number.isFinite(t0) ? Math.max(0, serverNow() - t0) : null }));
     draftBuf.current[itemId] = optId;
+    pickBuf.current[itemId] = Number.isFinite(t0) ? Math.max(0, serverNow() - t0) : null;
     if (draftTimer.current) clearTimeout(draftTimer.current);
     draftTimer.current = setTimeout(() => {
       draftTimer.current = null;
       const d = draftBuf.current; draftBuf.current = {};
-      if (Object.keys(d).length) fbStore.quizPatch(sid, { draft: d });
+      const pm = pickBuf.current; pickBuf.current = {};
+      if (Object.keys(d).length) fbStore.quizPatch(sid, { draft: d, pickMs: pm });   // 재접속해도 선택 시각이 남도록 함께 저장
     }, DRAFT_MS);
   };
 
@@ -676,7 +710,7 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
         if (retryRef.current >= SUBMIT_RETRY_N && pastGrace && !p.reduced) {
           /* 유예(60초)가 지나 규칙이 블록 쓰기를 더는 받지 않는다 — 마무리 필드만 써서 완료로 닫는다. 이 블록의 답은 저장되지 않는다.
              유예 안에서는 연결 문제일 수 있으므로 같은 블록 패치를 계속 다시 보낸다 */
-          p.reduced = true;
+          p.reduced = true; p.last = true;
           p.patch = { status: "done", finishedAt: iso(), cur: p.k, clientScore: clientScoreOf({ blocks: stRef.current.blocks, bank }) };
         }
         setSubmitErr(p.reduced ? "시간이 끝나 마지막 블록이 저장되지 않았습니다. 완료 처리를 다시 시도합니다. 선생님께 알려 주세요." : "시간이 끝나 자동 제출했지만 저장되지 않았습니다. 연결을 확인해 주세요. 잠시 뒤 다시 시도합니다.");
@@ -687,11 +721,18 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
       return;
     }
     pendingRef.current = null;
-    if (!p.reduced) setBlocks((b) => ({ ...b, [String(p.k)]: p.block }));
+    let landed = !p.reduced;
+    if (p.reduced) {
+      /* 마무리만 써서 닫았지만, 앞선 블록 전송이 시간 초과 뒤에 늦게 들어갔을 수 있다: 서버에 blocks[k] 가 있으면 저장된 것이다 */
+      const r = await fbStore.quizReadServer(sid);
+      if (r && r.ok && r.data && r.data.v && r.data.v.blocks && r.data.v.blocks[String(p.k)]) landed = true;
+    }
+    if (landed) setBlocks((b) => ({ ...b, [String(p.k)]: p.block }));
     if (p.last) {
       /* 완료: 전체화면을 풀고 「제출되었습니다」 화면을 보인다. 「닫기」가 onDone 을 부른다 */
       doneRef.current = true; statusRef.current = "done"; setStatus("done");
-      if (p.reduced) setSubmitErr("마지막 블록의 답은 시간 안에 저장되지 않아 응시 기록에 들어가지 않았습니다. 선생님께 알려 주세요.");
+      if (p.reduced && !landed) setSubmitErr("마지막 블록의 답은 시간 안에 저장되지 않아 응시 기록에 들어가지 않았습니다. 선생님께 알려 주세요.");
+      else setSubmitErr("");
       exitFs();
       return;
     }
@@ -713,8 +754,22 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
   };
 
   /* ---- 물러난 세션의 복귀: 교사가 세션을 초기화하면(sess null) 이 자리에서 다시 잡고 이어 푼다 ---- */
+  const pastGrace = timeUpRef.current ? serverNow() - timeUpRef.current > GRACE_MS : remain * 1000 <= -GRACE_MS;
+  /* 시간과 유예가 모두 지난 뒤에는 진행 필드(sess·served)를 쓸 수 없다(규칙): 마무리 필드만 써서 닫는다 */
+  const finishLate = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true; setBusy(true);
+    const ok = await fbStore.quizPatch(sid, { status: "done", finishedAt: iso(), cur: stRef.current.cur, clientScore: clientScoreOf({ blocks: stRef.current.blocks, bank }) });
+    busyRef.current = false; setBusy(false);
+    if (!ok) { setSubmitErr("완료 처리를 저장하지 못했습니다. 연결을 확인하고 한 번 더 눌러 주세요."); return; }
+    yieldRef.current = false; setYielded(null);
+    doneRef.current = true; statusRef.current = "done"; setStatus("done");
+    setSubmitErr("시간이 끝나 제출 처리되었습니다. 마지막 블록의 답은 시간 안에 저장되지 않았습니다. 선생님께 알려 주세요.");
+    exitFs();
+  };
   const reclaim = async () => {
     if (busyRef.current) return;
+    if (pastGrace) { await finishLate(); return; }
     busyRef.current = true; setBusy(true);
     const fsOk = await enterFullscreen();
     if (!fsOk) { busyRef.current = false; setBusy(false); setSubmitErr("브라우저가 전체화면을 막았습니다. 선생님께 알려 주세요."); return; }
@@ -753,7 +808,8 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
             ? "같은 학번이 다른 브라우저에서 시험을 보고 있어 이 화면은 멈췄습니다. 선생님이 「세션 초기화」를 누르면 여기서 이어 풀 수 있습니다."
             : "「이어서 풀기」를 누르면 이 자리에서 같은 블록을 이어 풉니다. 고른 답은 저장되어 있습니다."}</p>
           {submitErr && <div className="warn-note" role="alert">{submitErr}</div>}
-          <button type="button" className="btn qz-big" disabled={!canBack || busy} onClick={reclaim}>{busy ? "잇는 중…" : "이어서 풀기"}</button>
+          {pastGrace && <p className="hint">시간이 끝나 이어 풀 수 없습니다. 아래 버튼으로 제출 처리하고 선생님께 알려 주세요.</p>}
+          <button type="button" className="btn qz-big" disabled={(!canBack && !pastGrace) || busy} onClick={reclaim}>{busy ? "잇는 중…" : pastGrace ? "제출 처리" : "이어서 풀기"}</button>
         </div>
       </div>
     );
@@ -823,7 +879,7 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
       <div className="qz-bar">
         <span className="qz-bar-i">블록 <b className="mono">{cur}</b> / {BLOCKS}</span>
         <span className="qz-bar-i">답한 문항 <b className="mono">{answered}</b> / {ids.length || BLOCK_SIZE}</span>
-        <span className={"qz-bar-i qz-time" + (remain <= 60 ? " low" : "")} aria-hidden="true">
+        <span className={"qz-bar-i qz-time" + (remain <= 60 ? " low" : "")}>
           남은 시간 <b className="mono">{fmtMMSS(Math.max(0, remain))}</b>{frozenAt != null ? " (정지)" : ""}
         </span>
         <span className={"qz-bar-i qz-rec" + (late ? " late" : "")}>권장 종료: 남은 시간 {fmtMMSS(recRemain)} 전{late ? " (지났습니다)" : ""}</span>
@@ -838,10 +894,12 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
       </div>
       {alertText && <div className="qz-alert" aria-hidden="true">{alertText}</div>}
       {offline && <div className="warn-note qz-off" role="alert">연결을 확인해 주세요. 고른 답은 이 화면에 남아 있고, 인터넷이 이어지면 제출할 수 있습니다.</div>}
-      <main className="qz-main" aria-busy={busy}>
+      {/* 덮개가 떠 있는 동안 문항 영역은 inert: 초점·클릭이 닿지 않는다 */}
+      <main className="qz-main" aria-busy={busy} inert={cover ? true : undefined}>
         <h2 className="qz-blk-h">블록 {cur} / {BLOCKS} <span className="hint">5문항 모두 답한 뒤 「블록 제출」을 누르세요. 제출한 블록으로는 돌아갈 수 없습니다.</span></h2>
+        {pendingRef.current && !busy && <div className="warn-note" role="status">제출 중인 답은 바꿀 수 없습니다. 「다시 제출」이 같은 답을 다시 보냅니다.</div>}
         {ids.map((id, i) => (
-          <ItemCard key={id} it={itemMap.get(id)} missing={!itemMap.get(id)} idx={i} seed={seed} pick={draft[id]} onPick={(oid) => onPick(id, i, oid)} />
+          <ItemCard key={id} it={itemMap.get(id)} missing={!itemMap.get(id)} idx={i} seed={seed} pick={draft[id]} onPick={(oid) => onPick(id, i, oid)} disabled={busy || !!pendingRef.current} />
         ))}
         <div className="qz-submit">
           {submitErr && (
@@ -882,6 +940,7 @@ function ResultView({ v, cfg }) {
   const items = Array.isArray(r.items) ? r.items : [];
   const fp = new Set((Array.isArray(v.falsePos) ? v.falsePos : []).map(Number));
   const events = (Array.isArray(v.events) ? v.events : []).map((e, i) => ({ i, ...(e || {}) }));
+  const opened = (k) => !!(v.blocks && (v.blocks[String(k + 1)] || v.blocks[k + 1]));
   const moveWord = (k) => {
     if (k >= path.length) return "";
     if (k === path.length - 1) return r.F < path[k] ? "↓ 최종급 " + r.F + "급" : "= 최종급 " + r.F + "급";
@@ -902,11 +961,11 @@ function ResultView({ v, cfg }) {
             </dl>
           </div>
           {r.n < MIN_ANSWERED && <div className="warn-note">응답 문항이 {MIN_ANSWERED}개 미만이라 「끝까지 응답하지 못함」으로 E 2점입니다. 기술 장애 때문이라면 선생님께 말씀해 주세요.</div>}
-          {r.bonus && <div className="ok-note">문항 오류 정정으로 이동이 유리해져 최종급에 한 급을 더했습니다(§4.6 규칙).</div>}
+          {r.bonus && <div className="ok-note">문항 오류가 확인되어 전원 정답 처리한 결과, 급 이동이 유리해져 최종급에 한 급을 더했습니다(시험 전에 안내한 정정 규칙).</div>}
           <div className="qz-h">급 경로와 블록별 정답 수</div>
           <ol className="qz-path">
             {path.map((L, k) => (
-              <li key={k}><span className="qz-path-k">블록 {k + 1}</span><b>{L}급</b> <span className="mono">{bc[k] != null ? bc[k] : 0}/{BLOCK_SIZE}</span> <span className="qz-path-mv">{moveWord(k)}</span></li>
+              <li key={k}><span className="qz-path-k">블록 {k + 1}</span><b>{L}급</b> <span className="mono">{opened(k) ? (bc[k] != null ? bc[k] : 0) + "/" + BLOCK_SIZE : "열지 않음(0/" + BLOCK_SIZE + ")"}</span> <span className="qz-path-mv">{moveWord(k)}</span></li>
             ))}
           </ol>
           <p className="hint">4개 이상 맞히면 다음 블록이 한 급 오르고, 3개면 그대로, 2개 이하면 한 급 내려갑니다. 마지막 블록에서 2개 이하면 최종급이 한 급 내려갑니다.</p>
@@ -953,7 +1012,7 @@ function ResultView({ v, cfg }) {
                 <tbody>
                   {events.map((e) => (
                     <tr key={e.i} className={fp.has(e.i) ? "qz-fp" : ""}>
-                      <td className="mono">{e.i + 1}</td><td className="mono">{fmtHMS(e.t)}</td><td className="mono">{e.type}{e.mlb ? " (마우스 이탈 뒤)" : ""}</td>
+                      <td className="mono">{e.i + 1}</td><td className="mono">{fmtHMS(e.t)}</td><td>{eventLabel(e.type)}{e.mlb ? " (마우스 이탈 뒤)" : ""}{e.cover ? " (안내 화면 중)" : ""}</td>
                       <td className="mono">{e.ms != null ? secOf(e.ms) : "-"}</td><td className="mono">{e.block != null ? e.block : "-"}</td>
                       <td>{[e.prep ? "준비 구간" : "", e.key || e.action || "", fp.has(e.i) ? "오탐(선생님 확인)" : ""].filter(Boolean).join(" · ") || "-"}</td>
                     </tr>
@@ -982,6 +1041,7 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
   const [live, setLive] = useState(null);
   const [got, setGot] = useState(false);
   const [bankLive, setBankLive] = useState(null);
+  const [bankGot, setBankGot] = useState(false);   // 은행 문서 응답을 한 번이라도 받았는가(없음과 로딩 중을 가른다)
   const [slow, setSlow] = useState(false);
   const [session, setSession] = useState(null);   // { v, startedAtMs, offset, sess, prepUntil }
   const [busy, setBusy] = useState(false);
@@ -1002,7 +1062,7 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
   }, [sid, sampleMode, closed]);
   useEffect(() => {
     if (!sid || sampleMode || closed) return undefined;
-    const u = fbStore.watchDoc("quizBank", (v) => setBankLive(v && typeof v === "object" ? v : null));
+    const u = fbStore.watchDoc("quizBank", (v) => { setBankLive(v && typeof v === "object" ? v : null); setBankGot(true); });
     return () => u();
   }, [sid, sampleMode, closed]);
   useEffect(() => {
@@ -1074,8 +1134,10 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
         if (v.status === "done" || v.finishedAt) throw new Error("이미 제출되었습니다. 결과는 선생님이 공개하면 보입니다.");
         /* 시간이 끝나고 규칙의 유예(60초)도 지났으면 진행 필드(sess·served)를 쓸 수 없다(quizWithinTime).
            마무리 필드만 써서 완료로 닫는다. 유예 안이면 그대로 이어 열고, 시험 화면이 곧바로 현재 블록을 자동 제출한다 */
-        const remNow = remainingSec({ nowMs: Number.isFinite(b.data.hbMs) ? b.data.hbMs : Date.now() + offset, startedAtMs, cfg, v, sid });
-        if (remNow * 1000 <= -GRACE_MS) {
+        /* 전체 일시정지 중이면 정지 시각 기준으로 잰다(정지 시간은 재개 때 pausedAccumSec 에 더해진다) */
+        const nowForRem = cfg.paused && cfg.pausedAtMs ? Number(cfg.pausedAtMs) : Number.isFinite(b.data.hbMs) ? b.data.hbMs : Date.now() + offset;
+        const remNow = remainingSec({ nowMs: nowForRem, startedAtMs, cfg, v, sid });
+        if (remNow * 1000 <= -GRACE_MS && !cfg.paused) {
           const fin = new Date(Date.now() + offset).toISOString();
           const okFin = await fbStore.quizPatch(sid, { status: "done", finishedAt: fin, cur: Number(v.cur) || BLOCKS, clientScore: clientScoreOf({ blocks: v.blocks || {}, bank }) });
           exitFs(); setBusy(false);
@@ -1124,7 +1186,7 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
     <div className="card qz-card">
       <div className="card-head"><span className="card-code">쪽지시험</span><span className="card-title">{cfg.title || "쪽지시험"}</span><span className="card-sess">{stageNote}</span></div>
       <div className="card-body">
-        <ol className="qz-rules">{RULE_SENTENCES.map((s, i) => <li key={i}>{s}</li>)}</ol>
+        <ol className="qz-rules">{ruleSentences(cfg.warnLimit).map((s, i) => <li key={i}>{s}</li>)}</ol>
         <details className="qz-details">
           <summary>점수표 보기</summary>
           <ScoreTable />
@@ -1193,9 +1255,10 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
             {locked && <div className="warn-note" role="alert">시험이 잠겨 있습니다. 선생님을 불러 주세요. 선생님이 풀어 주면 「이어서 풀기」가 활성화됩니다.</div>}
             {lv.resumeOk && !locked && <div className="ok-note">선생님이 응시를 다시 열었습니다. 같은 문항·순서로 남은 블록을 이어 풉니다.</div>}
             {!locked && !dup && <p style={{ fontSize: 13, lineHeight: 1.6 }}>「이어서 풀기」를 누르면 전체화면으로 바뀌고 같은 블록의 같은 자리에서 이어 풉니다. 고른 답은 저장되어 있고, 남은 시간은 처음 시작한 시각 기준으로 이어집니다.</p>}
-            {!bankOk && <div className="warn-note">문항 은행을 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.</div>}
+            {cfg.paused && <div className="warn-note" role="status">선생님이 시험을 잠시 멈췄습니다. 재개되면 「이어서 풀기」가 활성화됩니다. 멈춘 시간은 보전됩니다.</div>}
+            {!bankOk && (bankGot ? <div className="warn-note">문항 은행이 아직 올라오지 않았습니다. 선생님께 알려 주세요.</div> : <div className="warn-note">문항 은행을 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.</div>)}
             {err && <div className="warn-note" role="alert">{err}</div>}
-            <button type="button" className="btn qz-big" disabled={busy || locked || waitDup || !bankOk} onClick={() => openSession(false)}>{busy ? "잇는 중…" : "이어서 풀기"}</button>
+            <button type="button" className="btn qz-big" disabled={busy || locked || waitDup || !bankOk || !!cfg.paused} onClick={() => openSession(false)}>{busy ? "잇는 중…" : "이어서 풀기"}</button>
           </div>
         </div>
       </>
@@ -1208,7 +1271,8 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
         <div className="card qz-card">
           <div className="card-head"><span className="card-code">시작</span><span className="card-title">시험 시작</span><span className="card-sess">{stageNote}</span></div>
           <div className="card-body">
-            {!bank && <div className="warn-note">문항 은행을 불러오는 중입니다. 잠시만 기다려 주세요.{slow ? " 연결이 느리면 인터넷 연결을 확인해 주세요." : ""}</div>}
+            {!bank && !bankGot && <div className="warn-note">문항 은행을 불러오는 중입니다. 잠시만 기다려 주세요.{slow ? " 연결이 느리면 인터넷 연결을 확인해 주세요." : ""}</div>}
+            {!bank && bankGot && <div className="warn-note">선생님이 아직 문항 은행을 올리지 않았습니다. 선생님께 알려 주세요.</div>}
             {bank && !bankOk && <div className="warn-note">문항 은행이 준비되지 않았습니다. 선생님께 알려 주세요.</div>}
             {!canStart && <div className="warn-note" role="alert">시작 마감이 지나 새로 시작할 수 없습니다. 선생님께 알려 주세요.</div>}
             {err && <div className="warn-note" role="alert">{err}</div>}
@@ -1247,6 +1311,8 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
 
 const QUIZ_CSS = `
 .qz-card{border-top:3px solid var(--ink)}
+body.qz-exam-on .topbar,body.qz-exam-on .sess-tabs,body.qz-exam-on .prog-strip{display:none!important}
+.qz-main[inert]{opacity:.35;filter:blur(1px)}
 .qz-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .qz-rules{margin:0 0 12px;padding-left:22px;font-size:14px;line-height:1.7}
 .qz-rules li{margin-bottom:4px}

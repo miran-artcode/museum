@@ -4748,7 +4748,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
 
   const enterTeacher = async () => {
     setErr("");
-    if (tpin.length < 6) return setErr("관리자 코드는 6자리 이상입니다.");
+    if (tpin.length < 5) return setErr("관리자 코드는 5자리 이상입니다.");
     setBusy(true);
     const r = await authApi.teacherEnter(tpin);
     setBusy(false);
@@ -4802,7 +4802,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
           </form>
         ) : mode === "teacher" ? (
           <form onSubmit={(e) => { e.preventDefault(); enterTeacher(); }}>
-            <div className="field"><label htmlFor="g4-tpin">관리자 코드 (6자리 이상)</label>
+            <div className="field"><label htmlFor="g4-tpin">관리자 코드 (5자리 이상)</label>
               <div style={{ display: "flex", gap: 6 }}>
                 <input id="g4-tpin" type={showT ? "text" : "password"} value={tpin} onChange={(e) => setTpin(e.target.value)} maxLength={32} style={{ flex: 1 }} />
                 <button type="button" className="btn small ghost" onClick={() => setShowT(!showT)} aria-pressed={showT}>{showT ? "숨기기" : "표시"}</button>
@@ -9033,10 +9033,10 @@ function TeacherApp({ onExit, onGallery }) {
                                 <div className="card">
                   <div className="card-head"><span className="card-code">설정 3</span><span className="card-title">관리자 코드 변경</span></div>
                   <div className="card-body">
-                    <div className="field" style={{ maxWidth: 260 }}><label>새 관리자 코드 (6자리 이상)</label>
+                    <div className="field" style={{ maxWidth: 260 }}><label>새 관리자 코드 (5자리 이상)</label>
                       <input type="password" value={npin} onChange={(e) => setNpin(e.target.value)} /></div>
                     <button className="btn" onClick={async () => {
-                      if (npin.length < 6) return setMsg("관리자 코드는 6자리 이상으로 정하세요.");
+                      if (npin.length < 5) return setMsg("관리자 코드는 5자리 이상으로 정하세요.");
                       const ok = await authApi.changeCode(npin);
                       if (ok) { setMsg("관리자 코드를 바꿨습니다."); setNpin(""); }
                       else setMsg("코드를 바꾸지 못했습니다. 다시 로그인한 뒤 시도하세요.");

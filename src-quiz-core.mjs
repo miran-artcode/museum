@@ -31,6 +31,7 @@ export const MIN_ANSWERED = 10;                                     // 이보다
 export const STEM_MAX = { 1: 60, 2: 80, 3: 120, 4: 160, 5: 220 };  // 문두 글자 상한
 export const CASE_MAX_5 = 140;                                      // 5급 사례 서술 상한(문항 필드 caseLen 로 검사)
 export const MAX_EVENTS = 300;
+export const IMAGE_MAX = 12;           // 은행 전체 이미지 문항 상한(§5.6, 8%)
 /* 급별 설계 목표 정답률과 사후 통계의 기대 범위 (쪽지시험_구현_근거.md §2.2, §6.1) */
 export const LEVEL_TARGET_P = { 1: 0.85, 2: 0.75, 3: 0.60, 4: 0.50, 5: 0.40 };
 export const LEVEL_P_RANGE = { 1: [0.75, 0.95], 2: [0.65, 0.90], 3: [0.50, 0.80], 4: [0.40, 0.70], 5: [0.30, 0.60] };
@@ -47,6 +48,21 @@ export const RULE_SENTENCES = [
   "20문항 중 맞힌 수가 등급 안의 점수를 정합니다. 빈칸은 오답과 같고 감점은 없으니 모르는 문항도 반드시 답하세요.",
   "시험 중에는 현재 급과 정답 여부를 보여 주지 않고, 시험이 끝나면 급 경로·블록별 정답 수·점수표의 내 행·화면 이탈 기록을 모두 공개합니다. 다른 창으로 나가면 기록되고, 세 번째에는 시험이 잠겨 선생님이 풀어 줍니다.",
 ];
+
+/* 경고 한도가 3이 아닐 때의 다섯 문장. 다섯째 문장의 「세 번째」만 한도에 맞춘다 */
+const ORDINAL = { 2: "두 번째", 3: "세 번째", 4: "네 번째", 5: "다섯 번째" };
+export function ruleSentences(warnLimit) {
+  const lim = Number(warnLimit) || 3;
+  if (lim === 3) return RULE_SENTENCES;
+  return RULE_SENTENCES.map((t, i) => (i === 4 ? t.replace("세 번째에는", (ORDINAL[lim] || lim + "번째") + "에는") : t));
+}
+
+/* 이탈 기록의 종류를 학생·교사 화면에 우리말로 보인다 (쪽지시험_구현_근거.md §7.2) */
+export const EVENT_LABELS = {
+  blur: "창 전환", blur_short: "짧은 창 전환", fs_exit: "전체화면 벗어남", devtools_key: "개발자 도구 단축키", blocked_key: "막힌 단축키",
+  blocked_action: "막힌 동작", mouseleave: "마우스 이탈", resize: "창 크기 변화", dup: "중복 접속", reconnect: "다시 접속", lock: "잠금",
+};
+export const eventLabel = (type) => EVENT_LABELS[type] || String(type || "");
 
 /* 산출표 (쪽지시험_구현_근거.md §4.2). 위에서부터 F가 같고 c >= cMin 인 첫 행이 점수다 */
 export const SCORE_ROWS = [
@@ -265,10 +281,14 @@ export function bankCells(bank, half) {
 }
 export const cellOrder = (seed, level, area, cell) => shuffled(cell || [], mulberry32(((seed >>> 0) ^ hash32("cell|" + level + "|" + area)) >>> 0));
 
-/* 블록 추출. AREA_MIX[level] 순서(①→④)로 칸을 훑으며 used·disabled가 아닌 첫 항목들을 고른다.
+/* 블록 추출. 칸을 ③ → ① → ② → ④ 순서(AREA_DRAW_ORDER)로 훑으며 used·disabled가 아닌 첫 항목들을 고른다.
+   ③을 ①보다 먼저 훑는 까닭: CELL_MIN에서 2~4급 ③ 칸은 예비가 없고(방문 수 × 1) ① 칸은 예비가 하나 있다.
+   ①을 먼저 훑어 이미지가 블록에 들어가면 ③의 이미지 문항이 건너뛰어져 마지막 방문에서 ③ 칸이 바닥나 반을 넘기게 되므로,
+   예비가 없는 ③을 먼저 채워 이미지 건너뜀이 예비가 있는 ①에 떨어지게 한다(정상 경로에서 crossHalf가 나지 않는다).
    포인터 대신 used 집합을 쓰므로 급이 바뀌었다 돌아와도 이미 본 문항은 다시 나오지 않는다.
    이미지 규칙: 블록에 이미지 문항이 이미 하나 있거나 noImage면 이미지 문항은 소비하지 않고 건너뛴다(skipped).
    칸이 바닥나면 반대 반의 같은 칸(같은 seed 순서)에서 채우고 crossHalf:true. 그래도 모자라면 있는 만큼 돌려준다. */
+export const AREA_DRAW_ORDER = [3, 1, 2, 4];
 export function drawBlock({ bank, half, seed, level, used, disabled, noImage, k }) {
   const usedSet = toSet(used), disSet = toSet(disabled);
   const other = half === "A" ? "B" : "A";
@@ -289,7 +309,7 @@ export function drawBlock({ bank, half, seed, level, used, disabled, noImage, k 
     }
     return got;
   };
-  for (let area = 1; area <= 4; area += 1) {
+  for (const area of AREA_DRAW_ORDER) {
     const need = mix[area - 1];
     if (!need) continue;
     const got = take(mine, area, need);
@@ -309,23 +329,32 @@ export function usedOf(served) {
 const sameSet = (a, b) => { const A = new Set((a || []).map(String)), B = new Set((b || []).map(String)); if (A.size !== B.size) return false; for (const x of A) if (!B.has(x)) return false; return true; };
 
 /* 교사 재현: path(급 경로)를 따라 블록마다 drawBlock을 돌려 served[k].itemIds와 집합으로 비교한다(표시 순서는 무시).
-   used는 실제 served 기록을 누적한다. 어느 블록 하나가 어긋나도 뒤 블록은 독립으로 대조되어 어긋난 자리가 드러난다 */
+   used는 실제 served 기록을 누적한다. 어느 블록 하나가 어긋나도 뒤 블록은 독립으로 대조되어 어긋난 자리가 드러난다.
+   비활성 목록은 재계산 시점의 것이라 추출 뒤에 비활성화한 문항이 served에 들어 있을 수 있다(served에는 당시 목록이 남지 않는다).
+   그래서 블록마다 served[k]에 실제로 들어 있는 id는 비활성 목록에서 빼고 재현한다. 학생은 cfg.disabled에 id를 넣을 수 없으므로
+   대조가 약해지지 않는다. 그런 블록이 집합까지 맞으면 warnings에 적어 둔다(불일치가 아니라 참고).
+   추출 당시에는 비활성이었다가 뒤에 다시 활성화한 문항은 여전히 불일치로 잡힌다(알려진 한계) */
 export function replayServed({ bank, half, seed, path, served, disabled, noImage }) {
-  const expected = {}, mismatches = [];
+  const expected = {}, mismatches = [], warnings = [];
+  const disAll = toSet(disabled);
   const used = new Set();
   for (let k = 1; k <= BLOCKS; k += 1) {
     const s = blockAt(served, k);
     if (!s) break;
     const level = (path && path[k - 1]) || (Number.isInteger(s.level) ? s.level : START_LEVEL);
-    const d = drawBlock({ bank, half, seed, level, used, disabled, noImage, k });
-    expected[k] = d.itemIds;
     const actual = (s.itemIds || []).map(String);
+    const disabledServed = actual.filter((id) => disAll.has(id));
+    const dis = disabledServed.length ? [...disAll].filter((id) => !disabledServed.includes(id)) : disAll;
+    const d = drawBlock({ bank, half, seed, level, used, disabled: dis, noImage, k });
+    expected[k] = d.itemIds;
     if (!sameSet(d.itemIds, actual) || (Number.isInteger(s.level) && s.level !== level)) {
       mismatches.push({ k, expected: d.itemIds, actual, level: { expected: level, actual: s.level } });
+    } else if (disabledServed.length) {
+      warnings.push({ k, disabledServed });
     }
     actual.forEach((id) => used.add(id));
   }
-  return { ok: mismatches.length === 0, expected, mismatches };
+  return { ok: mismatches.length === 0, expected, mismatches, warnings };
 }
 
 /* ---------- 채점 ---------- */
@@ -400,7 +429,10 @@ export function flagsOf(res, blocks, v) {
 /* 교사 재계산. 실제로 받은 문항과 실제 경로는 바꾸지 않고 c·F만 다시 센다(쪽지시험_구현_근거.md §4.6).
    정정(allCorrect)으로 블록 1~3 어느 곳에서든 이동이 원래보다 유리해졌으면(하강→유지, 유지→상승) F에 한 급을 더한다(최대 5).
    블록 4의 변화는 F 규칙에 이미 반영되므로 따로 더하지 않는다.
-   불일치: seed로 재현한 추출이 served와 다르거나, blocks의 문항·급이 served·규칙과 다르거나, 가채점과 F·c·점수가 다르면 표시 */
+   불일치: seed로 재현한 추출이 served와 다르거나, blocks의 문항·급이 served·규칙과 다르거나, 가채점과 F·c·점수가 다르면 표시.
+   가채점 대조는 정정 전 값(base)으로 한다. 학생 브라우저는 quizKeys(정정)를 읽지 못하고 keyHash로만 세므로 정정 뒤 값과 비교하면
+   정정이 있는 학급에서는 대조를 꺼야 했고, 그러면 고쳐 쓴 가채점을 놓친다.
+   notes: 불일치는 아니지만 교사가 알아 둘 참고(추출 뒤 비활성화한 문항이 든 블록 등) */
 export function recompute({ attempt, bank, keys, corrections, disabled, cfg, now }) {
   const v = attempt || {};
   const blocks = v.blocks || {};
@@ -418,11 +450,12 @@ export function recompute({ attempt, bank, keys, corrections, disabled, cfg, now
   }
   const dis = disabled != null ? disabled : (cfg && cfg.disabled) || [];
   const noImage = v.noImage != null ? !!v.noImage : !!(cfg && cfg.noImage && cfg.noImage[v.sid]);
-  const detail = [];
+  const detail = [], notes = [];
   let servedBad = false, scoreBad = false;
   if (bank && v.served) {
     const rep = replayServed({ bank, half: v.half, seed: v.seed, path: res.path, served: v.served, disabled: dis, noImage });
     if (!rep.ok) { servedBad = true; rep.mismatches.forEach((m) => detail.push("블록 " + m.k + " 추출 불일치")); }
+    (rep.warnings || []).forEach((w) => notes.push("블록 " + w.k + " 현재 비활성 문항 포함(추출 당시 활성): " + w.disabledServed.join(", ")));
   }
   // 급 대조는 정정 전 정답 수(base)로 한다. 학생이 실제로 밟은 경로는 정정 전 수로 정해졌으므로
   // 정정 뒤 수로 대조하면 정정 자체가 불일치로 잡힌다
@@ -436,15 +469,17 @@ export function recompute({ attempt, bank, keys, corrections, disabled, cfg, now
     level = base.path[k - 1]; prev = base.blockCorrect[k - 1];
   });
   const cs = v.clientScore;
-  if (cs && corr.size === 0 && (cs.F !== res.F || cs.c !== res.c || cs.score !== res.score)) {
+  // 추출·문항 기록이 이미 어긋났다면 그 결과로 생긴 가채점 차이는 별도 변조로 세지 않는다.
+  // served가 정상일 때만 clientScore 자체의 변조 여부를 독립적으로 판정한다.
+  if (!servedBad && cs && (cs.F !== base.F || cs.c !== base.c || cs.score !== base.score)) {
     scoreBad = true;
-    detail.push("가채점 불일치(학생 F" + cs.F + " c" + cs.c + " " + cs.score + "점, 재계산 F" + res.F + " c" + res.c + " " + res.score + "점)");
+    detail.push("가채점 불일치(학생 F" + cs.F + " c" + cs.c + " " + cs.score + "점, 정정 전 재계산 F" + base.F + " c" + base.c + " " + base.score + "점)");
   }
   const mismatch = servedBad || scoreBad ? { served: servedBad, score: scoreBad, detail: detail.join("; ") } : null;
   const flags = flagsOf({ ...res, flags: mismatch ? ["mismatch"] : [] }, blocks, v);
   return {
     path: res.path, blockCorrect: res.blockCorrect, F: res.F, c: res.c, n: res.n, score: res.score, band: res.band, answered: res.answered,
-    flags, mismatch, bonus, fBase: base.F, correctedIds: [...corr].filter((id) => Object.values(blocks).some((b) => b && (b.itemIds || []).map(String).includes(id))).sort(cmp),
+    flags, mismatch, notes, bonus, fBase: base.F, correctedIds: [...corr].filter((id) => Object.values(blocks).some((b) => b && (b.itemIds || []).map(String).includes(id))).sort(cmp),
     keyVer: (keys && keys.ver) || "", computedAt: now || new Date().toISOString(),
     warnCount: Number(v.warn) || 0, lockCount: (v.lock && Number(v.lock.count)) || 0,
   };
@@ -480,7 +515,10 @@ export function resultItems({ attempt, bank, keysDoc, seed }) {
 
 /* ---------- 사후 통계 ---------- */
 
-/* 학생×문항 응답 평면 목록. 정오는 정정 없이 원래 정답 키로 센다(통계는 문항의 실제 작동을 보는 것이 목적) */
+/* 학생×문항 응답 평면 목록. 정오는 정정 없이 원래 정답 키로 센다(통계는 문항의 실제 작동을 보는 것이 목적).
+   ms는 기록 그대로의 pickMs(블록 시작부터 마지막으로 답을 고른 시각까지의 누적 ms).
+   gapMs는 문항별 응답 시간 근사: 블록 안의 pickMs를 오름차순으로 세워 앞 문항과의 간격(첫 문항은 pickMs 자체)이다.
+   pickMs가 없는 문항은 null. 문항 통계의 중앙 초는 gapMs로 낸다(쪽지시험_구현_근거.md §6.1 「pickMs의 간격으로 근사」) */
 function responsesOf(attempts, keys) {
   const km = keyMapOf(keys);
   const rows = [];
@@ -489,9 +527,16 @@ function responsesOf(attempts, keys) {
     const mine = [];
     forEachBlock(v.blocks, (k, b) => {
       const ids = b.itemIds || [], ans = b.answers || [], ms = b.pickMs || [];
+      const order = ids.map((_, i) => i).filter((i) => Number.isFinite(ms[i])).sort((a, c) => ms[a] - ms[c]);
+      const gap = {};
+      let prev = 0;
+      // Date.now() 해상도 안에서 연속 선택하면 두 기록이 같은 값일 수 있다. 응답한 문항의
+      // 소요 시간이 0으로 오인되지 않도록 최소 관측 간격 1ms를 둔다.
+      order.forEach((i) => { gap[i] = Math.max(1, ms[i] - prev); prev = ms[i]; });
       ids.forEach((id, i) => {
         const pick = isPick(ans[i]) ? ans[i] : null;
-        mine.push({ sid, k, i, level: b.level, id: String(id), pick, correct: pick != null && km[String(id)] != null && km[String(id)] === pick, ms: Number.isFinite(ms[i]) ? ms[i] : null, auto: !!b.auto });
+        mine.push({ sid, k, i, level: b.level, id: String(id), pick, correct: pick != null && km[String(id)] != null && km[String(id)] === pick,
+          ms: Number.isFinite(ms[i]) ? ms[i] : null, gapMs: gap[i] != null ? gap[i] : null, auto: !!b.auto });
       });
     });
     const total = mine.filter((r) => r.correct).length;
@@ -528,7 +573,7 @@ export function itemStats({ attempts, keysDoc, bank }) {
         if (topHalfWrong == null && top.filter((r) => r.pick === o).length / top.length >= 0.5) topHalfWrong = o;
       });
     }
-    const medianMs = median(rows.map((r) => r.ms));
+    const medianMs = median(rows.map((r) => r.gapMs));   // 누적 pickMs가 아니라 문항별 간격의 중앙값
     const flags = [];
     if (n < ITEM_STAT_MIN_N) flags.push("few");
     if (n >= ITEM_FLAG_MIN_N) {
@@ -583,7 +628,10 @@ export function reliabilityStats({ attempts, keys, corrections, results }) {
   const scores = b1s.map((x) => x.score);
   const mu = mean(scores);
   const varX = scores.length >= 2 ? scores.reduce((a, x) => a + (x - mu) ** 2, 0) / scores.length : 0;
-  const kr20 = scores.length >= 2 && varX > 0 ? (BLOCK_SIZE / (BLOCK_SIZE - 1)) * (1 - mean(b1s.map((x) => x.pq)) / varX) : null;
+  const kr20Raw = scores.length >= 2 && varX > 0 ? (BLOCK_SIZE / (BLOCK_SIZE - 1)) * (1 - mean(b1s.map((x) => x.pq)) / varX) : null;
+  // 문항이 학생마다 다른 근삿값이라 음수는 가능하다. 다만 부동소수점 극한에서 생기는
+  // 비유한값은 보고하지 않고, 이론상 상한인 1을 넘는 미세 오차는 1로 제한한다.
+  const kr20 = Number.isFinite(kr20Raw) ? Math.min(1, kr20Raw) : null;
   const block1 = { n: b1s.length, mean: mu == null ? null : mu / BLOCK_SIZE, kr20 };
   let nR = 0, okR = 0, nB = 0, okB = 0;
   const halves = { A: { n: 0, sum: 0 }, B: { n: 0, sum: 0 } };
@@ -629,7 +677,8 @@ export function recordSheet({ attempt, result, keysDoc, bank }) {
         correct: corr.has(String(id)) || (pick != null && answer != null && pick === answer), corrected: corr.has(String(id)), pickMs: Number.isFinite(ms[i]) ? ms[i] : null });
     });
     const level = res.path[k - 1], c = res.blockCorrect[k - 1];
-    const mv = k === BLOCKS ? (c <= ROUTE_DOWN ? "down" : "stay") : moveOf(level, c) > 0 ? "up" : moveOf(level, c) < 0 ? "down" : "stay";
+    // 마지막 블록도 moveOf와 같이 실제 결과로 센다: 1급에서 2개 이하면 F는 그대로 1이므로 「유지」
+    const mv = k === BLOCKS ? (finalLevelOf(level, c) < level ? "down" : "stay") : moveOf(level, c) > 0 ? "up" : moveOf(level, c) < 0 ? "down" : "stay";
     blocks.push({ k, level, correct: c, answered: res.answered ? res.answered[k - 1] : null, move: mv, auto: !!b.auto, at: b.at || null, blockMs: b.blockMs != null ? b.blockMs : null });
   });
   const fp = new Set((Array.isArray(v.falsePos) ? v.falsePos : []).map(Number));
@@ -648,13 +697,14 @@ export function recordSheet({ attempt, result, keysDoc, bank }) {
 
 export function csvAttempts(attempts, results, pidOf) {
   const pid = pidFn(pidOf);
-  const head = ["pid", "half", "seed", "status", "time_mult", "no_image", "finished_at", "path", "b1", "b2", "b3", "b4", "F", "c", "n", "score", "band", "flags",
+  // seed 는 학번과 은행 salt 의 해시라 익명 번호를 되돌릴 수 있으므로 연구 CSV 에 넣지 않는다
+  const head = ["pid", "half", "status", "time_mult", "no_image", "finished_at", "path", "b1", "b2", "b3", "b4", "F", "c", "n", "score", "band", "flags",
     "warn", "lock_count", "paused_total_sec", "extra_sec", "n_events", "n_blur_short", "mismatch", "client_F", "client_c", "client_score", "bonus"];
   const rows = Object.keys(attempts || {}).sort(cmp).map((sid) => {
     const v = attempts[sid] || {}, r = (results && results[sid]) || null, cs = v.clientScore || {};
     const ev = Array.isArray(v.events) ? v.events.filter(Boolean) : [];
     const bc = (r && r.blockCorrect) || [];
-    return [pid(sid), v.half, v.seed, v.status, v.timeMult != null ? v.timeMult : 1, v.noImage ? 1 : 0, v.finishedAt,
+    return [pid(sid), v.half, v.status, v.timeMult != null ? v.timeMult : 1, v.noImage ? 1 : 0, v.finishedAt,
       r ? (r.path || []).join(">") : "", bc[0], bc[1], bc[2], bc[3], r && r.F, r && r.c, r && r.n, r && r.score, r && r.band, r ? (r.flags || []).join("|") : "",
       Number(v.warn) || 0, (v.lock && v.lock.count) || 0, Number(v.pausedTotalSec) || 0, Number(v.extraSec) || 0, ev.length, ev.filter((e) => e.type === "blur_short").length,
       r && r.mismatch ? 1 : 0, cs.F, cs.c, cs.score, r && r.bonus ? 1 : 0].map(cell);
@@ -716,7 +766,8 @@ export function validateBank(bank) {
     const opts = Array.isArray(p && p.options) ? p.options : [];
     if (!p || !trimStr(p.id) || !trimStr(p.stem) || opts.length !== 4 || !opts.some((o) => o && o.id === p.answer)) errors.push("연습 문항 " + (i + 1) + ": id·문두·보기 4개·정답이 갖춰져야 합니다");
   });
-  const seen = new Set(), specs = {};
+  const seen = new Set(), specs = {}, imgCells = {};
+  let imgTotal = 0;
   items.forEach((it, i) => {
     const tag = "문항 " + (it && it.id != null ? it.id : "#" + (i + 1));
     if (!it || typeof it !== "object") { errors.push(tag + ": 객체가 아닙니다"); return; }
@@ -753,6 +804,7 @@ export function validateBank(bank) {
     if (it.half === "A" || it.half === "B") {
       const key = it.level + "-" + it.area;
       if (cells[it.half][key] != null) cells[it.half][key] += 1;
+      if (it.image) { imgCells[it.half + ":" + key] = (imgCells[it.half + ":" + key] || 0) + 1; imgTotal += 1; }
     }
     if (trimStr(it.spec)) { const s = (specs[it.spec] = specs[it.spec] || { A: 0, B: 0 }); if (s[it.half] != null) s[it.half] += 1; }
     else warnings.push(tag + ": spec(쌍둥이 명세)이 없습니다");
@@ -760,6 +812,10 @@ export function validateBank(bank) {
   Object.keys(specs).sort(cmp).forEach((sp) => {
     if (specs[sp].A !== 1 || specs[sp].B !== 1) warnings.push("명세 " + sp + ": A·B 각 1문항이어야 합니다(A " + specs[sp].A + ", B " + specs[sp].B + ")");
   });
+  /* 이미지 문항 상한(쪽지시험_구현_근거.md §5.6): 반당 칸마다 최대 1개, 은행 전체 최대 IMAGE_MAX 개. 블록당 1개 규칙(drawBlock)이
+     이미지 문항을 건너뛰므로 한 칸에 이미지가 둘이면 최악 경로에서 칸이 바닥나 반을 넘길 수 있다 */
+  Object.keys(imgCells).sort(cmp).forEach((k) => { if (imgCells[k] > 1) warnings.push(k.replace(":", "반 ") + " 칸에 이미지 문항이 " + imgCells[k] + "개입니다(반당 칸마다 최대 1개)"); });
+  if (imgTotal > IMAGE_MAX) warnings.push("이미지 문항이 " + imgTotal + "개입니다(은행 전체 최대 " + IMAGE_MAX + "개)");
   ["A", "B"].forEach((h) => LEVELS.forEach((l) => [1, 2, 3, 4].forEach((a) => {
     const need = CELL_MIN[l][a - 1], have = cells[h][l + "-" + a];
     if (have < need) errors.push(h + "반 " + l + "급 영역 " + a + " 칸이 모자랍니다(" + have + "/" + need + ")");
@@ -864,15 +920,16 @@ export function buildSampleQuiz(ids) {
       cur = k;
       const auto = incomplete && k === 3;
       const answers = [], pickMs = [];
-      let c = 0;
+      let c = 0, acc = 0;   // pickMs는 학생 화면과 같이 블록 시작부터의 누적 시각이다
       d.itemIds.forEach((id, i) => {
         if (auto && i >= 2) { answers.push(null); pickMs.push(null); return; }
         const right = rnd() < prof[level];
         const pick = right ? km[id] : OPT_IDS.filter((o) => o !== km[id])[Math.floor(rnd() * 3)];
-        answers.push(pick); pickMs.push(Math.round(LEVEL_SEC[level] * 1000 * (0.5 + rnd())));
+        acc += Math.round(LEVEL_SEC[level] * 1000 * (0.5 + rnd()));
+        answers.push(pick); pickMs.push(acc);
         if (pick === km[id]) c += 1;
       });
-      const blockMs = pickMs.reduce((a, x) => a + (x || 0), 0) + 15000;
+      const blockMs = acc + 15000;
       if (locked && k === 2) {
         [1, 2, 3].forEach((w) => events.push({ t: iso(t + 20000 * w), type: "blur", ms: 3000 + 500 * w, block: k, item: w, warn: w }));
         warn = 3;
