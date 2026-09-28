@@ -4731,7 +4731,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
     if (reason === "wrong-code") return "관리자 코드가 맞지 않습니다.";
     if (reason === "auth/network-request-failed") return "인터넷 연결을 확인하세요.";
     if (reason === "auth/too-many-requests") return "시도가 너무 잦습니다. 잠시 뒤 다시 하세요.";
-    if (reason === "auth/operation-not-allowed") return "관리자 설정이 끝나지 않았습니다. Firebase 콘솔에서 이메일·비밀번호 로그인을 켜야 합니다.";
+    if (reason === "auth/operation-not-allowed") return "관리자 설정이 끝나지 않았습니다. Firebase 콘솔에서 이메일·비밀번호 로그인을 사용 설정해야 합니다.";
     return "입장하지 못했습니다. 잠시 뒤 다시 시도하세요.";
   };
 
@@ -4761,14 +4761,10 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
     setErr("");
     if (tpin.length < 5) return setErr("관리자 코드는 5자리 이상입니다.");
     setBusy(true);
+    // 교사·보기 전용 계정은 콘솔(또는 scripts/reset-pin.mjs)에서 만들어 둔다. 입장 화면은 계정을 만들지 않는다 (README §4)
     const r = await authApi.teacherEnter(tpin);
     setBusy(false);
     if (!r.ok) return setErr(msgOf(r.reason));
-    if (r.isNew && !r.viewer) {
-      // 병합 쓰기 — 계정만 다시 만든 경우나 읽기 실패 때 기존 설정 문서를 덮어쓰지 않는다
-      const cfg = (await store.get("config")) || {};
-      await store.set("config", { open: cfg.open || DEFAULT_OPEN, created: now() }, { merge: true });
-    }
     session.save({ role: "teacher", viewer: !!r.viewer });
     onTeacher();
   };
@@ -4780,7 +4776,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
     // 키보드 사용자가 스크롤 뒤에도 헤더에 남지 않도록 입장 패널로 포커스를 옮긴다
     if (focus) setTimeout(() => { try { el.focus({ preventScroll: true }); } catch (e) {} }, 400);
   };
-  const [showT, setShowT] = useState(false); // 관리자 코드 표시 — 첫 설정 때 오타가 그대로 학급 코드로 굳는 것을 막는다
+  const [showT, setShowT] = useState(false); // 관리자 코드 표시 — 입장이 거절됐을 때 오타인지 확인한다
 
   return (
     <div className="g4">
@@ -4821,7 +4817,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
               </div></div>
             {err && <div className="err" role="alert">{err}</div>}
             <button type="submit" className="btn full seal" disabled={busy}>{busy ? "확인 중…" : "관리자 입장"}</button>
-            <p className="gate-note">처음 입력한 코드가 이 학급의 관리자 코드가 됩니다. 새로 설정한다면 「표시」를 눌러 오타가 없는지 확인한 뒤 입장하세요.</p>
+            <p className="gate-note">관리자 코드나 참관용 코드를 입력합니다. 「표시」를 누르면 입력한 코드를 확인할 수 있습니다.</p>
           </form>
         ) : (
           <div>

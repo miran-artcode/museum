@@ -10,6 +10,7 @@ import {
   doc, getDoc, setDoc, collection, getDocs, onSnapshot, deleteDoc, query, where,
   serverTimestamp, arrayUnion, getDocFromServer, getDocsFromServer,
   updateDoc, deleteField, FieldPath,
+  waitForPendingWrites, terminate, clearIndexedDbPersistence,
 } from "firebase/firestore";
 import {
   getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -43,10 +44,12 @@ const auth = getAuth(app);
 
 const DOMAIN = "@museum.class";
 const TEACHER_ID = "teacher";
-// 보기 전용 교사 계정: 관리자 코드 자리에 VIEWER_CODE를 넣으면 viewer@museum.class로 들어간다.
+// 보기 전용 교사 계정(viewer@museum.class): 관리자 코드 칸에 참관용 코드를 넣으면 들어간다 (teacherEnter).
+// 참관용 코드는 이 파일에도 규칙에도 적지 않는다. 저장소가 공개라 적어 두면 누구나 학급 기록 전체를 읽는다.
 // 규칙(firestore.rules)이 viewer의 쓰기를 전부 거부하고, 아래 쓰기 함수도 서버에 보내지 않고 false를 돌려준다.
 const VIEWER_ID = "viewer";
-const VIEWER_CODE = "admin";
+// 비밀번호가 틀렸거나 계정이 없을 때 Auth가 돌려주는 코드 (이메일 열거 보호가 켜진 뒤로는 invalid-credential 하나로 온다)
+const BAD_CRED = ["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found", "auth/invalid-login-credentials"];
 const idOfUser = (u) => (u && u.email ? String(u.email).split("@")[0] : "");
 export const isViewerNow = () => idOfUser(auth.currentUser) === VIEWER_ID;
 export const emailOf = (id) => id + DOMAIN;
@@ -64,7 +67,7 @@ export const authApi = {
       return { ok: true, isNew: false };
     } catch (e) {
       const code = e && e.code;
-      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+      if (BAD_CRED.includes(code)) {
         try {
           await createUserWithEmailAndPassword(auth, emailOf(sid), pwOf(sid, pin));
           return { ok: true, isNew: true };
@@ -79,26 +82,22 @@ export const authApi = {
 
   isViewer() { return isViewerNow(); },
 
-  /* 관리자 코드가 VIEWER_CODE면 보기 전용 계정(viewer), 아니면 교사 계정(teacher)으로 들어간다 */
+  /* 관리자 코드 칸 하나로 두 계정을 가린다: 먼저 교사(teacher#코드), 맞지 않으면 보기 전용(viewer#코드)으로 들어간다.
+     두 계정은 Firebase 콘솔이나 scripts/reset-pin.mjs로 한 번 만들어 두고, 여기서는 만들지 않는다.
+     예전에는 로그인이 실패하면 그 코드로 계정을 새로 만들었다. 그러면 교사 계정이 지워진 사이에
+     처음 입장한 사람이 교사가 되고, 보기 전용 계정도 아무 코드로나 다시 만들 수 있었다. */
   async teacherEnter(code) {
-    const id = code === VIEWER_CODE ? VIEWER_ID : TEACHER_ID;
-    const viewer = id === VIEWER_ID;
-    try {
-      await signInWithEmailAndPassword(auth, emailOf(id), pwOf(id, code));
-      return { ok: true, isNew: false, viewer };
-    } catch (e) {
-      const c = e && e.code;
-      if (c === "auth/invalid-credential" || c === "auth/wrong-password" || c === "auth/user-not-found") {
-        try {
-          await createUserWithEmailAndPassword(auth, emailOf(id), pwOf(id, code));
-          return { ok: true, isNew: true, viewer };
-        } catch (e2) {
-          if (e2.code === "auth/email-already-in-use") return { ok: false, reason: "wrong-code" };
-          return { ok: false, reason: e2.code || "unknown" };
-        }
-      }
-      return { ok: false, reason: c || "unknown" };
-    }
+    const tryIn = async (id) => {
+      try { await signInWithEmailAndPassword(auth, emailOf(id), pwOf(id, code)); return ""; }
+      catch (e) { return (e && e.code) || "unknown"; }
+    };
+    const t = await tryIn(TEACHER_ID);
+    if (!t) return { ok: true, viewer: false };
+    if (!BAD_CRED.includes(t)) return { ok: false, reason: t }; // 연결 끊김·시도 과다는 그대로 알린다
+    const v = await tryIn(VIEWER_ID);
+    if (!v) return { ok: true, viewer: true };
+    if (!BAD_CRED.includes(v)) return { ok: false, reason: v };
+    return { ok: false, reason: "wrong-code" };
   },
 
   async changeCode(newCode) {

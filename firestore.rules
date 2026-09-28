@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // 허구의 아카이브 학급 기록실 접근 규칙
-// 계정 체계: 학생 = {학번}@museum.class / 교사 = teacher@museum.class
+// 계정 체계: 학생 = {학번}@museum.class / 교사 = teacher@museum.class / 보기 전용 = viewer@museum.class
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -27,7 +27,8 @@ service cloud.firestore {
     function isOwner(id) {
       return signedIn() && uid() == id;
     }
-    // 보기 전용 교사 계정(viewer@museum.class, 관리자 코드 자리에 admin): 수업 참관자·공동 연구자에게 나눠 주는 코드다.
+    // 보기 전용 교사 계정(viewer@museum.class): 관리자 코드 칸에 참관용 코드를 넣어 들어온다. 수업 참관자·공동 연구자에게
+    // 따로 알려 주는 코드이며 저장소 어디에도 적지 않는다(공개 저장소). 계정은 콘솔에서 만들고 앱은 만들지 않는다.
     // 수업 기록(기록지·채점·설문·상호평가·응시 기록·은행)은 읽되 아무것도 쓰지 못하고, 여러 사람이 아는 코드이므로
     // 정답 키(quizKeys)·연구 동의 대장(research)·기록지 시점 사본(wsHistory)·media 전체 목록은 교사(teacher)만 읽는다.
     function isViewer() {
