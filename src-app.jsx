@@ -5608,6 +5608,11 @@ function StudentApp({ me, onExit, onGallery }) {
 
 /* ---------- 교사: 학생 상세(열람 + 채점) ---------- */
 
+/* 관리 작업의 지우기·복사는 오프라인이면 끝나지 않고 매달린다 (deleteDoc·setDoc가 서버 확인을 기다린다).
+   결과를 교사에게 알려야 하므로 제한 시간 안에 답이 없으면 실패로 본다.
+   늦게 성공해도 다시 눌렀을 때 같은 결과가 되는(멱등) 작업에만 쓴다. */
+const timed = (p, ms) => Promise.race([p, new Promise((res) => setTimeout(() => res(false), ms || 8000))]);
+
 function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack, ids, onSel, initialTab }) {
   const [ws, setWs] = useState(null);
   const [grade, setGrade] = useState({});
@@ -5760,21 +5765,62 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
     onBack();
   };
 
+  /* 전시 정리는 기록지의 그 칸 하나만 바꾼다. 화면을 연 때 읽은 사본({...ws})으로 문서를 통째로 쓰면
+     그 뒤 학생이 쓴 칸이 모두 옛 값으로 돌아간다 (수업 중에 급히 내리는 작업이라 학생이 접속 중인 경우가 많다). */
+  const [exhibitLeft, setExhibitLeft] = useState(false); // 기록지는 내렸는데 전시장 사본을 못 지운 상태: 다시 누를 수 있게 버튼을 살려 둔다
+  const [imgLeft, setImgLeft] = useState(""); // 기록지에서는 뺐는데 파일을 못 지운 대표 이미지의 참조
   const unpublishWork = async () => {
-    const next = { ...ws, "s7x.show": "비공개" };
-    if (await store.set("ws:" + sid, next)) { setWs(next); setMgmtMsg("작품을 전시에서 내렸습니다. 전시장에서 더 이상 보이지 않습니다."); }
-    else setMgmtMsg("전시 내리기에 실패했습니다.");
+    setBusyMgmt(true);
+    const r = await store.updateFieldsT("ws:" + sid, { "s7x.show": "비공개" });
+    if (r !== true) {
+      setBusyMgmt(false);
+      return setMgmtMsg(r === "missing" ? "서버에 이 학생의 기록지가 없습니다. 목록으로 돌아가 다시 여세요." : "전시 내리기에 실패했습니다. 연결을 확인하고 다시 누르세요.");
+    }
+    setWs((p) => ({ ...p, "s7x.show": "비공개" }));
+    // 전시장은 exhibit/{학번} 사본을 읽는다. 기록지만 내리면 전시장에는 계속 걸려 있다
+    const ex = await timed(fbStore.remove("exhibit:" + sid));
+    setBusyMgmt(false);
+    setExhibitLeft(!ex);
+    setMgmtMsg(ex ? "작품을 전시에서 내렸습니다. 전시장에서 더 이상 보이지 않습니다."
+      : "기록지는 비공개로 바꿨지만 전시장 사본을 지우지 못해 전시장에는 아직 보일 수 있습니다. 「전시에서 내리기」를 다시 누르세요.");
   };
 
   const deleteWorkImage = async () => {
     const cur = ws["s7x.img"];
     if (!cur || !cur.ref) return setMgmtMsg("지울 대표 이미지가 없습니다.");
     if (!window.confirm("전시 대표 이미지를 지웁니다. 되돌릴 수 없습니다. 진행할까요?")) return;
-    await mediaStore.remove(sid, cur.ref);
-    const next = { ...ws, "s7x.img": "" };
-    await store.set("ws:" + sid, next);
-    setWs(next);
-    setMgmtMsg("대표 이미지를 지웠습니다.");
+    setBusyMgmt(true);
+    // 화면을 연 뒤 학생이 이미지를 바꿨다면 확인받은 것과 다른 이미지를 지우게 된다. 서버의 지금 값을 먼저 본다
+    const fresh = await store.getSafe("ws:" + sid);
+    if (!fresh.ok || fresh.fromCache) { setBusyMgmt(false); return setMgmtMsg("기록지를 다시 읽지 못했습니다. 연결을 확인하고 다시 누르세요."); }
+    const live = fresh.data || {};
+    const liveImg = live["s7x.img"];
+    if (!liveImg || liveImg.ref !== cur.ref) {
+      setWs(live); setBusyMgmt(false);
+      return setMgmtMsg(liveImg && liveImg.ref ? "화면을 연 뒤 학생이 대표 이미지를 바꿨습니다. 화면을 새 기록으로 바꿨으니 이미지를 확인하고 다시 누르세요." : "학생이 이미 대표 이미지를 뺐습니다.");
+    }
+    // ① 기록지에서 이 칸만 비운다. 실패하면 파일을 지우지 않는다 (기록지가 없는 파일을 가리키게 되므로)
+    const r = await store.updateFieldsT("ws:" + sid, { "s7x.img": "" });
+    if (r !== true) { setBusyMgmt(false); return setMgmtMsg("대표 이미지를 기록지에서 빼지 못했습니다. 연결을 확인하고 다시 누르세요."); }
+    setWs({ ...live, "s7x.img": "" });
+    const fails = [];
+    // ② 전시장 사본이 있으면 그 이미지도 비운다 (없으면 만들지 않는다)
+    const ex = await store.getSafe("exhibit:" + sid);
+    if (!ex.ok) fails.push("전시장 사본 확인");
+    else if (ex.data && (await store.updateFieldsT("exhibit:" + sid, { img: "" })) === false) fails.push("전시장 사본의 이미지 비우기");
+    // ③ 기록지가 더는 가리키지 않게 된 뒤에 파일을 지운다
+    const gone = await timed(mediaStore.remove(sid, cur.ref));
+    if (!gone) fails.push("이미지 파일 삭제");
+    setImgLeft(gone ? "" : cur.ref);
+    setBusyMgmt(false);
+    setMgmtMsg(fails.length ? "대표 이미지를 기록지에서 뺐지만 다음을 하지 못했습니다: " + fails.join(", ") + ". 연결을 확인하세요." : "대표 이미지를 지웠습니다.");
+  };
+  const retryImgFile = async () => {
+    setBusyMgmt(true);
+    const ok = await timed(mediaStore.remove(sid, imgLeft));
+    setBusyMgmt(false);
+    if (ok) setImgLeft("");
+    setMgmtMsg(ok ? "남아 있던 대표 이미지 파일을 지웠습니다." : "이미지 파일을 지우지 못했습니다. 연결을 확인하고 다시 누르세요.");
   };
 
   if (loadErr) return (
@@ -5866,8 +5912,9 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
                   </p>
                   {ws["s7x.img"] && ws["s7x.img"].ref && <div style={{ marginBottom: 10 }}><MediaThumb owner={sid} refId={ws["s7x.img"].ref} alt="전시 대표 이미지" size={110} /></div>}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button className="btn small ghost" disabled={busyMgmt || ws["s7x.show"] !== "공개"} onClick={unpublishWork}>전시에서 내리기</button>
+                    <button className="btn small ghost" disabled={busyMgmt || (ws["s7x.show"] !== "공개" && !exhibitLeft)} onClick={unpublishWork}>전시에서 내리기</button>
                     <button className="btn small ghost" disabled={busyMgmt || !(ws["s7x.img"] && ws["s7x.img"].ref)} onClick={deleteWorkImage}>대표 이미지 삭제</button>
+                    {imgLeft && <button className="btn small ghost" disabled={busyMgmt} onClick={retryImgFile}>남은 이미지 파일 지우기</button>}
                   </div>
                   <p className="hint" style={{ marginTop: 8 }}>부적절한 작품을 급히 내릴 때 씁니다. 내려도 학생의 기록지는 그대로 남고, 학생이 다시 「공개」로 바꿀 수 있습니다.</p>
                 </div>
