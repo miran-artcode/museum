@@ -683,13 +683,19 @@ function pearson(xs, ys) {
   return sxy / Math.sqrt(sxx * syy);
 }
 
+/* 스피어만–브라운 2r/(1+r)은 r > 0에서만 쓴다. r ≤ 0이면 보정하지 않고 r을 그대로 돌려준다 —
+   음수에 식을 대면 r → −1에서 발산해 −1 아래로 내려가고(r = −0.8 → −8) 중앙값을 끌어내린다.
+   r ≤ 0에서 항등, r > 0에서 증가이므로 전체가 단조라 중앙값의 순서는 보정 전과 같다 */
+export const spearmanBrown = (r) => (r == null || !Number.isFinite(r) ? null : r > 0 ? (2 * r) / (1 + r) : r);
+
 /* 반분 신뢰도 — 판정자를 무작위로 반으로 갈라 각각 BT를 풀고 θ의 상관을 스피어만–브라운으로 보정.
-   판정자 단위로 가르는 것이 판정 단위보다 보수적이다(같은 판정자의 판정은 서로 독립이 아니다). */
+   판정자 단위로 가르는 것이 판정 단위보다 보수적이다(같은 판정자의 판정은 서로 독립이 아니다).
+   nonPos: 반쪽 상관이 0 이하라 보정하지 않고 그대로 둔 회수 (values에도 보정 없이 들어간다) */
 export function splitHalf(judgements, workNos, opts = {}) {
   const by = opts.by || "judges", reps = opts.reps || 25, seed = opts.seed || "split";
   const main = (judgements || []).filter((J) => J.rep == null);
   const values = [], raw = [];
-  let failed = 0;
+  let failed = 0, nonPos = 0;
   const fitPair = (h1, h2) => {
     const b1 = bradleyTerry(h1, workNos), b2 = bradleyTerry(h2, workNos);
     const common = workNos.filter((no) => b1.plays[no] > 0 && b2.plays[no] > 0);
@@ -697,11 +703,12 @@ export function splitHalf(judgements, workNos, opts = {}) {
     const r = pearson(common.map((no) => b1.theta[no]), common.map((no) => b2.theta[no]));
     if (r == null) return null;
     raw.push(r);
-    return (2 * r) / (1 + r);
+    if (!(r > 0)) nonPos += 1;
+    return spearmanBrown(r);
   };
   if (by === "judges") {
     const judges = Array.from(new Set(main.map((J) => J.judge))).sort(cmp);
-    if (judges.length < 4) return { median: null, medianRaw: null, values, raw, failed: reps, n: 0 };
+    if (judges.length < 4) return { median: null, medianRaw: null, values, raw, failed: reps, nonPos: 0, n: 0 };
     for (let rep = 0; rep < reps; rep += 1) {
       const order = shuffled(judges, mulberry32(stableHash(seed + "::" + rep)));
       const half = new Set(order.slice(0, Math.floor(order.length / 2)));
@@ -715,8 +722,8 @@ export function splitHalf(judgements, workNos, opts = {}) {
       if (v == null) failed += 1; else values.push(v);
     }
   }
-  // median: 스피어만–브라운 보정값(전체 길이 추정), medianRaw: 문헌이 보고하는 반쪽끼리의 상관 그대로
-  return { median: median(values), medianRaw: median(raw), values, raw, failed, n: values.length };
+  // median: 스피어만–브라운 보정값(전체 길이 추정, r ≤ 0인 회는 보정 없이), medianRaw: 문헌이 보고하는 반쪽끼리의 상관 그대로
+  return { median: median(values), medianRaw: median(raw), values, raw, failed, nonPos, n: values.length };
 }
 
 /* 판정자 적합도 — 성적이 아니라 수업 자료. 제외 근거로 쓰지 않는다 */

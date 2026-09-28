@@ -6,6 +6,7 @@ import {
   bradleyTerry, scaleSeparation, splitHalf, judgeFit, positionBias, connectivity, repeatAgreement, ranksAndBands,
   collectJudgements, aggregate, csvJudgements, csvScores, csvSelf, csvSubmissions, csvJudges, buildSampleAssess, judgeBlockOf,
   wilson, predPctOf, simText, submissionFromWs, subReady, stableHash, peerCfg, DEFAULT_PEER, TAG_OPTIONS, QUALITY_MIN,
+  spearmanBrown,
 } from "./src-assess-core.mjs";
 
 const sids = (n, from = 20301) => Array.from({ length: n }, (_, i) => String(from + i));
@@ -475,4 +476,33 @@ test("비교 0회 작품은 순위 분모에서 빠지고 표 맨 뒤로, SSR은
   const firstNull = ranks.indexOf(null);
   assert.ok(firstNull === -1 || ranks.slice(firstNull).every((r) => r == null));
   assert.equal(buildSampleAssess(sids(3)).roster, null);
+});
+
+test("스피어만–브라운은 r > 0에만 쓰고, 반쪽 상관이 0 이하면 보정 없이 r을 둔다 (−1 아래로 내려가지 않는다)", () => {
+  assert.equal(spearmanBrown(-0.8), -0.8);                 // 식을 그대로 대면 −8
+  assert.equal(spearmanBrown(0), 0);
+  assert.ok(Math.abs(spearmanBrown(0.5) - 2 / 3) < 1e-12);
+  assert.equal(spearmanBrown(null), null);
+  assert.equal(spearmanBrown(NaN), null);
+  // 두 무리: 판정자 넷은 번호가 큰 작품을, 넷은 작은 작품을 고른다 → 판정자를 반으로 가르면 대개 두 반쪽의 θ가 거꾸로 선다
+  const nos = Array.from({ length: 8 }, (_, i) => "W" + i);
+  const J = [];
+  for (let j = 0; j < 8; j += 1) {
+    for (let x = 0; x < 8; x += 1) {
+      for (let y = x + 1; y < 8; y += 1) {
+        const up = j < 4;
+        J.push({ judge: "J" + j, i: J.length, a: nos[x], b: nos[y], win: up ? "b" : "a", rep: null });
+      }
+    }
+  }
+  const sh = splitHalf(J, nos, { by: "judges", reps: 25, seed: "camps" });
+  assert.ok(sh.nonPos > 0, "음의 반쪽 상관이 한 번은 나와야 한다");
+  assert.equal(sh.values.length, sh.raw.length);
+  sh.values.forEach((v, i) => {
+    assert.ok(v >= -1 - 1e-12 && v <= 1 + 1e-12, "범위 밖 " + v);
+    if (sh.raw[i] <= 0) assert.equal(v, sh.raw[i]);
+    else assert.ok(v >= sh.raw[i]);
+  });
+  assert.ok(sh.median >= -1 && sh.median <= 1);
+  assert.ok(sh.medianRaw <= sh.median + 1e-9);
 });
