@@ -286,6 +286,9 @@ function LinkEditor({ links, onChange }) {
         <div className="ed-link-row" key={i}>
           <input value={l.t || ""} placeholder="링크 이름 (예: 마르셀 뒤샹)" onChange={(e) => up(i, { t: e.target.value })} />
           <input className="mono" value={l.u || ""} placeholder="https://..." onChange={(e) => up(i, { u: e.target.value })} />
+          <label className="ed-src-k" title="원 텍스트·원본 기록·소장처 작품 기록이면 표시합니다. 학생 화면 작품 카드에 「원문」으로 따로 보입니다.">
+            <input type="checkbox" checked={l.k === "원문"} onChange={(e) => up(i, { k: e.target.checked ? "원문" : null })} /> 원문
+          </label>
           {l.u && <a className="wk-link" href={l.u} target="_blank" rel="noopener noreferrer">열기 ↗</a>}
           <button className="btn small ghost" onClick={() => onChange(ls.filter((_, j) => j !== i))}>삭제</button>
         </div>
@@ -344,6 +347,20 @@ function ImageEditor({ images, onChange, slot }) {
             <EdText label="그림 설명 (학생에게 보이는 글)" value={x.cap} onChange={(v) => up(i, { cap: v })} ph="예: 뒤샹 「샘」, 1917 (1964년 복제)" />
             <EdText label="출처 표기" value={x.credit} onChange={(v) => up(i, { credit: v })} ph="예: Tate 소장 / 촬영 ○○○" />
             <EdText label="눌렀을 때 열릴 설명 사이트 주소" mono value={x.link} onChange={(v) => up(i, { link: v })} ph="https://..." />
+            {/* 본문 속 위치와 크기: src-reading.jsx가 at 문단 뒤에 size 모양으로 놓는다 */}
+            <div className="ed-grid2">
+              <div className="ed-f"><label>본문 속 위치</label>
+                <input type="number" min="0" value={x.at == null ? "" : x.at + 1} placeholder="비우면 본문 끝"
+                  onChange={(e) => { const v = e.target.value.trim(); const k = Math.round(Number(v)); up(i, { at: v === "" || !isFinite(k) ? null : Math.max(-1, k - 1) }); }} />
+                <span className="hint">몇 번째 문단 뒤에 놓을지 적습니다. 0이면 맨 위, 비우면 본문 끝입니다.</span></div>
+              <div className="ed-f"><label>크기</label>
+                <select value={x.size || "full"} onChange={(e) => up(i, { size: e.target.value })}>
+                  <option value="full">크게 한 장</option>
+                  <option value="half">중간(위치가 같은 두 장은 나란히)</option>
+                  <option value="side">넓은 화면에서 글 옆에</option>
+                  <option value="thumb">작게(위치가 같은 3~4장을 한 줄로)</option>
+                </select></div>
+            </div>
             <button className="btn small ghost" onClick={() => del(i)}>이 그림 빼기</button>
           </div>
         </div>
@@ -417,10 +434,13 @@ function ReadingEditor({ rd, i, count, n, onPatch, onMove, onDel }) {
           <EdText label="단계 이름" value={rd.stage} onChange={(v) => onPatch(i, { stage: v })} ph="예: 감상 1" />
           <EdText label="소제목" value={rd.h} onChange={(v) => onPatch(i, { h: v })} ph="예: 1917년 뉴욕, 출품과 거부와 소실" />
         </div>
-        <EdArea label="이론·설명 본문" hint="빈 줄 하나로 문단을 나눕니다." min={6} max={40}
+        <EdArea label="이론·설명 본문" hint="빈 줄 하나로 문단을 나눕니다. 문단 맨 앞에 「## 」를 쓰면 소제목, 「> 」는 인용(마지막 줄을 「> 출처: …」로), 「- 」나 「1. 」은 목록, 「! 」는 핵심 상자가 됩니다. 글 안의 **글자**는 강조, [글자](https://주소)는 링크입니다." min={6} max={40}
           value={arrToParas(rd.p)} onChange={(v) => onPatch(i, { p: parasToArr(v) })} />
         <EdArea label="이 단계에서 던질 발문" hint="한 줄에 하나씩. 학생 화면에 「생각해 볼 질문」 상자로 보입니다. 비워 두면 상자가 나타나지 않습니다." min={2} max={12}
           value={arrToLines(rd.asks)} onChange={(v) => onPatch(i, { asks: linesToArr(v) })} />
+        {Array.isArray(rd.viz) && rd.viz.length > 0 && (
+          <p className="hint">이 읽기 자료에는 도식(연표·비교·용어 정리 등)이 {rd.viz.length}개 있습니다. 도식은 이 화면에서 고칠 수 없고 본문을 고쳐도 그대로 유지됩니다. 문단 수를 바꾸면 도식과 그림의 위치가 달라질 수 있으니 미리 보기로 확인하세요.</p>
+        )}
         <div className="ed-f"><label>그림·사진</label>
           <ImageEditor images={rd.images} slot={"L" + n + "r" + i} onChange={(v) => onPatch(i, { images: v })} /></div>
         <div className="ed-f"><label>작품·자료 표</label>
@@ -715,6 +735,7 @@ export const CONTENT_CSS = `
 .ed-f input,.ed-f textarea{width:100%;padding:8px 10px;border:1px solid var(--line);background:#fff;
   font-family:var(--sans);font-size:13.5px;line-height:1.7;color:var(--ink);border-radius:0}
 .ed-f input.mono,.ed-link-row input.mono,.ed-img-add input.mono{font-family:var(--mono);font-size:12px}
+.ed-f select{width:100%;padding:8px 10px;border:1px solid var(--line);background:#fff;font-family:var(--sans);font-size:13.5px;color:var(--ink);border-radius:0}
 .ed-f input:focus,.ed-f textarea:focus{outline:2px solid var(--ink);outline-offset:-1px}
 .ed-f .hint{display:block;margin-top:4px}
 .ed-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -736,6 +757,7 @@ export const CONTENT_CSS = `
 .ed-rowbtn .btn{margin-right:3px}
 .ed-links{display:flex;flex-direction:column;gap:6px}
 .ed-link-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ed-src-k{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--sub);white-space:nowrap}
 .ed-link-row input{flex:1 1 160px;padding:6px 8px;border:1px solid var(--line);background:#fff;
   font-family:var(--sans);font-size:12.5px;color:var(--ink);border-radius:0}
 .ed-imgs{display:flex;flex-direction:column;gap:12px}
