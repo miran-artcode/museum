@@ -26,6 +26,7 @@ import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, Inquiry
 import { makeSnapshotter, WsHistoryCard } from "./src-ws-history.jsx";
 import { makeDirtyTracker, changedKeys, mergeRemote, buildPatch } from "./src-ws-sync.mjs";
 import { LegacyEcho } from "./src-legacy-fields.jsx";
+import { WsLockCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
 import {
   ATTITUDES, ATTITUDE_HINTS, LADDER_INTRO, TRANSLATE_STAGES, REFLECT_KEYS, DERIVE_KEYS,
   LEGACY_BACK, normBack, backLabel, SYMBOL_WORDS, findSymbol, SCHEMA_REV, REV_SECTIONS,
@@ -4868,7 +4869,7 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
         {sec.ladder && <LadderRail sec={sec} ws={ws} />}
         {sec.id === "s3p" && <ScenesEcho ws={ws} />}
         {sec.id === "s3c" && <LegacyEcho ws={ws} obs={OBS_METHODS} engage={ENGAGE_MODES} />}
-        {sec.summary && <LadderSummaryBox ws={ws} setField={setField} />}
+        {sec.summary && <LockSet><LadderSummaryBox ws={ws} setField={setField} /></LockSet>}
         {/* 4차시 유물 설계는 3차시 발상 단계의 결론에서 시작한다 */}
         {sec.carry && <Carry ws={ws} items={["problem", "invisible", "object", "trace", "attitude"]} title="3차시 유물 발상 단계에서 가져온 것" toLadder />}
         {/* 탐구 질문은 앞에서 본 것을 근거로 삼는다 — 그 자료를 질문 위에 끌어온다 */}
@@ -4877,6 +4878,8 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
         )}
         {/* 3차시부터는 질문이 “내가 고른 문제·물건·흔적”을 전제한다 — 그 답을 여기 다시 놓는다 */}
         {sec.kind === "inquiry" && Number(sec.code) >= 3 && <Carry ws={ws} />}
+        {/* 입력 잠금(src-ws-lock.jsx) 중에는 이 안의 입력칸과 버튼이 모두 비활성화된다. 위의 수업 자료는 감싸지 않는다 */}
+        <LockSet tag>
         <div className="f-grid">
           {/* 감싸는 칸마다 저장 키를 달아 둔다 — 표·발상 단계·점검표처럼 자체 입력칸을 가진
               자리에 붙여넣어도 어느 칸인지 알 수 있어야 전 과정의 붙여넣기가 빠짐없이 남는다.
@@ -4887,6 +4890,7 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
             </div>
           ))}
         </div>
+        </LockSet>
       </div>
     </div>
   );
@@ -4935,6 +4939,10 @@ function StudentApp({ me, onExit, onGallery }) {
   useEffect(() => { if (peerStage === "closed") setAssessOn(false); }, [peerStage]);
   const quizStage = quizCfg(cfgAll).stage;
   useEffect(() => { if (quizStage === "closed") setQuizOn(false); }, [quizStage]);
+  /* 학습지 입력 잠금(src-ws-lock.jsx): 교사가 이론 평가를 앞두고 켜면 칸은 잠기고 수업 내용과 쓴 기록만 본다 */
+  const wsLocked = wsLockOn(cfgAll);
+  const wsLockRef = useRef(false);
+  wsLockRef.current = wsLocked;
   const [svBusy, setSvBusy] = useState(false);
   const [svSave, setSvSave] = useState(null); // 설문 자동 저장 상태: null | saving | saved | err
   const svTimer = useRef(null);
@@ -5145,7 +5153,7 @@ function StudentApp({ me, onExit, onGallery }) {
   };
 
   const setField = (k, v) => {
-    if (!loaded) return;
+    if (!loaded || wsLockRef.current) return; // 입력 잠금 중에는 어떤 칸도 쓰지 않는다
     const upd = (p) => {
       const next = { ...p, [k]: v };
       // 밑줄 키(_inq 같은 보조 기록)는 고쳐 쓰기 이력·붙여넣기·차시 시각 장부를 건드리지 않는다
@@ -5416,6 +5424,7 @@ function StudentApp({ me, onExit, onGallery }) {
   };
 
   return (
+    <WsLockCtx.Provider value={wsLocked}>
     <NavCtx.Provider value={{ openMap, go: navGo }}>
     <div>
       <div className="topbar">
@@ -5488,6 +5497,7 @@ function StudentApp({ me, onExit, onGallery }) {
             <button className="btn small" onClick={() => goStage("quiz")}>쪽지시험으로 이동</button>
           </div>
         )}
+        {loaded && wsLocked && !assessOn && !quizOn && <WsLockNote />}
         {loaded && <div className="sess-tabs" role="tablist">
           {SESSIONS.map((s) => {
             const open = isOpen(openMap, s);
@@ -5591,6 +5601,7 @@ function StudentApp({ me, onExit, onGallery }) {
       )}
     </div>
     </NavCtx.Provider>
+    </WsLockCtx.Provider>
   );
 }
 
@@ -8922,6 +8933,7 @@ function TeacherApp({ onExit, onGallery }) {
                     )}
                   </div>
                 </div>
+                <WsLockCard cfgAll={cfgAll} setCfgAll={setCfgAll} setMsg={setMsg} ids={ids} roster={roster} wsMap={wsMap} sampleMode={sampleMode} />
                 <div className="card">
                   <div className="card-head"><span className="card-code">설문</span><span className="card-title">사전·사후 창의성 설문 열기와 닫기</span></div>
                   <div className="card-body">
@@ -9874,6 +9886,7 @@ function App() {
       <QuizStyle />
       <QuizTeacherStyle />
       <InquiryStyle />
+      <WsLockStyle />
       <LadderStyle />
       <ThemeStyle />
       <UxStyle />
