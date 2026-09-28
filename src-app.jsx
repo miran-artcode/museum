@@ -22,12 +22,14 @@ import { UxStyle, ConfirmButton, session, TeacherTabs } from "./src-ux.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { ArExpoEntry, ArDeepLink, ArStyle } from "./src-ar.jsx";
 import { LabelCompare } from "./src-label-compare.jsx";
+import { ReadingCard, LessonMap } from "./src-reading.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
 import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, InquiryStyle, inquiryTraceRows } from "./src-inquiry.jsx";
 import { makeSnapshotter, WsHistoryCard } from "./src-ws-history.jsx";
 import { makeDirtyTracker, changedKeys, mergeRemote, buildPatch } from "./src-ws-sync.mjs";
 import { LegacyEcho } from "./src-legacy-fields.jsx";
 import { WsLockCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
+import { SketchPad, SketchStyle, sketchDirty } from "./src-sketch.jsx";
 import {
   ATTITUDES, ATTITUDE_HINTS, LADDER_INTRO, TRANSLATE_STAGES, REFLECT_KEYS, DERIVE_KEYS,
   LEGACY_BACK, normBack, backLabel, SYMBOL_WORDS, findSymbol, SCHEMA_REV, REV_SECTIONS,
@@ -460,7 +462,7 @@ const SCHEMA_DEF = [
     fields: [
       { k: "eskis", t: "area", label: "서로 다른 시점의 에스키스 세 점에 대한 메모 (구조·시점·스케일·배경·빛)" },
       { k: "eskisImg", t: "images", opt: true, label: "에스키스 사진 (최대 3장): 손으로 그린 세 점을 찍어 올립니다.", mm: true },
-      { k: "sketchpad", t: "sketch", opt: true, label: "디지털 에스키스: 화면에 직접 그려 저장합니다. 종이 스케치 사진과 함께 남겨도 됩니다.", mm: true },
+      { k: "sketchpad", t: "sketch", opt: true, label: "디지털 에스키스: 화면에 직접 그려 저장합니다. 종이 스케치 사진과 함께 올려도 됩니다.", mm: true },
       { k: "pairRead", t: "text", label: "짝이 읽어 준 내용" },
       { k: "final", t: "area", label: "최종 선택한 장면과 선택 이유" },
       { k: "checks", t: "checks", opts: ["구조·재질", "시점·스케일", "빛·배경", "마모·파손·수리 흔적의 위치"], label: "화면 설계 확인" },
@@ -2480,12 +2482,6 @@ body{background:var(--bg)}
 .mm-del{border:none;background:none;font-family:var(--sans);font-size:12px;color:var(--seal);cursor:pointer;padding:6px 8px;text-decoration:underline}
 .mm-load{font-family:var(--mono);font-size:11px;color:var(--sub)}
 .mm-rec{font-family:var(--mono);font-size:12px;color:var(--seal)}
-.sketch-box{border:1px dashed var(--line);background:#fff;padding:10px}
-.sketch-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-.sk-color{width:24px;height:24px;border:2px solid #fff;outline:1px solid var(--line);cursor:pointer;padding:0}
-.sk-color.on{outline:2px solid var(--seal)}
-.sketch-cv{width:100%;max-width:720px;border:1px solid var(--line2);background:#fff;touch-action:none;cursor:crosshair;display:block}
-.sketch-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .link-row{display:grid;grid-template-columns:2fr 1fr;gap:6px;margin-bottom:6px}
 @media(max-width:640px){.link-row{grid-template-columns:1fr}}
 
@@ -2734,7 +2730,6 @@ body{background:var(--bg)}
   .ivt button{padding:8px 10px;font-size:13px}
   .mm-del{padding:10px 10px}
   .back-link{padding:8px 0}
-  .sk-color{width:34px;height:34px}
   .chk{padding:9px 12px}
   .toggle-row button{padding:10px 14px}
   /* 폰에서 표는 거의 항상 가로 스크롤 안에 갇힌다 — 밀 수 있음을 알려 준다 */
@@ -2809,44 +2804,24 @@ function LessonPanel({ L, teacher, onReading }) {
             </div>
           </details>
         )}
+        <LessonMap L={L} bodyRef={bodyRef} />
         {L.readings.length > 1 && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
             <span className="hint">읽기 자료 {L.readings.length}개입니다. 수업 진행 순서대로 정리되어 있습니다.</span>
             <button type="button" className="btn small ghost" onClick={expandAll}>모두 펼치기</button>
           </div>
         )}
+        {/* 본문·도판·도식을 한 흐름으로 짜는 일은 src-reading.jsx가 맡는다 */}
         {L.readings.map((rd, i) => (
-          <details className="reading" key={i}
+          <ReadingCard key={i} rd={rd} i={i} count={L.readings.length} L={L} seen={!!seen[i]}
+            /* 2차시 도입의 "캡션 두 장" 실험: 강의 노트에서도 실제 자료를 보여 준다 */
+            extra={L.n === 2 && rd.stage === "도입" ? <LabelCompare /> : null}
             onToggle={(e) => {
               if (e.target.open) setSeen((p) => (p[i] ? p : { ...p, [i]: true }));
               const bulk = e.target.open && bulkRef.current > 0;
               if (bulk) bulkRef.current -= 1;
               onReading && onReading(e.target.open, bulk);
-            }}>
-            <summary>
-              <span className="stage-tag">{rd.stage}</span>
-              <span className="rd-i">{i + 1}/{L.readings.length}</span>{rd.h}
-              {seen[i] && <span className="rd-seen" aria-label="펼쳐 본 자료">✓</span>}
-            </summary>
-            <div className="reading-in">
-              {rd.p.map((para, j) => <p key={j}>{para}</p>)}
-              <LessonImages images={rd.images} />
-              {/* 2차시 도입의 "캡션 두 장" 실험 — 강의 노트에서도 실제 자료를 보여 준다 */}
-              {L.n === 2 && rd.stage === "도입" && <LabelCompare />}
-              <LessonAsks asks={rd.asks} />
-              {rd.works && rd.works.length > 0 && (
-                <table className="works-tbl">
-                  <caption>작품·문헌 살펴보기</caption>
-                  <thead><tr><th>작가·구분</th><th>작품·자료</th><th>연도</th><th>보는 이유</th></tr></thead>
-                  <tbody>
-                    {rd.works.map((w, j) => (
-                      <tr key={j}><td>{w.a}</td><td>{w.w}</td><td>{w.y}</td><td>{w.d}<WorkLinks links={w.links} /></td></tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </details>
+            }} />
         ))}
         {teacher && L.pedagogy && (
           <details className="reading pedagogy">
@@ -4358,115 +4333,10 @@ function AudioField({ f, fieldKey, v, setField }) {
   );
 }
 
-/* 스케치 캔버스 (디지털 에스키스) — 그린 뒤 저장하면 JPEG로 줄여 media 컬렉션에 남긴다 */
-
-const SKETCH_COLORS = ["#26241E", "#8A3B2E", "#4A5A6A"];
-
-/* 화면 어딘가의 스케치에 저장 안 된 획이 있는지 — 차시 이동·창 닫기 전 확인에 쓴다.
-   스케치 획은 컴포넌트 상태로만 있어 언마운트되면 소리 없이 사라지기 때문. */
-const sketchDirty = { current: false };
-
-function SketchField({ f, fieldKey, v, setField }) {
-  const cvRef = useRef(null);
-  const strokesRef = useRef([]);
-  const liveRef = useRef(null);
-  const [color, setColor] = useState(SKETCH_COLORS[0]);
-  const [wide, setWide] = useState(false);
-  const [eraser, setEraser] = useState(false);
-  const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const cur = typeof v === "string" ? null : v;
-
-  useEffect(() => {
-    sketchDirty.current = dirty;
-    return () => { sketchDirty.current = false; };
-  }, [dirty]);
-
-  const redraw = () => {
-    const cv = cvRef.current;
-    if (!cv) return;
-    const ctx = cv.getContext("2d");
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    for (const st of strokesRef.current) {
-      ctx.strokeStyle = st.c;
-      ctx.lineWidth = st.w;
-      ctx.beginPath();
-      st.pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
-      ctx.stroke();
-    }
-  };
-  useEffect(() => { redraw(); }, []);
-
-  const posOf = (e) => {
-    const cv = cvRef.current;
-    const r = cv.getBoundingClientRect();
-    return [((e.clientX - r.left) / r.width) * cv.width, ((e.clientY - r.top) / r.height) * cv.height];
-  };
-  const down = (e) => {
-    e.preventDefault();
-    cvRef.current.setPointerCapture(e.pointerId);
-    liveRef.current = { c: eraser ? "#FFFFFF" : color, w: eraser ? 22 : wide ? 6 : 2.5, pts: [posOf(e)] };
-    strokesRef.current.push(liveRef.current);
-    setDirty(true);
-  };
-  const move = (e) => {
-    if (!liveRef.current) return;
-    liveRef.current.pts.push(posOf(e));
-    redraw();
-  };
-  const up = () => { liveRef.current = null; };
-  const undo = () => { strokesRef.current.pop(); redraw(); };
-  const clearAll = () => { strokesRef.current = []; redraw(); };
-
-  const save = async () => {
-    setErr(""); setBusy(true);
-    try {
-      const data = cvRef.current.toDataURL("image/jpeg", 0.85);
-      if (data.length > 400000) { setBusy(false); return setErr("스케치가 너무 큽니다. 지우개로 정리한 뒤 다시 저장하세요."); }
-      if (cur) await mediaStore.remove(OWNER, cur.ref);
-      const ref = fieldKey + "." + Date.now();
-      const ok = await mediaStore.put(OWNER, ref, data);
-      if (ok) { setField(fieldKey, { ref, at: now() }); setDirty(false); }
-      else setErr("스케치 저장에 실패했습니다.");
-    } catch (e) { setErr("스케치를 저장하지 못했습니다."); }
-    setBusy(false);
-  };
-
-  return (
-    <div className="field span2">
-      <label>{f.label}</label>
-      <div className="sketch-box">
-        <div className="sketch-tools">
-          {SKETCH_COLORS.map((c) => (
-            <button key={c} className={"sk-color" + (!eraser && color === c ? " on" : "")} style={{ background: c }}
-              onClick={() => { setColor(c); setEraser(false); }} aria-label={"펜 색 " + c} />
-          ))}
-          <button className={"btn small " + (wide ? "" : "ghost")} onClick={() => setWide(!wide)}>굵게</button>
-          <button className={"btn small " + (eraser ? "" : "ghost")} onClick={() => setEraser(!eraser)}>지우개</button>
-          <button className="btn small ghost" onClick={undo}>되돌리기</button>
-          <button className="btn small ghost" onClick={clearAll}>모두 지우기</button>
-        </div>
-        <canvas ref={cvRef} width={720} height={480} className="sketch-cv"
-          onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />
-        <div className="sketch-foot">
-          <button className="btn small" disabled={busy || !dirty} onClick={save}>{busy ? "저장 중…" : "스케치 저장"}</button>
-          {dirty && !busy && <span className="hint" style={{ color: "var(--seal)" }}>아직 저장되지 않은 획이 있습니다. 「스케치 저장」을 눌러야 남습니다.</span>}
-          {cur && (
-            <>
-              <span className="hint">저장된 스케치 {fmtTime(cur.at)}</span>
-              <MediaThumb owner={OWNER} refId={cur.ref} alt="저장된 스케치" size={64} />
-              <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, cur.ref); setField(fieldKey, ""); }}>지우기</button>
-            </>
-          )}
-          {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
-        </div>
-      </div>
-    </div>
-  );
+/* 스케치 캔버스 (디지털 에스키스) — 도구·레이어·확대·저장은 src-sketch.jsx.
+   값 { ref, at, w, h, paper, layers } 중 ref(합친 그림)만 교사 화면·집계가 읽는다 */
+function SketchField(props) {
+  return <SketchPad {...props} owner={OWNER} store={mediaStore} MediaThumb={MediaThumb} confirmDel={confirmDel} fmtTime={fmtTime} />;
 }
 
 /* 짧은 영상 (카메라 녹화, 저해상도) — 문서 크기 한도 안에서 10초 안팎을 담는다 */
@@ -5258,7 +5128,7 @@ function StudentApp({ me, onExit, onGallery }) {
     const onHide = () => { if (document.visibilityState === "hidden") flush(); };
     // 저장이 끝나지 않은 채 창을 닫으면 경고 — 오프라인 큐 유실을 마지막에 한 번 더 막는다
     const onBefore = (e) => {
-      if (dirtyRef.current || savingRef.current || sketchDirty.current) { e.preventDefault(); e.returnValue = ""; }
+      if (dirtyRef.current || savingRef.current || sketchDirty.unsaved) { e.preventDefault(); e.returnValue = ""; }
     };
     const onOn = () => {
       setOnline(true);
@@ -9889,6 +9759,7 @@ function App() {
       <QuizTeacherStyle />
       <InquiryStyle />
       <WsLockStyle />
+      <SketchStyle />
       <LadderStyle />
       <ThemeStyle />
       <UxStyle />
