@@ -19,6 +19,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { fbStore } from "./src-fb.js";
+import { figAlt, FigureDesc } from "./src-access.jsx";
 import { useTopbarHeight } from "./src-survey-ui.jsx";
 import { SCHEMA_REV, REV_SECTIONS } from "./src-ladder.jsx";
 
@@ -168,7 +169,7 @@ function LessonFigure({ img }) {
   }, [ref]);
   const url = ref ? data : (img && img.src);
   if (!url) return ref ? <span className="lz-load">그림 불러오는 중…</span> : null;
-  const pic = <img className="lz-img" src={url} alt={img.cap || "수업 자료 그림"} loading="lazy" />;
+  const pic = <img className="lz-img" src={url} alt={figAlt(img, img.cap)} loading="lazy" />;
   const cap = img.cap || img.credit || img.link;
   return (
     <figure className="lz-fig">
@@ -181,6 +182,7 @@ function LessonFigure({ img }) {
           {img.srcPage && <a className="wk-link" href={img.srcPage} target="_blank" rel="noopener noreferrer">파일 출처 ↗</a>}
         </figcaption>
       )}
+      <FigureDesc src={img.src} />
     </figure>
   );
 }

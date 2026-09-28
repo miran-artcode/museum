@@ -6,7 +6,7 @@
   "scripts": {
     "build": "esbuild src-app.jsx --bundle --jsx=automatic --loader:.jsx=jsx --minify --format=iife --outfile=public/app.js && esbuild src-ar3d.js --bundle --minify --format=iife --outfile=public/ar3d.js",
     "deploy": "npm run build && npx firebase-tools deploy --only hosting",
-    "test": "node --test src-assess-core.test.mjs src-quiz-core.test.mjs src-ws-sync.test.mjs src-ar-expo.test.mjs",
+    "test": "node --test src-assess-core.test.mjs src-quiz-core.test.mjs src-ws-sync.test.mjs src-access-core.test.mjs src-ar-expo.test.mjs",
     "backup": "node scripts/backup-firestore.mjs",
     "restore": "node scripts/restore-worksheet.mjs"
   },

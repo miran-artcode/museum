@@ -9,6 +9,7 @@
 
 import React from "react";
 import { LessonImages, WorkLinks } from "./src-content.jsx";
+import { ObsAlt } from "./src-access.jsx";
 
 export const CARD_MEDIA = {
   obs: {
@@ -113,6 +114,8 @@ export function CardMedia({ src, k }) {
     <div className="pc-media">
       <LessonImages images={m.images} />
       <WorkLinks links={m.links} />
+      {/* 관찰 방법을 다른 감각으로 하는 길 (학생이 「학습 지원」에서 켤 때만, src-access.jsx) */}
+      {src === "obs" && <ObsAlt k={k} />}
     </div>
   );
 }

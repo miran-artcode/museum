@@ -29,6 +29,10 @@ import { makeSnapshotter, WsHistoryCard } from "./src-ws-history.jsx";
 import { makeDirtyTracker, changedKeys, mergeRemote, buildPatch } from "./src-ws-sync.mjs";
 import { LegacyEcho } from "./src-legacy-fields.jsx";
 import { WsLockCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
+import { AccessProvider, AccessButton, AccessLessonTerms, AccessMemo, AccessStyle, MediaText, MediaTextRead, GateLangHelp } from "./src-access.jsx";
+import { AccessTeacherPanel, AccessTeacherStyle, CaptionOnAir } from "./src-access-teacher.jsx";
+import { A11yStyle, A11yRuntime } from "./src-access-a11y.jsx";
+import { supportCsv, SUPPORT_CODEBOOK } from "./src-access-core.mjs";
 import {
   ATTITUDES, ATTITUDE_HINTS, LADDER_INTRO, TRANSLATE_STAGES, REFLECT_KEYS, DERIVE_KEYS,
   LEGACY_BACK, normBack, backLabel, SYMBOL_WORDS, findSymbol, SCHEMA_REV, REV_SECTIONS,
@@ -1376,6 +1380,8 @@ const CONSENT_ITEMS = [
   { k: "log", label: "활동 흔적", desc: "머문 시간·고쳐 쓴 이력", need: "별도 근거 필요" },
   { k: "survey", label: "사전·사후 설문", desc: "창의성 인식 24문항과 성향 문항", need: "별도 근거 필요" },
   { k: "media", label: "사진·음성·영상", desc: "관찰 사진·현장 소리·스케치·전시 영상", need: "별도 근거 필요" },
+  // 켠 학습 지원(자막·읽어 주기·도움 언어 등)은 장애·출신을 짐작하게 할 수 있어(개인정보 보호법 제23조 민감정보) 따로 묻는다
+  { k: "support", label: "학습 지원 사용", desc: "학생이 켠 학습 지원과 지원별 사용 횟수", need: "별도 근거 필요" },
 ];
 const CONSENT_KEYS = CONSENT_ITEMS.map((x) => x.k);
 
@@ -2782,7 +2788,7 @@ function LessonPanel({ L, teacher, onReading }) {
     <div className="lesson">
       <div className="lesson-head">
         <span className="lesson-n">{L.n}차시 {teacher ? "수업 안내" : "강의 노트"}</span>
-        <span className="lesson-title">{L.title}</span>
+        <span className="lesson-title" role="heading" aria-level="2">{L.title}</span>
         {teacher && <span className="lesson-min">{total}MIN</span>}
       </div>
       <div className="lesson-body" ref={bodyRef}>
@@ -2790,6 +2796,7 @@ function LessonPanel({ L, teacher, onReading }) {
         <ul className="goal-list">
           {L.goals.map((g, i) => <li key={i}>{g}</li>)}
         </ul>
+        {!teacher && <AccessLessonTerms L={L} />}
         {teacher && (
           <div className="std-chips">
             {L.stds.map((s, i) => <span className="std-chip" key={i}>{s}</span>)}
@@ -2838,6 +2845,7 @@ function LessonPanel({ L, teacher, onReading }) {
           </details>
         )}
       </div>
+      {!teacher && <AccessMemo L={L} />}
       {!teacher && <div className="lesson-guide">읽기 자료를 읽은 뒤 「배움 확인 {L.n}」, 「탐구 질문 {L.n}」에 답합니다. 답은 자동으로 저장됩니다.</div>}
     </div>
   );
@@ -4030,6 +4038,7 @@ function FieldReader({ sec, f, ws, owner }) {
       <div className="read-block">
         <div className="rl">{f.label}</div>
         {cur ? <div><MediaAudio owner={owner || OWNER} refId={cur.ref} /><span className="hint">길이 약 {cur.sec || "?"}초</span></div> : <div className="rv empty">녹음 없음</div>}
+        <MediaTextRead ws={ws} fieldKey={key} />
       </div>
     );
   }
@@ -4048,6 +4057,7 @@ function FieldReader({ sec, f, ws, owner }) {
       <div className="read-block">
         <div className="rl">{f.label}</div>
         {cur ? <div><MediaVideo owner={owner || OWNER} refId={cur.ref} /><span className="hint">길이 약 {cur.sec || "?"}초</span></div> : <div className="rv empty">영상 없음</div>}
+        <MediaTextRead ws={ws} fieldKey={key} />
       </div>
     );
   }
@@ -4333,6 +4343,7 @@ function AudioField({ f, fieldKey, v, setField }) {
           <button className="btn small ghost" onClick={start}>{cur ? "다시 녹음하기" : "녹음 시작"}</button>
         )}
         <span className="hint">최대 {MAX}초 · 약 0.5MB까지 저장됩니다.</span>
+        <MediaText fieldKey={fieldKey} kind="audio" v={cur} />
         {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
       </div>
     </div>
@@ -4532,6 +4543,7 @@ function VideoField({ f, fieldKey, v, setField }) {
           <button className="btn small ghost" disabled={busy} onClick={start}>{busy ? "저장 중…" : cur ? "다시 찍기" : "녹화 시작"}</button>
         )}
         <span className="hint">화질을 낮춰 {MAX}초 안팎만 저장됩니다. 소리는 담기지 않습니다.</span>
+        <MediaText fieldKey={fieldKey} kind="video" v={cur} />
         {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
       </div>
     </div>
@@ -4777,6 +4789,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
         <GateSections onEnter={() => scrollTo("g4-enter", true)} />
         <aside className="g4-enter" id="g4-enter" tabIndex={-1}>
           <div className="ticket">
+        <GateLangHelp />
         <div className="tab-switch" role="tablist">
           <button role="tab" aria-selected={mode === "student"} className={mode === "student" ? "on" : ""} disabled={busy} onClick={() => { setMode("student"); setErr(""); }}>학생</button>
           <button role="tab" aria-selected={mode === "teacher"} className={mode === "teacher" ? "on" : ""} disabled={busy} onClick={() => { setMode("teacher"); setErr(""); }}>교사</button>
@@ -4842,7 +4855,7 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
       <div className="card-head">
         {/* 발상 단계 카드는 「단계 3」처럼 tag만 찍는다. 교사 화면·CSV는 code(B3)를 쓴다 */}
         <span className="card-code">{sectionHead(sec)}</span>
-        <span className="card-title">{sec.title}{sec.hw && <span className="hw-chip">한 주 과제</span>}</span>
+        <span className="card-title" role="heading" aria-level="3">{sec.title}{sec.hw && <span className="hw-chip">한 주 과제</span>}</span>
         <span className="card-sess">{sec.session}</span>
       </div>
       {sec.note && sec.kind !== "inquiry" && <div className="card-note">{sec.note}</div>}
@@ -5406,25 +5419,31 @@ function StudentApp({ me, onExit, onGallery }) {
   };
 
   return (
+    <AccessProvider sid={me.sid} ws={ws} setField={setField} cfgAll={cfgAll} session={tab} loaded={loaded}
+      where={quizOn ? "quiz" : assessOn ? "assess" : "lesson"}>
     <WsLockCtx.Provider value={wsLocked}>
     <NavCtx.Provider value={{ openMap, go: navGo }}>
     <div>
       <div className="topbar">
         <div className="topbar-in">
-          <div className="brand">허구의 아카이브 기록실<small>STUDENT · {me.sid}</small></div>
+          <div className="brand" role="heading" aria-level="1">허구의 아카이브 기록실<small lang="en">STUDENT · {me.sid}</small></div>
           <div className="top-right">
             <span>{me.nick}</span>
-            <span role={saveState === "err" ? "alert" : "status"} aria-live="polite"
+            <span translate="no"
               className={"save-pill " + (saveState === "dirty" || saveState === "saving" || saveState === "queued" ? "dirty" : saveState === "err" ? "err" : "")}>
               {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "queued" ? "연결 대기(기기에 담아 둠)" : saveState === "err" ? "저장 실패, 5초 뒤 재시도" : "저장됨 " + fmtTime(savedAt)}
             </span>
+            <span className="ax-sr" role={saveState === "err" ? "alert" : "status"}>
+              {saveState === "err" ? "저장하지 못했습니다. 5초 뒤 다시 저장합니다." : saveState === "queued" ? "인터넷 연결을 기다립니다. 쓴 내용은 이 기기에 담아 두었습니다." : ""}
+            </span>
             {saveState === "err" && <button className="btn small" onClick={doSave}>지금 저장</button>}
+            <AccessButton />
             <button className="btn small ghost" onClick={onGallery}>전시장</button>
             <button className="btn small ghost" onClick={async () => { await doSave(); await authApi.leave(); onExit(); }}>나가기</button>
           </div>
         </div>
       </div>
-      <div className="wrap">
+      <div className="wrap" role="main" id="main">
         {!online && (
           <div className="warn-note" role="alert" style={{ marginBottom: 10 }}>
             인터넷이 끊겼습니다. 지금 쓰는 내용은 이 기기에 임시로 담겨 있다가 연결이 돌아오면 자동으로 저장됩니다. 그전에 창을 닫지 마세요.
@@ -5584,6 +5603,7 @@ function StudentApp({ me, onExit, onGallery }) {
     </div>
     </NavCtx.Provider>
     </WsLockCtx.Provider>
+    </AccessProvider>
   );
 }
 
@@ -7955,6 +7975,13 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     TRANSLATE_STAGES.forEach((st) => L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, st.keys.join(" / "), st.ask, st.out])));
     L.push(mdRow(["돌아보기", "태도 · 가까운 방법", REFLECT_KEYS.join(" / "), "이 자국으로 보는 사람에게 무엇을 하려 하고, 내 작업은 여덟 방법 중 어디에 가까운가", "태도와 이유, 가까운 방법과 이유"]));
     L.push("");
+    L.push("## 학습 지원 사용 자료 (연구자료_학습지원)");
+    L.push("");
+    L.push("학생이 상단 「학습 지원」에서 켠 설정(pref_)과 지원별 사용 횟수(use_)입니다. 진단명이나 장애 여부는 수집하지 않습니다. 동의 항목 「학습 지원 사용」에 동의한 학생만 들어갑니다. 설계와 근거: 다양한_학습자_지원_설계.md");
+    L.push("");
+    L.push(mdHead(["열", "내용"]));
+    SUPPORT_CODEBOOK.forEach((r) => L.push(mdRow(r)));
+    L.push("");
     return L.join("\n");
   };
 
@@ -8294,6 +8321,9 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       p: "표 1 기술통계, 표 2 단계 도달, 표 3 안 보이는 이유 분포, 표 4 선택 분포, 표 5 사전·사후 비교, 표 6 상관. 마크다운 표라 논문 편집기에 그대로 붙습니다.", go: () => download("기술통계" + tag + "_" + stamp + ".md", descriptivesMD(), "text/markdown") },
     { k: "codebook", h: "변수 사전", fn: "변수사전" + tag + "_" + stamp + ".md",
       p: "모든 변수의 조작적 정의, 구체성 지수의 산출식, 단계와 기록 칸의 대응표. 연구 방법 절의 측정 도구 서술에 씁니다.", go: () => download("변수사전" + tag + "_" + stamp + ".md", codebookMD(), "text/markdown") },
+    { k: "support", h: "학습 지원 사용 자료", fn: "연구자료_학습지원" + tag + "_" + stamp + ".csv",
+      p: "참여자 1명이 1행. 학생이 켠 학습 지원(글자 크기·대비·읽어 주기·도움 언어·자막 등)과 지원별 사용 횟수를 담습니다. 장애나 출신을 짐작하게 할 수 있어 동의 항목 「학습 지원 사용」에 동의한 학생만 넣습니다.",
+      go: () => download("연구자료_학습지원" + tag + "_" + stamp + ".csv", "\uFEFF" + supportCsv(cases.filter((c) => consentAgreed(c.consent, "support")).map((c) => ({ pid: c.pid, ws: c.ws }))), "text/csv") },
     { k: "manuscript", h: "원고 초안", fn: "원고초안" + tag + "_" + stamp + ".md",
       p: "연구 방법과 결과의 사실 서술을 수치까지 채워 넣은 초안. 해석·논의는 「연구자 서술」 자리로 비워 둡니다.", go: () => download("원고초안" + tag + "_" + stamp + ".md", manuscriptMD(), "text/markdown") },
   ];
@@ -8806,6 +8836,7 @@ function TeacherApp({ onExit, onGallery }) {
         </div>
       </div>
       <div className="wrap wide">
+        <CaptionOnAir />
         {authApi.isViewer() && <div className="sample-banner">보기 전용 계정으로 들어왔습니다. 모든 기록을 볼 수 있지만 채점·설정·수업 편집 등 어떤 것도 저장되지 않습니다. 고치려면 나간 뒤 관리자 코드로 다시 입장하세요.</div>}
         {sel ? (
           <div style={{ paddingTop: 18 }}>
@@ -8988,6 +9019,11 @@ function TeacherApp({ onExit, onGallery }) {
                 </div>
                 <InquiryAidConfig cfgAll={cfgAll} setCfgAll={setCfgAll} setMsg={setMsg} />
                 <p className="hint" style={{ marginTop: 8 }}>앵커 판정 실험 설정은 「연구」 탭 맨 아래로 옮겼습니다. 이 탭은 수업 중 급한 공개 조작만 담습니다.</p>
+              </div>
+            ) : tab === "학습 지원" ? (
+              <div>
+                {msg && <div className="ok-note">{msg}</div>}
+                <AccessTeacherPanel ids={ids} roster={roster} wsMap={wsMap} cfgAll={cfgAll} setCfgAll={setCfgAll} setMsg={setMsg} sampleMode={sampleMode} onSel={openStudent} />
               </div>
             ) : tab === "수업 안내" ? (
               <TeacherGuide />
@@ -9870,6 +9906,7 @@ function App() {
       <QuizTeacherStyle />
       <InquiryStyle />
       <WsLockStyle />
+      <AccessStyle /><AccessTeacherStyle /><A11yStyle /><A11yRuntime />
       <LadderStyle />
       <ThemeStyle />
       <UxStyle />

@@ -22,6 +22,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { fbStore } from "./src-fb.js";
+import { AccessReadingBar, AccessPara, figAlt, FigureDesc } from "./src-access.jsx";
 
 const isArr = Array.isArray;
 const arr = (x) => (isArr(x) ? x : []);
@@ -158,7 +159,7 @@ function Fig({ img, compact, clamp, onOpen }) {
       <button type="button" className="rd-fig-btn" onClick={() => onOpen(img)}
         aria-label={(title || "그림") + " 크게 보기"}>
         {url
-          ? <img src={url} alt={title || plain(img.cap) || "수업 자료 그림"} loading="lazy" decoding="async" />
+          ? <img src={url} alt={figAlt(img, title || plain(img.cap))} loading="lazy" decoding="async" />
           : <span className="lz-load">그림 불러오는 중…</span>}
         <span className="rd-zoom" aria-hidden="true">크게 보기</span>
       </button>
@@ -169,6 +170,7 @@ function Fig({ img, compact, clamp, onOpen }) {
           <FigMeta img={img} />
         </figcaption>
       )}
+      <FigureDesc src={img.src} />
     </figure>
   );
 }
@@ -542,10 +544,12 @@ export function ReadingBody({ rd, L, extra }) {
 
   return (
     <div className="rd">
+      <AccessReadingBar L={L} rd={rd} />
       {renderSlot(-1)}
       {blocks.map((b, j) => (
         <React.Fragment key={j}>
           {b && <Block b={b} lead={j === firstPlain && j === 0 && plain(b.text).length <= 240} />}
+          {b && <AccessPara L={L} rd={rd} j={j} raw={paras[j]} />}
           {renderSlot(j)}
         </React.Fragment>
       ))}
