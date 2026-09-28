@@ -429,7 +429,7 @@ function Viz({ v }) {
   if (!def) return null;
   const [tag, Body] = def;
   return (
-    <section className={"vz vz--" + v.type}>
+    <section className={"vz vz--" + v.type} aria-label={(v.tag || tag) + (v.title ? ": " + plain(v.title) : "")}>
       <div className="vz-head">
         <span className="vz-tag">{v.tag || tag}</span>
         {v.title && <span className="vz-title">{inline(v.title)}</span>}
