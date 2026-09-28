@@ -233,6 +233,44 @@ export const fbStore = {
     ]);
   },
 
+  /* updateFields의 경로판: v 아래 여러 단계 경로를 가리켜 그 값만 바꾼다 (2026-09-28).
+     entries = [[경로 배열, 값], ...]. 경로 조각 하나하나가 FieldPath의 한 조각이라 점이 든 키(l1.q1)도 그대로 쓴다.
+       기록지: [["l1.q1"], "글"] · 보조 맵의 한 항목 [["_inq", "q1.concept"], {...}] · [["_act", "3차시"], {...}]
+       설문:   [["pre"], 블록] · [["stance", "post"], 블록] · [["ver"], "v1"]
+     값이 undefined면 그 경로를 지운다. 맵 안의 한 항목만 바꾸므로 같은 맵의 다른 항목(다른 칸·차시·블록)은 서버 값이 남는다.
+     기록지 문서에는 cv: 2를 함께 싣는다 (C3 계약: 규칙이 cv 없는 학생 쓰기를 옛 화면의 통째 쓰기로 보고 거부한다).
+     돌려주는 값: true(성공) · false(실패) · "missing"(문서 없음) — updateFields와 같다 */
+  async updatePaths(key, entries) {
+    if (isViewerNow()) return false; // 보기 전용 계정
+    try {
+      const r = route(key);
+      if (r.kind !== "doc") return false;
+      const args = [];
+      for (const [path, val] of entries || []) {
+        const p = (Array.isArray(path) ? path : [path]).map(String);
+        if (!p.length) continue;
+        args.push(new FieldPath("v", ...p), val === undefined ? deleteField() : val);
+      }
+      if (r.path[0] === "worksheets") args.push(new FieldPath("cv"), 2);
+      args.push(new FieldPath("updatedAt"), Date.now());
+      await updateDoc(doc(db, r.path[0], r.path[1]), ...args);
+      return true;
+    } catch (e) {
+      if (e && e.code === "not-found") return "missing";
+      console.error("update fail", key, e);
+      return false;
+    }
+  },
+
+  /* updatePaths의 제한 시간판 (setT와 같은 이유) */
+  updatePathsT(key, entries, opts) {
+    const ms = (opts && opts.timeout) || 8000;
+    return Promise.race([
+      this.updatePaths(key, entries),
+      new Promise((res) => setTimeout(() => res(false), ms)),
+    ]);
+  },
+
   /* set과 같으나 제한 시간 안에 서버 확인이 없으면 false로 끝낸다.
      오프라인이면 setDoc이 거부되지 않고 영원히 미해결로 남아 await가 안 풀리기 때문 —
      저장·제출처럼 결과를 사용자에게 알려야 하는 모든 경로는 이것을 쓴다.
