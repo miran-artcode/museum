@@ -18,6 +18,8 @@
    근거 문헌은 쌍대비교_구현_근거.md 에 정리한다. 이 파일의 상수는 그 문서의 결정을 그대로 옮긴 것이다.
    ============================================================ */
 
+import { classOf, UNKNOWN_CLASS } from "./src-class.mjs";
+
 export const ASSESS_VER = "v1";
 export const ROSTER_VER = "r1";
 
@@ -962,29 +964,33 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
 /* ---------- CSV ---------- */
 
 const pidFn = (pidOf) => (typeof pidOf === "function" ? pidOf : pidOf && typeof pidOf.get === "function" ? (sid) => pidOf.get(sid) : (sid) => (pidOf || {})[sid]);
+/* class 열 — 그 행 학생(작품 소유자·판정자)의 반 두 자리(src-class.mjs, config.classMap 우선). 학번 형식이
+   달라 반을 알 수 없으면 빈칸으로 둔다. 학년 전체가 한 명단이라도 학급 단위 분석(학급별 SSR 등)을 할 수 있게 한다.
+   기존 열 순서를 바꾸지 않도록 맨 뒤에 붙인다 */
+const clsFn = (classMap) => (sid) => { const c = classOf(sid, classMap); return c === UNKNOWN_CLASS ? "" : c; };
 const cell = (v) => (v == null ? "" : v);
 const r3 = (x) => (Number.isFinite(x) ? Math.round(x * 1000) / 1000 : "");
 
-export function csvSubmissions({ roster, subMap, pidOf }) {
-  const pid = pidFn(pidOf);
+export function csvSubmissions({ roster, subMap, pidOf, classMap }) {
+  const pid = pidFn(pidOf), cls = clsFn(classMap);
   const inRoster = new Set(((roster && roster.works) || []).map((w) => w.sid));
-  const head = ["pid", "work_no", "in_roster", "title", "relic", "year", "era", "mat", "size", "context_len", "coll", "ai_level", "note_len", "has_img", "submitted_at"];
+  const head = ["pid", "work_no", "in_roster", "title", "relic", "year", "era", "mat", "size", "context_len", "coll", "ai_level", "note_len", "has_img", "submitted_at", "class"];
   const rows = Object.keys(subMap || {}).sort(cmp).filter((sid) => subMap[sid] && subMap[sid].locked).map((sid) => {
     const s = subMap[sid], p = s.plate || {};
     return [pid(sid), s.no, inRoster.has(sid) ? 1 : 0, s.title, p.relic, p.year, p.era, p.mat, p.size, trimStr(p.context).length, p.coll,
-      s.aiLevel, trimStr(s.note).length, s.img && s.img.ref ? 1 : 0, s.submittedAt].map(cell);
+      s.aiLevel, trimStr(s.note).length, s.img && s.img.ref ? 1 : 0, s.submittedAt, cls(sid)].map(cell);
   });
   return { head, rows };
 }
 
 /* 판정 단위 CSV — 이 명단의 판정은 배정표 대조를 거친 것(valid=1)만, 옛 명단·대조 탈락 항목은 valid=0으로 함께 */
-export function csvJudgements({ roster, assessMap, pidOf }) {
-  const pid = pidFn(pidOf);
-  const head = ["pid", "roster_ver", "valid", "screen_i", "work_a", "work_b", "left", "rep_of", "win", "win_no", "chosen_first", "axis", "vw", "conf", "hard", "know_author", "tag", "ms", "fast_override", "plate_opened", "why_len", "why", "at"];
+export function csvJudgements({ roster, assessMap, pidOf, classMap }) {
+  const pid = pidFn(pidOf), cls = clsFn(classMap);
+  const head = ["pid", "roster_ver", "valid", "screen_i", "work_a", "work_b", "left", "rep_of", "win", "win_no", "chosen_first", "axis", "vw", "conf", "hard", "know_author", "tag", "ms", "fast_override", "plate_opened", "why_len", "why", "at", "class"];
   const rows = [];
   const J = collectJudgements(assessMap, roster);
   J.forEach((x) => rows.push([pid(x.judge), roster && roster.fixedAt, 1, x.i, x.a, x.b, x.left, x.rep == null ? "" : x.rep, x.win, x.winNo, x.chosenLeft ? 1 : 0,
-    x.axis || "", x.vw, x.conf, x.hard ? 1 : 0, x.knowAuthor ? 1 : 0, x.tag, x.ms, x.fastOverride ? 1 : 0, x.plateOpened ? 1 : 0, x.why.length, x.why, x.at].map(cell)));
+    x.axis || "", x.vw, x.conf, x.hard ? 1 : 0, x.knowAuthor ? 1 : 0, x.tag, x.ms, x.fastOverride ? 1 : 0, x.plateOpened ? 1 : 0, x.why.length, x.why, x.at, cls(x.judge)].map(cell)));
   const ownNo = {};
   ((roster && roster.works) || []).forEach((w) => { if (w && w.sid) ownNo[trimStr(w.sid)] = trimStr(w.no); });
   Object.keys(assessMap || {}).sort(cmp).forEach((sid) => {
@@ -1006,7 +1012,7 @@ export function csvJudgements({ roster, assessMap, pidOf }) {
           if (accepted) { seenI.add(it.i); return; }
         }
         rows.push([pid(sid), b.rosterVer || "", 0, it.i, it.a, it.b, it.left, it.rep == null ? "" : it.rep, it.win, it.win === "a" ? it.a : it.b, it.win === it.left ? 1 : 0,
-          it.axis || "", it.vw, it.conf, it.hard ? 1 : 0, it.knowAuthor ? 1 : 0, it.tag, it.ms, it.fastOverride ? 1 : 0, it.plateOpened ? 1 : 0, trimStr(it.why).length, trimStr(it.why), it.at].map(cell));
+          it.axis || "", it.vw, it.conf, it.hard ? 1 : 0, it.knowAuthor ? 1 : 0, it.tag, it.ms, it.fastOverride ? 1 : 0, it.plateOpened ? 1 : 0, trimStr(it.why).length, trimStr(it.why), it.at, cls(sid)].map(cell));
       });
     });
   });
@@ -1014,20 +1020,20 @@ export function csvJudgements({ roster, assessMap, pidOf }) {
 }
 
 /* 판정자 단위 CSV — 적합도·역방향률·위치·시간·이유 품질 (설계 §7 judgeFit) */
-export function csvJudges({ agg, pidOf }) {
-  const pid = pidFn(pidOf);
-  const head = ["pid", "n", "infit", "outfit", "flag", "against", "n_gap", "against_rate", "left_rate", "median_ms", "fast_n", "dup_why_n", "short_why_n", "conf_mean", "plate_open_rate", "hard_n", "know_n"];
+export function csvJudges({ agg, pidOf, classMap }) {
+  const pid = pidFn(pidOf), cls = clsFn(classMap);
+  const head = ["pid", "n", "infit", "outfit", "flag", "against", "n_gap", "against_rate", "left_rate", "median_ms", "fast_n", "dup_why_n", "short_why_n", "conf_mean", "plate_open_rate", "hard_n", "know_n", "class"];
   const judges = (agg && agg.quality && agg.quality.judges) || {};
   const rows = Object.keys(judges).sort(cmp).map((sid) => {
     const f = judges[sid];
-    return [pid(sid), f.n, r3(f.infit), r3(f.outfit), f.flag ? 1 : 0, f.against, f.nGap, r3(f.againstRate), r3(f.leftRate), f.medianMs, f.fastN, f.dupWhyN, f.shortWhyN, r3(f.confMean), r3(f.plateOpenRate), f.hardN, f.knowN].map(cell);
+    return [pid(sid), f.n, r3(f.infit), r3(f.outfit), f.flag ? 1 : 0, f.against, f.nGap, r3(f.againstRate), r3(f.leftRate), f.medianMs, f.fastN, f.dupWhyN, f.shortWhyN, r3(f.confMean), r3(f.plateOpenRate), f.hardN, f.knowN, cls(sid)].map(cell);
   });
   return { head, rows };
 }
 
-export function csvSelf({ roster, assessMap, pidOf }) {
-  const pid = pidFn(pidOf);
-  const head = ["pid", "phase", "overall", "veri", "cause", "plate", "voice", "why", "pred_rank", "n", "pred_pct", "started_at", "submitted_at", "dur_sec", "locked_at", "change_code", "change_why"];
+export function csvSelf({ roster, assessMap, pidOf, classMap }) {
+  const pid = pidFn(pidOf), cls = clsFn(classMap);
+  const head = ["pid", "phase", "overall", "veri", "cause", "plate", "voice", "why", "pred_rank", "n", "pred_pct", "started_at", "submitted_at", "dur_sec", "locked_at", "change_code", "change_why", "class"];
   const rows = [];
   Object.keys(assessMap || {}).sort(cmp).forEach((sid) => {
     const self = (assessMap[sid] && assessMap[sid].self) || {};
@@ -1036,17 +1042,17 @@ export function csvSelf({ roster, assessMap, pidOf }) {
       if (!s || !(s.submittedAt || (ph === "s2" && s.lockedAt))) return;
       const sc = s.scores || {};
       rows.push([pid(sid), ph, sc.overall, sc.veri, sc.cause, sc.plate, sc.voice, s.why, s.predRank, s.n,
-        r3(Number.isFinite(s.predPct) ? s.predPct : predPctOf(s.predRank, s.n)), s.startedAt, s.submittedAt, s.durSec, s.lockedAt, s.changeCode, s.changeWhy].map(cell));
+        r3(Number.isFinite(s.predPct) ? s.predPct : predPctOf(s.predRank, s.n)), s.startedAt, s.submittedAt, s.durSec, s.lockedAt, s.changeCode, s.changeWhy, cls(sid)].map(cell));
     });
   });
   return { head, rows };
 }
 
-export function csvScores({ agg, pidOf }) {
-  const pid = pidFn(pidOf);
-  const head = ["pid", "work_no", "theta", "se", "rank", "n", "pct", "band", "plays", "wins", "left_rate", "pred_pct1", "pred_pct2", "bias1", "bias2", "calib", "n_received"];
+export function csvScores({ agg, pidOf, classMap }) {
+  const pid = pidFn(pidOf), cls = clsFn(classMap);
+  const head = ["pid", "work_no", "theta", "se", "rank", "n", "pct", "band", "plays", "wins", "left_rate", "pred_pct1", "pred_pct2", "bias1", "bias2", "calib", "n_received", "class"];
   const rows = ((agg && agg.works) || []).map((w) => [pid(w.sid), w.no, r3(w.theta), r3(w.se), w.rank, w.n, r3(w.pct), w.band, w.plays, w.wins,
-    r3(w.leftRate), r3(w.predPct1), r3(w.predPct2), r3(w.bias1), r3(w.bias2), r3(w.calib), (w.received || []).length].map(cell));
+    r3(w.leftRate), r3(w.predPct1), r3(w.predPct2), r3(w.bias1), r3(w.bias2), r3(w.calib), (w.received || []).length, cls(w.sid)].map(cell));
   return { head, rows };
 }
 

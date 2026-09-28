@@ -347,12 +347,13 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
   const stamp = () => new Date().toISOString().slice(2, 10).replace(/-/g, "");
   const exportKind = (kind) => {
     let out;
+    const classMap = (cfgAll && cfgAll.classMap) || null;   // class 열 — 학번 가운데 두 자리, 설정의 classMap이 먼저 (src-class.mjs)
     try {
-      out = kind === "submissions" ? csvSubmissions({ roster: peer, subMap, pidOf })
-        : kind === "judgements" ? csvJudgements({ roster: peer, assessMap, pidOf })
-          : kind === "self" ? csvSelf({ roster: peer, assessMap, pidOf })
-          : kind === "judges" ? csvJudges({ agg: shownAgg, pidOf })
-            : csvScores({ agg: shownAgg, pidOf });
+      out = kind === "submissions" ? csvSubmissions({ roster: peer, subMap, pidOf, classMap })
+        : kind === "judgements" ? csvJudgements({ roster: peer, assessMap, pidOf, classMap })
+          : kind === "self" ? csvSelf({ roster: peer, assessMap, pidOf, classMap })
+          : kind === "judges" ? csvJudges({ agg: shownAgg, pidOf, classMap })
+            : csvScores({ agg: shownAgg, pidOf, classMap });
     } catch (e) { setNote({ kind: "warn", text: "CSV를 만들지 못했습니다: " + ((e && e.message) || e) }); return; }
     if (!out || !out.head) { setNote({ kind: "warn", text: "내려받을 행이 없습니다." }); return; }
     downloadCsv("상호평가_" + kind + (sampleMode ? "_표본" : "") + "_" + stamp() + ".csv", out.head, out.rows || []);
