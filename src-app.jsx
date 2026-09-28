@@ -20,6 +20,7 @@ import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
 import { UxStyle, ConfirmButton, session, TeacherTabs } from "./src-ux.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
+import { ArExpoEntry, ArDeepLink, ArStyle } from "./src-ar.jsx";
 import { LabelCompare } from "./src-label-compare.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
 import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, InquiryStyle, inquiryTraceRows } from "./src-inquiry.jsx";
@@ -9552,6 +9553,7 @@ function Gallery({ onBack, backLabel }) {
             관람은 두 번 합니다. 처음에는 작품 캡션을 가린 채 이미지만 보고, 두 번째에는 작품 캡션을 펼쳐 같은 이미지가 어떻게 다르게 읽히는지 확인합니다.
             작품은 이름 대신 작품 번호로만 걸려 있습니다.
           </p>
+          <ArExpoEntry />
         </div>
         <div className="gal-controls">
           <div className="toggle-row" role="tablist">
@@ -9890,6 +9892,7 @@ function App() {
       <LadderStyle />
       <ThemeStyle />
       <UxStyle />
+      <ArStyle />
       {restoring && <div style={{ padding: "60px 16px", textAlign: "center", color: "var(--sub)", fontSize: 13 }}>기록실을 여는 중…</div>}
       {view === "gate" && !restoring && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
@@ -9901,6 +9904,7 @@ function App() {
       {view === "gallery" && <Gallery onBack={() => setView(galFrom === "student" && !me ? "gate" : galFrom)}
         backLabel={galFrom === "student" && me ? "기록실로 돌아가기" : galFrom === "teacher" ? "교사 화면으로" : "입장 화면으로"} />}
       {view === "demo" && <DemoView onBack={() => setView("gate")} />}
+      <ArDeepLink />
     </div>
   );
 }
