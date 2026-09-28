@@ -126,7 +126,11 @@ function route(key) {
   // 연구 참여 동의 대장 — 교사만 읽고 쓴다 (학생 화면에서는 존재를 알 수 없음)
   if (key.startsWith("research:")) return { kind: "doc", path: ["research", safe(key.slice(9))] };
   // 상호평가(쌍대비교) — 작품 스냅샷은 학급이 읽고, 평가 기록은 본인·교사만 읽는다 (src-assess-core.js 계약)
-  if (key === "peerRoster") return { kind: "doc", path: ["meta", "peerRoster"] };
+  if (key === "peerRoster") return { kind: "doc", path: ["meta", "peerRoster"] }; // 반을 나누기 전의 옛 명단
+  // 반별 비교 명단: peerRoster:{반} → meta/peerRoster_{반} (반은 src-class.mjs의 classOf, 미상 "?"는 "_"가 된다)
+  if (key.startsWith("peerRoster:")) return { kind: "doc", path: ["meta", "peerRoster_" + safe(key.slice(11))] };
+  // 전시장 출품: 기록지의 「공개」 작품 캡션 사본. 기록지는 본인·교사만 읽으므로 전시장은 이 컬렉션을 읽는다
+  if (key.startsWith("exhibit:")) return { kind: "doc", path: ["exhibit", safe(key.slice(8))] };
   if (key.startsWith("sub:")) return { kind: "doc", path: ["submissions", safe(key.slice(4))] };
   if (key.startsWith("assess:")) return { kind: "doc", path: ["assess", safe(key.slice(7))] };
   // 적응형 쪽지시험: 은행(공개부)·정답 키·응시 기록 (src-quiz-core.mjs 계약)
@@ -135,6 +139,12 @@ function route(key) {
   if (key.startsWith("quiz:")) return { kind: "doc", path: ["quiz", safe(key.slice(5))] };
   return { kind: "doc", path: ["misc", safe(key)] };
 }
+
+/* 기록지 판 표시. 2026-09-17 전의 옛 화면은 기록지를 통째로 덮어써 다른 기기에서 쓴 칸을 지웠다.
+   이 계층을 거치는 기록지 쓰기는 모두 cv: 2를 함께 쓰고, 규칙(firestore.rules /worksheets)은
+   cv가 한 번 들어간 문서를 cv 없이 고치는 쓰기(옛 화면이 열린 채 남은 탭)를 거부한다. */
+const WS_CV = 2;
+const isWsKey = (key) => typeof key === "string" && key.startsWith("ws:");
 
 /* ---------- store: 기존 API 유지 ---------- */
 
@@ -195,7 +205,9 @@ export const fbStore = {
         await setDoc(doc(db, "students", sid), { nick: mine.nick || "", updatedAt: Date.now() }, { merge: true });
         return true;
       }
-      await setDoc(doc(db, r.path[0], r.path[1]), { v: value, updatedAt: Date.now() }, { merge: !!(opts && opts.merge) });
+      const body = { v: value, updatedAt: Date.now() };
+      if (isWsKey(key)) body.cv = WS_CV;
+      await setDoc(doc(db, r.path[0], r.path[1]), body, { merge: !!(opts && opts.merge) });
       return true;
     } catch (e) { console.error("write fail", key, e); return false; }
   },
@@ -214,6 +226,7 @@ export const fbStore = {
         args.push(new FieldPath("v", k), patch[k] === undefined ? deleteField() : patch[k]);
       }
       args.push(new FieldPath("updatedAt"), Date.now());
+      if (isWsKey(key)) args.push(new FieldPath("cv"), WS_CV);
       await updateDoc(doc(db, r.path[0], r.path[1]), ...args);
       return true;
     } catch (e) {
