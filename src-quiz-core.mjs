@@ -22,8 +22,11 @@ export const LEVEL_WORDS = { 1: "가장 낮은 단계", 2: "낮은 단계", 3: "
 export const AREAS = { 1: "미술사의 흐름", 2: "사물·흔적·환유", 3: "이미지와 증거", 4: "관찰·사회·전시·비평" };
 /* 급별 블록 안 영역 ①②③④ 문항 수 (쪽지시험_구현_근거.md §5.2). 5급은 ④를 빼고 ②③을 두 배로 둔다 */
 export const AREA_MIX = { 1: [2, 1, 1, 1], 2: [2, 1, 1, 1], 3: [2, 1, 1, 1], 4: [2, 1, 1, 1], 5: [1, 2, 2, 0] };
-/* 반(half)당 칸 최소 문항 수 (쪽지시험_구현_근거.md §5.3): 급별 최대 방문 블록 수 × 블록당 영역 문항 수 이상이면 어떤 경로에도 반복이 없다 */
+/* 반(half)당 칸 최소 문항 수 (쪽지시험_구현_근거.md §5.3): 급별 최대 방문 블록 수 × 블록당 영역 문항 수 이상이면 어떤 경로에도 반복이 없다.
+   여기 적은 값은 예비를 더한 확정치다(2·3·4급 ①과 5급 ②③에 하나씩). 예비를 뺀 실제 필요 수는 cellNeed 가 계산한다 */
 export const CELL_MIN = { 1: [4, 2, 2, 2], 2: [7, 3, 3, 3], 3: [9, 4, 4, 4], 4: [7, 3, 3, 3], 5: [2, 5, 5, 0] };
+/* 급별 최대 방문 블록 수 (1,296경로 전수 열거). 3급에서 출발하므로 3급이 넷, 끝 급이 둘이다 */
+export const MAX_VISIT = { 1: 2, 2: 3, 3: 4, 4: 3, 5: 2 };
 export const LEVEL_SEC = { 1: 40, 2: 50, 3: 70, 4: 90, 5: 120 };   // 문항당 권장 초
 export const BLOCK_END_MIN = [7, 15, 25, 35];                       // 블록별 권장 종료 (시작 후 분)
 export const ROUTE_UP = 4, ROUTE_DOWN = 2;                          // 정답 4 이상 상승, 2 이하 하강, 3 유지
@@ -89,7 +92,8 @@ export const FLAG_LABELS = {
 export const RELIABILITY_NOTE =
   "한 학급 25명의 결과로는 문항 난이도를 확정할 수 없다(정답률 표준오차 약 .10, 상관 표준오차 약 ±.2). " +
   "이 통계는 다음 해 문항을 고치는 데 쓰며 이 학급의 점수를 바꾸는 근거가 아니다. " +
-  "5문항 블록 하나의 이동 판정은 오차가 크며(p=.7일 때 정답 수 표준편차 1.02), 등급 판정에는 ±1등급 오차가 있을 수 있다.";
+  "5문항 블록 하나의 이동 판정은 오차가 크며(p=.7일 때 정답 수 표준편차 1.02), 등급 판정에는 ±1등급 오차가 있을 수 있다. " +
+  "같은 학생이 같은 조건에서 다시 치른다고 할 때 같은 등급이 나올 확률은 시뮬레이션에서 약 .45, 점수 차가 1점 이내일 확률은 약 .69다(설계 근거 §4.8).";
 
 /* 기본 설정 (쪽지시험_구현_근거.md §8.1). 제한 시간 40분은 화면에서 고정 표시하고 설정으로 바꾸지 않는다 */
 export const DEFAULT_QUIZ = {
@@ -751,6 +755,36 @@ const OPT_IDS = ["a", "b", "c", "d"];
 /* 은행 원본(quiz-bank/bank.json)을 검사한다. 오류(errors)가 있으면 올리지 않는다.
    문두 길이·쌍둥이 짝·부정 문두 급·5급 사례 길이는 작성 규칙이라 경고(warnings)로만 알린다.
    칸 부족은 최악 경로에서 문항이 반복될 수 있으므로 오류다 */
+/* 한 칸(급·영역·반)에 실제로 있어야 하는 문항 수. 예비를 뺀 값이라 CELL_MIN 보다 작거나 같다 */
+export const cellNeed = (level, area) => (MAX_VISIT[level] || 0) * ((AREA_MIX[level] || [])[area - 1] || 0);
+
+/* 교사가 비활성으로 돌린 문항 때문에 칸이 필요 수 아래로 내려갔는가.
+   내려간 칸은 그 급 블록에서 반대 반 문항을 꺼내 쓰므로(drawBlock 의 crossHalf) 앞뒤좌우 좌석과
+   문항이 겹치지 않는다는 보장이 사라진다(쪽지시험_구현_근거.md §5.3). 예비가 없는 칸은 한 문항만 빼도 걸린다.
+   도판이 든 칸은 하나가 더 있어야 한다: 블록에 이미 도판 문항이 있으면 그 문항을 건너뛰므로 그 블록에서는
+   쓸 수 있는 문항이 하나 줄어든다. 비활성으로 돌린 도판 문항은 drawBlock 이 먼저 빼므로 세지 않는다.
+   영역 ③은 AREA_DRAW_ORDER 에서 가장 먼저 채우므로 도판을 건너뛸 일이 없어 뺀다. 이미지 제외(noImage) 학생은
+   도판 문항을 늘 건너뛰므로 이 계산 밖이다: 도판이 든 ③ 칸은 비활성이 없어도 그 학생에게 하나 모자란다 */
+export function cellShort(bank, disabled) {
+  const items = (bank && Array.isArray(bank.items) && bank.items) || [];
+  const dis = toSet(disabled);
+  if (!items.length || !dis.size) return [];
+  const have = {}, off = {}, img = new Set();
+  items.forEach((it) => {
+    if (!it || (it.half !== "A" && it.half !== "B")) return;
+    const k = it.half + "|" + it.level + "|" + it.area;
+    have[k] = (have[k] || 0) + 1;
+    if (it.image && !dis.has(String(it.id))) img.add(k);
+    if (dis.has(String(it.id))) (off[k] = off[k] || []).push(String(it.id));
+  });
+  return Object.keys(off).sort(cmp).map((k) => {
+    const [half, level, area] = k.split("|");
+    const need = cellNeed(Number(level), Number(area)) + (Number(area) !== 3 && img.has(k) ? 1 : 0);
+    const left = have[k] - off[k].length;
+    return left < need ? { half, level: Number(level), area: Number(area), left, need, ids: off[k].sort(cmp) } : null;
+  }).filter(Boolean);
+}
+
 export function validateBank(bank) {
   const errors = [], warnings = [];
   const cells = { A: {}, B: {} };
@@ -840,8 +874,44 @@ export function splitBank(bankFile) {
   const keys = { ver: b.ver || "", seedSalt: salt, items: {}, corrections: [] };
   items.forEach((it) => {
     keys.items[it.id] = { answer: it.answer, expl: it.expl || "", src: it.src || null, level: it.level, area: it.area, half: it.half, spec: it.spec || "", tags: Array.isArray(it.tags) ? it.tags : [] };
+    /* 5급 사례 서술은 공개부에 들어가지 않는 필드다. 정답부에 함께 두어야 백업만으로 은행을 되살릴 수 있다(mergeBank) */
+    if (it.case != null) keys.items[it.id].case = it.case;
+    if (it.question != null) keys.items[it.id].question = it.question;
+    if (it.caseLen != null) keys.items[it.id].caseLen = it.caseLen;
   });
   return { pub, keys };
+}
+
+/* splitBank의 역함수. 백업해 둔 공개부·정답부 두 문서로 은행 원본을 되살린다(scripts/quiz-bank-restore.mjs).
+   교사 PC의 quiz-bank/bank.json 이 사라졌을 때의 복구 경로다. 필드 순서도 원본과 같게 맞춘다 */
+export function mergeBank(pubDoc, keysDoc) {
+  const p = pubDoc || {}, k = keysDoc || {};
+  const km = k.items && typeof k.items === "object" && !Array.isArray(k.items) ? k.items : {};
+  const items = (Array.isArray(p.items) ? p.items : []).map((it) => {
+    const e = km[it.id] || {};
+    const out = {
+      id: it.id, level: it.level != null ? it.level : e.level, area: it.area != null ? it.area : e.area,
+      half: it.half || e.half || "", spec: it.spec || e.spec || "", stem: it.stem || "",
+      options: (it.options || []).map((o) => ({ id: o.id, text: o.text })),
+      answer: e.answer != null ? e.answer : null,
+      image: it.image ? { src: it.image.src, alt: it.image.alt || "" } : null,
+      /* src 의 키 순서를 은행 파일과 맞춘다. Firestore 를 거치면 맵의 키 순서가 뒤바뀌어 돌아온다 */
+      neg: !!it.neg, expl: e.expl || "",
+      src: e.src && typeof e.src === "object" ? { lesson: e.src.lesson, h: e.src.h, quote: e.src.quote } : (e.src || null),
+      tags: Array.isArray(e.tags) ? e.tags : [],
+    };
+    if (e.case != null) out.case = e.case;
+    if (e.question != null) out.question = e.question;
+    if (e.caseLen != null) out.caseLen = e.caseLen;
+    return out;
+  });
+  return {
+    ver: p.ver || k.ver || "", seedSalt: p.seedSalt || k.seedSalt || "",
+    practice: (Array.isArray(p.practice) ? p.practice : []).map((q) => ({
+      id: q.id, level: q.level, stem: q.stem, options: (q.options || []).map((o) => ({ id: o.id, text: o.text })), answer: q.answer, expl: q.expl || "",
+    })),
+    items,
+  };
 }
 
 /* 남은 초 = durationSec × 배수 + pausedTotalSec + extraSec + pausedAccumSec − 경과.
