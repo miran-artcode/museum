@@ -839,7 +839,8 @@ export const READING_CSS = `
   .vz-tl.h .vz-tl-y{display:block;text-align:left;padding:0 0 4px}
   .vz-tl.h .vz-tl-b{padding-left:0}
 }
-@media(max-width:520px){.vz-tl li{grid-template-columns:64px 1fr;gap:10px}.vz-tl li::before{left:69px}.vz-tl li::after{left:64px}.vz-tl-y{font-size:13px}}
+@media(max-width:520px){.vz-tl li{grid-template-columns:78px 1fr;gap:10px}.vz-tl li::before{left:83px}.vz-tl li::after{left:78px}.vz-tl-y{font-size:12.5px;padding-right:10px}}
+.vz-tl-y{overflow-wrap:normal}
 
 /* 흐름 */
 .vz-flow{list-style:none;margin:0;padding:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:26px}
