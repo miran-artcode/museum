@@ -166,7 +166,7 @@ src-access-teacher.jsx 교사 「학습 지원」 탭: 학급 설정·실시간 
 src-access-a11y.jsx    모든 화면 공통 접근성 보정: 이름표 잇기·표 입력칸 이름·초점·문서 제목·대비 (§14)
 src-access-core.mjs    학습 지원 순수 계산: 설정 정규화·문장 나누기·용어 찾기·글 지문·자막 버퍼·연구 CSV (npm test)
 src-access-speech.mjs  읽어 주기·말로 입력·기기 안 번역 감싸기, 페이지 번역과 React 충돌 막기
-src-access-lexicon.mjs 차시별 핵심 용어(5개 언어)와 읽기 자료 쉬운 말 요약 / src-access-describe.mjs 도판 대체 글·작품 설명 74장
+src-access-lexicon.mjs 차시별 핵심 용어(5개 언어)와 읽기 자료 쉬운 말 요약 / src-access-describe.mjs 도판 대체 글·작품 설명 149장
 scripts/access-check.mjs       학습 지원 자료 점검: 본문에 없는 용어, 맞지 않게 된 요약, 설명 없는 도판, 문체
 firebase.json          호스팅·규칙 설정
 firestore.rules        접근 권한 규칙
