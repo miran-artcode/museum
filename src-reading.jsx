@@ -75,10 +75,12 @@ function parseBlock(raw) {
     const ol = rest.every((l) => LIST_OL.test(l));
     const ul = rest.every((l) => LIST_UL.test(l));
     if (ol || ul) {
+      const items = rest.map((l) => l.replace(ol ? LIST_OL : LIST_UL, ""));
       return {
         k: ol ? "ol" : "ul",
         lead: lines.slice(0, first).join(" "),
-        items: rest.map((l) => l.replace(ol ? LIST_OL : LIST_UL, "")),
+        items,
+        cn: !ol && items.every((x) => /^[①-⑳]/.test(x)), // ①…⑳
       };
     }
   }
@@ -108,7 +110,7 @@ function Block({ b, lead }) {
     return (
       <div className="rd-lw">
         {b.lead && <p className="rd-p">{inline(b.lead)}</p>}
-        <L className={"rd-list " + b.k}>{b.items.map((x, i) => <li key={i}>{inline(x)}</li>)}</L>
+        <L className={"rd-list " + b.k + (b.cn ? " cn" : "")}>{b.items.map((x, i) => <li key={i}>{inline(x)}</li>)}</L>
       </div>
     );
   }
@@ -284,7 +286,7 @@ function VzCompare({ v }) {
           <thead><tr><th />{cols.map((c, i) => <th key={i}>{c.img && <Thumb src={c.img} alt={plain(c.h)} />}{inline(c.h)}{c.sub && <small>{inline(c.sub)}</small>}</th>)}</tr></thead>
           <tbody>
             {v.rows.map((r, j) => (
-              <tr key={j}><th scope="row">{inline(r)}</th>{cols.map((c, i) => <td key={i}>{inline(arr(c.points)[j] || "")}</td>)}</tr>
+              <tr key={j}><th scope="row">{inline(r)}</th>{cols.map((c, i) => <td key={i} data-label={plain(c.h)}>{inline(arr(c.points)[j] || "")}</td>)}</tr>
             ))}
           </tbody>
         </table>
@@ -391,7 +393,7 @@ function VzTable({ v }) {
       <table className="vz-tbl">
         {isArr(v.heads) && <thead><tr>{v.heads.map((h, i) => <th key={i}>{inline(h)}</th>)}</tr></thead>}
         <tbody>
-          {arr(v.rows).map((r, j) => <tr key={j}>{arr(r).map((c, i) => (i === 0 ? <th key={i} scope="row">{inline(c)}</th> : <td key={i}>{inline(c)}</td>))}</tr>)}
+          {arr(v.rows).map((r, j) => <tr key={j}>{arr(r).map((c, i) => (i === 0 ? <th key={i} scope="row">{inline(c)}</th> : <td key={i} data-label={isArr(v.heads) ? plain(v.heads[i] || "") : ""}>{inline(c)}</td>))}</tr>)}
         </tbody>
       </table>
     </div>
@@ -749,6 +751,8 @@ export const READING_CSS = `
 .rd-list li:last-child{border-bottom:1px solid var(--line2)}
 .rd-list.ol li::before{counter-increment:rdl;content:counter(rdl);position:absolute;left:0;top:10px;width:25px;height:25px;border-radius:50%;background:var(--seal);color:#fff;font:700 12px/25px 'Archivo',sans-serif;text-align:center}
 .rd-list.ul li::before{content:"";position:absolute;left:9px;top:21px;width:7px;height:7px;background:var(--ink)}
+.rd-list.cn li{padding-left:6px}
+.rd-list.cn li::before{display:none}
 
 /* 도판 */
 .rd-figs{clear:both;display:grid;gap:16px;margin:22px 0 26px}
@@ -918,6 +922,16 @@ export const READING_CSS = `
 .vz-tbl th,.vz-tbl td{border-bottom:1px solid var(--line2);padding:8px 10px;text-align:left;vertical-align:top;word-break:keep-all}
 .vz-tbl thead th{border-bottom:2px solid var(--ink);color:var(--ink);font-size:13px}
 .vz-tbl tbody th{color:var(--ink);font-weight:700}
+/* 좁은 화면: 표를 행마다 카드로 쌓고 칸 앞에 열 이름을 붙인다(오른쪽 열이 잘려 안 보이는 일을 막음) */
+@media(max-width:560px){
+  .vz-tbl,.vz-cmp-t{min-width:0}
+  .vz-tbl thead,.vz-cmp-t thead{display:none}
+  .vz-tbl,.vz-tbl tbody,.vz-tbl tr,.vz-tbl th,.vz-tbl td,.vz-cmp-t,.vz-cmp-t tbody,.vz-cmp-t tr,.vz-cmp-t th,.vz-cmp-t td{display:block;width:auto}
+  .vz-tbl tr,.vz-cmp-t tr{border:1px solid var(--line2);border-top:2px solid var(--ink);padding:9px 12px 6px;margin-bottom:10px}
+  .vz-tbl tbody th,.vz-cmp-t tbody th{border:0;padding:0 0 4px;font-size:14px;color:var(--ink);width:auto}
+  .vz-tbl td,.vz-cmp-t td{border:0;padding:5px 0;border-top:1px dotted var(--line)}
+  .vz-tbl td[data-label]:not([data-label=""])::before,.vz-cmp-t td[data-label]:not([data-label=""])::before{content:attr(data-label);display:block;font-size:11.5px;font-weight:700;color:var(--sub);margin-bottom:1px}
+}
 
 /* 인용 */
 .vz--quote{border:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);padding:16px 4px 14px;background:none}
