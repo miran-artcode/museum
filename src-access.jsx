@@ -1080,6 +1080,13 @@ dialog.ax-panel::backdrop{background:rgba(0,0,0,.45)}
 /* ---------- 작품 설명 ---------- */
 .ax-desc{margin:6px 0 0;font-size:13px}
 .ax-desc>summary{cursor:pointer;color:var(--sub);font-size:13px}
+/* 강의 노트 읽기 자료(details.reading) 안에 놓이면 읽기 자료 제목 줄 모양(.reading summary의 14px 굵게·flex·「＋/－」)을
+   자손 선택자로 물려받는다. 학습 지원의 접이 상자는 그 모양을 쓰지 않고 작은 ▸/▾ 표시를 단다 */
+html .reading :is(.ax-desc,.ax-obs,.ax-memo)>summary{display:block;padding:0;margin:0;font-family:var(--sans);font-size:13px;line-height:1.6;font-weight:400;color:var(--sub);gap:0;list-style:none}
+html .reading .ax-obs>summary{color:var(--patina);font-weight:700}
+html .reading :is(.ax-desc,.ax-obs,.ax-memo)>summary::-webkit-details-marker{display:none}
+html .reading :is(.ax-desc,.ax-obs,.ax-memo)>summary::before{content:"▸ " / "";font-family:var(--sans);color:inherit;font-weight:400}
+html .reading :is(.ax-desc,.ax-obs,.ax-memo)[open]>summary::before{content:"▾ " / ""}
 .ax-desc-in{border-left:3px solid var(--line);padding:4px 0 4px 10px;margin-top:6px}
 .ax-desc-in p{margin:4px 0!important;font-size:13.5px!important;line-height:1.7}
 .ax-touch{color:var(--sub)}
