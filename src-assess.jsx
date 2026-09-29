@@ -318,7 +318,7 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
           <div className="ok-note">제출이 확정되어 잠겼습니다. 고치려면 선생님께 해제를 요청하세요.</div>
           <div className="as-sub-grid">
             <div className="as-sub-img">
-              {img ? <img src={img} alt="제출한 대표 이미지" /> : <span className="ph">{img === undefined ? "불러오는 중…" : "이미지 없음"}</span>}
+              {img ? <img src={img} alt={"내 작품 " + (sub.no || "") + " 「" + (sub.title || "무제") + "」"} /> : <span className="ph">{img === undefined ? "불러오는 중…" : "이미지 없음"}</span>}
             </div>
             <div>
               <div className="as-work-h">작품 {sub.no}</div>
@@ -382,7 +382,7 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
         <div className="as-sub-grid">
           <div>
             <div className="as-sub-img">
-              {img ? <img src={img} alt="대표 이미지" /> : <span className="ph">{img === undefined ? "불러오는 중…" : "이미지 없음"}</span>}
+              {img ? <img src={img} alt={"내 작품 「" + (d.title || "무제") + "」"} /> : <span className="ph">{img === undefined ? "불러오는 중…" : "이미지 없음"}</span>}
             </div>
             {img === null && (
               <div className="warn-note" style={{ marginTop: 8 }}>대표 이미지가 없거나 불러오지 못했습니다. 7차시 「전시 출품」에서 대표 이미지를 먼저 올려 주세요.</div>
@@ -447,7 +447,7 @@ export function MyWork({ sub, compact }) {
   return (
     <figure className={"as-mine" + (compact ? " compact" : "")}>
       <div className="as-mine-img">
-        {img ? <img src={img} alt={"내 작품 " + (sub.no || "") + "의 대표 이미지"} /> : <span className="ph">{img === undefined ? "불러오는 중…" : "이미지 없음"}</span>}
+        {img ? <img src={img} alt={"내 작품 " + (sub.no || "") + " 「" + (sub.title || "무제") + "」"} /> : <span className="ph">{img === undefined ? "불러오는 중…" : "이미지 없음"}</span>}
       </div>
       <figcaption className="as-mine-cap">
         <span className="as-work-h">내 작품 {sub.no}</span>
@@ -614,7 +614,7 @@ export function SelfScreen({ sid, phase, block, prev, n, sub, subFail, reloadSub
     return (
       <div className="card as-card">
         <div className="card-head"><span className="card-code">자기평가 ②</span><span className="card-title">처음 평가와 나란히 보기</span></div>
-        <div className="card-note">점수와 근거는 확정되었습니다. 달라졌든 같든 어느 쪽이 더 낫거나 못한 것이 아닙니다.</div>
+        <div className="card-note">점수와 근거는 확정되었습니다. 달라졌든 같든 어느 쪽도 더 낫거나 못하지 않습니다.</div>
         <div className="card-body">
           <div className="as-self">
             <aside className="as-self-side"><MyWork sub={sub} /></aside>
@@ -636,7 +636,7 @@ export function SelfScreen({ sid, phase, block, prev, n, sub, subFail, reloadSub
                 <div><span className="as-lab">② 근거</span>{b.why || ""}</div>
               </div>
               <div className="field" style={{ marginTop: 14 }}>
-                <label>이번 판단은 처음 평가와 견주어 어땠나요?</label>
+                <label>이번 판단의 근거는 처음과 견주어 어땠나요?</label>
                 <div className="as-opts as-col" role="radiogroup" aria-label="처음 평가와 견준 이번 판단">
                   {CHANGE_CODES.map((c) => (
                     <button type="button" key={c.k} role="radio" aria-checked={code === c.k} className={code === c.k ? "on" : ""}
@@ -646,7 +646,7 @@ export function SelfScreen({ sid, phase, block, prev, n, sub, subFail, reloadSub
               </div>
               {code && code !== "unclear" && (
                 <div className="field">
-                  <label>{code === "same" ? "처음과 같은 판단을 유지한 까닭을" : "무엇이 판단을 바꾸었는지"} 내 작품에서 확인한 근거와 함께 적어 주세요 ({MIN_WHY_CHANGE}자 이상)</label>
+                  <label>{code === "same" ? "처음과 같은 판단을 유지한 까닭을" : code === "other" ? "그 밖의 이유를" : "판단이 달라진 까닭을"} 내 작품에서 확인한 근거와 함께 적어 주세요 ({MIN_WHY_CHANGE}자 이상)</label>
                   <textarea rows={2} maxLength={SELF_WHY_MAX} value={cwhy} onChange={(e) => { setCwhy(e.target.value); setWarn(""); }} />
                   <span className={"as-count" + (cwhy.trim().length < MIN_WHY_CHANGE ? " low" : "")}>{cwhy.trim().length} / {SELF_WHY_MAX}</span>
                 </div>
@@ -846,7 +846,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
     if (sampleMode) { setWarn("예시 화면에서는 저장되지 않습니다."); return; }
     const ms = Date.now() - startRef.current;
     const w = why.trim();
-    if (!win) { setWarn("어느 쪽이 더 성립하는지 먼저 고르세요."); return; }
+    if (!win) { setWarn("어느 쪽이 더 설득력 있는지 먼저 고르세요."); return; }
     if (cfg.askConf && !conf) { setWarn("이 판단을 얼마나 확신하는지 골라 주세요."); return; }
     if (w.length < cfg.minWhy) { setWarn("고른 이유를 " + cfg.minWhy + "자 이상 써 주세요."); return; }
     if (!tag) { setWarn("무엇이 결정적이었는지 하나 고르세요."); return; }
@@ -904,7 +904,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
       <div className={"as-work" + (on ? " on" : "")} key={side}>
         <div className="as-work-h">작품 {no}</div>
         <div className="as-img" ref={side === "a" ? boxA : boxB} data-side={side}>
-          {src ? <img src={src} alt={"작품 " + no + "의 이미지"} onLoad={() => onImgLoad(side)} />
+          {src ? <img src={src} alt={"작품 " + no} onLoad={() => onImgLoad(side)} />
             : <span className="ph">{src === undefined ? "불러오는 중…" : "이미지 없음"}</span>}
         </div>
         {openPlate ? (
@@ -919,7 +919,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
             </div>
           ) : <div className="as-plate-hidden">작품 캡션 없음</div>
         ) : <div className="as-plate-hidden">작품 캡션 접힘</div>}
-        <button type="button" role="radio" aria-checked={on} className={"btn small " + (on ? "" : "ghost")} disabled={!canPick}
+        <button type="button" role="radio" aria-checked={on} aria-label={"작품 " + no + (on ? " 고름" : " 고르기")} className={"btn small " + (on ? "" : "ghost")} disabled={!canPick}
           onClick={() => { setWin(side); setWarn(""); }}>{on ? "고름" : "이쪽"}</button>
       </div>
     );
@@ -929,7 +929,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
     <div className="card as-card">
       <div className="card-head">
         <span className="card-code">동료 비교</span>
-        <span className="card-title">두 작품 가운데 어느 쪽이 더 성립하는가</span>
+        <span className="card-title">두 작품 가운데 어느 쪽이 더 설득력 있는가</span>
         <span className="card-sess" role="status" aria-live="polite">
           {busy ? "저장 중…" : saveErr ? "저장 실패" : doneN > 0 ? "저장됨 · " + doneN + "/" + N : N + "쌍"}
         </span>
@@ -948,7 +948,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
         </div>
         {saveErr && (
           <div className="warn-note" role="alert" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ flex: 1, minWidth: 200 }}>판정을 저장하지 못했습니다. 판정은 이 화면에 남아 있으니 연결을 확인하고 「다시 저장」을 눌러 주세요. 저장되기 전에 창을 닫으면 사라집니다.</span>
+            <span style={{ flex: 1, minWidth: 200 }}>판정을 저장하지 못했습니다. 고른 내용은 이 화면에 그대로 있으니 연결을 확인하고 「다시 저장」을 눌러 주세요. 저장되기 전에 창을 닫으면 사라집니다.</span>
             <button className="btn small" disabled={busy} onClick={retry}>{busy ? "저장 중…" : "다시 저장"}</button>
           </div>
         )}
@@ -959,7 +959,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
         ) : (
           <>
             <div className="as-q">{cfg.question}</div>
-            <div className="as-pair" role="radiogroup" aria-label="더 성립하는 작품 고르기">{order.map(work)}</div>
+            <div className="as-pair" role="radiogroup" aria-label="더 설득력 있는 작품 고르기">{order.map(work)}</div>
             <div className="as-tools">
               <button type="button" className="btn small ghost" aria-expanded={openPlate} onClick={() => setOpenPlate((v) => { if (!v) everOpened.current = true; return !v; })}>
                 {openPlate ? "작품 캡션 접기" : "작품 캡션 보기"}
@@ -982,7 +982,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
               </div>
             )}
             <div className="field">
-              <label>고른 이유를 한 문장으로 ({cfg.minWhy}자 이상). 결정에 가장 큰 영향을 준 화면의 특징이나 작품 캡션의 근거를 적습니다</label>
+              <label>고른 이유를 한 문장으로 ({cfg.minWhy}자 이상). 고르는 데 가장 중요했던 이미지나 작품 캡션의 근거를 적습니다</label>
               <textarea rows={2} maxLength={REASON_MAX} value={why} onChange={(e) => { setWhy(e.target.value); setWarn(""); }}
                 placeholder="예: 손잡이 안쪽만 닳아 있어서 실제로 쥐고 쓴 물건처럼 보였다" />
               <span className={"as-count" + (whyLen < cfg.minWhy ? " low" : "")}>{whyLen} / {REASON_MAX}</span>
@@ -1047,7 +1047,7 @@ export function ResultScreen({ cfg, result, self, sub }) {
   const predWord = (pp) => {
     if (typeof pp !== "number" || typeof r.pct !== "number") return null;
     const d = pp - r.pct;
-    return Math.abs(d) < 0.15 ? "예측과 비슷한 위치" : d > 0 ? "예측보다 아래쪽" : "예측보다 위쪽";
+    return Math.abs(d) < 0.15 ? "예측과 비슷한 위치" : d > 0 ? "예측보다 뒤쪽" : "예측보다 앞쪽";
   };
   const pp1 = typeof r.predPct1 === "number" ? r.predPct1 : self && self.s1 ? self.s1.predPct : null;
   const pp2 = typeof r.predPct2 === "number" ? r.predPct2 : self && self.s2 ? self.s2.predPct : null;
@@ -1062,12 +1062,12 @@ export function ResultScreen({ cfg, result, self, sub }) {
 
   return (
     <div className="card as-card">
-      <div className="card-head"><span className="card-code">결과</span><span className="card-title">내 작품{r.no ? " " + r.no : ""}이 놓인 위치</span>
+      <div className="card-head"><span className="card-code">결과</span><span className="card-title">내 작품{r.no ? " " + r.no : ""}의 위치</span>
         <span className="card-sess">{fmtT(r.aggAt)} 집계</span></div>
       <div className="card-note">2학년 친구들이 두 작품씩 비교하며 기록한 판단을 모은 것입니다. 누가 어떻게 판정했는지는 나오지 않습니다. 이유를 먼저 읽고, 위치는 그 뒤에 봅니다.</div>
       <div className="card-body">
         {sub && <div className="as-res-mine"><MyWork sub={sub} compact /></div>}
-        {tagLine && <p className="as-plays">심사자들이 결정적이었다고 고른 것: {tagLine}</p>}
+        {tagLine && <p className="as-plays">판정한 학생들이 결정적이었다고 고른 것: {tagLine}</p>}
         <div className="as-h">이 작품을 고른 판정의 이유 ({won.length})</div>
         {won.length ? list(won) : <p className="hint">기록된 문장이 없습니다.</p>}
         <div className="as-h">다른 작품을 고른 판정의 이유 ({lost.length})</div>
@@ -1081,7 +1081,7 @@ export function ResultScreen({ cfg, result, self, sub }) {
             {pos && reveal !== "band" && (
               <p className="as-plays">
                 이 작품은 {typeof r.plays === "number" ? r.plays + "번" : "여러 번"} 비교되었고,
-                {typeof r.wins === "number" ? " 그 가운데 " + r.wins + "번" : " 그 가운데 몇 번"} 더 성립하는 쪽으로 골라졌습니다.
+                {typeof r.wins === "number" ? " 그 가운데 " + r.wins + "번" : " 그 가운데 몇 번"} 더 설득력 있는 쪽으로 선택되었습니다.
               </p>
             )}
             {(w1 || w2) && (
@@ -1089,12 +1089,12 @@ export function ResultScreen({ cfg, result, self, sub }) {
                 내 예측과 견주면 {w1 ? "자기평가 ①의 " + w1 : ""}{w1 && w2 ? ", " : ""}{w2 ? "자기평가 ②의 " + w2 : ""}입니다.
               </p>
             )}
-            {r.caution && <p className="hint">이번 심사는 판정 수가 넉넉하지 않아 위치의 폭이 넓습니다. 한 칸 위아래는 같은 위치로 읽어도 됩니다.</p>}
+            {r.caution && <p className="hint">이번 비교는 판정 수가 넉넉하지 않아 위치에 오차가 있을 수 있습니다.</p>}
           </div>
         )}
         <div className="as-fixed">
-          이 위치는 이번 심사에서 작품이 놓인 순서이며 점수가 아닙니다. 비교 횟수가 많지 않아 위치는 넉넉한 폭으로 읽어야 하고,
-          한 판정자의 문장보다 여러 문장이 겹치는 지점이 내 작품을 다시 보는 실마리입니다.
+          이 위치는 이번 비교에서 작품이 놓인 순서이며 점수가 아닙니다. 위치에는 오차가 있으니,
+          한 학생의 문장보다 여러 학생이 함께 쓴 이유부터 살펴보세요.
         </div>
       </div>
     </div>
