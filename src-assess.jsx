@@ -22,7 +22,8 @@ import { fbStore } from "./src-fb.js";
 import { LikertRow } from "./src-survey-ui.jsx";
 import { ConfirmButton } from "./src-ux.jsx";
 import {
-  ASSESS_VER, CRITERIA, TAG_OPTIONS, SELF_ITEMS, SELF_LABELS, CONF_LABELS, CHANGE_CODES,
+  ASSESS_VER, CRITERIA, TAG_OPTIONS, SELF_ITEMS, SELF_LABELS, SELF_SCALE, SELF_TEXT, CONF_LABELS, CHANGE_CODES,
+  RANK_TICKS, rankFromTop, topFromRank,
   stageAtLeast, peerCfg, MIN_WHY_CHANGE, REASON_MAX, DUP_SIM,
   submissionFromWs, myPairs, simText, predPctOf, judgeBlockOf,
 } from "./src-assess-core.mjs";
@@ -55,6 +56,8 @@ const PLATE_ROWS = [
   ["relic", "유물 명칭"], ["year", "발굴 연도"], ["era", "추정 연대"], ["mat", "재질"],
   ["size", "크기"], ["context", "출토 맥락"], ["coll", "소장"],
 ];
+/* 동료 비교 화면의 작품 캡션 — 「소장」은 뺀다. 학생이 「○반 가상 컬렉션」처럼 반을 적어 두면 명단이 2학년 전체인 비교에서 작가의 반이 드러난다 */
+const PEER_PLATE_ROWS = PLATE_ROWS.filter(([k]) => k !== "coll");
 
 /* 이미지 캐시 — 같은 작품을 두 번 보면 한 번만 읽는다. 실패(null)는 담아 두지 않아 다음에 다시 읽는다 */
 const imgCache = new Map();
@@ -220,7 +223,7 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
     : subMap ? Object.keys(subMap).filter((k) => subMap[k] && subMap[k].locked).length : null;
   const subsNote = subFail && !subMap ? (
     <div className="warn-note" role="alert" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-      <span style={{ flex: 1, minWidth: 200 }}>우리 반 작품 목록을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요. 연결되면 다시 시도합니다.</span>
+      <span style={{ flex: 1, minWidth: 200 }}>2학년 전체 작품 목록을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요. 연결되면 다시 시도합니다.</span>
       <button type="button" className="btn small" onClick={reloadSubs}>다시 불러오기</button>
     </div>
   ) : null;
@@ -236,14 +239,14 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
   } else if (cur === "submit" || (stage === "submit" && subDone)) {
     screen = <SubmitScreen sid={sid} ws={ws} sub={sub} roster={roster} stage={stage} sampleMode={sampleMode} onSkip={() => setSkipSub(true)} />;
   } else if (cur === "self1") {
-    screen = <SelfScreen key="s1" sid={sid} phase="s1" block={self.s1} prev={null} n={n} subFail={!!subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
+    screen = <SelfScreen key="s1" sid={sid} phase="s1" block={self.s1} prev={null} n={n} sub={sub} subFail={!!subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
   } else if (cur === "peer") {
     screen = <PeerScreen key={"p-" + (roster.fixedAt || "") + "-" + (roster.hash || "")} sid={sid} cfg={cfg} roster={roster} jkey={jkey}
       pairs={pairs} block={p1} subMap={subMap} subFail={!!subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
   } else if (cur === "self2") {
-    screen = <SelfScreen key="s2" sid={sid} phase="s2" block={self.s2} prev={self.s1 || null} n={n} subFail={!!subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
+    screen = <SelfScreen key="s2" sid={sid} phase="s2" block={self.s2} prev={self.s1 || null} n={n} sub={sub} subFail={!!subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
   } else if (cur === "result") {
-    screen = <ResultScreen cfg={cfg} result={assess.result} self={self} />;
+    screen = <ResultScreen cfg={cfg} result={assess.result} self={self} sub={sub} />;
   } else {
     screen = <div className="card as-card"><div className="card-body"><div className="ok-note" role="status">{waitNote({ stage, roster, pairs, s2Done, noWork })}</div></div></div>;
   }
@@ -370,7 +373,7 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
       <div className="card-head"><span className="card-code">제출</span><span className="card-title">최종 작품 제출</span></div>
       <div className="card-note">
         7차시까지 쓴 제목·작품 캡션·대표 이미지를 그대로 가져왔습니다. 여기서 고친 뒤 「제출 확정」을 누르면
-        이 내용이 그대로 고정되어 우리 반의 비교 대상이 됩니다. 비교 화면에는 작품 번호와 이미지, 펼쳤을 때의 작품 캡션만 보입니다.
+        이 내용이 그대로 고정되어 2학년 전체 비교 대상이 됩니다. 비교 화면에는 작품 번호와 이미지, 펼쳤을 때의 작품 캡션만 보입니다.
       </div>
       <div className="card-body">
         {notInRoster && (
@@ -408,7 +411,7 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
         {warn && <div className="warn-note" role="alert">{warn}</div>}
         <div className="sv-foot">
           <ConfirmButton className="btn" disabled={busy || sampleMode} precheck={submitCheck} onConfirm={submit} yes="확정"
-            ask="제출을 확정하면 이 내용이 그대로 고정되어 우리 반의 비교 대상이 됩니다. 고치려면 선생님께 해제를 요청해야 합니다. 지금 확정할까요?"
+            ask="제출을 확정하면 이 내용이 그대로 고정되어 2학년 전체 비교 대상이 됩니다. 고치려면 선생님께 해제를 요청해야 합니다. 지금 확정할까요?"
             label={busy ? "저장 중…" : "제출 확정"} />
           {canSkip && <button type="button" className="btn ghost" disabled={busy || sampleMode} onClick={onSkip}>제출하지 않고 다음 단계로</button>}
           <span className="hint">확정하면 고칠 수 없습니다. 이미지는 긴 변 {SUB_MAX_PX}px로 줄인 사본을 따로 저장합니다.{canSkip ? " 제출하지 않아도 판정에는 참여합니다." : ""}</span>
@@ -423,33 +426,141 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
    ②는 ①을 보지 않고 답한 뒤 「현재 점수 확정」으로 굳히고, 그다음에야 ①과 나란히 본다
    ============================================================ */
 
-export function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sampleMode }) {
+/* 내 작품 — 자기평가와 결과 화면에서 평가하는 작품을 늘 보이게 한다. 제출 사본(sub)의 이미지·제목·작품 캡션을 쓴다.
+   작품 캡션은 넓은 화면에서 펼친 채, 좁은 화면(760px 이하)에서는 접힌 채 시작한다 */
+export function MyWork({ sub, compact }) {
+  const owner = sub && sub.img && sub.img.owner ? String(sub.img.owner) : "";
+  const ref = sub && sub.img && sub.img.ref ? String(sub.img.ref) : "";
+  const [img, setImg] = useState(undefined);   // undefined 읽는 중 · null 없음/실패 · 문자열 dataURL
+  const [open, setOpen] = useState(() => !compact && !(typeof window !== "undefined" && window.innerWidth <= 760));
+  useEffect(() => {
+    let live = true;
+    if (!ref) { setImg(null); return undefined; }
+    setImg(undefined);
+    loadImg(owner, ref).then((v) => { if (live) setImg(v || null); });
+    return () => { live = false; };
+  }, [owner, ref]);
+  if (!sub) return null;
+  const plate = sub.plate || {};
+  const rows = PLATE_ROWS.filter(([k]) => String(plate[k] || "").trim());
+  const hasCap = rows.length > 0 || !!String(plate.notice || "").trim();
+  return (
+    <figure className={"as-mine" + (compact ? " compact" : "")}>
+      <div className="as-mine-img">
+        {img ? <img src={img} alt={"내 작품 " + (sub.no || "") + "의 대표 이미지"} /> : <span className="ph">{img === undefined ? "불러오는 중…" : "이미지 없음"}</span>}
+      </div>
+      <figcaption className="as-mine-cap">
+        <span className="as-work-h">내 작품 {sub.no}</span>
+        <span className="as-title">「{sub.title || "무제"}」</span>
+        {hasCap && (
+          <button type="button" className="as-mine-tg" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+            {open ? "작품 캡션 접기" : "작품 캡션 보기"}
+          </button>
+        )}
+      </figcaption>
+      {open && hasCap && (
+        <div className="as-mine-more">
+          {rows.length > 0 && <dl className="as-dl">{rows.map(([k, label]) => <React.Fragment key={k}><dt>{label}</dt><dd>{plate[k]}</dd></React.Fragment>)}</dl>}
+          {plate.notice && <p className="as-mine-notice">{plate.notice}</p>}
+        </div>
+      )}
+    </figure>
+  );
+}
+
+/* 네 수준 고르기 — 수준마다 작품의 모습을 설명한 문장을 버튼으로 둔다. 방향키로도 옮겨 다닌다 */
+function LevelPick({ item, value, onPick }) {
+  const ref = useRef(null);
+  const n = item.levels.length;
+  const onKeyDown = (e) => {
+    const step = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const cur = value >= 1 && value <= n ? value : (step > 0 ? 0 : n + 1);
+    const next = Math.min(n, Math.max(1, cur + step));
+    onPick(next);
+    const btns = ref.current ? ref.current.querySelectorAll("button") : null;
+    if (btns && btns[next - 1]) btns[next - 1].focus();
+  };
+  return (
+    <div className="as-lv" role="radiogroup" aria-label={item.label} ref={ref} onKeyDown={onKeyDown}>
+      {item.levels.map((txt, i) => {
+        const v = i + 1, on = value === v;
+        return (
+          <button key={v} type="button" role="radio" aria-checked={on} className={on ? "on" : ""}
+            aria-label={v + " " + SELF_LABELS[i] + ". " + txt}
+            tabIndex={on || (!(value >= 1) && v === 1) ? 0 : -1} onClick={() => onPick(v)}>
+            <span className="as-lv-n" aria-hidden="true">{v}<small>{SELF_LABELS[i]}</small></span>
+            <span className="as-lv-t">{txt}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* 위치 예측 — 2학년 전체 작품을 한 줄로 세웠을 때 「앞에서 몇 % 안」인지 고른다(1이 맨 앞). 등수는 그 값에서 계산해 함께 보여 준다 */
+function RankPick({ n, top, onPick }) {
+  const shown = top == null ? 50 : top;
+  const rank = rankFromTop(shown, n);
+  const settle = () => onPick(shown);
+  return (
+    <div className="as-rank">
+      <div className="as-rank-q">{SELF_TEXT.rankQ.replace("{n}", n)}</div>
+      <div className="as-range">
+        <span className="as-rv">맨 앞</span>
+        <div className="as-track">
+          <input type="range" min={1} max={100} step={1} value={shown} aria-label="앞에서 몇 % 안에 드는지"
+            aria-valuetext={"앞에서 " + shown + "% 안, " + n + "점 가운데 약 " + rank + "번째"}
+            onChange={(e) => onPick(Number(e.target.value))}
+            onPointerUp={settle}
+            onKeyUp={(e) => { if (RANK_KEYS.has(e.key)) settle(); }} />
+          <div className="as-ticks" aria-hidden="true">
+            {RANK_TICKS.map((t) => <span key={t} style={{ left: ((t - 1) / 99) * 100 + "%" }}>{t}%</span>)}
+          </div>
+        </div>
+        <span className="as-rv">맨 뒤</span>
+      </div>
+      <div className={"as-rank-txt" + (top == null ? " dim" : "")} aria-live="polite">
+        {top == null ? "슬라이더를 움직여 위치를 정하세요." : <>앞에서 <b>{shown}%</b> 안 · {n}점 가운데 약 <b>{rank}번째</b></>}
+      </div>
+    </div>
+  );
+}
+
+const pad2 = (i) => String(i).padStart(2, "0");
+const topOf = (blk) => (!blk ? null : Number.isFinite(blk.predTop) ? blk.predTop : topFromRank(blk.predRank, blk.n));
+
+export function SelfScreen({ sid, phase, block, prev, n, sub, subFail, reloadSubs, sampleMode }) {
   const isS2 = phase === "s2";
   const b = block || {};
   const locked = isS2 && !!b.lockedAt;
   const [scores, setScores] = useState({});
   const [why, setWhy] = useState("");
-  const [rank, setRank] = useState(null);          // null = 아직 슬라이더를 움직이지 않음
+  const [top, setTop] = useState(null);           // null = 아직 슬라이더를 움직이지 않음
   const [code, setCode] = useState(null);
   const [cwhy, setCwhy] = useState("");
   const [busy, setBusy] = useState(false);
   const [warn, setWarn] = useState("");
   const startRef = useRef(b.startedAt || nowISO());
+  const itemRefs = useRef({});
   const nOk = typeof n === "number" && n >= 2;
-  const rankShown = nOk ? Math.min(n, Math.max(1, rank == null ? Math.ceil(n / 2) : rank)) : null;
-  const answered = SELF_ITEMS.every((it) => scores[it.k] >= 1);
+  const topShown = top == null ? 50 : top;
+  const rankShown = nOk ? rankFromTop(topShown, n) : null;
+  const missing = SELF_ITEMS.map((it, i) => (scores[it.k] >= 1 ? null : i + 1)).filter(Boolean);
+  const nAns = SELF_ITEMS.length - missing.length;
 
   const check = () => {
     if (sampleMode) return "예시 화면에서는 저장되지 않습니다.";
-    if (!answered) return "다섯 문항에 모두 답해 주세요.";
+    if (missing.length) return "아직 고르지 않은 문항이 있습니다(" + missing.join(", ") + "번).";
     if (why.trim().length < SELF_MIN_WHY) return "근거를 " + SELF_MIN_WHY + "자 이상 적어 주세요.";
-    if (n == null) return subFail ? "우리 반 작품 목록을 불러오지 못해 등수 예측을 받을 수 없습니다. 「다시 불러오기」를 눌러 주세요." : "우리 반 작품 수를 세는 중입니다. 잠시 뒤 다시 눌러 주세요.";
-    if (nOk && rank == null) return "등수 예측 슬라이더를 움직여 위치를 정해 주세요.";
+    if (n == null) return subFail ? "2학년 전체 작품 목록을 불러오지 못해 위치를 예측할 수 없습니다. 「다시 불러오기」를 눌러 주세요." : "2학년 전체 작품 수를 세는 중입니다. 잠시 뒤 다시 눌러 주세요.";
+    if (nOk && top == null) return "위치 예측 슬라이더를 움직여 정해 주세요.";
     return "";
   };
   const body = () => ({
-    scores: { ...scores }, why: why.trim(),
-    predRank: nOk ? rankShown : null, n: nOk ? n : (n || 0),
+    scores: { ...scores }, scale: SELF_SCALE, why: why.trim(),
+    predTop: nOk ? topShown : null, predRank: nOk ? rankShown : null, n: nOk ? n : (n || 0),
     predPct: nOk ? predPctOf(rankShown, n) : null,
     startedAt: startRef.current,
   });
@@ -458,11 +569,20 @@ export function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sa
     setBusy(true); setWarn("");
     const ok = await fbStore.setT("assess:" + sid, { ver: ASSESS_VER, self: { [phase]: v } }, { merge: true });
     setBusy(false);
-    if (!ok) setWarn("저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요. 적은 내용은 이 화면에 그대로 남아 있습니다.");
+    if (!ok) setWarn("저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요. 적은 내용은 이 화면에 그대로 있습니다.");
     return ok;
   };
-  /* 제출·확정 여부를 묻기 전의 검사. ConfirmButton의 precheck로 쓴다 */
-  const precheck1 = () => { const e = check(); if (e) { setWarn(e); return false; } return true; };
+  /* 제출·확정 여부를 묻기 전의 검사. ConfirmButton의 precheck로 쓴다. 비어 있는 첫 문항으로 화면을 옮긴다 */
+  const precheck1 = () => {
+    const e = check();
+    if (!e) return true;
+    setWarn(e);
+    if (missing.length) {
+      const el = itemRefs.current[SELF_ITEMS[missing[0] - 1].k];
+      if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    return false;
+  };
   const submit1 = async () => {
     if (!precheck1()) return;
     const p = body(); const at = nowISO();
@@ -477,7 +597,7 @@ export function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sa
     if (sampleMode) { setWarn("예시 화면에서는 저장되지 않습니다."); return; }
     if (!code) { setWarn("네 가지 가운데 하나를 골라 주세요."); return; }
     const needWhy = code !== "unclear";
-    if (needWhy && cwhy.trim().length < MIN_WHY_CHANGE) { setWarn("고른 사유를 내 작품의 구체적인 근거와 이어 " + MIN_WHY_CHANGE + "자 이상 적어 주세요."); return; }
+    if (needWhy && cwhy.trim().length < MIN_WHY_CHANGE) { setWarn("내 작품에서 확인한 근거를 들어 " + MIN_WHY_CHANGE + "자 이상 적어 주세요."); return; }
     const at = nowISO();
     await save({ changeCode: code, changeWhy: needWhy ? cwhy.trim() : "", submittedAt: at, durSec: durOf(b.startedAt || startRef.current, at) });
   };
@@ -485,50 +605,58 @@ export function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sa
   /* ---- ② 확정 뒤: ①과 나란히 보고 변화 사유를 고른다 ---- */
   if (locked) {
     const pv = prev || null;
-    const sc = (blk, k) => (blk && blk.scores && blk.scores[k] >= 1 ? blk.scores[k] : "–");
-    const rk = (blk) => (blk && blk.predRank ? blk.predRank + "번째쯤" : "–");
+    const lv = (blk, k) => {
+      const v = blk && blk.scores ? blk.scores[k] : null;
+      return v >= 1 ? <><b className="as-sc-n">{v}</b><span className="as-sc-w">{SELF_LABELS[v - 1] || ""}</span></> : "–";
+    };
+    const tp = (blk) => { const t = topOf(blk); return t ? "앞에서 " + t + "% 안" : "–"; };
+    const moved = (k) => pv && pv.scores && b.scores && pv.scores[k] >= 1 && b.scores[k] >= 1 && pv.scores[k] !== b.scores[k];
     return (
       <div className="card as-card">
         <div className="card-head"><span className="card-code">자기평가 ②</span><span className="card-title">처음 평가와 나란히 보기</span></div>
-        <div className="card-note">
-          점수와 근거는 확정되었습니다. 아래에 처음 평가(①)와 이번 평가(②)를 나란히 놓았습니다.
-          달라졌든 같든 어느 쪽이 더 낫거나 못한 것이 아닙니다. 이번 판단이 처음과 견주어 어떻게 느껴졌는지만 답해 주세요.
-        </div>
+        <div className="card-note">점수와 근거는 확정되었습니다. 달라졌든 같든 어느 쪽이 더 낫거나 못한 것이 아닙니다.</div>
         <div className="card-body">
-          <table className="as-cmp">
-            <thead><tr><th>문항</th><th className="as-sc">①</th><th className="as-sc" aria-hidden="true" /><th className="as-sc">②</th></tr></thead>
-            <tbody>
-              {SELF_ITEMS.map((it) => (
-                <tr key={it.k}><td>{it.label}</td><td className="as-sc">{sc(pv, it.k)}</td><td className="as-sc as-arrow" aria-hidden="true">→</td><td className="as-sc">{sc(b, it.k)}</td></tr>
-              ))}
-              <tr><td>등수 예측{b.n ? " (" + b.n + "점 가운데)" : ""}</td><td className="as-sc">{rk(pv)}</td><td className="as-sc as-arrow" aria-hidden="true">→</td><td className="as-sc">{rk(b)}</td></tr>
-            </tbody>
-          </table>
-          <div className="as-why2">
-            <div><span className="as-lab">① 근거</span>{pv && pv.why ? pv.why : "기록 없음"}</div>
-            <div><span className="as-lab">② 근거</span>{b.why || ""}</div>
-          </div>
-          <div className="field" style={{ marginTop: 14 }}>
-            <label>이번 판단 과정이 처음 평가와 견주어 어떻게 느껴졌나요?</label>
-            <div className="as-opts as-col" role="radiogroup" aria-label="처음 평가와 견준 느낌">
-              {CHANGE_CODES.map((c) => (
-                <button type="button" key={c.k} role="radio" aria-checked={code === c.k} className={code === c.k ? "on" : ""}
-                  onClick={() => { setCode(c.k); setWarn(""); }}>{c.label}</button>
-              ))}
+          <div className="as-self">
+            <aside className="as-self-side"><MyWork sub={sub} /></aside>
+            <div className="as-self-main">
+              <table className="as-cmp">
+                <thead><tr><th>문항</th><th className="as-sc">①</th><th className="as-sc" aria-hidden="true" /><th className="as-sc">②</th></tr></thead>
+                <tbody>
+                  {SELF_ITEMS.map((it) => (
+                    <tr key={it.k} className={moved(it.k) ? "moved" : ""}>
+                      <td>{it.label}</td><td className="as-sc">{lv(pv, it.k)}</td>
+                      <td className="as-sc as-arrow" aria-hidden="true">→</td><td className="as-sc">{lv(b, it.k)}</td>
+                    </tr>
+                  ))}
+                  <tr><td>위치 예측{b.n ? " (" + b.n + "점 가운데)" : ""}</td><td className="as-sc">{tp(pv)}</td><td className="as-sc as-arrow" aria-hidden="true">→</td><td className="as-sc">{tp(b)}</td></tr>
+                </tbody>
+              </table>
+              <div className="as-why2">
+                <div><span className="as-lab">① 근거</span>{pv && pv.why ? pv.why : "기록 없음"}</div>
+                <div><span className="as-lab">② 근거</span>{b.why || ""}</div>
+              </div>
+              <div className="field" style={{ marginTop: 14 }}>
+                <label>이번 판단은 처음 평가와 견주어 어땠나요?</label>
+                <div className="as-opts as-col" role="radiogroup" aria-label="처음 평가와 견준 이번 판단">
+                  {CHANGE_CODES.map((c) => (
+                    <button type="button" key={c.k} role="radio" aria-checked={code === c.k} className={code === c.k ? "on" : ""}
+                      onClick={() => { setCode(c.k); setWarn(""); }}>{c.label}</button>
+                  ))}
+                </div>
+              </div>
+              {code && code !== "unclear" && (
+                <div className="field">
+                  <label>{code === "same" ? "처음과 같은 판단을 유지한 까닭을" : "무엇이 판단을 바꾸었는지"} 내 작품에서 확인한 근거와 함께 적어 주세요 ({MIN_WHY_CHANGE}자 이상)</label>
+                  <textarea rows={2} maxLength={SELF_WHY_MAX} value={cwhy} onChange={(e) => { setCwhy(e.target.value); setWarn(""); }} />
+                  <span className={"as-count" + (cwhy.trim().length < MIN_WHY_CHANGE ? " low" : "")}>{cwhy.trim().length} / {SELF_WHY_MAX}</span>
+                </div>
+              )}
+              {warn && <div className="warn-note" role="alert">{warn}</div>}
+              <div className="sv-foot">
+                <button className="btn" disabled={busy || sampleMode} onClick={submit2}>{busy ? "저장 중…" : "제출"}</button>
+                <span className="hint">제출하면 고칠 수 없습니다.</span>
+              </div>
             </div>
-            <span className="hint">비교 활동 때문이라고 미리 가정하지 마세요. 어느 답도 더 낫거나 못한 답이 아닙니다.</span>
-          </div>
-          {code && code !== "unclear" && (
-            <div className="field">
-              <label>고른 사유를 내 작품에서 확인되는 구체적인 근거와 이어서 적어 주세요 ({MIN_WHY_CHANGE}자 이상)</label>
-              <textarea rows={2} maxLength={SELF_WHY_MAX} value={cwhy} onChange={(e) => { setCwhy(e.target.value); setWarn(""); }} />
-              <span className={"as-count" + (cwhy.trim().length < MIN_WHY_CHANGE ? " low" : "")}>{cwhy.trim().length} / {SELF_WHY_MAX}</span>
-            </div>
-          )}
-          {warn && <div className="warn-note" role="alert">{warn}</div>}
-          <div className="sv-foot">
-            <button className="btn" disabled={busy || sampleMode} onClick={submit2}>{busy ? "저장 중…" : "제출"}</button>
-            <span className="hint">제출하면 고칠 수 없습니다.</span>
           </div>
         </div>
       </div>
@@ -540,57 +668,52 @@ export function SelfScreen({ sid, phase, block, prev, n, subFail, reloadSubs, sa
     <div className="card as-card">
       <div className="card-head">
         <span className="card-code">{isS2 ? "자기평가 ②" : "자기평가 ①"}</span>
-        <span className="card-title">내 작품을 다섯 문항으로 보기</span>
-        <span className="card-sess">5문항 · 약 5분</span>
+        <span className="card-title">내 작품 평가하기</span>
+        <span className="card-sess">{SELF_ITEMS.length}문항 · 약 7분</span>
       </div>
       <div className="card-note">
-        정답이 없고 성적과 관계없습니다. 지금 보는 내 작품을 기준으로, 문장마다 얼마나 그런지 고르세요.
-        {isS2 ? " 처음 평가와 같은 문항입니다. 처음에 무엇이라 답했는지 기억해 맞출 필요는 없습니다." : ""}
+        {isS2 ? SELF_TEXT.note2 : SELF_TEXT.note1}
       </div>
       <div className="card-body">
-        <div className="sv-legend">{SELF_LABELS.map((l, i) => <span key={l}><b>{i + 1}</b>{l}</span>)}</div>
-        {SELF_ITEMS.map((it, i) => (
-          <div className="sv-item as-item" key={it.k}>
-            <div className="sv-q">
-              <span className="sv-n">{String(i + 1).padStart(2, "0")}</span><b>{it.label}</b>
-              <span className="as-qt">{it.text}</span>
+        <div className="as-self">
+          <aside className="as-self-side">
+            <MyWork sub={sub} />
+            <div className="as-self-prog" aria-live="polite">
+              <span>고른 문항</span><b>{nAns} / {SELF_ITEMS.length}</b>
+              <span className="as-bar"><i style={{ width: (nAns / SELF_ITEMS.length) * 100 + "%" }} /></span>
             </div>
-            <LikertRow value={scores[it.k]} onPick={(v) => { setScores((s) => ({ ...s, [it.k]: v })); setWarn(""); }}
-              label={it.label + ": " + it.text} labels={SELF_LABELS} />
+          </aside>
+          <div className="as-self-main">
+            {SELF_ITEMS.map((it, i) => (
+              <section className={"as-qi" + (scores[it.k] >= 1 ? " done" : "")} key={it.k} ref={(el) => { itemRefs.current[it.k] = el; }}>
+                <div className="as-qi-h">
+                  <span className="sv-n">{pad2(i + 1)}</span><b>{it.label}</b>
+                  {it.group && <span className="as-qi-g">{it.group}</span>}
+                </div>
+                <p className="as-qi-t">{it.text}</p>
+                {it.look && <p className="as-qi-look"><span>살펴볼 곳</span>{it.look}</p>}
+                <LevelPick item={it} value={scores[it.k]} onPick={(v) => { setScores((s) => ({ ...s, [it.k]: v })); setWarn(""); }} />
+              </section>
+            ))}
+            <div className="field as-evi">
+              <label>{SELF_TEXT.whyQ} ({SELF_MIN_WHY}자 이상)</label>
+              <textarea rows={2} maxLength={SELF_WHY_MAX} value={why} onChange={(e) => { setWhy(e.target.value); setWarn(""); }}
+                placeholder={SELF_TEXT.whyEx} />
+              <span className={"as-count" + (why.trim().length < SELF_MIN_WHY ? " low" : "")}>{why.trim().length} / {SELF_WHY_MAX}</span>
+            </div>
+            {n == null ? (
+              <p className="hint">{subFail ? "2학년 전체 작품 목록을 불러오지 못했습니다. " : "2학년 전체 작품 수를 세는 중… "}
+                {subFail && reloadSubs && <button type="button" className="btn small ghost" onClick={reloadSubs}>다시 불러오기</button>}
+              </p>
+            ) : nOk && <RankPick n={n} top={top} onPick={(v) => { setTop(v); setWarn(""); }} />}
+            {warn && <div className="warn-note" role="alert">{warn}</div>}
+            <div className="sv-foot">
+              <ConfirmButton className="btn" disabled={busy || sampleMode} precheck={precheck1} onConfirm={isS2 ? lock2 : submit1}
+                ask={isS2 ? "확정하면 점수와 근거를 고칠 수 없습니다. 지금 확정할까요?" : "제출하면 답을 고칠 수 없습니다. 지금 제출할까요?"} yes={isS2 ? "확정" : "제출"}
+                label={busy ? "저장 중…" : isS2 ? "현재 점수 확정" : "제출하기"} />
+              <span className="hint">{isS2 ? "확정한 뒤에 처음 평가와 나란히 봅니다." : "제출하면 고칠 수 없습니다."}</span>
+            </div>
           </div>
-        ))}
-        <div className="field" style={{ marginTop: 14 }}>
-          <label>이번 점수를 정할 때 가장 중요하게 본 내 작품의 구체적인 특징이나 근거 한 가지 ({SELF_MIN_WHY}자 이상)</label>
-          <textarea rows={2} maxLength={SELF_WHY_MAX} value={why} onChange={(e) => { setWhy(e.target.value); setWarn(""); }}
-            placeholder="예: 손잡이 안쪽만 닳아 있어서 쥐고 쓴 방향이 읽힌다" />
-          <span className={"as-count" + (why.trim().length < SELF_MIN_WHY ? " low" : "")}>{why.trim().length} / {SELF_WHY_MAX}</span>
-        </div>
-        {n == null ? (
-          <p className="hint">{subFail ? "우리 반 작품 목록을 불러오지 못했습니다. " : "우리 반 작품 수를 세는 중… "}
-            {subFail && reloadSubs && <button type="button" className="btn small ghost" onClick={reloadSubs}>다시 불러오기</button>}
-          </p>
-        ) : nOk && (
-          <div className="field">
-            <label>우리 반 {n}점 가운데 내 작품은 몇 번째쯤일까요? <span className="hint">(1이 가장 앞)</span></label>
-            <div className="as-range">
-              <span className="as-rv">1</span>
-              <input type="range" min={1} max={n} step={1} value={rankShown} aria-label="등수 예측" aria-valuetext={rankShown + "번째쯤"}
-                onChange={(e) => { setRank(Number(e.target.value)); setWarn(""); }}
-                onPointerUp={() => setRank((r) => (r == null ? rankShown : r))}
-                onKeyUp={(e) => { if (!RANK_KEYS.has(e.key)) return; setRank((r) => (r == null ? rankShown : r)); }} />
-              <span className="as-rv">{n}</span>
-            </div>
-            <div className={"as-rank-txt" + (rank == null ? " dim" : "")} aria-live="polite">
-              {rank == null ? "슬라이더를 움직여 위치를 정하세요" : "우리 반 " + n + "점 가운데 " + rankShown + "번째쯤"}
-            </div>
-          </div>
-        )}
-        {warn && <div className="warn-note" role="alert">{warn}</div>}
-        <div className="sv-foot">
-          <ConfirmButton className="btn" disabled={busy || sampleMode} precheck={precheck1} onConfirm={isS2 ? lock2 : submit1}
-            ask={isS2 ? "확정하면 점수와 근거를 고칠 수 없습니다. 지금 확정할까요?" : "제출하면 답을 고칠 수 없습니다. 지금 제출할까요?"} yes={isS2 ? "확정" : "제출"}
-            label={busy ? "저장 중…" : isS2 ? "현재 점수 확정" : "제출하기"} />
-          <span className="hint">{isS2 ? "확정하면 점수와 근거를 고칠 수 없습니다. 확정한 뒤에 처음 평가와 나란히 봅니다." : "제출하면 고칠 수 없습니다."}</span>
         </div>
       </div>
     </div>
@@ -757,7 +880,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
 
   if (!subMap) {
     return (
-      <div className="card as-card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>우리 반 작품을 불러오는 중… 잠시만 기다려 주세요.</div></div>
+      <div className="card as-card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>2학년 전체 작품을 불러오는 중… 잠시만 기다려 주세요.</div></div>
     );
   }
 
@@ -789,7 +912,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
             <div className="as-plate">
               <div className="as-title">「{w.sub.title || "무제"}」</div>
               <dl>
-                {PLATE_ROWS.filter(([k]) => plate && String(plate[k] || "").trim()).map(([k, label]) => (
+                {PEER_PLATE_ROWS.filter(([k]) => plate && String(plate[k] || "").trim()).map(([k, label]) => (
                   <React.Fragment key={k}><dt>{label}</dt><dd>{plate[k]}</dd></React.Fragment>
                 ))}
               </dl>
@@ -812,9 +935,9 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
         </span>
       </div>
       <div className="card-note">
-        우리 반 작품을 두 점씩 견줍니다. 작품 번호만 보이고 누구의 작품인지는 나오지 않습니다.
+        2학년 전체 작품을 두 점씩 견줍니다. 다른 반 작품도 함께 나옵니다. 작품 번호만 보이고 누구의 작품인지는 나오지 않습니다.
         매번 한 쪽을 고르고 그 이유를 한 문장으로 써 주세요. 고른 것은 되돌릴 수 없습니다.
-        <div className="as-banner">이 반의 모든 작품은 AI 이미지 도구로 만들었고, 작품 캡션은 학생이 썼습니다. 각 작품의 AI 활용 범위는 비교가 끝난 뒤 전시장에서 공개됩니다.</div>
+        <div className="as-banner">이번 비교에 나오는 작품은 모두 2학년 학생이 AI 이미지 도구를 써서 만들었고, 작품 캡션은 학생이 직접 썼습니다. 각 작품의 AI 활용 범위는 모든 반의 비교가 끝난 뒤 전시장에서 공개합니다.</div>
       </div>
       <div className="card-body">
         <div className="as-prog">
@@ -897,22 +1020,21 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
    5. 결과 — reveal 범위만큼만, 숫자보다 말로
    ============================================================ */
 
-export function ResultScreen({ cfg, result, self }) {
+export function ResultScreen({ cfg, result, self, sub }) {
   const r = result || {};
   const reveal = cfg.reveal;
-  const [showPos, setShowPos] = useState(false);   // 자리(밴드·백분위·등수)는 이유를 읽은 뒤 스스로 눌러야 보인다
+  const [showPos, setShowPos] = useState(false);   // 위치(밴드·백분위·등수)는 이유를 읽은 뒤 스스로 눌러야 보인다
   const n = r.n || 0;
   let pos = null;
   if (r.rank == null || r.band == null) {
-    pos = null;   // 비교된 적이 없는 작품 — 자리를 말할 수 없다
+    pos = null;   // 비교된 적이 없는 작품 — 위치를 말할 수 없다
   } else if (reveal === "band") {
-    pos = r.band === "상" ? "우리 반에서 위쪽 1/3에 놓였습니다."
-      : r.band === "하" ? "우리 반에서 아래쪽 1/3에 놓였습니다."
-        : "우리 반에서 가운데에 놓였습니다.";
+    pos = "2학년 전체 작품을 앞·가운데·뒤 세 묶음으로 나누면 "
+      + (r.band === "상" ? "앞 묶음" : r.band === "하" ? "뒤 묶음" : "가운데 묶음") + "에 놓였습니다.";
   } else if (reveal === "pct" && typeof r.pct === "number") {
-    pos = "우리 반 작품 가운데 약 " + Math.round(r.pct * 100) + "%의 작품보다 앞에 놓였습니다.";
+    pos = "2학년 전체 " + n + "점 가운데 약 " + Math.round(r.pct * 100) + "%의 작품보다 앞에 놓였습니다.";
   } else if (reveal === "rank" && r.rank) {
-    pos = "우리 반 " + n + "점 가운데 " + r.rank + "번째에 놓였습니다.";
+    pos = "2학년 전체 " + n + "점 가운데 " + r.rank + "번째에 놓였습니다.";
   }
   const received = Array.isArray(r.received) ? r.received : [];
   const won = received.filter((x) => x && x.won);
@@ -940,18 +1062,19 @@ export function ResultScreen({ cfg, result, self }) {
 
   return (
     <div className="card as-card">
-      <div className="card-head"><span className="card-code">결과</span><span className="card-title">내 작품 {r.no ? "(" + r.no + ")" : ""}이 놓인 자리</span>
+      <div className="card-head"><span className="card-code">결과</span><span className="card-title">내 작품{r.no ? " " + r.no : ""}이 놓인 위치</span>
         <span className="card-sess">{fmtT(r.aggAt)} 집계</span></div>
-      <div className="card-note">같은 반 친구들이 두 작품씩 비교하며 기록한 판단을 모은 것입니다. 누가 어떻게 판정했는지는 나오지 않습니다. 이유를 먼저 읽고, 위치는 그 뒤에 봅니다.</div>
+      <div className="card-note">2학년 친구들이 두 작품씩 비교하며 기록한 판단을 모은 것입니다. 누가 어떻게 판정했는지는 나오지 않습니다. 이유를 먼저 읽고, 위치는 그 뒤에 봅니다.</div>
       <div className="card-body">
+        {sub && <div className="as-res-mine"><MyWork sub={sub} compact /></div>}
         {tagLine && <p className="as-plays">심사자들이 결정적이었다고 고른 것: {tagLine}</p>}
         <div className="as-h">이 작품을 고른 판정의 이유 ({won.length})</div>
         {won.length ? list(won) : <p className="hint">기록된 문장이 없습니다.</p>}
         <div className="as-h">다른 작품을 고른 판정의 이유 ({lost.length})</div>
         {lost.length ? list(lost) : <p className="hint">기록된 문장이 없습니다.</p>}
-        <div className="as-h">이 작품이 놓인 자리</div>
+        <div className="as-h">이 작품이 놓인 위치</div>
         {!showPos ? (
-          <button type="button" className="btn small ghost" onClick={() => setShowPos(true)}>자리 보기</button>
+          <button type="button" className="btn small ghost" onClick={() => setShowPos(true)}>위치 보기</button>
         ) : (
           <div>
             {pos ? <div className="as-pos">{pos}</div> : <div className="hint" style={{ marginBottom: 8 }}>이 작품은 아직 비교된 적이 없어 위치를 말할 수 없습니다.</div>}
@@ -970,7 +1093,7 @@ export function ResultScreen({ cfg, result, self }) {
           </div>
         )}
         <div className="as-fixed">
-          이 위치는 오늘 이 심사에서 작품이 놓인 순서이며 점수가 아닙니다. 비교 횟수가 많지 않아 위치는 넉넉한 폭으로 읽어야 하고,
+          이 위치는 이번 심사에서 작품이 놓인 순서이며 점수가 아닙니다. 비교 횟수가 많지 않아 위치는 넉넉한 폭으로 읽어야 하고,
           한 판정자의 문장보다 여러 문장이 겹치는 지점이 내 작품을 다시 보는 실마리입니다.
         </div>
       </div>
@@ -1036,11 +1159,59 @@ const ASSESS_CSS = `
 .as-cmp{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px}
 .as-cmp th{font-weight:500;color:var(--sub);font-size:12px;text-align:left;border-bottom:1px solid var(--line2);padding:6px 8px}
 .as-cmp td{padding:6px 8px;border-bottom:1px dashed var(--line2);vertical-align:top}
-.as-cmp .as-sc{font-family:var(--mono);text-align:center;white-space:nowrap;width:48px}
+.as-cmp .as-sc{text-align:center;white-space:nowrap;min-width:72px}
 .as-cmp .as-arrow{color:var(--sub);width:28px}
 .as-why2{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;line-height:1.6}
 .as-why2>div{border:1px solid var(--line2);background:var(--card2);padding:8px 10px}
 .as-lab{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--sub);margin-bottom:3px}
+
+/* 자기평가 — 내 작품을 옆에 두고 문항마다 네 수준 가운데 하나를 고른다 */
+.as-self{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:24px;align-items:start}
+.as-self-side{position:sticky;top:72px;display:flex;flex-direction:column;gap:10px}
+.as-self-main{min-width:0}
+.as-mine{margin:0;border:1px solid var(--line);background:#fff}
+.as-mine-img{background:var(--card2);aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;overflow:hidden;border-bottom:1px solid var(--line2)}
+.as-mine-img img{width:100%;height:100%;object-fit:contain;display:block}
+.as-mine-img .ph{font-size:11px;color:var(--sub)}
+.as-mine-cap{padding:10px 12px 10px;display:flex;flex-direction:column;gap:3px}
+.as-mine-more{padding:0 12px 12px}
+.as-mine-more .as-dl{grid-template-columns:62px 1fr;font-size:11.5px;line-height:1.55;max-height:36vh;overflow:auto;padding-right:4px;margin-top:0}
+.as-mine-tg{align-self:flex-start;background:none;border:none;padding:4px 0 0;font-family:var(--sans);font-size:12px;color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.as-mine-notice{font-size:11.5px;color:var(--sub);margin:6px 0 0;padding-top:6px;border-top:1px dashed var(--line2);line-height:1.55}
+.as-self-prog{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub)}
+.as-self-prog b{font-family:var(--mono);color:var(--ink);font-weight:500;white-space:nowrap}
+.as-qi{padding:16px 0 18px;border-bottom:1px dashed var(--line2);scroll-margin-top:84px}
+.as-qi:first-child{padding-top:2px}
+.as-qi-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.as-qi-h b{font-size:15px}
+.as-qi.done .as-qi-h b::after{content:" ✓";color:var(--patina);font-weight:400}
+.as-qi-g{font-size:11px;color:var(--sub);border:1px solid var(--line2);padding:0 6px;line-height:1.7}
+.as-qi-t{font-size:14px;line-height:1.65;margin:4px 0 2px}
+.as-qi-look{font-size:12px;color:var(--sub);margin:0 0 10px;line-height:1.6}
+.as-qi-look span{font-weight:700;color:var(--ink);margin-right:6px}
+.as-lv{display:flex;flex-direction:column;gap:6px}
+.as-lv button{display:grid;grid-template-columns:62px 1fr;gap:10px;align-items:start;text-align:left;padding:9px 12px;border:1px solid var(--line);background:#fff;cursor:pointer;font-family:var(--sans);font-size:13px;line-height:1.6;color:var(--ink)}
+.as-lv button:hover{border-color:var(--ink)}
+.as-lv button:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.as-lv button.on{border-color:var(--ink);background:var(--ink);color:#fff}
+.as-lv-n{font-family:var(--mono);font-size:15px;display:flex;align-items:baseline;gap:6px}
+.as-lv-n small{font-family:var(--sans);font-size:11.5px;color:var(--sub)}
+.as-lv button.on .as-lv-n small{color:#d9d9d9}
+.as-evi{margin-top:18px}
+.as-evi label{font-size:13px;color:var(--ink);font-weight:700}
+.as-rank{border:1px solid var(--line2);background:var(--card2);padding:12px 14px 10px;margin:4px 0 14px}
+.as-rank-q{font-size:13px;font-weight:700;line-height:1.6;margin-bottom:6px}
+.as-track{flex:1;min-width:0;position:relative;padding-bottom:18px}
+.as-track input[type=range]{width:100%;margin:0;accent-color:var(--ink);height:28px}
+.as-ticks span{position:absolute;bottom:0;transform:translateX(-50%);font-family:var(--mono);font-size:10.5px;color:var(--sub)}
+.as-rank-txt b{font-weight:700}
+.as-cmp tr.moved td{background:var(--card2)}
+.as-cmp .as-sc-n{font-family:var(--mono);font-weight:500;margin-right:4px}
+.as-cmp .as-sc-w{font-size:11.5px;color:var(--sub)}
+.as-res-mine{margin-bottom:14px}
+.as-mine.compact{display:grid;grid-template-columns:minmax(120px,200px) 1fr;align-items:start}
+.as-mine.compact .as-mine-img{border-bottom:none;border-right:1px solid var(--line2)}
+.as-mine.compact .as-mine-more{grid-column:1/-1;border-top:1px solid var(--line2);padding-top:10px}
 
 /* 동료 비교 */
 .as-prog{display:flex;align-items:center;gap:10px;margin-bottom:12px}
@@ -1070,6 +1241,15 @@ const ASSESS_CSS = `
 /* 손가락 입력에서는 버튼을 40px 이상으로 · 움직임 줄이기 · 640px 이하에서는 두 작품을 세로로 */
 @media (pointer:coarse){.as-opts button,.as-work .btn,.as-tools .btn,.as-step{min-height:40px}}
 @media (prefers-reduced-motion:reduce){.as-bar i{transition:none}}
+@media (pointer:coarse){.as-lv button{min-height:44px}}
+@media (max-width:760px){
+  .as-self{grid-template-columns:1fr;gap:14px}
+  .as-self-side{position:static}
+  .as-mine,.as-mine.compact{display:grid;grid-template-columns:118px 1fr;align-items:start;gap:0}
+  .as-mine-img,.as-mine.compact .as-mine-img{border:none;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2)}
+  .as-mine .as-mine-more{grid-column:1/-1;border-top:1px solid var(--line2);padding-top:10px}
+  .as-mine-more .as-dl{max-height:none}
+}
 @media (max-width:640px){
   .as-pair,.as-sub-grid,.as-grid2,.as-why2{grid-template-columns:1fr}
   .as-opts button{flex:1 1 100%}
