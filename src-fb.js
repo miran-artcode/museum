@@ -268,6 +268,44 @@ export const fbStore = {
     ]);
   },
 
+  /* updateFields의 경로판: v 아래 여러 단계 경로를 가리켜 그 값만 바꾼다 (2026-09-28).
+     entries = [[경로 배열, 값], ...]. 경로 조각 하나하나가 FieldPath의 한 조각이라 점이 든 키(l1.q1)도 그대로 쓴다.
+       기록지: [["l1.q1"], "글"] · 보조 맵의 한 항목 [["_inq", "q1.concept"], {...}] · [["_act", "3차시"], {...}]
+       설문:   [["pre"], 블록] · [["stance", "post"], 블록] · [["ver"], "v1"]
+     값이 undefined면 그 경로를 지운다. 맵 안의 한 항목만 바꾸므로 같은 맵의 다른 항목(다른 칸·차시·블록)은 서버 값이 남는다.
+     기록지 문서에는 cv: 2를 함께 싣는다 (C3 계약: 규칙이 cv 없는 학생 쓰기를 옛 화면의 통째 쓰기로 보고 거부한다).
+     돌려주는 값: true(성공) · false(실패) · "missing"(문서 없음) — updateFields와 같다 */
+  async updatePaths(key, entries) {
+    if (isViewerNow()) return false; // 보기 전용 계정
+    try {
+      const r = route(key);
+      if (r.kind !== "doc") return false;
+      const args = [];
+      for (const [path, val] of entries || []) {
+        const p = (Array.isArray(path) ? path : [path]).map(String);
+        if (!p.length) continue;
+        args.push(new FieldPath("v", ...p), val === undefined ? deleteField() : val);
+      }
+      if (r.path[0] === "worksheets") args.push(new FieldPath("cv"), 2);
+      args.push(new FieldPath("updatedAt"), Date.now());
+      await updateDoc(doc(db, r.path[0], r.path[1]), ...args);
+      return true;
+    } catch (e) {
+      if (e && e.code === "not-found") return "missing";
+      console.error("update fail", key, e);
+      return false;
+    }
+  },
+
+  /* updatePaths의 제한 시간판 (setT와 같은 이유) */
+  updatePathsT(key, entries, opts) {
+    const ms = (opts && opts.timeout) || 8000;
+    return Promise.race([
+      this.updatePaths(key, entries),
+      new Promise((res) => setTimeout(() => res(false), ms)),
+    ]);
+  },
+
   /* set과 같으나 제한 시간 안에 서버 확인이 없으면 false로 끝낸다.
      오프라인이면 setDoc이 거부되지 않고 영원히 미해결로 남아 await가 안 풀리기 때문 —
      저장·제출처럼 결과를 사용자에게 알려야 하는 모든 경로는 이것을 쓴다.
@@ -303,15 +341,32 @@ export const fbStore = {
   /* watchDoc과 같으나 문서 유무와 출처(캐시 사본인지, 이 기기의 미전송 쓰기가 섞였는지)를 함께 준다.
      학생 화면이 자기 기록지를 구독해 다른 기기가 쓴 값을 받을 때 쓴다 (src-ws-sync.mjs):
      fromCache 사본은 로드 때 이미 반영됐고 서버보다 오래됐을 수 있어 부른 쪽이 건너뛴다. */
-  watchDocMeta(key, cb) {
+  /* 오류가 나면 onSnapshot 구독은 그대로 죽는다 (네트워크 끊김은 SDK가 알아서 잇지만 권한·토큰 오류는 아니다).
+     그러면 탭이 아무 표시 없이 옛 사본에 머물므로 2초부터 두 배씩 최대 60초 간격으로 다시 구독한다.
+     onErr(e)는 끊겼을 때, onOk()는 다시 받기 시작했을 때 부른다 (학생 화면의 「실시간 연결 끊김」 안내) */
+  watchDocMeta(key, cb, onErr, onOk) {
     const r = route(key);
     if (r.kind !== "doc") return () => {};
-    return onSnapshot(doc(db, r.path[0], r.path[1]), (s) => {
-      const m = s.metadata || {};
-      if (!s.exists()) return cb({ exists: false, data: null, fromCache: !!m.fromCache, hasPendingWrites: !!m.hasPendingWrites });
-      const data = s.data();
-      cb({ exists: true, data: data && data.v !== undefined ? data.v : data, fromCache: !!m.fromCache, hasPendingWrites: !!m.hasPendingWrites });
-    }, (e) => { console.error("watch fail", key, e); });
+    let un = null, timer = null, stopped = false, wait = 2000, broken = false;
+    const start = () => {
+      un = onSnapshot(doc(db, r.path[0], r.path[1]), (s) => {
+        wait = 2000;
+        if (broken) { broken = false; if (onOk) onOk(); }
+        const m = s.metadata || {};
+        if (!s.exists()) return cb({ exists: false, data: null, fromCache: !!m.fromCache, hasPendingWrites: !!m.hasPendingWrites });
+        const data = s.data();
+        cb({ exists: true, data: data && data.v !== undefined ? data.v : data, fromCache: !!m.fromCache, hasPendingWrites: !!m.hasPendingWrites });
+      }, (e) => {
+        console.error("watch fail", key, e);
+        if (stopped) return;
+        broken = true;
+        if (onErr) onErr(e);
+        timer = setTimeout(() => { timer = null; if (!stopped) start(); }, wait);
+        wait = Math.min(wait * 2, 60000);
+      });
+    };
+    start();
+    return () => { stopped = true; if (timer) clearTimeout(timer); if (un) un(); };
   },
 
   /* 한 학생의 기록지 시점 사본 목록. 실패와 없음을 구분한다 (되돌리기 화면이 빈 목록을 "없음"으로 보이면 안 되므로) */

@@ -26,7 +26,7 @@ import { ReadingCard, LessonMap } from "./src-reading.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
 import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, InquiryStyle, inquiryTraceRows } from "./src-inquiry.jsx";
 import { makeSnapshotter, WsHistoryCard } from "./src-ws-history.jsx";
-import { makeDirtyTracker, changedKeys, mergeRemote, buildPatch } from "./src-ws-sync.mjs";
+import { makeDirtyTracker, changedTokens, mergeRemote, buildEntries, mergeTraceForSave, reconcileTrace, tok as wsTok, mergeSurvey, surveyEntries, submittedBlocks } from "./src-ws-sync.mjs";
 import { LegacyEcho } from "./src-legacy-fields.jsx";
 import { WsLockCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
 import { AccessProvider, AccessButton, AccessLessonTerms, AccessMemo, AccessStyle, MediaText, MediaTextRead, GateLangHelp } from "./src-access.jsx";
@@ -70,7 +70,8 @@ const mediaStore = {
   get: (owner, ref) => fbStore.get("media:" + owner + "_" + ref),
   getSafe: (owner, ref) => fbStore.getSafe("media:" + owner + "_" + ref), // 실패와 없음을 구분 — 학번 이전처럼 원본 삭제가 뒤따르는 곳용
   put: (owner, ref, data) => fbStore.set("media:" + owner + "_" + ref, data),
-  putT: (owner, ref, data) => fbStore.setT("media:" + owner + "_" + ref, data), // 오프라인이면 8초 뒤 false
+  // 1MB에 가까운 사진·녹음은 느린 학교 와이파이에서 8초를 넘길 수 있어 30초를 기다린다. 오프라인이면 30초 뒤 false (실패가 보인다)
+  putT: (owner, ref, data) => fbStore.setT("media:" + owner + "_" + ref, data, { timeout: 30000 }),
   remove: (owner, ref) => fbStore.remove("media:" + owner + "_" + ref),
 };
 
@@ -3107,7 +3108,10 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
   const ph = (m && m.ph) || { when: "밤 11시", where: "아파트 분리수거장", what: "상자 더미 옆 손수레, 오른쪽 손잡이에만 테이프" };
   const legacy = typeof v === "string" && v.trim() ? v : "";
   const blank = { when: "", where: "", what: "" };
-  const rows = padRows(legacy ? [] : v, 3, blank);
+  /* 옛 기록이 줄글이면 줄마다 한 장면으로 표에 옮겨 보여 준다. 예전에는 빈 표가 떠서 첫 글자를 치는 순간
+     줄글이 통째로 사라졌다. 이제 표를 고치면 옮긴 줄이 함께 저장되므로 줄글의 내용이 빠지지 않는다 (줄 수 제한 없음) */
+  const legacyRows = legacy ? legacy.split(/\n+/).map((x) => x.trim()).filter(Boolean).map((x) => ({ ...blank, what: x })) : [];
+  const rows = padRows(legacy ? legacyRows : v, 3, blank);
   const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
   return (
     <div className="field span2">
@@ -3126,10 +3130,8 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
           <b>이전에 줄글로 쓴 내용</b>
           <div style={{ whiteSpace: "pre-wrap" }}>{legacy}</div>
           <div className="carry-row">
-            <button type="button" className="btn small ghost" onClick={() => {
-              const parts = legacy.split(/\n+/).map((x) => x.replace(/^\s*\d+[.)]\s*/, "").trim()).filter(Boolean).slice(0, 3);
-              setField(fieldKey, padRows(parts.map((p) => ({ when: "", where: "", what: p })), 3, blank));
-            }}>줄글을 표로 옮기기</button>
+            <button type="button" className="btn small ghost" onClick={() => setField(fieldKey, rows)}>표로 옮겨 저장하기</button>
+            <span className="hint" style={{ margin: 0 }}>아래 표에 줄마다 옮겨 두었습니다. 표를 고치면 표로 저장됩니다.</span>
           </div>
         </div>
       )}
@@ -3140,9 +3142,9 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="rn">{i + 1}</td>
-                <td data-th={col.when}><input value={r.when || ""} maxLength={60} placeholder={i === 0 ? ph.when : ""} onChange={(e) => up(i, "when", e.target.value)} /></td>
-                <td data-th={col.where}><input value={r.where || ""} maxLength={60} placeholder={i === 0 ? ph.where : ""} onChange={(e) => up(i, "where", e.target.value)} /></td>
-                <td data-th={col.what}><input value={r.what || ""} maxLength={200} placeholder={i === 0 ? ph.what : ""} onChange={(e) => up(i, "what", e.target.value)} /></td>
+                <td data-th={col.when}><input aria-label={(i + 1) + "번째 장면: " + col.when} value={r.when || ""} maxLength={60} placeholder={i === 0 ? ph.when : ""} onChange={(e) => up(i, "when", e.target.value)} /></td>
+                <td data-th={col.where}><input aria-label={(i + 1) + "번째 장면: " + col.where} value={r.where || ""} maxLength={60} placeholder={i === 0 ? ph.where : ""} onChange={(e) => up(i, "where", e.target.value)} /></td>
+                <td data-th={col.what}><input aria-label={(i + 1) + "번째 장면: " + col.what} value={r.what || ""} maxLength={200} placeholder={i === 0 ? ph.what : ""} onChange={(e) => up(i, "what", e.target.value)} /></td>
               </tr>
             ))}
           </tbody>
@@ -3181,7 +3183,7 @@ function InvisField({ f, fieldKey, v, setField, ws }) {
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="rn">{i + 1}</td>
-                <td data-th="안 보이는 것"><textarea rows={2} value={r.text || ""} maxLength={150} placeholder={INVIS_PH[i] || ""} onChange={(e) => up(i, "text", e.target.value)} /></td>
+                <td data-th="안 보이는 것"><textarea aria-label={(i + 1) + "번째 줄: 안 보이는 것"} rows={2} value={r.text || ""} maxLength={150} placeholder={INVIS_PH[i] || ""} onChange={(e) => up(i, "text", e.target.value)} /></td>
                 <td data-th="안 보이는 이유">
                   <div className="ivt">
                     {INVIS_TYPES.map((t) => (
@@ -3266,9 +3268,9 @@ function CandsField({ f, fieldKey, v, setField, ws }) {
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="rn">{i + 1}</td>
-                <td data-th="물건"><textarea rows={2} value={r.obj || ""} maxLength={60} placeholder={CAND_PH[i][0]} onChange={(e) => up(i, "obj", e.target.value)} /></td>
-                <td data-th="어디에 있는지"><textarea rows={2} value={r.where || ""} maxLength={60} placeholder={CAND_PH[i][1]} onChange={(e) => up(i, "where", e.target.value)} /></td>
-                <td data-th="누가 어떻게 만지는지"><textarea rows={2} value={r.act || ""} maxLength={120} placeholder={CAND_PH[i][2]} onChange={(e) => up(i, "act", e.target.value)} /></td>
+                <td data-th="물건"><textarea aria-label={(i + 1) + "번째 후보: 물건"} rows={2} value={r.obj || ""} maxLength={60} placeholder={CAND_PH[i][0]} onChange={(e) => up(i, "obj", e.target.value)} /></td>
+                <td data-th="어디에 있는지"><textarea aria-label={(i + 1) + "번째 후보: 어디에 있는지"} rows={2} value={r.where || ""} maxLength={60} placeholder={CAND_PH[i][1]} onChange={(e) => up(i, "where", e.target.value)} /></td>
+                <td data-th="누가 어떻게 만지는지"><textarea aria-label={(i + 1) + "번째 후보: 누가 어떻게 만지는지"} rows={2} value={r.act || ""} maxLength={120} placeholder={CAND_PH[i][2]} onChange={(e) => up(i, "act", e.target.value)} /></td>
                 <td data-th="선택 / 제외">
                   <div className="seg" style={{ flexDirection: "column" }}>
                     <button type="button" className={r.verdict === "고름" ? "on-ok" : ""} onClick={() => setVerdict(i, "고름")}>선택</button>
@@ -3289,7 +3291,6 @@ function CandsField({ f, fieldKey, v, setField, ws }) {
 
 /* 단계 6: 흔적 네 칸(자리·자국·동작·반복). 표 대신 세로 칸 격자라 폰에서도 옆으로 밀지 않는다 */
 function TracesField({ f, fieldKey, v, setField, ws }) {
-  const d = ws || {};
   const rows = padRows(v, 2, { spot: "", shape: "", act: "", freq: "" });
   const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
   const hasRow = (r) => r && (filled(r.spot) || filled(r.shape) || filled(r.act) || filled(r.freq));
@@ -3302,8 +3303,7 @@ function TracesField({ f, fieldKey, v, setField, ws }) {
     const wd = findSymbol(val);
     if (wd && wd !== warnRef.current) {
       warnRef.current = wd;
-      const log = Array.isArray(d._symWarn) ? d._symWarn : [];
-      setField("_symWarn", [...log, { word: wd, at: now() }].slice(-20));
+      setField("_symWarn", (log) => [...(Array.isArray(log) ? log : []), { word: wd, at: now() }].slice(-20));
     }
     if (!wd) warnRef.current = "";
   };
@@ -3314,8 +3314,8 @@ function TracesField({ f, fieldKey, v, setField, ws }) {
       <div className="tf">
         <span className="tf-l">{label}</span>
         {multi
-          ? <textarea rows={2} value={r[k] || ""} maxLength={max} placeholder={i === 0 ? ph : ""} onChange={(e) => (k === "shape" ? onShape(i, e.target.value) : up(i, k, e.target.value))} />
-          : <input value={r[k] || ""} maxLength={max} placeholder={i === 0 ? ph : ""} onChange={(e) => up(i, k, e.target.value)} />}
+          ? <textarea aria-label={label} rows={2} value={r[k] || ""} maxLength={max} placeholder={i === 0 ? ph : ""} onChange={(e) => (k === "shape" ? onShape(i, e.target.value) : up(i, k, e.target.value))} />
+          : <input aria-label={label} value={r[k] || ""} maxLength={max} placeholder={i === 0 ? ph : ""} onChange={(e) => up(i, k, e.target.value)} />}
         {sym && <span className="sym-warn">‘{sym}’은(는) 사진에 찍히지 않습니다. 위치·모양·횟수로 바꿔 보세요.</span>}
         {k === "freq" && filled(r.span) && !String(r.freq || "").includes(r.span) && <span className="hint">옛 기록의 기간: {r.span}</span>}
       </div>
@@ -3495,7 +3495,7 @@ function LadderSummaryBox({ ws, setField }) {
   const edited = (x) => filled(d["s3b." + x]) && String(d["s3b." + x]).trim() !== String(auto[x] || "").trim();
   const restore = (x) => {
     setField("s3b." + x, auto[x]);
-    setField("_s3bAuto", { ...(d._s3bAuto || {}), [x]: auto[x] });
+    setField("_s3bAuto", (m) => ({ ...(m || {}), [x]: auto[x] }));
   };
   const row = (l, x, val, extra) => (
     <div className="row">
@@ -3588,6 +3588,10 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
   const v = ws[key];
   // 사진 처리 오류를 alert 대신 그 칸 안에 보여 준다 — 모바일에서 alert은 맥락을 가린다
   const [imgErr, setImgErr] = useState("");
+  // 칸 이름표와 입력칸을 잇는다 (스크린리더가 칸 이름을 읽는다)
+  const fid = React.useId();
+  // 아직 올리는 중인 사진 수. 겹쳐 고른 사진까지 세어 3장 상한을 넘기지 않는다
+  const upRef = useRef(0);
   // 상한의 80%를 넘으면 카운터를 보여 준다 — 조용히 잘리는 maxLength의 예고
   const lenHint = (val, max) => {
     const n = String(val || "").length;
@@ -3613,20 +3617,20 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
     return (
       <div className={"field " + (f.t === "area" || wide ? "span2" : "")}>
         {f.qtype ? (
-          <div className="q-head"><span className={"q-type " + (f.qtype === "설계" ? "design" : "concept")}>{f.qtype}</span><label style={{ margin: 0 }}>{f.label}</label></div>
+          <div className="q-head"><span className={"q-type " + (f.qtype === "설계" ? "design" : "concept")}>{f.qtype}</span><label htmlFor={fid} style={{ margin: 0 }}>{f.label}</label></div>
         ) : (
-          <label>{f.label}</label>
+          <label htmlFor={fid}>{f.label}</label>
         )}
         <ThinkSteps steps={f.steps} />
         <StageEcho sec={sec} f={f} ws={ws} />
         {f.t === "text" && !wide ? (
           /* phTrace: 4차시 마모·수리 칸은 3차시 흔적 글의 앞머리를 예시로 보여 준다 (칸마다 다른 머리말) */
-          <input value={v ?? ""} placeholder={f.phTrace && filled(ladderSummary(ws).trace) ? f.phTrace : (f.def || "")}
+          <input id={fid} value={v ?? ""} placeholder={f.phTrace && filled(ladderSummary(ws).trace) ? f.phTrace : (f.def || "")}
             maxLength={f.max || 300} onChange={(e) => setField(key, e.target.value)} />
         ) : f.t === "text" ? (
-          <textarea rows={legacyLong ? 3 : 2} value={v ?? ""} maxLength={legacyLong ? 4000 : f.max} placeholder={f.def || ""} onChange={(e) => setField(key, e.target.value)} />
+          <textarea id={fid} rows={legacyLong ? 3 : 2} value={v ?? ""} maxLength={legacyLong ? 4000 : f.max} placeholder={f.def || ""} onChange={(e) => setField(key, e.target.value)} />
         ) : (
-          <textarea rows={f.rows || 3} value={v ?? ""} maxLength={4000} placeholder={f.ph || ""} onChange={(e) => setField(key, e.target.value)} />
+          <textarea id={fid} rows={f.rows || 3} value={v ?? ""} maxLength={4000} placeholder={f.ph || ""} onChange={(e) => setField(key, e.target.value)} />
         )}
         {legacyLong && <span className="hint">이전에 여러 줄로 쓴 답입니다. 한 줄로 줄여 써도 됩니다.</span>}
         {lenHint(v, legacyLong ? 4000 : (f.max || (f.t === "text" ? 300 : 4000)))}
@@ -3643,15 +3647,15 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
         <div className="debate-grid">
           <div className="debate-cell">
             <div className="debate-l">① 내 입장</div>
-            <textarea rows={3} maxLength={1500} value={m.pos || ""} onChange={(e) => up("pos", e.target.value)} />
+            <textarea aria-label="내 입장" rows={3} maxLength={1500} value={m.pos || ""} onChange={(e) => up("pos", e.target.value)} />
           </div>
           <div className="debate-cell">
             <div className="debate-l">② 반대 입장의 가장 강한 근거</div>
-            <textarea rows={3} maxLength={1500} value={m.counter || ""} onChange={(e) => up("counter", e.target.value)} placeholder="내 입장을 반박하는 쪽이 내놓을 가장 설득력 있는 근거를 그 사람의 입장에서 쓰기" />
+            <textarea aria-label="반대 입장의 가장 강한 근거" rows={3} maxLength={1500} value={m.counter || ""} onChange={(e) => up("counter", e.target.value)} placeholder="내 입장을 반박하는 쪽이 내놓을 가장 설득력 있는 근거를 그 사람의 입장에서 쓰기" />
           </div>
           <div className="debate-cell">
             <div className="debate-l">③ 그 근거를 알고도 내 입장을 유지하는 이유 (입장을 바꿨다면 무엇이 바꿨는지)</div>
-            <textarea rows={3} maxLength={1500} value={m.hold || ""} onChange={(e) => up("hold", e.target.value)} />
+            <textarea aria-label="그 근거를 알고도 내 입장을 유지하는 이유" rows={3} maxLength={1500} value={m.hold || ""} onChange={(e) => up("hold", e.target.value)} />
           </div>
         </div>
         <span className="hint">채점은 ③이 채워졌는지만 봅니다. 어느 입장인지는 보지 않습니다.</span>
@@ -3699,21 +3703,23 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
     const list = v || [];
     const preset = imgPresetOf(key);
     const pick = async (e) => {
-      const files = Array.from(e.target.files || []).slice(0, 3 - list.length);
+      const files = Array.from(e.target.files || []).slice(0, Math.max(0, 3 - list.length - upRef.current));
       e.target.value = "";
       setImgErr("");
-      // 여러 장을 한 번에 고르면 렌더 때의 list가 낡아 앞 장을 덮어쓰므로 여기서 누적한다
-      let cur = list.slice();
+      upRef.current += files.length;
+      // 올리기가 끝날 때마다 그 칸의 최신 값에 덧붙인다. 렌더 때의 list로 쓰면 겹쳐 고른 앞 묶음이나
+      // 그 사이 지운 사진이 되돌아간다 (setField에 함수를 준다)
       for (const file of files) {
         try {
           const r = await prepareImage(file, preset);
           if (r.blurry && !window.confirm(BLUR_CONFIRM)) continue;
           const ref = key + "." + Date.now() + Math.floor(Math.random() * 100);
-          const ok = await mediaStore.put(OWNER, ref, r.data);
+          const ok = await mediaStore.putT(OWNER, ref, r.data);
           if (!ok) { setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요."); continue; }
-          cur = [...cur, { ref, at: now(), w: r.w, h: r.h }].slice(0, 3);
-          setField(key, cur);
+          const item = { ref, at: now(), w: r.w, h: r.h };
+          setField(key, (cur) => [...(Array.isArray(cur) ? cur : []), item].slice(0, 3), { upload: true });
         } catch (err) { setImgErr(imgErrText(err)); }
+        finally { upRef.current = Math.max(0, upRef.current - 1); }
       }
     };
     return (
@@ -3724,7 +3730,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
             {list.map((it, i) => (
               <div className="mm-item" key={it.ref}>
                 <MediaThumb owner={OWNER} refId={it.ref} alt={f.label + " " + (i + 1)} />
-                <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, it.ref); setField(key, list.filter((x) => x.ref !== it.ref)); }}>지우기</button>
+                <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, it.ref); setField(key, (cur) => (Array.isArray(cur) ? cur : []).filter((x) => x.ref !== it.ref)); }}>지우기</button>
               </div>
             ))}
           </div>
@@ -3779,11 +3785,11 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
         const r = await prepareImage(file, preset);
         if (r.blurry && !window.confirm(BLUR_CONFIRM)) return;
         const ref = key + "." + Date.now();
-        const ok = await mediaStore.put(OWNER, ref, r.data);
+        const ok = await mediaStore.putT(OWNER, ref, r.data);
         if (!ok) return setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요.");
+        setField(key, { ref, at: now(), w: r.w, h: r.h }, { upload: true });
         // 바꿔 올리면 옛 문서는 아무도 가리키지 않으므로 지운다 (녹음·영상 칸과 같은 처리). 실패해도 새 사진에는 지장 없음
         if (cur && cur.ref) mediaStore.remove(OWNER, cur.ref);
-        setField(key, { ref, at: now(), w: r.w, h: r.h });
       } catch (err) { setImgErr(imgErrText(err)); }
     };
     return (
@@ -3817,6 +3823,11 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
       const next = rows.map((r, j) => (j === i ? { ...r, [k2]: val } : r));
       setField(key, next);
     };
+    // 올리기·지우기처럼 await 뒤에 쓰는 곳: 렌더 때의 rows로 쓰면 그 사이 친 프롬프트가 지워진다. 최신 표에 그 칸만 바꾼다
+    const upLate = (i, k2, val, opts) => setField(key, (cur) => {
+      const base = Array.isArray(cur) ? cur : [{}, {}, {}, {}, {}];
+      return base.map((r, j) => (j === i ? { ...r, [k2]: val } : r));
+    }, opts);
     return (
       <div className="tbl-scroll">
         {/* 프롬프트 전문 칸이 들어와 열이 일곱이 되었다. .tbl-scroll의 기본 최소 너비(640px)로는
@@ -3840,7 +3851,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
                   {r.img ? (
                     <div className="mm-item">
                       <MediaThumb owner={OWNER} refId={r.img} alt={i + 1 + "회차 결과"} size={64} />
-                      <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, r.img); up(i, "img", ""); }}>지우기</button>
+                      <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, r.img); upLate(i, "img", ""); }}>지우기</button>
                     </div>
                   ) : (
                     <input type="file" accept="image/*" style={{ fontSize: 11 }} onChange={async (e) => {
@@ -3852,7 +3863,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
                         const r = await prepareImage(file, imgPresetOf(key));
                         if (r.blurry && !window.confirm(BLUR_CONFIRM)) return;
                         const ref = key + ".r" + i + "." + Date.now();
-                        if (await mediaStore.put(OWNER, ref, r.data)) up(i, "img", ref);
+                        if (await mediaStore.putT(OWNER, ref, r.data)) upLate(i, "img", ref, { upload: true });
                         else setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요.");
                       } catch (err) { setImgErr(imgErrText(err)); }
                     }} />
@@ -4284,7 +4295,8 @@ function AudioField({ f, fieldKey, v, setField }) {
         stream.getTracks().forEach((t) => t.stop());
         clearInterval(timerRef.current);
         const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
-        if (blob.size > 900000) { setErr("녹음 파일이 저장 한도(약 0.9MB)를 넘어 담지 못했습니다. 조금 더 짧게 나눠 녹음해 주세요."); setRec(null); setSec(0); return; }
+        // 규칙이 받는 문서는 base64 100만 자 미만(원본 약 0.75MB)이다. 넘으면 저장이 거부되어 「연결 확인」으로 잘못 안내되므로 여기서 크기로 알린다
+        if (blob.size > 740000) { setErr("녹음 파일이 저장 한도(약 0.7MB)를 넘어 담지 못했습니다. 조금 더 짧게 나눠 녹음해 주세요."); setRec(null); setSec(0); return; }
         const fr = new FileReader();
         fr.onload = async () => {
           // 새 녹음을 먼저 저장하고, 성공한 뒤에만 이전 녹음을 지운다 —
@@ -4292,7 +4304,7 @@ function AudioField({ f, fieldKey, v, setField }) {
           const ref = fieldKey + "." + Date.now();
           const ok = await mediaStore.putT(OWNER, ref, fr.result);
           if (ok) {
-            setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) });
+            setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) }, { upload: true });
             if (cur) mediaStore.remove(OWNER, cur.ref); // 잔존물 정리 — 실패해도 새 녹음에는 지장 없음
           } else setErr("녹음 저장에 실패했습니다. 연결을 확인하고 다시 녹음해 주세요. 이전 녹음은 그대로 있습니다.");
           setRec(null); setSec(0);
@@ -4386,11 +4398,14 @@ function VideoField({ f, fieldKey, v, setField }) {
         }
         const fr = new FileReader();
         fr.onload = async () => {
-          if (cur) await mediaStore.remove(OWNER, cur.ref);
+          // 새 영상을 먼저 저장하고 성공한 뒤에만 이전 영상을 지운다 (녹음 칸과 같은 순서).
+          // 지우기부터 하면 저장이 실패했을 때 이전 영상까지 사라진다
           const ref = fieldKey + "." + Date.now();
-          const ok = await mediaStore.put(OWNER, ref, fr.result);
-          if (ok) setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) });
-          else setErr("영상 저장에 실패했습니다.");
+          const ok = await mediaStore.putT(OWNER, ref, fr.result);
+          if (ok) {
+            setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) }, { upload: true });
+            if (cur) mediaStore.remove(OWNER, cur.ref);
+          } else setErr("영상 저장에 실패했습니다. 연결을 확인하고 다시 찍어 주세요. 이전 영상은 그대로 있습니다.");
           setRec(null); setSec(0); setBusy(false);
         };
         fr.readAsDataURL(blob);
@@ -4453,7 +4468,7 @@ function ReflectField({ f, fieldKey, m, ws, setField }) {
           <div className="prev-t">{prev || "5차시 성찰 질문에 아직 답하지 않았습니다. 5차시 탭에서 먼저 쓰고 오면 비교할 수 있습니다."}</div>
         </div>
       )}
-      <textarea rows={4} maxLength={2000} value={m.pos || ""} onChange={(e) => setField(fieldKey, { ...m, pos: e.target.value, at: now() })} />
+      <textarea aria-label={f.label} rows={4} maxLength={2000} value={m.pos || ""} onChange={(e) => setField(fieldKey, { ...m, pos: e.target.value, at: now() })} />
     </div>
   );
 }
@@ -4781,6 +4796,9 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
 }
 /* ---------- 학생 화면 (실시간 저장) ---------- */
 
+/* 전시장에 다녀오는 학번. 학생 화면은 전시장에 가면 닫혔다가 돌아오면 새로 열린다 (방문 횟수를 다시 세지 않기 위함) */
+let galleryTripSid = "";
+
 function StudentApp({ me, onExit, onGallery }) {
   useContent();                              // 교사가 수업 내용을 고치면 이 화면도 다시 그린다
   useEffect(() => watchContent(), []);
@@ -4788,7 +4806,14 @@ function StudentApp({ me, onExit, onGallery }) {
   const snapWs = useRef(makeSnapshotter(me.sid)); // 저장 성공 때마다 1시간 단위 사본 (src-ws-history.jsx)
   const dirtyKeys = useRef(makeDirtyTracker()).current; // 고치는 중·저장 중인 키. 바뀐 키만 저장하고, 서버 값을 받을 때 이 키는 지킨다 (src-ws-sync.mjs)
   const docExistsRef = useRef(false);   // 서버에 기록지 문서가 있는가. 없으면 첫 저장만 통째로 만든다
-  const lastSavedAtRef = useRef(null);  // 이 탭이 마지막으로 저장한 _updatedAt. 구독이 되돌려 준 자기 저장분을 가려낸다
+  const serverRef = useRef({});         // 이 탭이 본 마지막 서버 사본. 흔적 배열(_log·_paste)을 저장 전에 이것과 합친다 (src-ws-sync.mjs)
+  // 선생님이 이 학번의 기록지를 지웠다(초기화·학번 이관). 옛 사본으로 문서를 되살리지 않도록 저장을 멈추고 칸을 잠근다.
+  // 학생이 「다시 불러오기」를 누르면 서버의 지금 상태로 새로 시작한다
+  const removedRef = useRef(false);
+  const [removed, setRemoved] = useState(false);
+  const enteredRef = useRef(false); // 이 화면에서 입장 방문을 이미 셌다
+  const [liveErr, setLiveErr] = useState(false); // 실시간 구독이 끊김 (fbStore.watchDocMeta가 다시 잇는 중)
+  const [leaving, setLeaving] = useState(false); // 「나가기」: 남은 저장을 마치는 중
   const [ws, setWs] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [readErr, setReadErr] = useState(false); // 최초 로드 실패 — 덮어쓰기를 막으려 학습지를 잠근다
@@ -4920,8 +4945,19 @@ function StudentApp({ me, onExit, onGallery }) {
     setStaleWarn(!!(res.fromCache || svRes.fromCache));
     const saved = res.data;
     docExistsRef.current = !!saved;
-    if (saved) { setWs(saved); wsRef.current = saved; setSavedAt(saved._updatedAt || null); lastSavedAtRef.current = saved._updatedAt || null; }
-    setSurvey(svRes.data || {});
+    if (removedRef.current) {
+      // 지워진 뒤 다시 불러옴: 서버의 지금 상태(대개 빈 기록지)에서 새로 시작한다
+      removedRef.current = false;
+      setRemoved(false);
+      dirtyKeys.clear();
+      dirtyRef.current = false;
+      wsRef.current = saved || {};
+      setWs(saved || {});
+    }
+    serverRef.current = saved || {};
+    if (saved) { setWs(saved); wsRef.current = saved; setSavedAt(saved._updatedAt || null); }
+    svServerRef.current = svRes.data || null;
+    setSurveyNow(svRes.data || {});
     if (gRes.ok) setGrade(gRes.data);
     const cfg = cfgRes.ok ? cfgRes.data : null;
       const om = (cfg && cfg.open) || DEFAULT_OPEN;
@@ -4934,7 +4970,11 @@ function StudentApp({ me, onExit, onGallery }) {
       if (saved && saved._lastTab && isOpen(om, saved._lastTab)) t0 = saved._lastTab;
       else { const lastOpen = [...SESSIONS].reverse().find((s) => isOpen(om, s)); if (lastOpen) t0 = lastOpen; }
     setTab(t0);
-    accAct(t0, { visits: 1 }); // 입장 방문은 실제로 열린 차시에 귀속
+    // 입장 방문은 실제로 열린 차시에 귀속. 전시장에 다녀온 것과 「다시 불러오기」는 새 방문으로 세지 않는다
+    const back = galleryTripSid === me.sid;
+    galleryTripSid = "";
+    if (!back && !enteredRef.current) accAct(t0, { visits: 1 });
+    enteredRef.current = true;
     loadedRef.current = true;
     setLoaded(true);
   };
@@ -4950,16 +4990,14 @@ function StudentApp({ me, onExit, onGallery }) {
         // 선생님이 기록을 초기화했거나 다른 학번으로 옮겼다. 빈 기록지에서 다시 시작한다 (옛 사본으로 문서를 되살리지 않는다).
         // 이 기기의 미전송 쓰기가 섞인 스냅샷(hasPendingWrites)은 서버 확인이 아니므로 건너뛴다
         if (!docExistsRef.current || s.hasPendingWrites) return;
-        docExistsRef.current = false;
-        dirtyKeys.clear();
-        wsRef.current = {};
-        setWs({});
-        setCloseNote("선생님이 이 학번의 기록을 초기화하거나 다른 학번으로 옮겼습니다. 계속 쓰면 새 기록지에 저장됩니다. 학번을 잘못 입력했다면 나가서 다시 들어오세요.");
+        markRemoved();
         return;
       }
       docExistsRef.current = true;
       const remote = s.data || {};
-      if (remote._updatedAt && remote._updatedAt === lastSavedAtRef.current) return; // 이 탭이 방금 저장한 그대로
+      serverRef.current = remote;
+      // _updatedAt이 이 탭의 마지막 저장과 같아도 건너뛰지 않는다: 다른 기기가 같은 시각 안에 쓴 칸이나
+      // 맵 항목이 함께 와 있을 수 있다. 바뀐 것이 없으면 mergeRemote가 같은 객체를 돌려줘 다시 그리지 않는다.
       // 함수형 갱신: 아직 화면에 반영되지 않은 키 입력(대기 중인 갱신)이 있어도 그 위에 합쳐진다
       setWs((p) => {
         const merged = mergeRemote(p, remote, dirtyKeys.all());
@@ -4967,7 +5005,7 @@ function StudentApp({ me, onExit, onGallery }) {
         return merged;
       });
       if (!dirtyRef.current && !savingRef.current && remote._updatedAt) setSavedAt(remote._updatedAt);
-    });
+    }, () => setLiveErr(true), () => setLiveErr(false));
     return un;
   }, [loaded]);
 
@@ -4978,36 +5016,84 @@ function StudentApp({ me, onExit, onGallery }) {
     return () => { un1(); un2(); };
   }, []);
 
-  const doSave = async () => {
-    if (!loadedRef.current || savingRef.current) return;
+  const markRemoved = () => {
+    removedRef.current = true;
+    docExistsRef.current = false;
+    dirtyKeys.clear();
+    dirtyRef.current = false;
+    if (timer.current) clearTimeout(timer.current);
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    setRemoved(true);
+    setSaveState("saved");
+  };
+
+  /* 화면이 닫힌 뒤(전시장으로 가거나 나가기) 옛 화면의 저장·재시도가 계속 도는 일을 막는다.
+     닫힐 때 남은 것은 한 번만 저장하고(afterExitRef), 실패해도 재시도하지 않는다 (오프라인이면 기기 큐에 남는다) */
+  const aliveRef = useRef(true);
+  const afterExitRef = useRef(0);
+  const exitedRef = useRef(false); // 「나가기」로 저장을 마치고 로그아웃함
+  const savePromiseRef = useRef(null);
+  const doSave = () => {
+    if (!loadedRef.current || savingRef.current || removedRef.current) return Promise.resolve(false);
+    if (!aliveRef.current) {
+      if (afterExitRef.current <= 0) return Promise.resolve(false);
+      afterExitRef.current -= 1;
+    }
     savingRef.current = true;
+    const p = saveOnce();
+    savePromiseRef.current = p;
+    return p;
+  };
+  const saveOnce = async () => {
     dirtyRef.current = false;
     setSaveState("saving");
     const before = wsRef.current;
-    const data = pruneTrace({ ...drainAct(), _updatedAt: now() });
-    // 바뀐 키만 보낸다: 고치던 칸 + 저장 직전에 바뀐 보조 키(_act·_updatedAt·덜어 낸 _log 등).
+    const toks = dirtyKeys.take();
+    // 흔적 배열(_log·_paste)은 이 탭이 본 마지막 서버 사본과 항목 단위로 합친 뒤 상한(300·200)을 적용한다.
+    // 옛 탭의 짧은 배열이 다른 기기가 늘린 서버 배열을 덮지 못하게 하고, 덜어 낸 건수는 _pruned에 더한다.
+    const data = pruneTrace(mergeTraceForSave({ ...drainAct(), _updatedAt: now() }, serverRef.current, toks));
+    // 바뀐 것만 보낸다: 고치던 칸 + 저장 직전에 바뀐 보조 키(_act·_updatedAt·합친 _log 등).
+    // 보조 맵(_inq·_t·_act)은 안쪽 항목(칸·섹션·차시) 단위로 보낸다. 맵을 통째로 쓰면 다른 기기가 쓴 항목을 지운다.
     // 문서를 통째로 쓰면 다른 탭·기기가 그 사이에 쓴 칸을 이 탭의 옛 사본으로 지운다 (src-ws-sync.mjs).
     // 오프라인이면 쓰기가 거부되지 않고 미해결로 남아 "저장 중…"에 영원히 갇힌다.
     // 8초 안에 답이 없으면 실패로 치고 재시도 루프에 태운다 (늦게 성공해도 같은 내용이라 무해).
-    const patch = buildPatch(before, data, dirtyKeys.take());
-    let ok = false;
+    const entries = buildEntries(before, data, toks);
+    let ok = false, created = false;
     if (docExistsRef.current) {
-      ok = await store.updateFieldsT(WSKEY, patch);
-      if (ok === "missing") { docExistsRef.current = false; ok = false; }
+      ok = await fbStore.updatePathsT(WSKEY, entries);
+      if (ok === "missing") {
+        // 있던 문서가 저장하는 사이에 사라졌다: 학생은 기록지를 지울 수 없으므로 선생님이 지운 것이다.
+        // 지우기 전에 만든 data로 다시 만들면 초기화·이관한 기록이 되살아나므로 만들지 않고 멈춘다
+        savingRef.current = false;
+        markRemoved();
+        return false;
+      }
     }
     if (!ok && !docExistsRef.current) {
-      // 서버에 문서가 없을 때(첫 저장)만 통째로 만든다
-      ok = await store.setT(WSKEY, data);
-      if (ok) docExistsRef.current = true;
+      // 서버에 문서가 없을 때(첫 저장)만 통째로 만든다. 두 탭이 동시에 첫 저장을 해도 먼저 만든 쪽의 칸이 지워지지 않게 병합으로 쓴다
+      ok = await store.setT(WSKEY, data, { merge: true });
+      if (ok) { docExistsRef.current = true; created = true; }
     }
     savingRef.current = false;
     if (ok) {
       dirtyKeys.done();
-      lastSavedAtRef.current = data._updatedAt;
-      // 덜어 낸 것이 있으면 화면의 기록도 저장된 것과 같게 맞춘다. 아니면 저장 시각만 맞춘다
-      if (data._pruned && data._pruned !== (wsRef.current._pruned || 0)) {
-        wsRef.current = data;
-        setWs((p) => (p === before ? data : { ...p, _log: data._log, _paste: data._paste, _pruned: data._pruned, _updatedAt: data._updatedAt }));
+      // 이 탭이 쓴 흔적 배열은 서버 사본에도 바로 반영한다. 구독이 되돌려 주기 전에 다음 저장이 옛 사본과 합쳐
+      // 덜어 낸 항목을 되살리고 두 번 세는 일을 막는다
+      const wrote = new Set(entries.map((e) => e[0][0]));
+      if (created) serverRef.current = data;
+      else if (wrote.has("_log") || wrote.has("_paste") || wrote.has("_pruned")) {
+        const s = { ...serverRef.current };
+        for (const k of ["_log", "_paste", "_pruned"]) if (wrote.has(k)) { if (data[k] === undefined) delete s[k]; else s[k] = data[k]; }
+        serverRef.current = s;
+      }
+      // 흔적 배열을 합치거나 덜어 냈으면 화면의 기록도 저장된 것과 맞춘다 (저장하는 사이 새로 붙은 항목은 남긴다). 아니면 저장 시각만 맞춘다
+      if (data._log !== before._log || data._paste !== before._paste || data._pruned !== before._pruned) {
+        setWs((p) => {
+          const n = { ...p, _log: reconcileTrace(p._log, before._log, data._log), _paste: reconcileTrace(p._paste, before._paste, data._paste), _pruned: data._pruned, _updatedAt: data._updatedAt };
+          for (const k of ["_log", "_paste", "_pruned"]) if (n[k] === undefined) delete n[k];
+          wsRef.current = n;
+          return n;
+        });
       } else {
         setWs((p) => (p._updatedAt === data._updatedAt ? p : { ...p, _updatedAt: data._updatedAt }));
       }
@@ -5015,9 +5101,13 @@ function StudentApp({ me, onExit, onGallery }) {
       snapWs.current(data);
       if (dirtyRef.current) { setSaveState("dirty"); doSave(); }
       else setSaveState("saved");
+      return true;
     } else {
       dirtyKeys.fail();
+      // 저장 직전에 바뀐 보조 항목(_act·합친 흔적 등)도 다시 저장 대상에 올린다. 안 그러면 실패한 저장분이 다음 저장에서 빠진다
+      dirtyKeys.mark(entries.map((e) => (e[0].length > 1 ? wsTok(e[0][0], e[0][1]) : e[0][0])));
       dirtyRef.current = true;
+      if (!aliveRef.current) return false; // 닫힌 화면은 재시도하지 않는다
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         // 오프라인 시간 초과는 실패가 아니라 대기다 — 내용은 이 기기 큐에 담겨 있고
         // 연결이 돌아오면 online 핸들러가 저장한다. 여기서 5초 재시도를 돌리면
@@ -5028,7 +5118,24 @@ function StudentApp({ me, onExit, onGallery }) {
         if (retryTimer.current) clearTimeout(retryTimer.current);
         retryTimer.current = setTimeout(doSave, 5000); // 실패 시 5초 뒤 자동 재시도
       }
+      return false;
     }
+  };
+
+  /* 나가기 전: 진행 중인 저장을 기다리고, 남은 입력과 활동 시간을 한 번 더 저장한다. 성공하면 true */
+  const saveAllNow = async () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    if (retryTimer.current) { clearTimeout(retryTimer.current); retryTimer.current = null; }
+    const sv = svFlush();
+    let ok = true;
+    for (let i = 0; i < 6; i++) {
+      if (removedRef.current) break;
+      if (savingRef.current && savePromiseRef.current) { await savePromiseRef.current; continue; }
+      if (dirtyRef.current || dirtyKeys.size || Object.keys(actAccRef.current).length) { ok = await doSave(); if (!ok) break; continue; }
+      break;
+    }
+    const svOk = await sv;
+    return ok && svOk && !dirtyRef.current;
   };
 
   const flush = () => {
@@ -5036,24 +5143,33 @@ function StudentApp({ me, onExit, onGallery }) {
     if (dirtyRef.current || saveState === "dirty") doSave();
   };
 
-  const setField = (k, v) => {
-    if (!loaded || wsLockRef.current) return; // 입력 잠금 중에는 어떤 칸도 쓰지 않는다
+  /* v 자리에 함수를 주면 그 칸의 지금 값(다른 기기에서 받은 값·방금 고친 값까지 반영된 최신 값)을 받아 새 값을 돌려준다.
+     사진 올리기처럼 await 뒤에 쓰는 곳과 _inq처럼 여러 항목이 든 맵은 이렇게 써야, 렌더 때의 낡은 값으로 다른 항목을 되돌리지 않는다. */
+  /* opts.upload: 사진·녹음·영상 올리기가 끝나 참조를 적는 쓰기. 잠금 전에 시작한 올리기는 잠긴 뒤에 끝나도 적는다
+     (안 적으면 올라간 파일이 아무도 가리키지 않는 채 남는다). 잠긴 동안에는 올리기 입력칸이 비활성이라 새로 시작할 수 없다 */
+  const setField = (k, v, opts) => {
+    if (!loaded || removedRef.current) return;
+    if (wsLockRef.current && !(opts && opts.upload)) return; // 입력 잠금 중에는 어떤 칸도 쓰지 않는다
+    const fn = typeof v === "function";
     const upd = (p) => {
-      const next = { ...p, [k]: v };
+      const val = fn ? v(p[k]) : v;
+      if (fn && val === p[k]) return p; // 바뀐 것이 없다
+      const next = { ...p, [k]: val };
       // 밑줄 키(_inq 같은 보조 기록)는 고쳐 쓰기 이력·붙여넣기·차시 시각 장부를 건드리지 않는다
       if (String(k).charAt(0) === "_") return next;
       // 사고 변화를 볼 자리는 고쳐 쓰기 전의 문장을 남겨 둠.
       // 길이 차만 보면 길이는 그대로인 채 내용만 갈아엎은 개작을 놓치므로 어휘 겹침도 함께 본다.
-      if (TRACKED.includes(k) && typeof p[k] === "string" && typeof v === "string") {
+      if (TRACKED.includes(k) && typeof p[k] === "string" && typeof val === "string") {
         const prev = p[k].trim();
-        const cur = v.trim();
+        const cur = val.trim();
         const log = p._log || [];
         const last = log.filter((e) => e.k === k).slice(-1)[0];
         const gapOk = !last || Date.now() - new Date(last.at).getTime() > 120000;
         const grew = Math.abs(cur.length - prev.length) > 8;
         const reworded = cur.length > 15 && jaccard(gramSet(prev), gramSet(cur)) < 0.6;
         if (prev.length > 15 && gapOk && (grew || reworded)) {
-          next._log = [...log, { k, at: now(), prev: prev.slice(0, 400) }].slice(-300);
+          // 300건 상한은 저장할 때 서버 사본과 합친 뒤 한 번만 적용하고 덜어 낸 수를 _pruned에 센다 (mergeTraceForSave)
+          next._log = [...log, { k, at: now(), prev: prev.slice(0, 400) }];
         }
       }
       /* 붙여넣은 뒤 그 칸을 마지막으로 손댈 때까지의 초 — 붙이고 바로 넘어갔는지 붙잡고 고쳤는지.
@@ -5078,7 +5194,7 @@ function StudentApp({ me, onExit, onGallery }) {
       // 발상 단계의 결론(s3b.*)은 학생이 다시 적지 않고 여기서 끌어온다
       return DERIVE_KEYS.includes(k) ? deriveSummary(next, p) : next;
     };
-    setWs((p) => { const out = upd(p); dirtyKeys.mark(changedKeys(p, out)); return out; }); // 바뀐 키만 저장 대상에 올린다
+    setWs((p) => { const out = upd(p); dirtyKeys.mark(changedTokens(p, out)); return out; }); // 바뀐 키(보조 맵은 바뀐 항목)만 저장 대상에 올린다
     dirtyRef.current = true;
     setSaveState("dirty");
     if (timer.current) clearTimeout(timer.current);
@@ -5113,7 +5229,8 @@ function StudentApp({ me, onExit, onGallery }) {
         head: body.slice(0, 120),
         base: strLen(readAt(wsRef.current, k)),
       };
-      setWs((p) => ({ ...p, _paste: [...(Array.isArray(p._paste) ? p._paste : []), entry].slice(-200) }));
+      // 200건 상한은 저장할 때 서버 사본과 합친 뒤 한 번만 적용하고 덜어 낸 수를 _pruned에 센다 (mergeTraceForSave)
+      setWs((p) => ({ ...p, _paste: [...(Array.isArray(p._paste) ? p._paste : []), entry] }));
       dirtyKeys.mark(["_paste"]);
       dirtyRef.current = true;
       setSaveState("dirty");
@@ -5146,7 +5263,7 @@ function StudentApp({ me, onExit, onGallery }) {
     const onOn = () => {
       setOnline(true);
       if (dirtyRef.current) doSave();
-      if (svSaveRef.current === "err") svPersist(); // 끊긴 사이 실패로 남은 설문 응답도 다시 밀어 넣는다
+      if (svSaveRef.current === "err" || svDirty.size) svPersist(); // 끊긴 사이 실패로 남은 설문 응답도 다시 밀어 넣는다
     };
     const onOff = () => setOnline(false);
     window.addEventListener("visibilitychange", onHide);
@@ -5162,101 +5279,173 @@ function StudentApp({ me, onExit, onGallery }) {
       window.removeEventListener("beforeunload", onBefore);
       window.removeEventListener("online", onOn);
       window.removeEventListener("offline", onOff);
-      if (timer.current) clearTimeout(timer.current);
       if (retryTimer.current) clearTimeout(retryTimer.current);
-      if (svTimer.current) clearTimeout(svTimer.current);
+      // 화면이 닫힌다(전시장으로 이동 등). 기다리던 입력은 버리지 않고 한 번만 저장한다. 재시도는 하지 않는다.
+      // 「나가기」는 이미 저장을 마치고 로그아웃했으므로 여기서 다시 쓰지 않는다
+      aliveRef.current = false;
+      const pending = !!timer.current || dirtyRef.current || Object.keys(actAccRef.current).length > 0;
+      if (timer.current) clearTimeout(timer.current);
+      if (!exitedRef.current) {
+        afterExitRef.current = 1;
+        if (pending) doSave();
+        svFlush();
+      } else if (svTimer.current) clearTimeout(svTimer.current);
     };
   }, []);
 
-  /* 설문 — 응답은 0.8초 뒤 자동 저장(중간 이탈 분석용), 제출하면 잠긴다 */
+  /* 설문 — 응답은 0.8초 뒤 자동 저장(중간 이탈 분석용), 제출하면 잠긴다.
+     문서를 통째로 쓰지 않고 고친 블록(pre·post·anchor·stance.pre·stance.post)만 쓴다 (src-ws-sync.mjs).
+     통째로 쓰면 다른 기기에서 막 제출한 블록을 이 탭의 옛 사본으로 「제출 전」으로 되돌렸다.
+     자기 설문 문서를 구독해 다른 기기의 응답과 제출을 받는다. 서버에서 제출된 블록은 언제나 이긴다 */
+  const SVKEY = "survey:" + me.sid;
+  const svDirty = useRef(makeDirtyTracker()).current; // 고치는 중·저장 중인 블록 토큰 ("pre", "stance.post" …)
+  const svServerRef = useRef(null);                   // 이 탭이 본 마지막 서버 사본
+  const svSubmittingRef = useRef(new Set());          // 제출을 쓰는 중인 블록: 구독이 옛 서버 값으로 되돌리지 않게 지킨다
+  const svSavingRef = useRef(null);                   // 진행 중인 자동 저장 (겹쳐 보내지 않는다)
+  const svAgainRef = useRef(false);
+  const setSurveyNow = (next) => { surveyRef.current = next; setSurvey(next); };
+  /* 블록 단위로 쓴다. 문서가 아직 없을 때(첫 응답)만 지금 화면의 설문 전체로 만든다 */
+  const svWrite = async (entries, full) => {
+    if (!entries.length) return true;
+    let ok = await fbStore.updatePathsT(SVKEY, entries);
+    if (ok === "missing") ok = await store.setT(SVKEY, full || {});
+    return ok === true;
+  };
   const svPersist = () => {
     // 응답 자동 저장 — 결과를 배지로 보여 준다. "자동 저장됩니다"라고 말해 놓고
     // 실패를 침묵하면 학생이 24문항을 잃고도 모른다.
-    const seq = ++svSeq.current;
+    if (svSavingRef.current) { svAgainRef.current = true; return svSavingRef.current; }
+    const toks = svDirty.take();
+    if (!toks.length) return Promise.resolve(true);
+    ++svSeq.current;
     setSvSave("saving"); svSaveRef.current = "saving";
-    store.setT("survey:" + me.sid, surveyRef.current).then((ok) => {
-      // 뒤 저장이 "저장됨"을 띄운 다음에 앞 저장의 시간 초과가 늦게 도착해
-      // "실패"로 도로 뒤집는 일이 없도록, 마지막으로 나간 저장만 배지를 정한다
-      if (seq !== svSeq.current) return;
+    const p = (async () => {
+      const ok = await svWrite(surveyEntries(surveyRef.current, toks, svServerRef.current), surveyRef.current);
+      if (ok) svDirty.done(); else svDirty.fail();
+      svSavingRef.current = null;
       setSvSave(ok ? "saved" : "err"); svSaveRef.current = ok ? "saved" : "err";
-    });
+      if (svAgainRef.current) { svAgainRef.current = false; if (ok && svDirty.size) return svPersist(); }
+      return ok;
+    })();
+    svSavingRef.current = p;
+    return p;
   };
-  const svChange = (phase, block) => {
-    const next = { ...(surveyRef.current || {}), ver: SURVEY_VER, [phase]: block };
-    setSurvey(next);
+  /* 대기 중인 설문 저장을 바로 보낸다 (나가기·화면 닫힘) */
+  const svFlush = () => {
+    if (svTimer.current) { clearTimeout(svTimer.current); svTimer.current = null; }
+    return svDirty.size || svSavingRef.current ? svPersist() : Promise.resolve(true);
+  };
+  const svQueue = (block, next, ms) => {
+    setSurveyNow(next);
+    svDirty.mark([block]);
     if (svTimer.current) clearTimeout(svTimer.current);
-    svTimer.current = setTimeout(svPersist, 800);
+    svTimer.current = setTimeout(svPersist, ms);
+  };
+  /* 제출: 그 블록만 한 번 쓴다. 쓰는 동안 구독이 옛 값으로 되돌리지 않게 지키고, 실패하면 알린다 */
+  const svSubmitWrite = async (block, next, entries, failMsg, restore) => {
+    const cur = surveyRef.current || {};
+    setSvBusy(true);
+    if (svTimer.current) { clearTimeout(svTimer.current); svTimer.current = null; }
+    svDirty.drop([block]);
+    svSubmittingRef.current.add(block);
+    setSurveyNow(next);
+    const ok = await svWrite(entries, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
+    svSubmittingRef.current.delete(block);
+    setSvBusy(false);
+    if (!ok) {
+      alert(failMsg);
+      if (restore) { setSurveyNow(cur); svDirty.mark([block]); }
+    }
+  };
+  const blockDone = (block) => {
+    const started = block.startedAt || now();
+    const sub = now();
+    return { ...block, startedAt: started, submittedAt: sub, durSec: Math.max(0, Math.round((new Date(sub) - new Date(started)) / 1000)) };
+  };
+
+  const svChange = (phase, block) => {
+    svQueue(phase, { ...(surveyRef.current || {}), ver: SURVEY_VER, [phase]: block }, 800);
   };
   const svSubmit = async (phase) => {
     const cur = surveyRef.current || {};
-    const block = cur[phase] || {};
-    const started = block.startedAt || now();
-    const sub = now();
-    const next = {
-      ...cur, ver: SURVEY_VER,
-      [phase]: { ...block, startedAt: started, submittedAt: sub, durSec: Math.max(0, Math.round((new Date(sub) - new Date(started)) / 1000)) },
-    };
-    setSvBusy(true);
-    if (svTimer.current) clearTimeout(svTimer.current);
-    setSurvey(next);
-    const ok = await store.setT("survey:" + me.sid, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
-    setSvBusy(false);
-    if (!ok) { alert("제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요."); setSurvey(cur); }
+    const done = blockDone(cur[phase] || {});
+    await svSubmitWrite(phase, { ...cur, ver: SURVEY_VER, [phase]: done }, [[["ver"], SURVEY_VER], [[phase], done]],
+      "제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.", true);
   };
 
   /* 평가자 성향 설문(s1) — 같은 surveys/{학번} 문서의 stance 블록. v1 응답은 건드리지 않는다 */
   const stChange = (phase, block) => {
     const cur = surveyRef.current || {};
-    const next = { ...cur, stance: { ...(cur.stance || {}), ver: STANCE_VER, [phase]: block } };
-    setSurvey(next);
-    if (svTimer.current) clearTimeout(svTimer.current);
-    svTimer.current = setTimeout(svPersist, 800);
+    svQueue("stance." + phase, { ...cur, stance: { ...(cur.stance || {}), ver: STANCE_VER, [phase]: block } }, 800);
   };
   const stSubmit = async (phase) => {
     const cur = surveyRef.current || {};
     const st = cur.stance || {};
-    const block = st[phase] || {};
-    const started = block.startedAt || now();
-    const sub = now();
-    const next = {
-      ...cur,
-      stance: {
-        ...st, ver: STANCE_VER,
-        [phase]: { ...block, startedAt: started, submittedAt: sub, durSec: Math.max(0, Math.round((new Date(sub) - new Date(started)) / 1000)) },
-      },
-    };
-    setSvBusy(true);
-    if (svTimer.current) clearTimeout(svTimer.current);
-    setSurvey(next);
-    const ok = await store.setT("survey:" + me.sid, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
-    setSvBusy(false);
-    if (!ok) { alert("제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요."); setSurvey(cur); }
+    const done = blockDone(st[phase] || {});
+    await svSubmitWrite("stance." + phase, { ...cur, stance: { ...st, ver: STANCE_VER, [phase]: done } },
+      [[["stance", "ver"], STANCE_VER], [["stance", phase], done]],
+      "제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.", true);
   };
 
   /* 앵커 판정 — 같은 surveys/{학번} 문서의 anchor 블록.
      상호평가(assess 컬렉션)가 아직 없어 임시로 여기 얹는다. */
   const anChange = (blk) => {
-    const cur = surveyRef.current || {};
-    const next = { ...cur, anchor: { ...blk, ver: ANCHOR_VER } };
-    setSurvey(next);
-    if (svTimer.current) clearTimeout(svTimer.current);
-    svTimer.current = setTimeout(() => { store.set("survey:" + me.sid, surveyRef.current); }, 500);
+    svQueue("anchor", { ...(surveyRef.current || {}), anchor: { ...blk, ver: ANCHOR_VER } }, 500);
   };
   const anSubmit = async (blk) => {
     const cur = surveyRef.current || {};
-    const started = (blk && blk.startedAt) || now();
-    const at = now();
-    const next = {
-      ...cur,
-      anchor: { ...blk, ver: ANCHOR_VER, startedAt: started, submittedAt: at,
-        durSec: Math.max(0, Math.round((new Date(at) - new Date(started)) / 1000)) },
-    };
-    setSvBusy(true);
-    if (svTimer.current) clearTimeout(svTimer.current);
-    setSurvey(next);
-    const ok = await store.setT("survey:" + me.sid, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
-    setSvBusy(false);
-    if (!ok) alert("판정을 저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
+    const done = { ...blockDone(blk || {}), ver: ANCHOR_VER };
+    await svSubmitWrite("anchor", { ...cur, anchor: done }, [[["anchor"], done]],
+      "판정을 저장하지 못했습니다. 인터넷 연결을 확인해 주세요.", false);
+  };
+
+  /* 자기 설문 문서 구독: 다른 기기의 응답·제출을 받는다. 고치는 중·제출 중인 블록은 이 탭의 값을 지킨다 */
+  useEffect(() => {
+    if (!loaded) return;
+    let existed = !!svServerRef.current;
+    const keep = () => new Set([...svDirty.all(), ...svSubmittingRef.current]);
+    const un = fbStore.watchDocMeta(SVKEY, (s) => {
+      if (s.fromCache) return;
+      if (!s.exists) {
+        // 선생님이 설문 문서를 지웠다: 고치는 중이 아닌 블록은 비운다
+        if (!existed || s.hasPendingWrites) return;
+        existed = false;
+        svServerRef.current = null;
+        const m = mergeSurvey(surveyRef.current, {}, keep());
+        if (m !== surveyRef.current) setSurveyNow(m);
+        return;
+      }
+      existed = true;
+      const remote = s.data || {};
+      svServerRef.current = remote;
+      svDirty.drop(submittedBlocks(remote)); // 서버에서 제출된 블록은 더 자동 저장하지 않는다
+      const m = mergeSurvey(surveyRef.current, remote, keep());
+      if (m !== surveyRef.current) setSurveyNow(m);
+    }, () => setLiveErr(true), () => setLiveErr(false));
+    return un;
+  }, [loaded]);
+
+  /* 전시장으로: 기다리던 입력을 먼저 저장에 태운다 (화면이 닫힌 뒤에도 그 저장은 끝까지 간다).
+     돌아왔을 때 같은 차시의 방문 횟수를 다시 세지 않도록 표시해 둔다 */
+  const toGallery = () => {
+    flush();
+    svFlush();
+    galleryTripSid = me.sid;
+    onGallery();
+  };
+  /* 나가기: 진행 중인 저장과 남은 입력을 마친 뒤(최대 6초) 로그아웃한다.
+     확인하지 못하면 묻는다: 로그아웃하면 이 기기에 담긴 저장분은 같은 학번으로 다시 들어올 때까지 보내지지 않는다 */
+  const leave = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    const ok = await Promise.race([saveAllNow(), new Promise((res) => setTimeout(() => res(false), 6000))]);
+    if (!ok && !removedRef.current && !window.confirm("마지막으로 쓴 내용의 저장을 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.\n지금 나가면 그 내용이 저장되지 않을 수 있습니다. 그래도 나갈까요?")) {
+      setLeaving(false);
+      return;
+    }
+    exitedRef.current = true;
+    await authApi.leave();
+    onExit();
   };
 
   /* 최종 평가·쪽지시험 화면으로. 탭 버튼과 탭 줄 위의 이동 안내가 함께 쓴다 */
@@ -5310,7 +5499,7 @@ function StudentApp({ me, onExit, onGallery }) {
   return (
     <AccessProvider sid={me.sid} ws={ws} setField={setField} cfgAll={cfgAll} session={tab} loaded={loaded}
       where={quizOn ? "quiz" : assessOn ? "assess" : "lesson"}>
-    <WsLockCtx.Provider value={wsLocked}>
+    <WsLockCtx.Provider value={wsLocked || removed}>
     <NavCtx.Provider value={{ openMap, go: navGo }}>
     <div>
       <div className="topbar">
@@ -5320,19 +5509,30 @@ function StudentApp({ me, onExit, onGallery }) {
             <span>{me.nick}</span>
             <span translate="no"
               className={"save-pill " + (saveState === "dirty" || saveState === "saving" || saveState === "queued" ? "dirty" : saveState === "err" ? "err" : "")}>
-              {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "queued" ? "연결 대기(기기에 담아 둠)" : saveState === "err" ? "저장 실패, 5초 뒤 재시도" : "저장됨 " + fmtTime(savedAt)}
+              {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "queued" ? "연결 대기(기기에 담아 둠)" : saveState === "err" ? "저장 실패, 5초 뒤 재시도" : savedAt ? "저장됨 " + fmtTime(savedAt) : "아직 저장 기록 없음"}
             </span>
             <span className="ax-sr" role={saveState === "err" ? "alert" : "status"}>
               {saveState === "err" ? "저장하지 못했습니다. 5초 뒤 다시 저장합니다." : saveState === "queued" ? "인터넷 연결을 기다립니다. 쓴 내용은 이 기기에 담아 두었습니다." : ""}
             </span>
             {saveState === "err" && <button className="btn small" onClick={doSave}>지금 저장</button>}
             <AccessButton />
-            <button className="btn small ghost" onClick={onGallery}>전시장</button>
-            <button className="btn small ghost" onClick={async () => { await doSave(); onExit(); }}>나가기</button>
+            <button className="btn small ghost" onClick={toGallery}>전시장</button>
+            <button className="btn small ghost" disabled={leaving} onClick={leave}>{leaving ? "저장하는 중…" : "나가기"}</button>
           </div>
         </div>
       </div>
       <div className="wrap" role="main" id="main">
+        {removed && (
+          <div className="warn-note" role="alert" style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ flex: 1, minWidth: 200 }}>선생님이 이 학번의 기록을 초기화했거나 다른 학번으로 옮겨 저장을 멈췄습니다. 「다시 불러오기」를 누르거나, 학번이 바뀌었다면 나가서 새 학번으로 들어오세요.</span>
+            <button className="btn small" onClick={loadAll}>다시 불러오기</button>
+          </div>
+        )}
+        {liveErr && !removed && (
+          <div className="warn-note" role="status" style={{ marginBottom: 10 }}>
+            실시간 연결이 끊겨 다시 연결하는 중입니다. 다른 기기에서 쓴 내용이 보이지 않으면 새로고침하세요.
+          </div>
+        )}
         {!online && (
           <div className="warn-note" role="alert" style={{ marginBottom: 10 }}>
             인터넷이 끊겼습니다. 지금 쓰는 내용은 이 기기에 임시로 담겨 있다가 연결이 돌아오면 자동으로 저장됩니다. 그전에 창을 닫지 마세요.

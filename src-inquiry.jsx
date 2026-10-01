@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useId } from "react";
 import { fbStore } from "./src-fb.js";
 
 /* ============================================================
@@ -289,10 +289,11 @@ export function textSim(a, b) {
 
 function SelfQ({ value, onChange, level }) {
   const [stems, setStems] = useState(level !== "self");
+  const id = useId();
   return (
     <div className="inq-selfq">
-      <label className="inq-l">내가 만드는 질문 하나 (위 답에서 아직 답하지 않은 것)</label>
-      <input value={value || ""} maxLength={200} placeholder="예: ‘…이 아닌 경우는?’처럼 내 답을 다시 살펴보게 하는 질문"
+      <label className="inq-l" htmlFor={id}>내가 만드는 질문 하나 (위 답에서 아직 답하지 않은 것)</label>
+      <input id={id} value={value || ""} maxLength={200} placeholder="예: ‘…이 아닌 경우는?’처럼 내 답을 다시 살펴보게 하는 질문"
         onChange={(e) => onChange(e.target.value)} />
       <div className="inq-stems">
         <button type="button" className="inq-link" onClick={() => setStems(!stems)}>{stems ? "질문 예시 접기" : "질문 예시 보기"}</button>
@@ -312,8 +313,14 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
   const specific = Array.isArray(f.probes) ? f.probes.filter(filled) : [];
   const generic = INQ_GENERIC[f.qtype] || INQ_GENERIC["개념"];
   const [showV1, setShowV1] = useState(false);
+  const fid = useId(); // 질문 문장과 답 칸을 잇는다 (스크린리더가 질문을 읽는다)
 
-  const setTr = (patch) => setField("_inq", { ...all, [key]: { ...tr, ...patch } });
+  /* _inq는 모든 탐구 질문의 흔적이 든 맵이다. 렌더 때의 all로 통째로 쓰면 다른 기기에서 막 받은 다른 질문의 흔적을
+     옛 값으로 되돌리므로, 최신 맵을 받아 이 질문의 항목만 바꾼다 (저장도 _inq의 이 항목만 간다: src-ws-sync.mjs) */
+  const setTr = (patch) => setField("_inq", (cur) => {
+    const m = cur && typeof cur === "object" && !Array.isArray(cur) ? cur : {};
+    return { ...m, [key]: { ...(m[key] || {}), ...patch } };
+  });
   const sOrder = seededOrder(specific.length, seed + "|s");
   const gOrder = seededOrder(generic.length, seed + "|g");
   const drawn = tr.drawn || { s: 0, g: 0 };
@@ -363,10 +370,10 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
     <div className="field span2 inq">
       <div className="q-head">
         <span className={"q-type " + (f.qtype === "설계" ? "design" : "concept")}>{f.qtype}</span>
-        <label style={{ margin: 0 }}>{f.label}</label>
+        <label htmlFor={fid} style={{ margin: 0 }}>{f.label}</label>
       </div>
       {echo}
-      <textarea rows={f.rows || 4} value={text} maxLength={4000} placeholder={ph} onChange={(e) => onText(e.target.value)} />
+      <textarea id={fid} rows={f.rows || 4} value={text} maxLength={4000} placeholder={ph} onChange={(e) => onText(e.target.value)} />
       {!tr.v1 ? (
         <div className="inq-foot">
           {text.trim().length >= MIN_V1 ? (
@@ -383,8 +390,9 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
       ) : (
         <div className="inq-probe">
           <div className="inq-pt">
-            <span className="inq-acc">추가 질문</span>
-            아래 질문에 답하면서 <b>위 칸의 글을 고칩니다</b>. 처음 쓴 답은 따로 저장되어 있습니다.
+            {probes.length > 0 ? (
+              <><span className="inq-acc">추가 질문</span>아래 질문에 답하면서 <b>위 칸의 글을 고칩니다</b>. 처음 쓴 답은 따로 저장되어 있습니다.</>
+            ) : "처음 쓴 답은 따로 저장되어 있습니다. 위 칸에서 이어 고쳐 씁니다."}
           </div>
           {level === "self" && <SelfQ level={level} value={tr.selfQ} onChange={(v) => setTr({ selfQ: v, selfQAt: now() })} />}
           {probes.length > 0 && (
