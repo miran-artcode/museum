@@ -4626,14 +4626,18 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
     setBusy(true);
     const r = await authApi.studentEnter(id, pin);
     if (!r.ok) { setBusy(false); return setErr(msgOf(r.reason)); }
-    const roster = (await store.get("roster")) || {};
-    const rec = roster[id];
-    const name = (nick.trim() || (rec && rec.nick) || "").slice(0, 12);
-    if (!name) { setBusy(false); await authApi.leave(); return setErr("처음 입장할 때는 별명을 함께 입력하세요. 실명은 쓰지 않습니다."); }
-    if (!rec || rec.nick !== name) {
+    // 명부 전체가 아니라 자기 문서 한 건만 읽는다. 명부에 오르기 전에는 전체 명부를 읽을 권한이 없다(규칙 member()).
+    // 명부 문서는 설정·수업 자료 같은 학급 문서를 읽기 전에 여기서 만들어 둔다. 읽기 실패는 입장을 막지 않는다
+    const g = await fbStore.getStudent(id);
+    const rec = g.data;
+    let name = (nick.trim() || (rec && rec.nick) || "").slice(0, 12);
+    if (!name && g.ok) { setBusy(false); await authApi.cancelEnter(); return setErr("처음 입장할 때는 별명을 함께 입력하세요. 실명은 쓰지 않습니다."); }
+    if (name && (!rec || rec.nick !== name)) {
       // 명단 잠금(교사 설정 4)이 켜져 있으면 명부에 없는 학번의 쓰기를 규칙이 거부한다
-      const okR = await store.set("roster", { [id]: { nick: name } });
-      if (!okR) { setBusy(false); await authApi.leave(); return setErr("명단에 없는 학번이거나 저장하지 못했습니다. 선생님께 학번 등록을 요청하세요."); }
+      const okR = await store.setT("roster", { [id]: { nick: name } });
+      // 명부에 없다고 확인된 학번만 막는다. 이미 명부에 있으면 별명만 못 바꾼 것이고, 읽기가 실패했으면 확인할 수 없으니 들여보낸다
+      if (!okR && g.ok && !rec) { setBusy(false); await authApi.cancelEnter(); return setErr("명단에 없는 학번이거나 저장하지 못했습니다. 선생님께 학번 등록을 요청하세요."); }
+      if (!okR && rec) name = rec.nick || "";
     }
     setBusy(false);
     session.save({ role: "student", sid: id, nick: name }); // 같은 탭의 새로고침·뒤로 가기에서 되살린다 (src-ux.jsx)
@@ -5324,7 +5328,7 @@ function StudentApp({ me, onExit, onGallery }) {
             {saveState === "err" && <button className="btn small" onClick={doSave}>지금 저장</button>}
             <AccessButton />
             <button className="btn small ghost" onClick={onGallery}>전시장</button>
-            <button className="btn small ghost" onClick={async () => { await doSave(); await authApi.leave(); onExit(); }}>나가기</button>
+            <button className="btn small ghost" onClick={async () => { await doSave(); onExit(); }}>나가기</button>
           </div>
         </div>
       </div>
@@ -8718,7 +8722,7 @@ function TeacherApp({ onExit, onGallery }) {
           <div className="top-right">
             <button className="btn small ghost" onClick={() => { if (confirmLoseEdit()) onGallery(); }}>전시장</button>
             <button className="btn small ghost" onClick={() => { if (confirmLoseEdit()) loadAll(); }}>새로고침</button>
-            <button className="btn small ghost" onClick={async () => { if (!confirmLoseEdit()) return; await authApi.leave(); onExit(); }}>나가기</button>
+            <button className="btn small ghost" onClick={() => { if (!confirmLoseEdit()) return; onExit(); }}>나가기</button>
           </div>
         </div>
       </div>
@@ -9754,6 +9758,8 @@ function DemoView({ onBack }) {
 
 function App() {
   const [view, setView] = useState("gate");
+  // 나가기: 학생·교사 화면이 내려간 뒤(구독·beforeunload 해제) 로그아웃하고 캐시를 지운 다음 새로 고친다 (src-fb.js leave)
+  useEffect(() => { if (view === "leaving") authApi.leave(); }, [view]);
   const [me, setMe] = useState(null);
   // 전시장은 게이트·학생·교사 어디서든 들어오므로, 돌아갈 곳과 버튼 문구를 진입 지점에 맞춘다
   const [galFrom, setGalFrom] = useState("gate");
@@ -9805,8 +9811,9 @@ function App() {
         onTeacher={() => setView("teacher")}
         onGallery={() => goGallery("gate")}
         onDemo={() => setView("demo")} />}
-      {view === "student" && me && <StudentApp me={me} onGallery={() => goGallery("student")} onExit={() => { session.clear(); setMe(null); setMediaOwner("preview"); setView("gate"); }} />}
-      {view === "teacher" && <TeacherApp onGallery={() => goGallery("teacher")} onExit={() => { session.clear(); setView("gate"); }} />}
+      {view === "student" && me && <StudentApp me={me} onGallery={() => goGallery("student")} onExit={() => { session.clear(); setMe(null); setMediaOwner("preview"); setView("leaving"); }} />}
+      {view === "teacher" && <TeacherApp onGallery={() => goGallery("teacher")} onExit={() => { session.clear(); setView("leaving"); }} />}
+      {view === "leaving" && <div style={{ padding: "60px 16px", textAlign: "center", color: "var(--sub)", fontSize: 13 }}>기록실을 닫는 중…</div>}
       {view === "gallery" && <Gallery onBack={() => setView(galFrom === "student" && !me ? "gate" : galFrom)}
         backLabel={galFrom === "student" && me ? "기록실로 돌아가기" : galFrom === "teacher" ? "교사 화면으로" : "입장 화면으로"} />}
       {view === "demo" && <DemoView onBack={() => setView("gate")} />}
