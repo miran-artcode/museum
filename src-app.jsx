@@ -9709,6 +9709,12 @@ const DEMO_WS = {
   "s8a.ownQ": "관람자가 허구인 줄 알면서도 믿어 주는 마음은 어디까지 갈 수 있는가. 허구 고지의 글씨를 조금씩 키워 가며 어느 크기에서 믿음이 꺼지는지 전시로 실험해 보고 싶다.",
 };
 
+/* 예시 기록지는 로그인 없이 열리므로 저작권이 있는 작품 도판(© … 교육 목적 인용)은 뺀다.
+   출처 표기가 없거나 ©·「교육 목적」이 들어간 도판은 자유 이용(퍼블릭 도메인·CC·공공누리)으로 볼 수 없다.
+   로그인한 수업 화면에서는 그대로 보인다 */
+const freeImage = (img) => !!(img && img.credit) && !/©|교육 목적/.test(img.credit);
+const demoLesson = (L) => ({ ...L, readings: (L.readings || []).map((rd) => (rd && Array.isArray(rd.images) ? { ...rd, images: rd.images.filter(freeImage) } : rd)) });
+
 function DemoView({ onBack }) {
   // 학생 화면과 같은 차시 탭 — 8차시 전체를 한 화면에 쏟아 놓으면 스크롤로만 훑어야 한다
   const [tab, setTab] = useState(SESSIONS[0]);
@@ -9726,6 +9732,7 @@ function DemoView({ onBack }) {
         <div className="card" style={{ marginTop: 18 }}>
           <div className="card-body" style={{ fontSize: 13, color: "var(--sub)" }}>
             자료집의 예시 작품 A 「오른손」(새벽 배송 노동)으로 채워 둔 기록지입니다. 생성형 AI로 만든 가상의 사례이며 실제 학생 작품이 아닙니다. 여기서는 읽기만 할 수 있고, 자기 기록은 학생 입장에서 작성합니다.
+            작품 도판은 로그인한 뒤 수업 화면에서 볼 수 있습니다.
           </div>
         </div>
         <div className="sess-tabs" role="tablist">
@@ -9736,11 +9743,12 @@ function DemoView({ onBack }) {
         </div>
         {[tab].map((sess) => (
           <div key={sess}>
-            {LESSONS.filter((L) => L.session === sess).map((L) => <LessonPanel key={L.n} L={L} />)}
+            {LESSONS.filter((L) => L.session === sess).map((L) => <LessonPanel key={L.n} L={demoLesson(L)} />)}
             {SCHEMA.filter((s) => s.session === sess).map((sec) => (
               <div className="card" key={sec.id}>
                 <div className="card-head">
-                  <span className="card-code">{sec.kind === "learn" ? "배움 확인" : sec.kind === "inquiry" ? "탐구 질문" : "기록"} {sec.code}</span>
+                  {/* 학생 화면(SectionCard)과 같은 머리표: 발상 단계는 「단계 5」 */}
+                  <span className="card-code">{sectionHead(sec)}</span>
                   <span className="card-title">{sec.title}</span>
                   <span className="card-sess">{sec.session}</span>
                 </div>
