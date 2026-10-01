@@ -146,6 +146,7 @@ function route(key) {
   if (key.startsWith("grade:")) return { kind: "doc", path: ["grades", safe(key.slice(6))] };
   if (key.startsWith("survey:")) return { kind: "doc", path: ["surveys", safe(key.slice(7))] };
   if (key.startsWith("media:")) return { kind: "doc", path: ["media", safe(key.slice(6))] };
+  if (key.startsWith("exhibit:")) return { kind: "doc", path: ["exhibit", safe(key.slice(8))] };
   // 연구 참여 동의 대장 — 교사만 읽고 쓴다 (학생 화면에서는 존재를 알 수 없음)
   if (key.startsWith("research:")) return { kind: "doc", path: ["research", safe(key.slice(9))] };
   // 상호평가(쌍대비교) — 작품 스냅샷은 학급이 읽고, 평가 기록은 본인·교사만 읽는다 (src-assess-core.js 계약)

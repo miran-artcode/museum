@@ -75,6 +75,42 @@ if (!yes) {
   if (!/^y(es)?$/i.test(ans.trim())) { console.log("취소했습니다."); process.exit(0); }
 }
 
+/* --to: 기록지의 미디어 참조는 media/{기록지 주인}_{ref}로 풀리므로, 기록지만 옮기면 새 학번에서 사진·녹음이 모두 빈다.
+   기록지를 쓰기 전에 참조마다 media/{원래 학번}_{ref}를 media/{새 학번}_{ref}로 복사한다(이미 있으면 그대로 둔다).
+   지금 서버에 없으면 백업 폴더의 media.json(--with-media 백업), --at이면 그 시점의 문서에서 찾는다. 하나라도 쓰기에 실패하면 기록지를 쓰지 않는다. */
+const safeId = (s) => String(s).replace(/[\/\s"'#\[\]*~?:]/g, "_").slice(0, 180); // src-fb.js safe()와 같은 규칙
+function mediaRefs(ws) {
+  const refs = new Set();
+  const visit = (v) => {
+    if (!v) return;
+    if (Array.isArray(v)) return v.forEach(visit);
+    if (typeof v === "object") { if (typeof v.ref === "string" && v.ref) refs.add(v.ref); Object.values(v).forEach(visit); }
+  };
+  Object.entries(ws || {}).forEach(([k, v]) => { if (!k.startsWith("_")) visit(v); });
+  ((ws || {})["s5b.rounds"] || []).forEach((r) => { if (r && typeof r.img === "string" && r.img) refs.add(r.img); });
+  return [...refs];
+}
+if (target !== sid) {
+  let backupMedia = null;
+  if (!at) { const mf = path.join(path.isAbsolute(dirArg) ? dirArg : path.join(BACKUP_DIR, dirArg), "media.json"); if (fs.existsSync(mf)) backupMedia = JSON.parse(fs.readFileSync(mf, "utf8")); }
+  const copied = [], kept = [], missing = [];
+  for (const ref of mediaRefs(fromWs)) {
+    const toId = safeId(`${target}_${ref}`), fromId = safeId(`${sid}_${ref}`);
+    if (await getDoc(token, "media", toId)) { kept.push(ref); continue; }
+    let src = await getDoc(token, "media", fromId);
+    if (!src && backupMedia && backupMedia[fromId]) src = backupMedia[fromId];
+    if (!src && at) src = await getDoc(token, "media", fromId, { readTime: at });
+    const v = unwrap(src);
+    if (!src || typeof v !== "string") { missing.push(ref); continue; }
+    await putDoc(token, "media", toId, { v, updatedAt: Date.now() });
+    copied.push(ref);
+  }
+  console.log(`미디어: ${copied.length}개 복사 (media/${sid}_* → media/${target}_*), 새 학번에 이미 있음 ${kept.length}개, 원본을 찾지 못함 ${missing.length}개`);
+  copied.forEach((r) => console.log("  복사 " + r));
+  missing.forEach((r) => console.log("  ⚠ 원본 없음 " + r));
+  console.log(`⚠ 주의: 옛 학번 ${sid}을(를) 교사 화면에서 지우면 media/${sid}_* 파일도 함께 지워집니다. 복사한 것은 새 학번에 남지만, 위에서 원본을 찾지 못한 항목은 되살릴 수 없으니 지우기 전에 확인하세요.`);
+}
+
 const nowIso = new Date().toISOString();
 if (cur) {
   // ① 되돌리기 전 상태를 사본으로. 교사 화면의 「기록 되돌리기」 카드에서도 이 사본이 보인다

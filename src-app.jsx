@@ -5699,6 +5699,29 @@ function StudentApp({ me, onExit, onGallery }) {
 
 /* ---------- 교사: 학생 상세(열람 + 채점) ---------- */
 
+/* 관리 작업의 지우기·복사는 오프라인이면 끝나지 않고 매달린다 (deleteDoc·setDoc가 서버 확인을 기다린다).
+   결과를 교사에게 알려야 하므로 제한 시간 안에 답이 없으면 실패로 본다.
+   늦게 성공해도 다시 눌렀을 때 같은 결과가 되는(멱등) 작업에만 쓴다. */
+const timed = (p, ms) => Promise.race([p, new Promise((res) => setTimeout(() => res(false), ms || 8000))]);
+
+/* 한 학생의 기록지·미디어·전시장 사본을 지운다 (기록 초기화·학생 완전 삭제·명부 일괄 삭제가 함께 쓴다).
+   지우기 직전에 서버의 기록지를 다시 읽어 미디어 참조를 모은다: 화면을 연 뒤 올린 사진이 빠지면 주인 없는 파일로 남는다.
+   미디어를 하나라도 못 지우면 기록지는 지우지 않는다. 기록지가 남아야 다시 눌렀을 때 참조를 다시 모을 수 있다.
+   돌려주는 값: { fatal: 기록지를 건드리지 못했는가, fails: 못 한 일 이름들 } */
+async function wipeWorksheet(sid, knownWs) {
+  const fresh = await store.getSafe("ws:" + sid);
+  if (!fresh.ok || fresh.fromCache) return { fatal: true, fails: ["기록지 읽기"] };
+  const refs = new Set([...collectMediaRefs(fresh.data || {}), ...collectMediaRefs(knownWs || {})]);
+  let mFail = 0;
+  for (const ref of refs) if (!(await timed(mediaStore.remove(sid, ref)))) mFail++;
+  if (mFail) return { fatal: true, fails: ["미디어 " + mFail + "개"] };
+  const fails = [];
+  // 기록지가 사라지면 전시장 사본만 남아 걸려 있게 된다
+  if (!(await timed(fbStore.remove("exhibit:" + sid)))) fails.push("전시장 사본");
+  if (fresh.data && !(await timed(fbStore.remove("ws:" + sid)))) fails.push("기록지");
+  return { fatal: false, fails };
+}
+
 function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack, ids, onSel, initialTab }) {
   const [ws, setWs] = useState(null);
   const [grade, setGrade] = useState({});
@@ -5776,7 +5799,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
   const [busyMgmt, setBusyMgmt] = useState(false);
   const [newNick, setNewNick] = useState("");
   const [newSid, setNewSid] = useState("");
-  const canManage = !isSample && !isPreview;
+  const canManage = !isSample && !isPreview && !authApi.isViewer(); // 보기 전용 계정은 쓰기가 모두 거부되므로 관리 버튼을 감춘다
 
   const changeNick = async () => {
     const nick = newNick.trim().slice(0, 12);
@@ -5786,86 +5809,190 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
     else setMgmtMsg("별명 변경에 실패했습니다.");
   };
 
+  /* 학번 옮기기: 모든 것을 지금 서버에서 다시 읽어 옮긴다. 화면을 연 때의 사본을 옮기고 원본을 지우면
+     그 뒤 학생이 쓴 것이 사라진다. 복사가 모두 확인된 뒤에만 원본을 지우고, 중간에 끊긴 이관은
+     새 학번 기록지의 _moved 표시로 알아보고 다시 눌렀을 때 이어서 옮긴다. */
   const changeSid = async () => {
+    if (authApi.isViewer()) return setMgmtMsg("보기 전용 계정은 학번을 옮길 수 없습니다.");
     const target = newSid.trim();
     if (!/^\d{3,6}$/.test(target)) return setMgmtMsg("새 학번은 숫자 3~6자리입니다.");
     if (target === sid) return setMgmtMsg("현재 학번과 같습니다.");
     setBusyMgmt(true);
-    // 읽기 실패를 "비어 있음"으로 치면 사용 중인 학번을 빈 학번으로 오판해 그 학생의 기록을 덮어쓴다
-    const [tRes, rosterRes] = await Promise.all([store.getSafe("ws:" + target), store.getSafe("roster")]);
-    if (!tRes.ok || !rosterRes.ok) { setBusyMgmt(false); return setMgmtMsg("학번 확인 읽기에 실패했습니다. 연결을 확인하고 다시 시도하세요."); }
-    const tWs = tRes.data, allRoster = rosterRes.data;
-    if ((allRoster && allRoster[target]) || tWs) { setBusyMgmt(false); return setMgmtMsg("이미 사용 중인 학번입니다(" + target + "). 먼저 그 학번을 정리하세요."); }
-    if (!window.confirm(sid + " → " + target + " 학번을 바꿉니다.\n기록·미디어·채점이 새 학번으로 옮겨집니다. 학생이 지금 접속 중이 아닐 때 실행하세요.\n진행할까요?")) { setBusyMgmt(false); return; }
+    const stop = (m) => { setBusyMgmt(false); setMgmtMsg(m); };
+    const keys = ["ws:" + sid, "ws:" + target, "roster", "grade:" + sid, "survey:" + sid, "survey:" + target,
+      "exhibit:" + sid, "sub:" + sid, "assess:" + sid, "quiz:" + sid, "research:consent"];
+    const [res, histR] = await Promise.all([Promise.all(keys.map((k) => store.getSafe(k))), fbStore.listWsHistory(sid)]);
+    const [srcR, tWsR, rosterR, gR, svR, tSvR, exR, subR, asR, qzR, cmR] = res;
+    // 읽기 실패를 "없음"으로 치면 사용 중인 학번을 빈 학번으로 오판하거나 옮길 것을 빠뜨린 채 원본을 지운다
+    if ([srcR, tWsR, rosterR, gR, svR, tSvR, exR].some((r) => !r.ok || r.fromCache)) return stop("학번 확인 읽기에 실패했습니다. 연결을 확인하고 다시 시도하세요.");
+    const fresh = srcR.data;
+    if (!fresh && ws._updatedAt) return stop("화면을 연 뒤 이 학생의 기록지가 지워졌습니다. 목록으로 돌아가 다시 여세요.");
+    if ((fresh ? fresh._updatedAt || "" : "") !== (ws._updatedAt || "")) {
+      setWs(fresh);
+      return stop("화면을 연 뒤 학생이 기록지를 고쳤습니다(최근 저장 " + fmtTime(fresh._updatedAt) + "). 화면을 새 기록으로 바꿨습니다. 학생이 접속 중이 아닌지 확인한 뒤 다시 누르세요.");
+    }
+    const allRoster = rosterR.data || {};
+    const tWs = tWsR.data;
+    const mv = tWs && Array.isArray(tWs._moved) ? tWs._moved[tWs._moved.length - 1] : null;
+    // 앞선 이관이 끊겨 남은 복사본이고, 그 뒤 새 학번으로 쓴 기록이 없을 때만 이어서 옮긴다
+    const resumed = !!(mv && mv.from === sid && !((tWs._updatedAt || "") > (mv.at || "")));
+    if ((allRoster[target] || tWs) && !resumed) return stop("이미 사용 중인 학번입니다(" + target + "). 먼저 그 학번을 정리하세요.");
+    const svSrc = svR.data, svT = tSvR.data;
+    const svSame = !!(svSrc && svT) && JSON.stringify(svSrc) === JSON.stringify(svT); // 끊긴 이관이 이미 복사해 둔 설문
+    const svMove = !!svSrc && (!svT || svSame);
+    const refs = collectMediaRefs(fresh || {});
+    const nick = (allRoster[sid] || rec).nick || "";
+    const has = (r, name) => (!r.ok ? name + "(확인하지 못함)" : r.data ? name : null);
+    const moveList = [
+      fresh ? "기록지 (진행 " + overallProgress(fresh) + "%, 최근 저장 " + fmtTime(fresh._updatedAt) + ")" : null,
+      refs.length ? "사진·음성·스케치·영상 " + refs.length + "개" : null,
+      gR.data ? "채점" : null,
+      svMove ? "설문" : null,
+      exR.data ? "전시장 작품" : null,
+      "명부의 별명" + (nick ? " 「" + nick + "」" : ""),
+    ].filter(Boolean);
+    const stayList = [
+      svSrc && !svMove ? "설문 (새 학번에 이미 다른 설문이 있어 옮기지 않음)" : null,
+      has(subR, "상호평가 제출작"), has(asR, "상호평가 기록"), has(qzR, "쪽지시험 응시 기록"),
+      !histR.ok ? "기록지 시점 사본(확인하지 못함)" : histR.data.length ? "기록지 시점 사본 " + histR.data.length + "개 (되돌리기 목록)" : null,
+      !cmR.ok ? "연구 동의 대장의 칸(확인하지 못함)" : cmR.data && cmR.data[sid] ? "연구 동의 대장의 칸" : null,
+      "로그인 계정 (" + sid + "@museum.class)",
+    ].filter(Boolean);
+    if (!window.confirm(sid + " → " + target + " 학번을 바꿉니다." + (resumed ? "\n(앞서 끊긴 이관을 이어서 합니다.)" : "") +
+      "\n\n새 학번으로 옮기는 것\n· " + moveList.join("\n· ") +
+      "\n\n옛 학번에 그대로 남는 것 (옮기지 않음)\n· " + stayList.join("\n· ") +
+      "\n\n학생이 지금 접속 중이 아닐 때 실행하세요. 진행할까요?")) return stop("");
     setMgmtMsg("옮기는 중… 창을 닫지 마세요.");
+    const copiedRefs = [];
     try {
-      if (!(await store.set("ws:" + target, ws))) throw new Error("기록지 복사 실패");
-      const refs = collectMediaRefs(ws);
+      if (fresh) {
+        const moved = [...(Array.isArray(fresh._moved) ? fresh._moved : []), { from: sid, to: target, at: now() }].slice(-10);
+        if (!(await store.setT("ws:" + target, { ...fresh, _moved: moved }))) throw new Error("기록지 복사 실패");
+      }
       for (const ref of refs) {
         // 읽기 실패를 "미디어 없음"으로 치면 복사를 건너뛴 채 아래에서 원본을 지운다 — 사진·녹음이 영영 사라진다
         const r = await mediaStore.getSafe(sid, ref);
         if (!r.ok) throw new Error("미디어 읽기 실패");
-        if (r.data && !(await mediaStore.put(target, ref, r.data))) throw new Error("미디어 복사 실패");
+        if (!r.data) continue; // 기록지가 가리키지만 파일은 이미 없는 경우
+        if (!(await timed(mediaStore.put(target, ref, r.data), 30000))) throw new Error("미디어 복사 실패");
+        copiedRefs.push(ref);
       }
-      const gRes = await store.getSafe("grade:" + sid);
-      if (!gRes.ok) throw new Error("채점 읽기 실패");
-      if (gRes.data && !(await store.set("grade:" + target, gRes.data))) throw new Error("채점 복사 실패");
-      await fbStore.setStudent(target, { nick: rec.nick || "" });
-      // 복사가 모두 성공한 뒤에만 원본을 지운다
-      for (const ref of refs) await mediaStore.remove(sid, ref);
-      await fbStore.remove("ws:" + sid);
-      await fbStore.remove("grade:" + sid);
-      await fbStore.removeStudent(sid);
-      setBusyMgmt(false); setMgmtMsg("");
-      window.alert("학번을 옮겼습니다 → " + target + ".\n학생에게: 다음 입장부터 새 학번과 새 비밀번호 4자리로 들어오라고 안내하세요.\n예전 로그인 계정(" + sid + "@museum.class)은 Firebase 콘솔 Authentication에서 지우면 됩니다.");
-      if (onSel) onSel(target); else onBack();
+      if (gR.data && !(await store.setT("grade:" + target, gR.data))) throw new Error("채점 복사 실패");
+      if (svMove && !svSame && !(await store.setT("survey:" + target, svSrc))) throw new Error("설문 복사 실패");
+      if (exR.data && !(await store.setT("exhibit:" + target, { ...exR.data, owner: target }))) throw new Error("전시장 작품 복사 실패");
+      if (!(await timed(fbStore.setStudent(target, { nick })))) throw new Error("명부 등록 실패");
     } catch (e) {
-      setBusyMgmt(false);
-      setMgmtMsg("옮기다 중단됐습니다 (" + e.message + "). 원본 기록은 그대로 남아 있으니 다시 시도하세요.");
+      return stop("옮기다 중단됐습니다 (" + e.message + "). 옛 학번의 기록은 그대로 있으니 다시 누르면 이어서 옮깁니다.");
     }
+    // 지우기 직전에 원본을 한 번 더 본다. 옮기는 사이 학생이 저장했다면 원본을 지우지 않는다
+    const again = await store.getSafe("ws:" + sid);
+    if (!again.ok || again.fromCache || (again.data ? again.data._updatedAt || "" : "") !== (fresh ? fresh._updatedAt || "" : "")) {
+      if (again.ok && again.data) setWs(again.data);
+      return stop("새 학번에 복사는 끝났지만 그 사이 옛 학번 기록지가 바뀌었거나 확인하지 못해 옛 학번 자료를 지우지 않았습니다. 학생이 접속을 마친 뒤 「학번 옮기기」를 다시 누르면 새 기록으로 이어서 옮깁니다.");
+    }
+    const left = [];
+    if (exR.data && !(await timed(fbStore.remove("exhibit:" + sid)))) left.push("전시장 작품");
+    let mFail = 0;
+    for (const ref of copiedRefs) if (!(await timed(mediaStore.remove(sid, ref)))) mFail++;
+    if (mFail) left.push("미디어 " + mFail + "개");
+    if (svMove && !(await timed(fbStore.remove("survey:" + sid)))) left.push("설문");
+    if (fresh && !(await timed(fbStore.remove("ws:" + sid)))) left.push("기록지");
+    if (gR.data && !(await timed(fbStore.remove("grade:" + sid)))) left.push("채점");
+    // 명부는 마지막에, 나머지를 모두 지웠을 때만 지운다. 남은 것이 있으면 옛 학번이 목록에 보여야 정리할 수 있다
+    if (!left.length && !(await timed(fbStore.removeStudent(sid)))) left.push("명부");
+    setBusyMgmt(false); setMgmtMsg("");
+    window.alert("학번을 옮겼습니다 → " + target + ".\n" +
+      (left.length ? "옛 학번(" + sid + ")에서 다음을 지우지 못했습니다: " + left.join(", ") + ". 목록에서 옛 학번을 열어 정리하세요.\n" : "") +
+      "학생에게: 다음 입장부터 새 학번과 새 비밀번호 4자리로 들어오라고 안내하세요.\n예전 로그인 계정(" + sid + "@museum.class)은 Firebase 콘솔 Authentication에서 지우면 됩니다.");
+    if (onSel) onSel(target); else onBack();
   };
 
   const resetRecords = async () => {
     const token = window.prompt("이 학생의 기록지와 미디어를 모두 지웁니다. 별명(명부)과 채점은 남습니다.\n지우면 되돌릴 수 없습니다. 확인을 위해 학번(" + sid + ")을 입력하세요.");
     if (token == null) return;
     if (token.trim() !== sid) return setMgmtMsg("학번이 일치하지 않아 취소했습니다.");
+    if (authApi.isViewer()) return setMgmtMsg("보기 전용 계정은 지울 수 없습니다.");
     setBusyMgmt(true); setMgmtMsg("지우는 중…");
-    for (const ref of collectMediaRefs(ws)) await mediaStore.remove(sid, ref);
-    await fbStore.remove("ws:" + sid);
-    setWs({});
+    const w = await wipeWorksheet(sid, ws);
     setBusyMgmt(false);
+    if (w.fails.length) return setMgmtMsg("초기화를 끝내지 못했습니다(" + w.fails.join(", ") + " 실패). " + (w.fatal ? "기록지는 그대로 있습니다. " : "") + "연결을 확인하고 다시 누르세요.");
+    setWs({});
     setMgmtMsg("기록을 초기화했습니다. 학생이 다시 입장하면 빈 기록지로 시작합니다. (접속 중이던 학생은 화면을 새로 고침해야 합니다.)");
   };
 
   const deleteStudent = async () => {
-    const token = window.prompt("학생 " + sid + "의 명부·기록·미디어·채점을 모두 지웁니다. 되돌릴 수 없습니다.\n확인을 위해 학번을 입력하세요.");
+    const token = window.prompt("학생 " + sid + "의 명부·기록·미디어·채점·전시장 작품을 모두 지웁니다. 되돌릴 수 없습니다.\n(설문·상호평가·쪽지시험 기록·기록지 시점 사본·연구 동의 칸은 남습니다.)\n확인을 위해 학번을 입력하세요.");
     if (token == null) return;
     if (token.trim() !== sid) return setMgmtMsg("학번이 일치하지 않아 취소했습니다.");
+    if (authApi.isViewer()) return setMgmtMsg("보기 전용 계정은 지울 수 없습니다.");
     setBusyMgmt(true); setMgmtMsg("지우는 중…");
-    for (const ref of collectMediaRefs(ws)) await mediaStore.remove(sid, ref);
-    await fbStore.remove("ws:" + sid);
-    await fbStore.remove("grade:" + sid);
-    await fbStore.removeStudent(sid);
+    const w = await wipeWorksheet(sid, ws);
+    const fails = w.fails.slice();
+    if (!w.fatal && !(await timed(fbStore.remove("grade:" + sid)))) fails.push("채점");
+    // 명부는 나머지를 모두 지웠을 때만 지운다. 남은 것이 있으면 목록에 보여야 다시 정리할 수 있다
+    if (!fails.length && !(await timed(fbStore.removeStudent(sid)))) fails.push("명부");
     setBusyMgmt(false);
+    if (fails.length) return setMgmtMsg("삭제를 끝내지 못했습니다(" + fails.join(", ") + " 실패). 연결을 확인하고 다시 누르세요.");
     window.alert("학생 " + sid + "의 자료를 모두 지웠습니다.\n로그인 계정(" + sid + "@museum.class)은 Firebase 콘솔 Authentication에서 지울 수 있습니다. 같은 학번으로 다시 입장하면 새로 시작됩니다.");
     onBack();
   };
 
+  /* 전시 정리는 기록지의 그 칸 하나만 바꾼다. 화면을 연 때 읽은 사본({...ws})으로 문서를 통째로 쓰면
+     그 뒤 학생이 쓴 칸이 모두 옛 값으로 돌아간다 (수업 중에 급히 내리는 작업이라 학생이 접속 중인 경우가 많다). */
+  const [exhibitLeft, setExhibitLeft] = useState(false); // 기록지는 내렸는데 전시장 사본을 못 지운 상태: 다시 누를 수 있게 버튼을 살려 둔다
+  const [imgLeft, setImgLeft] = useState(""); // 기록지에서는 뺐는데 파일을 못 지운 대표 이미지의 참조
   const unpublishWork = async () => {
-    const next = { ...ws, "s7x.show": "비공개" };
-    if (await store.set("ws:" + sid, next)) { setWs(next); setMgmtMsg("작품을 전시에서 내렸습니다. 전시장에서 더 이상 보이지 않습니다."); }
-    else setMgmtMsg("전시 내리기에 실패했습니다.");
+    setBusyMgmt(true);
+    const r = await store.updateFieldsT("ws:" + sid, { "s7x.show": "비공개" });
+    if (r !== true) {
+      setBusyMgmt(false);
+      return setMgmtMsg(r === "missing" ? "서버에 이 학생의 기록지가 없습니다. 목록으로 돌아가 다시 여세요." : "전시 내리기에 실패했습니다. 연결을 확인하고 다시 누르세요.");
+    }
+    setWs((p) => ({ ...p, "s7x.show": "비공개" }));
+    // 전시장은 exhibit/{학번} 사본을 읽는다. 기록지만 내리면 전시장에는 계속 걸려 있다
+    const ex = await timed(fbStore.remove("exhibit:" + sid));
+    setBusyMgmt(false);
+    setExhibitLeft(!ex);
+    setMgmtMsg(ex ? "작품을 전시에서 내렸습니다. 전시장에서 더 이상 보이지 않습니다."
+      : "기록지는 비공개로 바꿨지만 전시장 사본을 지우지 못해 전시장에는 아직 보일 수 있습니다. 「전시에서 내리기」를 다시 누르세요.");
   };
 
   const deleteWorkImage = async () => {
     const cur = ws["s7x.img"];
     if (!cur || !cur.ref) return setMgmtMsg("지울 대표 이미지가 없습니다.");
     if (!window.confirm("전시 대표 이미지를 지웁니다. 되돌릴 수 없습니다. 진행할까요?")) return;
-    await mediaStore.remove(sid, cur.ref);
-    const next = { ...ws, "s7x.img": "" };
-    await store.set("ws:" + sid, next);
-    setWs(next);
-    setMgmtMsg("대표 이미지를 지웠습니다.");
+    setBusyMgmt(true);
+    // 화면을 연 뒤 학생이 이미지를 바꿨다면 확인받은 것과 다른 이미지를 지우게 된다. 서버의 지금 값을 먼저 본다
+    const fresh = await store.getSafe("ws:" + sid);
+    if (!fresh.ok || fresh.fromCache) { setBusyMgmt(false); return setMgmtMsg("기록지를 다시 읽지 못했습니다. 연결을 확인하고 다시 누르세요."); }
+    const live = fresh.data || {};
+    const liveImg = live["s7x.img"];
+    if (!liveImg || liveImg.ref !== cur.ref) {
+      setWs(live); setBusyMgmt(false);
+      return setMgmtMsg(liveImg && liveImg.ref ? "화면을 연 뒤 학생이 대표 이미지를 바꿨습니다. 화면을 새 기록으로 바꿨으니 이미지를 확인하고 다시 누르세요." : "학생이 이미 대표 이미지를 뺐습니다.");
+    }
+    // ① 기록지에서 이 칸만 비운다. 실패하면 파일을 지우지 않는다 (기록지가 없는 파일을 가리키게 되므로)
+    const r = await store.updateFieldsT("ws:" + sid, { "s7x.img": "" });
+    if (r !== true) { setBusyMgmt(false); return setMgmtMsg("대표 이미지를 기록지에서 빼지 못했습니다. 연결을 확인하고 다시 누르세요."); }
+    setWs({ ...live, "s7x.img": "" });
+    const fails = [];
+    // ② 전시장 사본이 있으면 그 이미지도 비운다 (없으면 만들지 않는다)
+    const ex = await store.getSafe("exhibit:" + sid);
+    if (!ex.ok) fails.push("전시장 사본 확인");
+    else if (ex.data && (await store.updateFieldsT("exhibit:" + sid, { img: "" })) === false) fails.push("전시장 사본의 이미지 비우기");
+    // ③ 기록지가 더는 가리키지 않게 된 뒤에 파일을 지운다
+    const gone = await timed(mediaStore.remove(sid, cur.ref));
+    if (!gone) fails.push("이미지 파일 삭제");
+    setImgLeft(gone ? "" : cur.ref);
+    setBusyMgmt(false);
+    setMgmtMsg(fails.length ? "대표 이미지를 기록지에서 뺐지만 다음을 하지 못했습니다: " + fails.join(", ") + ". 연결을 확인하세요." : "대표 이미지를 지웠습니다.");
+  };
+  const retryImgFile = async () => {
+    setBusyMgmt(true);
+    const ok = await timed(mediaStore.remove(sid, imgLeft));
+    setBusyMgmt(false);
+    if (ok) setImgLeft("");
+    setMgmtMsg(ok ? "남아 있던 대표 이미지 파일을 지웠습니다." : "이미지 파일을 지우지 못했습니다. 연결을 확인하고 다시 누르세요.");
   };
 
   if (loadErr) return (
@@ -5914,7 +6041,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
         <div>
           {!canManage ? (
             <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
-              {isSample ? "표본 학급 자료는 관리할 수 없습니다. 실제 학생이 입장하면 여기서 별명·학번 변경, 기록 초기화, 작품 정리를 할 수 있습니다." : "미리보기 기록은 관리 대상이 아닙니다."}
+              {isSample ? "표본 학급 자료는 관리할 수 없습니다. 실제 학생이 입장하면 여기서 별명·학번 변경, 기록 초기화, 작품 정리를 할 수 있습니다." : isPreview ? "미리보기 기록은 관리 대상이 아닙니다." : "보기 전용 계정은 학생 관리를 할 수 없습니다."}
             </div></div>
           ) : (
             <div>
@@ -5957,8 +6084,9 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
                   </p>
                   {ws["s7x.img"] && ws["s7x.img"].ref && <div style={{ marginBottom: 10 }}><MediaThumb owner={sid} refId={ws["s7x.img"].ref} alt="전시 대표 이미지" size={110} /></div>}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button className="btn small ghost" disabled={busyMgmt || ws["s7x.show"] !== "공개"} onClick={unpublishWork}>전시에서 내리기</button>
+                    <button className="btn small ghost" disabled={busyMgmt || (ws["s7x.show"] !== "공개" && !exhibitLeft)} onClick={unpublishWork}>전시에서 내리기</button>
                     <button className="btn small ghost" disabled={busyMgmt || !(ws["s7x.img"] && ws["s7x.img"].ref)} onClick={deleteWorkImage}>대표 이미지 삭제</button>
+                    {imgLeft && <button className="btn small ghost" disabled={busyMgmt} onClick={retryImgFile}>남은 이미지 파일 지우기</button>}
                   </div>
                   <p className="hint" style={{ marginTop: 8 }}>부적절한 작품을 급히 내릴 때 씁니다. 내려도 학생의 기록지는 그대로 남고, 학생이 다시 「공개」로 바꿀 수 있습니다.</p>
                 </div>
@@ -8612,7 +8740,19 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
    학생 상세의 「학생 완전 삭제」는 한 명씩이라 열댓 개를 지우려면 번거롭다.
    지우는 것: 기록지 · 미디어 · 채점 · 설문 · 명부 · 동의 대장의 그 학생 칸.
    지우지 못하는 것: 로그인 계정 자체 (Firebase 콘솔에서만 지울 수 있다). */
-function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
+/* 기록지에 학생이 쓴 것이 하나라도 있는가 (밑줄 키는 보조 기록이라 뺀다). 진행률 0%만 보면
+   설문·사진만 한 1차시 학생이 「기록 없음」으로 골라진다 */
+function wsHasContent(w) {
+  const walk = (v) => {
+    if (typeof v === "string") return v.trim().length > 0;
+    if (Array.isArray(v)) return v.some(walk);
+    if (v && typeof v === "object") return Object.keys(v).some((k) => walk(v[k]));
+    return v != null && v !== "";
+  };
+  return Object.keys(w || {}).some((k) => k.charAt(0) !== "_" && walk(w[k])) || collectMediaRefs(w || {}).length > 0;
+}
+
+function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone, loadFail }) {
   const [sel, setSel] = useState({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -8623,6 +8763,25 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
 
   const [tone, setTone] = useState("ok"); // 성공·진행은 초록, 실패·취소만 붉게 — 삭제 성공이 경고색으로 뜨면 실패로 오독한다
   const say = (t, text) => { setTone(t); setMsg(text); };
+  /* 「기록 없음」= 기록지가 없거나 쓴 칸·미디어가 없고, 설문·상호평가 제출·평가 기록·쪽지시험 응시 기록도 없음.
+     목록 화면에 없는 컬렉션은 지금 서버에서 읽고, 하나라도 못 읽거나 기록지를 못 읽은 학생은 고르지 않는다 */
+  const pickEmpty = async () => {
+    setBusy(true); say("ok", "학생별 기록을 확인하는 중…");
+    const cols = await Promise.all(["surveys", "submissions", "assess", "quiz"].map((n) => fbStore.allOfSafe(n)));
+    setBusy(false);
+    if (cols.some((r) => !r.ok || r.fromCache)) return say("warn", "설문·상호평가·쪽지시험 기록을 모두 확인하지 못해 고르지 않았습니다. 연결을 확인하고 다시 누르세요.");
+    const fail = loadFail || {};
+    const m = {};
+    ids.forEach((id) => {
+      if (fail[id] || wsHasContent(wsMap[id])) return;
+      if (cols.some((r) => r.data[id])) return;
+      m[id] = true;
+    });
+    setSel(m);
+    const nf = ids.filter((id) => fail[id]).length;
+    say("ok", "기록이 없는 학생 " + Object.keys(m).length + "명을 골랐습니다(기록지·미디어·설문·상호평가·쪽지시험 확인)." + (nf ? " 기록지를 불러오지 못한 " + nf + "명은 고르지 않았습니다." : ""));
+  };
+
   const del = async () => {
     if (sampleMode || !chosen.length) return;
     const names = chosen.map((id) => id + (roster[id] && roster[id].nick ? "(" + roster[id].nick + ")" : "")).join(", ");
@@ -8633,30 +8792,35 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
     if (token == null) return;
     if (token.trim() !== String(chosen.length)) return say("warn", "인원 수가 일치하지 않아 취소했습니다.");
 
+    if (authApi.isViewer()) return say("warn", "보기 전용 계정은 지울 수 없습니다.");
     setBusy(true);
-    let done = 0;
-    try {
-      for (const id of chosen) {
-        say("ok", "지우는 중… " + (done + 1) + " / " + chosen.length + " (" + id + ")");
-        for (const ref of collectMediaRefs(wsMap[id] || {})) await mediaStore.remove(id, ref);
-        await fbStore.remove("ws:" + id);
-        await fbStore.remove("grade:" + id);
-        await fbStore.remove("survey:" + id);
-        await fbStore.removeStudent(id);
-        done++;
+    const doneIds = [], failed = [];
+    for (const id of chosen) {
+      say("ok", "지우는 중… " + (doneIds.length + failed.length + 1) + " / " + chosen.length + " (" + id + ")");
+      const w = await wipeWorksheet(id, wsMap[id]);
+      const fails = w.fails.slice();
+      if (!w.fatal) {
+        if (!(await timed(fbStore.remove("grade:" + id)))) fails.push("채점");
+        if (!(await timed(fbStore.remove("survey:" + id)))) fails.push("설문");
       }
-      const cm = await store.get("research:consent");
-      if (cm && typeof cm === "object") {
-        const next = { ...cm };
-        chosen.forEach((id) => { delete next[id]; });
-        await store.set("research:consent", next);
-      }
-      setSel({});
-      say("ok", done + "명을 지웠습니다. 로그인 계정은 Firebase 콘솔의 Authentication에서 따로 지워야 하며, 같은 학번으로 다시 입장하면 빈 기록지로 새로 시작합니다.");
-      if (onDone) onDone();
-    } catch (e) {
-      say("warn", "지우다 중단됐습니다 (" + done + "명 처리). 남은 학생은 다시 고르고 실행하세요.");
+      // 명부는 나머지를 모두 지웠을 때만 지운다. 남은 것이 있으면 목록에 남아야 다시 고를 수 있다
+      if (!fails.length && !(await timed(fbStore.removeStudent(id)))) fails.push("명부");
+      if (fails.length) failed.push(id + "(" + fails.join("·") + ")"); else doneIds.push(id);
     }
+    // 동의 대장은 그 학생 칸만 지운다. 읽어서 통째로 다시 쓰면 그 사이 다른 화면이 고친 칸이 사라진다
+    let consentOk = true;
+    if (doneIds.length) {
+      const patch = {};
+      doneIds.forEach((id) => { patch[id] = undefined; });
+      consentOk = (await store.updateFieldsT("research:consent", patch)) !== false; // "missing"이면 지울 칸도 없다
+    }
+    setSel(failed.length ? Object.fromEntries(chosen.filter((id) => !doneIds.includes(id)).map((id) => [id, true])) : {});
+    if (failed.length || !consentOk) {
+      say("warn", doneIds.length + "명을 지웠습니다. " + (failed.length ? failed.length + "명은 끝내지 못했습니다: " + failed.join(", ") + ". 연결을 확인하고 남은 학생(고른 상태로 둠)을 다시 지우세요. " : "") + (consentOk ? "" : "동의 대장의 칸을 지우지 못했습니다."));
+    } else {
+      say("ok", doneIds.length + "명을 지웠습니다. 로그인 계정은 Firebase 콘솔의 Authentication에서 따로 지워야 하며, 같은 학번으로 다시 입장하면 빈 기록지로 새로 시작합니다.");
+    }
+    if (doneIds.length && onDone) onDone();
     setBusy(false);
   };
 
@@ -8671,7 +8835,7 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
         {msg && <div role="status" className={tone === "warn" ? "warn-note" : "ok-note"} style={{ marginBottom: 10 }}>{msg}</div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
           <button className="btn small ghost" disabled={busy} onClick={() => pick(() => true)}>전체 고르기</button>
-          <button className="btn small ghost" disabled={busy} onClick={() => pick((id) => pctOf(id) === 0)}>기록이 없는 학생만</button>
+          <button className="btn small ghost" disabled={busy} onClick={pickEmpty}>기록이 없는 학생만</button>
           <button className="btn small ghost" disabled={busy} onClick={() => setSel({})}>고른 것 해제</button>
         </div>
         <div className="tbl-scroll" style={{ maxHeight: 320, overflow: "auto" }}>
@@ -8692,7 +8856,7 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
                     </td>
                     <td className="mono">{id}</td>
                     <td>{(roster[id] || {}).nick || ""}</td>
-                    <td className="mono">{pctOf(id)}%</td>
+                    <td className="mono">{(loadFail || {})[id] ? "불러오기 실패" : pctOf(id) + "%"}</td>
                     <td className="mono">{mediaCount(w)}</td>
                     <td className="mono">{nDone}/2</td>
                     <td className="mono" style={{ fontSize: 11 }}>{w._updatedAt ? fmtTime(w._updatedAt) : "—"}</td>
@@ -8703,7 +8867,7 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
           </table>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
-          <button className="btn" disabled={busy || sampleMode || !chosen.length}
+          <button className="btn" disabled={busy || sampleMode || !chosen.length || authApi.isViewer()} hidden={authApi.isViewer()}
             style={chosen.length ? { background: "var(--seal)", borderColor: "var(--seal)" } : {}}
             onClick={del}>
             {busy ? "지우는 중…" : "고른 " + chosen.length + "명 지우기"}
@@ -8730,7 +8894,7 @@ function TeacherApp({ onExit, onGallery }) {
   const [surveyMap, setSurveyMap] = useState({});
   const [sel, setSel] = useState(null);
   const [selTab, setSelTab] = useState(null); // 학생 상세를 열 때 곧장 보여 줄 서브탭 (예: 「변화 보기」→사고 변화)
-  const openStudent = (id, tab2) => { setSelTab(tab2 || null); setSel(id); };
+  const openStudent = (id, tab2) => { setSelTab(tab2 || null); setSel(id); if (id && visitedRef.current) visitedRef.current.add(id); };
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const [openMap, setOpenMap] = useState(DEFAULT_OPEN);
@@ -8751,34 +8915,78 @@ function TeacherApp({ onExit, onGallery }) {
     setTab(t);
   };
 
-  const loadAll = async () => {
-    setLoading(true);
-    const real = (await store.get("roster")) || {};
+  /* 학급 기록 읽기. 읽기 실패를 빈 기록({})으로 두면 그 학생이 「기록 없음」으로 보여
+     명부 정리의 「기록이 없는 학생만」에 골라져 지워질 수 있다. 실패한 학생은 loadFail에 표시한다.
+     quiet: 이미 보이는 자료를 그대로 둔 채 뒤에서 새로 읽는다 (탭을 비우면 패널 상태와 메시지가 사라진다). */
+  const [loadFail, setLoadFail] = useState({});
+  const [loadErr, setLoadErr] = useState("");
+  const newerWs = (a, b) => (a && b && (a._updatedAt || "") > (b._updatedAt || "") ? a : b);
+  const loadAll = async (opts) => {
+    const quiet = !!(opts && opts.quiet);
+    if (!quiet) setLoading(true);
+    const rRes = await store.getSafe("roster");
+    if (!rRes.ok) {
+      // 명부를 못 읽었는데 표본 학급을 띄우면 실제 학급이 사라진 것처럼 보인다. 지금 화면을 그대로 둔다
+      if (!viewerOnly) setLoadErr("학급 명부를 불러오지 못했습니다. 연결을 확인하고 「새로고침」을 누르세요.");
+      setLoading(false);
+      return;
+    }
+    const real = rRes.data || {};
     const realIds = Object.keys(real);
-    let r = {}, wsMapNew = {}, gMapNew = {}, svMapNew = {};
+    let r = {}, wsMapNew = {}, gMapNew = {}, svMapNew = null;
+    const fails = {};
+    let err = "";
     if (realIds.length) {
       r = { ...real };
-      const gs = await fbStore.allGrades();
-      svMapNew = await fbStore.allSurveys();
+      const [gs, svs] = await Promise.all([fbStore.allOfSafe("grades"), fbStore.allOfSafe("surveys")]);
+      if (!gs.ok || !svs.ok) err = "채점 또는 설문 기록을 불러오지 못해 앞서 읽은 값을 보여 줍니다.";
+      if (svs.ok) svMapNew = svs.data;
       await Promise.all(realIds.map(async (id) => {
-        wsMapNew[id] = (await store.get("ws:" + id)) || {};
-        gMapNew[id] = gs[id] || null;
+        const w = await store.getSafe("ws:" + id);
+        if (w.ok) wsMapNew[id] = w.data || {}; else fails[id] = true;
+        if (gs.ok) gMapNew[id] = gs.data[id] || null;
       }));
       setSampleMode(false);
+      if (gs.ok) setGradeMap(gMapNew);
     } else {
       const sample = buildSampleClass();
       r = { ...sample.roster }; wsMapNew = { ...sample.ws }; gMapNew = { ...sample.grade }; svMapNew = { ...sample.surveys };
       setSampleMode(true);
+      setGradeMap(gMapNew);
     }
-    const cfg = await store.get("config");
-    setOpenMap((cfg && cfg.open) || DEFAULT_OPEN);
-    setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
-    setAnCfg((cfg && cfg.anchor) || DEFAULT_ANCHOR);
+    const cfgRes = await store.getSafe("config");
+    if (cfgRes.ok) {
+      const cfg = cfgRes.data;
+      setOpenMap((cfg && cfg.open) || DEFAULT_OPEN);
+      setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
+      setAnCfg((cfg && cfg.anchor) || DEFAULT_ANCHOR);
+    }
     setRoster(r);
-    setWsMap(wsMapNew);
-    setGradeMap(gMapNew);
-    setSurveyMap(svMapNew);
+    // 실패한 학생은 앞서 읽은 값을 남긴다. 조용한 갱신에서는 구독이 먼저 가져온 더 새 기록을 덮지 않는다
+    setWsMap((p) => {
+      const n = { ...wsMapNew };
+      Object.keys(fails).forEach((id) => { if (p[id]) n[id] = p[id]; });
+      if (quiet) Object.keys(n).forEach((id) => { n[id] = newerWs(p[id], n[id]) || n[id]; });
+      return n;
+    });
+    if (svMapNew) setSurveyMap(svMapNew);
+    setLoadFail(fails);
+    const nf = Object.keys(fails).length;
+    setLoadErr(err + (nf ? (err ? " " : "") + "학생 " + nf + "명의 기록지를 불러오지 못했습니다(「불러오기 실패」로 표시). 「새로고침」을 누르세요." : ""));
     setLoading(false);
+  };
+
+  /* 학생 상세에서 돌아올 때: 학급 전체를 다시 읽고 탭을 비우는 대신, 열어 본 학생과 실패했던 학생만 뒤에서 다시 읽는다.
+     명부·기록지·설문은 목록 화면의 실시간 구독이 다시 붙으면서 새로 받는다 */
+  const visitedRef = useRef(new Set());
+  const refreshStudents = async (idList) => {
+    const list = [...idList].filter(Boolean);
+    if (!list.length || sampleMode) return;
+    const res = await Promise.all(list.map(async (id) => [id, ...(await Promise.all(["ws:", "grade:", "survey:"].map((k) => store.getSafe(k + id))))]));
+    setWsMap((p) => { const n = { ...p }; res.forEach(([id, w]) => { if (w.ok) n[id] = w.data || {}; }); return n; });
+    setGradeMap((p) => { const n = { ...p }; res.forEach(([id, , g]) => { if (g.ok) n[id] = g.data || null; }); return n; });
+    setSurveyMap((p) => { const n = { ...p }; res.forEach(([id, , , s]) => { if (s.ok) { if (s.data) n[id] = s.data; else delete n[id]; } }); return n; });
+    setLoadFail((p) => { const n = { ...p }; res.forEach(([id, w]) => { if (w.ok) delete n[id]; }); return n; });
   };
 
   /* config 문서는 차시 공개·설문·붙여넣기·앵커가 나눠 쓴다. 통째로 읽어 통째로 다시 쓰면
@@ -8852,7 +9060,7 @@ function TeacherApp({ onExit, onGallery }) {
       if (Object.keys(r).length) { setRoster(r); setSampleMode(false); setLoading(false); }
     });
     const un2 = fbStore.watchWorksheets((w) => {
-      if (Object.keys(w).length) setWsMap((p) => ({ ...p, ...w }));
+      if (Object.keys(w).length) { setWsMap((p) => ({ ...p, ...w })); setLoadFail((p) => { const n = { ...p }; Object.keys(w).forEach((id) => { delete n[id]; }); return n; }); }
     });
     const un3 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); if (cfg) setCfgAll(cfg); if (cfg) setAnCfg(cfg.anchor || DEFAULT_ANCHOR); });
     const un4 = fbStore.watchSurveys((s) => {
@@ -8932,7 +9140,7 @@ function TeacherApp({ onExit, onGallery }) {
         {sel && !viewerOnly ? (
           <div style={{ paddingTop: 18 }}>
             <TeacherStudentView key={sel} sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} surveyData={surveyMap[sel]} ids={ids} onSel={openStudent} initialTab={selTab}
-              onBack={() => { setSel(null); loadAll(); }} />
+              onBack={() => { const v = new Set([...visitedRef.current, ...Object.keys(loadFail)]); visitedRef.current = new Set(); setSel(null); refreshStudents(v); }} />
           </div>
         ) : (
           <div>
@@ -8941,6 +9149,7 @@ function TeacherApp({ onExit, onGallery }) {
                 지금 보이는 학급은 <b>표본 자료</b>입니다. 화면 구조를 살펴보기 위한 가상 학생 8명이며, 실제 학생이 입장하면 자동으로 실데이터로 바뀝니다.
               </div>
             )}
+            {loadErr && <div role="status" className="warn-note" style={{ marginBottom: 10 }}>{loadErr}</div>}
             <TeacherTabs tab={tab} onSwitch={switchTab} dirty={edDirty} viewer={viewerOnly} />
             {loading ? <div style={{ color: "var(--sub)" }}>학급 기록을 불러오는 중…</div> : tab === "현황" ? (
               <div>
@@ -8973,7 +9182,7 @@ function TeacherApp({ onExit, onGallery }) {
                             <tr key={id}>
                               <td className="mono">{id}</td>
                               <td>{roster[id].nick}</td>
-                              <td><span className="mini-bar"><i style={{ width: p + "%" }} /></span> <span className="mono" style={{ fontSize: 11 }}>{p}%</span></td>
+                              <td>{loadFail[id] ? <span style={{ color: "var(--seal)", fontSize: 12 }}>불러오기 실패</span> : <><span className="mini-bar"><i style={{ width: p + "%" }} /></span> <span className="mono" style={{ fontSize: 11 }}>{p}%</span></>}</td>
                               <td><div className="sess-dots">{SESSIONS.map((s) => {
                                 const r = sessionProgress(s, w);
                                 const st = r >= 0.999 ? "완료" : r > 0 ? "진행 중" : "기록 없음";
@@ -9274,7 +9483,7 @@ function TeacherApp({ onExit, onGallery }) {
                   </div>
                 </div>
                 <RosterAdmin ids={ids} roster={roster} wsMap={wsMap} surveyMap={surveyMap}
-                  sampleMode={sampleMode} onDone={loadAll} />
+                  sampleMode={sampleMode} loadFail={loadFail} onDone={() => loadAll({ quiet: true })} />
               </div>
             )}
           </div>

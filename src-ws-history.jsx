@@ -84,19 +84,34 @@ export function WsHistoryCard({ sid, ws, busy, onRestored, setMsg }) {
   }, [sid, tick]);
 
   const cur = summarize(ws);
+  /* 서버의 지금 기록지. 화면을 연 때의 ws를 「되돌리기 전」 사본으로 남기면 그 뒤 학생이 쓴 것이 사본에서 빠져
+     되돌리기를 되돌려도 돌아오지 않는다. 확인 창의 수치도 서버 기준이어야 한다. */
+  const readLive = async () => {
+    const r = await fbStore.getSafe("ws:" + sid);
+    if (!r.ok || r.fromCache) { setMsg && setMsg("지금 기록지를 서버에서 읽지 못해 중단했습니다. 연결을 확인하고 다시 시도하세요."); return null; }
+    return { data: r.data };
+  };
   const restore = async (row) => {
-    const s = summarize(row.ws);
-    const msg = sid + " 학생의 기록지를 " + fmt(row.at) + " 상태로 되돌립니다.\n" +
-      "지금: 채운 칸 " + cur.fields + "개 · " + cur.chars.toLocaleString() + "자 → 되돌린 뒤: 채운 칸 " + s.fields + "개 · " + s.chars.toLocaleString() + "자\n\n" +
-      "되돌리기 직전 상태도 사본으로 남기므로 다시 되돌릴 수 있습니다.\n학생이 접속 중이면 학생 화면도 되돌린 내용을 바로 받습니다. 학생이 그 순간 고치고 있던 칸만 학생 쪽 값이 남습니다.\n진행할까요?";
-    if (!window.confirm(msg)) return;
     setWorking(true);
+    const first = await readLive();
+    if (!first) { setWorking(false); return; }
+    const c = summarize(first.data), s = summarize(row.ws);
+    const changed = ((first.data && first.data._updatedAt) || "") !== ((ws && ws._updatedAt) || "");
+    const msg = sid + " 학생의 기록지를 " + fmt(row.at) + " 상태로 되돌립니다.\n" +
+      (changed ? "(화면을 연 뒤 학생이 기록을 고쳤습니다. 아래 「지금」은 서버의 최신 기록입니다.)\n" : "") +
+      "지금: 채운 칸 " + c.fields + "개 · " + c.chars.toLocaleString() + "자 → 되돌린 뒤: 채운 칸 " + s.fields + "개 · " + s.chars.toLocaleString() + "자\n\n" +
+      "되돌리기 직전 상태도 사본으로 남기므로 다시 되돌릴 수 있습니다.\n학생이 접속 중이면 학생 화면도 되돌린 내용을 바로 받습니다. 학생이 그 순간 고치고 있던 칸만 학생 쪽 값이 남습니다.\n진행할까요?";
+    if (!window.confirm(msg)) { setWorking(false); return; }
+    // 확인 창이 떠 있던 사이의 저장까지 사본에 담기 위해 한 번 더 읽는다
+    const live = await readLive();
+    if (!live) { setWorking(false); return; }
+    const cur0 = live.data;
     const nowIso = new Date().toISOString();
-    // ① 현재 상태를 먼저 사본으로 남긴다 (실패하면 되돌리지 않는다)
-    const backupOk = await fbStore.setT("wsh:" + sid + "_r" + Date.now(), { sid, bucket: "되돌리기 전", at: nowIso, ws });
+    // ① 현재 상태를 먼저 사본으로 남긴다 (실패하면 되돌리지 않는다). 기록지가 없으면 남길 것이 없다
+    const backupOk = !cur0 || await fbStore.setT("wsh:" + sid + "_r" + Date.now(), { sid, bucket: "되돌리기 전", at: nowIso, ws: cur0 });
     if (!backupOk) { setWorking(false); setMsg && setMsg("되돌리기 전 사본 저장에 실패해 중단했습니다. 연결을 확인하고 다시 시도하세요."); return; }
     // ② 사본을 본 문서에 쓴다. 되돌린 사실은 _restored에 남긴다
-    const next = { ...row.ws, _updatedAt: nowIso, _restored: [...(Array.isArray(ws && ws._restored) ? ws._restored : []), { from: row.at, at: nowIso }].slice(-20) };
+    const next = { ...row.ws, _updatedAt: nowIso, _restored: [...(Array.isArray(cur0 && cur0._restored) ? cur0._restored : []), { from: row.at, at: nowIso }].slice(-20) };
     const ok = await fbStore.setT("ws:" + sid, next);
     setWorking(false);
     if (!ok) { setMsg && setMsg("되돌리기에 실패했습니다. 다시 시도하세요."); return; }

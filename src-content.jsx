@@ -97,7 +97,66 @@ export function watchContent() {
 
 /* ---------- 원본 + 편집 내용 합치기 ---------- */
 
-function mergeOne(L, o) {
+/* 원본 지문 (_base)
+   편집을 저장할 때 그 칸이 기댄 코드 원본의 짧은 지문을 _base[칸]에 함께 남긴다.
+   얹을 때 지금 코드 원본의 지문과 다르면 그 사이 원본이 바뀐 것이므로(그림 교체·용어 정정 등) 옛 편집을 얹지 않고
+   원본을 보여 준다. 읽기 자료 하나만 고쳐도 readings 배열 전체가 저장되므로, 이것이 없으면 뒤의 코드 수정이 영영 가려진다.
+   지문이 없는 옛 편집(이 장치 이전에 저장한 것)도 무엇에 기대었는지 알 수 없어 얹지 않는다.
+   교사는 편집 화면의 「원본이 바뀌어 적용하지 않은 편집」 카드에서 「원래대로」 또는 「그래도 적용」을 고른다. */
+export function fingerprint(v) {
+  const s = JSON.stringify(v === undefined ? null : v);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(36) + "." + s.length.toString(36);
+}
+const LESSON_PROPS = ["title", "notice", "goals", "stds", "flow", "readings", "pedagogy"];
+const SEC_PROPS = ["title", "note"];
+const FIELD_PROPS = ["label", "steps", "probes"];
+const lessonDef = (L, p) => (p === "notice" ? L.notice || "" : L[p]);
+/* 덮어쓰기 o의 p 칸 상태: none(편집 없음) · ok(적용) · changed(원본이 바뀜) · legacy(지문 없는 옛 편집) */
+export function propState(o, p, defVal) {
+  if (!o || o[p] == null) return "none";
+  const b = o._base && o._base[p];
+  if (!b) return "legacy";
+  return b === fingerprint(defVal) ? "ok" : "changed";
+}
+/* 지금 얹을 수 있는 칸만 남긴 덮어쓰기 */
+function applicable(o, defOf, props) {
+  if (!o) return null;
+  const out = {};
+  let any = false;
+  props.forEach((p) => { if (propState(o, p, defOf(p)) === "ok") { out[p] = o[p]; any = true; } });
+  return any ? out : null;
+}
+const baseOf = (o, patch, defOf) => {
+  const b = { ...((o && o._base) || {}) };
+  Object.keys(patch).forEach((p) => { b[p] = fingerprint(defOf(p)); });
+  return b;
+};
+
+/* 얹지 않은 편집 목록 (교사 화면 안내용) */
+export function staleEdits(content, lessonDefs, schemaDefs) {
+  const out = [];
+  const c = content || emptyContent();
+  lessonDefs.forEach((L) => {
+    const o = c.lessons[String(L.n)];
+    LESSON_PROPS.forEach((p) => { const st = propState(o, p, lessonDef(L, p)); if (st === "changed" || st === "legacy") out.push({ kind: "lessons", id: String(L.n), p, st, n: L.n, where: L.n + "차시 · " + (LESSON_NAMES[p] || p), val: o[p] }); });
+  });
+  schemaDefs.forEach((sec) => {
+    const L = lessonDefs.find((x) => x.session === sec.session);
+    const s = c.secs[sec.id];
+    SEC_PROPS.forEach((p) => { const st = propState(s, p, sec[p]); if (st === "changed" || st === "legacy") out.push({ kind: "secs", id: sec.id, p, st, n: L && L.n, where: sec.session + " · " + sec.id + " " + (p === "title" ? "구간 제목" : "구간 안내문"), val: s[p] }); });
+    sec.fields.forEach((f) => {
+      const key = sec.id + "." + f.k, o = c.fields[key];
+      FIELD_PROPS.forEach((p) => { const st = propState(o, p, f[p]); if (st === "changed" || st === "legacy") out.push({ kind: "fields", id: key, p, st, n: L && L.n, where: sec.session + " · " + key + " " + (p === "label" ? "발문" : p === "steps" ? "생각 단계" : "되묻기"), val: o[p] }); });
+    });
+  });
+  return out;
+}
+const LESSON_NAMES = { title: "차시 제목", notice: "오늘의 발문", goals: "학습 목표", stds: "성취기준", flow: "수업 흐름", readings: "읽기 자료", pedagogy: "설계 근거" };
+
+function mergeOne(L, o0) {
+  const o = applicable(o0, (p) => lessonDef(L, p), LESSON_PROPS);
   if (!o) return L;
   return {
     ...L,
@@ -121,10 +180,10 @@ export function mergeSchema(defs) {
   const so = CONTENT.secs, fo = CONTENT.fields;
   if ((!so || !Object.keys(so).length) && (!fo || !Object.keys(fo).length)) return defs;
   return defs.map((sec) => {
-    const s = so[sec.id];
+    const s = applicable(so[sec.id], (p) => sec[p], SEC_PROPS);
     let touched = !!s;
     const fields = sec.fields.map((f) => {
-      const o = fo[sec.id + "." + f.k];
+      const o = applicable(fo[sec.id + "." + f.k], (p) => f[p], FIELD_PROPS);
       if (!o) return f;
       touched = true;
       const steps = isArr(o.steps) ? (o.steps.length ? o.steps : undefined) : f.steps;
@@ -245,7 +304,11 @@ function compressImage(file, maxPx, maxBytes) {
       const cv = document.createElement("canvas");
       cv.width = Math.round(img.width * scale);
       cv.height = Math.round(img.height * scale);
-      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      const g = cv.getContext("2d");
+      // JPEG에는 투명이 없어 칠하지 않은 곳이 검게 나온다 (투명 PNG 도식). 흰 바탕을 먼저 칠한다
+      g.fillStyle = "#fff";
+      g.fillRect(0, 0, cv.width, cv.height);
+      g.drawImage(img, 0, 0, cv.width, cv.height);
       let q = 0.82, data = cv.toDataURL("image/jpeg", q);
       while (data.length > maxBytes && q > 0.3) { q -= 0.08; data = cv.toDataURL("image/jpeg", q); }
       URL.revokeObjectURL(url);
@@ -301,7 +364,7 @@ function LinkEditor({ links, onChange }) {
 }
 
 /* 그림 목록 편집 — 파일 올리기와 주소 붙여넣기 둘 다 된다 */
-function ImageEditor({ images, onChange, slot }) {
+function ImageEditor({ images, onChange, slot, onUploaded }) {
   const xs = isArr(images) ? images : [];
   const [busy, setBusy] = useState(false);
   const [urlIn, setUrlIn] = useState("");
@@ -317,6 +380,7 @@ function ImageEditor({ images, onChange, slot }) {
       const ref = slot + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const ok = await fbStore.set("media:" + TEACHER + "_" + ref, data);
       if (!ok) throw new Error("save fail");
+      if (onUploaded) onUploaded(ref);
       onChange([...xs, { src: "m:" + ref, cap: "", credit: "", link: "" }]);
     } catch (e) {
       window.alert("그림을 올리지 못했습니다. 파일이 너무 크면 화면을 캡처해 작게 만든 뒤 다시 시도하세요.");
@@ -336,7 +400,7 @@ function ImageEditor({ images, onChange, slot }) {
   const del = (i) => {
     const x = xs[i];
     if (!window.confirm("이 그림을 뺄까요?")) return;
-    if (x && typeof x.src === "string" && x.src.slice(0, 2) === "m:") fbStore.remove("media:" + TEACHER + "_" + x.src.slice(2));
+    // 파일은 여기서 지우지 않는다. 원고를 저장하지 않고 떠나면 그림이 원고에 그대로 남으므로, 저장이 확인된 뒤 ContentEditor가 지운다
     onChange(xs.filter((_, j) => j !== i));
   };
 
@@ -422,7 +486,7 @@ function WorksEditor({ works, onChange }) {
 }
 
 /* 읽기 자료(이론) 하나 */
-function ReadingEditor({ rd, i, count, n, onPatch, onMove, onDel }) {
+function ReadingEditor({ rd, i, count, n, onPatch, onMove, onDel, onUploaded }) {
   return (
     <details className="ed-block" open={i === 0}>
       <summary><span className="stage-tag">{rd.stage || "단계"}</span>{rd.h || "(제목 없음)"}</summary>
@@ -444,12 +508,26 @@ function ReadingEditor({ rd, i, count, n, onPatch, onMove, onDel }) {
           <p className="hint">이 읽기 자료에는 도식(연표·비교·용어 정리 등)이 {rd.viz.length}개 있습니다. 도식은 이 화면에서 고칠 수 없고 본문을 고쳐도 그대로 유지됩니다. 문단 수를 바꾸면 도식과 그림의 위치가 달라질 수 있으니 미리 보기로 확인하세요.</p>
         )}
         <div className="ed-f"><label>그림·사진</label>
-          <ImageEditor images={rd.images} slot={"L" + n + "r" + i} onChange={(v) => onPatch(i, { images: v })} /></div>
+          <ImageEditor images={rd.images} slot={"L" + n + "r" + i} onUploaded={onUploaded} onChange={(v) => onPatch(i, { images: v })} /></div>
         <div className="ed-f"><label>작품·자료 표</label>
           <WorksEditor works={rd.works} onChange={(v) => onPatch(i, { works: v })} /></div>
       </div>
     </details>
   );
+}
+
+/* 원고 안에서 교사가 올린 그림(src가 m:로 시작)의 참조를 모두 모은다 */
+function teacherRefs(c) {
+  const out = new Set();
+  const walk = (v) => {
+    if (isArr(v)) return v.forEach(walk);
+    if (v && typeof v === "object") {
+      if (typeof v.src === "string" && v.src.slice(0, 2) === "m:") out.add(v.src.slice(2));
+      Object.values(v).forEach(walk);
+    }
+  };
+  walk(c);
+  return out;
 }
 
 export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) {
@@ -461,11 +539,24 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
   const [preview, setPreview] = useState(false);
   useTopbarHeight(); // 편집 바(.ed-bar)의 sticky top이 상단바 실제 높이를 따라가게 한다
 
+  /* 원고는 서버에서 확실히 읽었을 때만 연다. get은 실패해도 null(=편집 없음)을 주므로, 그 빈 원고를 저장하면
+     여덟 차시의 편집이 모두 지워진다. 캐시 사본도 다른 기기가 저장한 최신 편집보다 오래됐을 수 있어 받지 않는다 */
+  const [loadErr, setLoadErr] = useState(false);
+  const [loadTry, setLoadTry] = useState(0);
+  const savedRef = useRef(null);     // 마지막으로 읽거나 저장한 원고: 저장 뒤 더는 쓰지 않는 그림을 가려내는 기준
+  const uploadedRef = useRef(new Set()); // 이 화면에서 올린 그림 (저장 전에 뺀 것도 저장 때 정리한다)
   useEffect(() => {
     let live = true;
-    fbStore.get(CONTENT_KEY).then((v) => { if (live) setDraft(normalize(v)); });
+    setLoadErr(false);
+    fbStore.getSafe(CONTENT_KEY).then((r) => {
+      if (!live) return;
+      if (!r.ok || r.fromCache) { setLoadErr(true); return; }
+      const d = normalize(r.data);
+      savedRef.current = d;
+      setDraft(d);
+    });
     return () => { live = false; };
-  }, []);
+  }, [loadTry]);
 
   useEffect(() => {
     if (!msg) return;
@@ -487,6 +578,14 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
     return () => { if (onDirty) onDirty(false); };
   }, [dirty]);
 
+  if (!draft && loadErr) return (
+    <div className="card"><div className="card-body" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <span style={{ flex: 1, minWidth: 220, color: "var(--seal)", fontSize: 13 }}>
+        저장된 수업 편집을 서버에서 읽지 못했습니다. 이 상태로 고쳐 저장하면 다른 차시의 편집이 모두 지워질 수 있어 편집을 잠갔습니다. 연결을 확인한 뒤 다시 불러오세요.
+      </span>
+      <button className="btn small" onClick={() => setLoadTry((x) => x + 1)}>다시 불러오기</button>
+    </div></div>
+  );
   if (!draft) return <div className="card"><div className="card-body" style={{ color: "var(--sub)" }}>수업 내용을 불러오는 중…</div></div>;
 
   const L0 = lessonDefs.find((x) => x.n === n) || lessonDefs[0];
@@ -496,9 +595,43 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
   const edited = !!ovL || secs.some((s) => draft.secs[s.id] || s.fields.some((f) => draft.fields[s.id + "." + f.k]));
 
   const touch = (fn) => { setDraft(fn); setDirty(true); };
-  const setL = (patch) => touch((d) => ({ ...d, lessons: { ...d.lessons, [String(n)]: { ...(d.lessons[String(n)] || {}), ...patch } } }));
-  const setSec = (id, patch) => touch((d) => ({ ...d, secs: { ...d.secs, [id]: { ...(d.secs[id] || {}), ...patch, rev: SCHEMA_REV } } }));
-  const setFld = (id, k, patch) => touch((d) => ({ ...d, fields: { ...d.fields, [id + "." + k]: { ...(d.fields[id + "." + k] || {}), ...patch, rev: SCHEMA_REV } } }));
+  // 고친 칸마다 그 칸이 기댄 원본의 지문(_base)을 함께 남긴다
+  const secDef = (id) => schemaDefs.find((s) => s.id === id) || { fields: [] };
+  const setL = (patch) => touch((d) => {
+    const o = d.lessons[String(n)] || {};
+    return { ...d, lessons: { ...d.lessons, [String(n)]: { ...o, ...patch, _base: baseOf(o, patch, (p) => lessonDef(L0, p)) } } };
+  });
+  const setSec = (id, patch) => touch((d) => {
+    const o = d.secs[id] || {}, sd = secDef(id);
+    return { ...d, secs: { ...d.secs, [id]: { ...o, ...patch, rev: SCHEMA_REV, _base: baseOf(o, patch, (p) => sd[p]) } } };
+  });
+  const setFld = (id, k, patch) => touch((d) => {
+    const key = id + "." + k, o = d.fields[key] || {}, fd = secDef(id).fields.find((f) => f.k === k) || {};
+    return { ...d, fields: { ...d.fields, [key]: { ...o, ...patch, rev: SCHEMA_REV, _base: baseOf(o, patch, (p) => fd[p]) } } };
+  });
+
+  /* 원본이 바뀌어 얹지 않은 편집: 「원래대로」는 그 칸의 편집을 버리고, 「그래도 적용」은 지금 원본에 기댄 것으로 표시한다 */
+  const stale = staleEdits(draft, lessonDefs, schemaDefs);
+  const defOfStale = (e) => {
+    if (e.kind === "lessons") return lessonDef(lessonDefs.find((x) => String(x.n) === e.id) || {}, e.p);
+    const [sid, fk] = e.id.split(".");
+    const sd = secDef(e.kind === "secs" ? e.id : sid);
+    return e.kind === "secs" ? sd[e.p] : (sd.fields.find((f) => f.k === fk) || {})[e.p];
+  };
+  const resolveStale = (list, keep) => touch((d) => {
+    const nd = { ...d, lessons: { ...d.lessons }, secs: { ...d.secs }, fields: { ...d.fields } };
+    list.forEach((e) => {
+      const o = { ...(nd[e.kind][e.id] || {}) };
+      const b = { ...(o._base || {}) };
+      if (keep) b[e.p] = fingerprint(defOfStale(e));
+      else { delete o[e.p]; delete b[e.p]; }
+      o._base = b;
+      const left = Object.keys(o).filter((k) => k !== "_base" && k !== "rev");
+      if (left.length) nd[e.kind][e.id] = o; else delete nd[e.kind][e.id];
+    });
+    return nd;
+  });
+  const clip = (v) => { const s = typeof v === "string" ? v : isArr(v) ? (v.length + "개 항목") : "편집 내용"; return s.length > 60 ? s.slice(0, 60) + "…" : s; };
 
   const rds = isArr(cur.readings) ? cur.readings : [];
   const patchRd = (i, patch) => setL({ readings: rds.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
@@ -525,9 +658,17 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
       return setMsg("내용이 너무 많아 저장할 수 없습니다(지금 약 "
         + Math.round(size / 1024) + "KB, 한도 1MB). 그림은 파일 올리기 대신 주소 링크로 바꿔 주세요.");
     }
-    const ok = await fbStore.set(CONTENT_KEY, payload);
+    if (!savedRef.current) { setBusy(false); return setMsg("원고를 서버에서 읽지 못해 저장하지 않습니다."); }
+    const ok = await fbStore.setT(CONTENT_KEY, payload);
     setBusy(false);
-    if (ok) { setContent(payload); setDirty(false); setMsg("저장했습니다. 학생 화면에 바로 반영됩니다."); }
+    if (ok) {
+      // 저장이 확인된 뒤에만, 이제 아무 데서도 쓰지 않는 그림 파일을 지운다 (「이 그림 빼기」·읽기 자료 삭제·원래대로)
+      const now = teacherRefs(payload);
+      const gone = new Set([...teacherRefs(savedRef.current), ...uploadedRef.current].filter((r) => !now.has(r)));
+      gone.forEach((r) => { fbStore.remove("media:" + TEACHER + "_" + r); });
+      savedRef.current = payload; uploadedRef.current = new Set();
+      setContent(payload); setDirty(false); setMsg("저장했습니다. 학생 화면에 바로 반영됩니다.");
+    }
     else setMsg("저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.");
   };
 
@@ -570,6 +711,37 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
         <button className="btn small" onClick={save} disabled={busy}>{busy ? "저장 중…" : "저장"}</button>
       </div>
       {msg && <div className="ok-note">{msg}</div>}
+      {stale.length > 0 && (
+        <div className="card" style={{ borderColor: "var(--seal)" }}>
+          <div className="card-head"><span className="card-code" style={{ color: "var(--seal)" }}>확인</span><span className="card-title">원본이 바뀌어 적용하지 않은 편집 {stale.length}건</span></div>
+          <div className="card-body">
+            <p style={{ fontSize: 13, marginBottom: 10 }}>
+              아래 편집은 저장한 뒤 코드의 원본 자료가 바뀌었거나(그림 교체·용어 정정 등), 어느 원본을 고친 것인지 기록이 없는 옛 편집입니다.
+              학생 화면에는 지금 원본이 보입니다. 편집을 다시 쓰려면 「그래도 적용」, 버리려면 「원래대로」를 누른 뒤 저장하세요.
+            </p>
+            <div className="tbl-scroll"><table className="roster">
+              <thead><tr><th>위치</th><th>상태</th><th>편집 내용</th><th style={{ width: 170 }}></th></tr></thead>
+              <tbody>
+                {stale.map((e) => (
+                  <tr key={e.kind + e.id + e.p}>
+                    <td style={{ fontSize: 12 }}>{e.where}</td>
+                    <td style={{ fontSize: 12 }}>{e.st === "changed" ? "원본이 바뀜" : "기준 기록 없음(옛 편집)"}</td>
+                    <td style={{ fontSize: 12, color: "var(--sub)" }}>{clip(e.val)}</td>
+                    <td>
+                      <button className="btn small ghost" onClick={() => resolveStale([e], false)}>원래대로</button>{" "}
+                      <button className="btn small ghost" onClick={() => resolveStale([e], true)}>그래도 적용</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button className="btn small ghost" onClick={() => { if (window.confirm(stale.length + "건을 모두 버리고 원본으로 둘까요? (저장을 눌러야 확정됩니다)")) resolveStale(stale, false); }}>모두 원래대로</button>
+              <button className="btn small ghost" onClick={() => { if (window.confirm(stale.length + "건을 모두 지금 원본 위에 적용할까요? (저장을 눌러야 확정됩니다)")) resolveStale(stale, true); }}>모두 그래도 적용</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {preview ? (
         <div className="ed-preview">
@@ -628,7 +800,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
             <div className="card-head"><span className="card-code">이론</span><span className="card-title">읽기 자료 · 그림 · 작품 링크</span></div>
             <div className="card-body">
               {rds.map((rd, i) => (
-                <ReadingEditor key={i} rd={rd} i={i} count={rds.length} n={n} onPatch={patchRd} onMove={moveRd} onDel={delRd} />
+                <ReadingEditor key={i} rd={rd} i={i} count={rds.length} n={n} onPatch={patchRd} onMove={moveRd} onDel={delRd} onUploaded={(r) => uploadedRef.current.add(r)} />
               ))}
               <button className="btn small ghost" onClick={addRd}>＋ 읽기 자료 추가</button>
             </div>
@@ -639,7 +811,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
             <div className="card-body">
               {secs.length === 0 && <p className="hint">이 차시에는 학습지 항목이 없습니다.</p>}
               {secs.map((sec) => {
-                const so = draft.secs[sec.id] || {};
+                const so = applicable(draft.secs[sec.id], (p) => sec[p], SEC_PROPS) || {};
                 return (
                   <details className="ed-block" key={sec.id}>
                     <summary>
@@ -651,7 +823,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                       <EdText label="구간 안내문" value={so.note != null ? so.note : (sec.note || "")} onChange={(v) => setSec(sec.id, { note: v })}
                         ph="비워 두면 안내문이 나타나지 않습니다." />
                       {sec.fields.map((f) => {
-                        const fo = draft.fields[sec.id + "." + f.k] || {};
+                        const fo = applicable(draft.fields[sec.id + "." + f.k], (p) => f[p], FIELD_PROPS) || {};
                         const label = fo.label != null ? fo.label : f.label;
                         const steps = isArr(fo.steps) ? fo.steps : (f.steps || []);
                         const probes = isArr(fo.probes) ? fo.probes : (f.probes || []);
