@@ -7,6 +7,8 @@
      E. 위치 편향 탐지력과 θ 불편성
      F. 보정 지표 calib: 평균 회귀 인공물(하위 삼분위 bias1), 1종 오류, 검정력
      G. 반복 쌍 일치율의 기대치(모형 기준선)
+     H. 2학년 전체 한 척도(작품·판정자 145): SSR·밴드 일치율·백분위 오차, 한 반이 판정하지 못한 경우
+     I. 보정 지표를 전체 한 척도(학생 144명)에서
    사용: node scripts/assess-sim.mjs [A|B|C|D|E|F|G|all|A,B] [--reps=200] [--out=경로]
    결과는 JSON으로 저장(같은 파일에 시나리오별로 병합)하고 요약 행을 표준 출력에 찍는다. */
 import fs from "node:fs";
@@ -120,7 +122,7 @@ function refitWithRef(judgements, nos, prior = 0.5) {
 }
 
 /* ---------- 시나리오 ---------- */
-const results = { meta: { at: new Date().toISOString(), reps: REPS, node: process.version }, A: [], B: [], C: [], D: [], E: [], F: {}, G: [] };
+const results = { meta: { at: new Date().toISOString(), reps: REPS, node: process.version }, A: [], B: [], C: [], D: [], E: [], F: {}, G: [], H: [], I: {} };
 const log = (tag, row) => console.log(tag, JSON.stringify(row));
 
 function scenarioA() {
@@ -236,18 +238,18 @@ function scenarioE() {
 }
 
 /* F. 보정 지표 — 학급 6개(n=24) × 학생 144명. 예측 백분위 = 진짜 백분위 + N(0, s). bias는 앱처럼 「측정된 BT 백분위」 기준으로 계산 */
-function scenarioF() {
-  const CLASSES = 6, n = 24, k = 12;
+function scenarioF(opts = {}) {
+  const CLASSES = opts.classes || 6, n = opts.n || 24, k = 12, tag = opts.tag || "F";
   const out = {};
   for (const sigma of [0.75, 1.0]) for (const [s1, s2, label] of [[0.25, 0.25, "null"], [0.25, 0.20, "small"], [0.25, 0.15, "medium"]]) {
     const R = rng(6000 + Math.round(sigma * 100) + Math.round(s2 * 100));
     let rejects = 0, reps = 0;
     const calibMeans = [], lowM = [], highM = [], lowT = [], corrM = [], corrT = [], ssrs = [];
-    const nRep = Math.max(200, REPS);
+    const nRep = opts.reps || Math.max(200, REPS);
     for (let r = 0; r < nRep; r += 1) {
       const calibs = [], rows = [], thM = [], thT = [];
       for (let c = 0; c < CLASSES; c += 1) {
-        const s = simulateClass({ n, k, sigma, seedTag: "F" + label + "-" + r + "-" + c }, R);
+        const s = simulateClass({ n, k, sigma, seedTag: tag + label + "-" + r + "-" + c }, R);
         ssrs.push(s.agg.quality.ssr);
         const truePct = ranksAndBands(s.truth).pct, bandsTrue = ranksAndBands(s.truth).band;
         s.nos.forEach((no) => {
@@ -274,10 +276,43 @@ function scenarioF() {
       calibMean: r3(mean(calibMeans)), calibSDacrossReps: r3(sd(calibMeans)), rejectRate: r3(rejects / reps),
       lowTertileBias1_measuredBand: r3(mean(lowM)), highTertileBias1_measuredBand: r3(mean(highM)), lowTertileBias1_trueBand: r3(mean(lowT)),
       corr_bias1_thetaHat: r3(mean(corrM)), corr_biasTrue_thetaTrue: r3(mean(corrT)) };
-    log("F", out[key]);
+    log(tag, out[key]);
   }
-  results.F = out;
+  if (tag === "F") results.F = out; else results[tag] = out;
+  return out;
 }
+
+/* H. 2학년 전체 한 척도 — 작품·판정자 145, 1인당 k쌍. 학급 단위(A)와 같은 지표에 백분위 오차를 더한다.
+   absent는 한 반(29명)이 통째로 판정하지 못한 경우처럼 판정자가 빠지는 조건이다. 반분은 계산량 때문에 3회 중앙값 */
+function scenarioH() {
+  const cells = [];
+  for (const k of [10, 12, 15]) for (const sigma of [0.5, 0.75, 1.0, 1.5]) cells.push({ n: 145, k, sigma, absent: 0 });
+  for (const absent of [15, 29]) cells.push({ n: 145, k: 12, sigma: 1.0, absent });
+  cells.forEach((cell, gi) => {
+    const R = rng(8000 + gi);
+    const ssr = [], r2 = [], sh = [], adopt = [], ok = [], band = [], pctErr = [], pctErr90 = [], rankErr = [], exMin = [];
+    const reps = Number(opt("hreps", 40));
+    for (let r = 0; r < reps; r += 1) {
+      const s = simulateClass({ ...cell, splitReps: 3, seedTag: "H" + gi + "-" + r }, R);
+      ssr.push(s.agg.quality.ssr); sh.push(s.agg.quality.splitHalf.median);
+      const pr = pearson(s.th, s.tt); r2.push(pr * pr);
+      adopt.push(s.agg.quality.ssr >= QUALITY_MIN.ssrAdopt ? 1 : 0); ok.push(s.agg.ok ? 1 : 0);
+      const tb = ranksAndBands(s.truth);
+      band.push(mean(s.nos.map((no) => (s.byNo[no].band === tb.band[no] ? 1 : 0))));
+      const errs = s.nos.map((no) => Math.abs(s.byNo[no].pct - tb.pct[no]));
+      pctErr.push(mean(errs)); pctErr90.push(quantile(errs, 0.9));
+      rankErr.push(mean(s.nos.map((no) => Math.abs(s.byNo[no].rank - tb.rank[no]))));
+      exMin.push(Math.min(...s.agg.works.map((w) => w.plays)));
+    }
+    const row = { ...cell, perWork: 2 * cell.k, reps, ssrMean: r3(mean(ssr)), ssrP10: r3(quantile(ssr, 0.1)), ssrP90: r3(quantile(ssr, 0.9)), r2Mean: r3(mean(r2)),
+      shMedian: r3(mean(sh)), pAdopt: r3(mean(adopt)), pOk: r3(mean(ok)), bandAgree: r3(mean(band)), pctAbsErrMean: r3(mean(pctErr)), pctAbsErrP90: r3(mean(pctErr90)),
+      rankAbsErrMean: r3(mean(rankErr)), exposureMinMean: r3(mean(exMin)) };
+    results.H.push(row); log("H", row);
+  });
+}
+
+/* I. 보정 지표를 2학년 전체 한 척도(학생 144명)에서 — F와 같은 조건, 학급 여섯 개 대신 한 명단 */
+function scenarioI() { scenarioF({ classes: 1, n: 144, tag: "I", reps: Number(opt("ireps", 120)) }); }
 
 /* G. 반복 쌍 일치율의 기대치 — 표준 BT 판정자가 같은 쌍을 다시 볼 때 P²+(1−P)²의 기대값(Δθ ~ N(0, 2σ²)), 그리고 시뮬레이션 관측치 */
 function scenarioG() {
@@ -292,7 +327,7 @@ function scenarioG() {
   }
 }
 
-const run = { A: scenarioA, B: scenarioB, C: scenarioC, D: scenarioD, E: scenarioE, F: scenarioF, G: scenarioG };
+const run = { A: scenarioA, B: scenarioB, C: scenarioC, D: scenarioD, E: scenarioE, F: () => scenarioF(), G: scenarioG, H: scenarioH, I: scenarioI };
 const t0 = Date.now();
 (which === "ALL" ? Object.keys(run) : which.split(",")).forEach((w) => { if (run[w]) { console.log("== 시나리오", w); run[w](); } });
 results.meta.seconds = Math.round((Date.now() - t0) / 1000);

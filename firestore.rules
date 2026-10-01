@@ -33,10 +33,9 @@ service cloud.firestore {
     function isOwner(id) {
       return student() && uid() == id;
     }
-    // 보기 전용 교사 계정(viewer@museum.class): 관리자 코드 칸에 참관용 코드를 넣어 들어온다. 수업 참관자·공동 연구자에게
-    // 따로 알려 주는 코드이며 저장소 어디에도 적지 않는다(공개 저장소). 계정은 콘솔에서 만들고 앱은 만들지 않는다.
-    // 수업 기록(기록지·채점·설문·상호평가·응시 기록·은행)은 읽되 아무것도 쓰지 못하고, 여러 사람이 아는 코드이므로
-    // 정답 키(quizKeys)·연구 문서(research, 가명 대응표 pidMap만 예외)·기록지 시점 사본(wsHistory)·media 전체 목록은 교사(teacher)만 읽는다.
+    // 보기 전용 계정(viewer@museum.class): 관리자 코드 칸에 참관용 코드를 넣어 들어온다. 코드는 저장소 어디에도 적지 않는다(공개 저장소).
+    // 수업 설정(meta/config)과 수업 자료(misc/lessonEdits)만 읽는다. 학생 개인 기록(기록지·채점·설문·상호평가·응시 기록)과
+    // 학번이 드러나는 문서(명부·제출작·media·명단·전시·연구)는 읽지 못하고, 아무것도 쓰지 못한다.
     function isViewer() {
       return signedIn() && uid() == 'viewer';
     }
@@ -70,17 +69,17 @@ service cloud.firestore {
     function studentNickOk() {
       return request.resource.data.get('nick', '') is string && request.resource.data.get('nick', '').size() <= 12;
     }
-    // 학급 구성원: 교사·보기 전용, 그리고 명부(students)에 오른 학생.
+    // 학급 구성원: 교사, 그리고 명부(students)에 오른 학생. 보기 전용 계정은 들지 않는다(위 설명).
     // 이메일·비밀번호 가입은 누구에게나 열려 있어 로그인만으로는 이 학급 사람인지 알 수 없다.
     // 학급이 함께 보는 문서(설정·명부·제출·전시·수업 자료·media)는 로그인(signedIn)이 아니라 이것으로 연다.
     // 입장 화면은 로그인 직후 명부 문서부터 만들고(별명) 그 뒤에 이 문서들을 읽는다.
     function member() {
-      return canView() || (student() && enrolled(uid()));
+      return isTeacher() || (student() && enrolled(uid()));
     }
 
     // 차시 공개 설정·상호평가 비교 명단(peerRoster, 반별 peerRoster_{반}): 학급 구성원이 읽고, 교사만 쓴다
     match /meta/{docId} {
-      allow read: if member();
+      allow read: if member() || (isViewer() && docId == 'config');
       allow write: if isTeacher();
     }
 
@@ -106,7 +105,7 @@ service cloud.firestore {
       return !('cv' in resource.data) || request.resource.data.get('cv', 0) >= 2;
     }
     match /worksheets/{sid} {
-      allow read: if isOwner(sid) || canView();
+      allow read: if isOwner(sid) || isTeacher();
       allow create: if isTeacher() || (isOwner(sid) && enrolled(sid) && request.resource.data.get('cv', 0) >= 2);
       allow update: if isTeacher() || (isOwner(sid) && wsCvOk());
       allow delete: if isTeacher();
@@ -132,7 +131,7 @@ service cloud.firestore {
 
     // 채점 기록: 본인은 읽기만, 쓰기는 교사만
     match /grades/{sid} {
-      allow read: if isOwner(sid) || canView();
+      allow read: if isOwner(sid) || isTeacher();
       allow write: if isTeacher();
     }
 
@@ -158,7 +157,7 @@ service cloud.firestore {
           && svBlockKept(bSt.get('post', {}), aSt.get('post', {}));
     }
     match /surveys/{sid} {
-      allow read: if isOwner(sid) || canView();
+      allow read: if isOwner(sid) || isTeacher();
       allow create: if isTeacher() || (isOwner(sid) && enrolled(sid));
       allow update: if isOwner(sid) && surveyKept();
       allow delete: if isTeacher();
@@ -221,7 +220,7 @@ service cloud.firestore {
       return before.get('submittedAt', null) == null || after == before;
     }
     match /assess/{sid} {
-      allow read: if isOwner(sid) || canView();
+      allow read: if isOwner(sid) || isTeacher();
       allow delete: if isTeacher();
       allow create, update: if isTeacher();
       allow create: if isOwner(sid) && enrolled(sid) && !('result' in assessV(request.resource));
@@ -301,7 +300,7 @@ service cloud.firestore {
       return after == before || after == request.time;
     }
     match /quizBank/{docId} {
-      allow read: if canView() || (signedIn() && quizStage() != 'closed');
+      allow read: if isTeacher() || (signedIn() && !isViewer() && quizStage() != 'closed');
       allow write: if isTeacher();
     }
     match /quizKeys/{docId} {
@@ -309,7 +308,7 @@ service cloud.firestore {
       allow write: if isTeacher();
     }
     match /quiz/{sid} {
-      allow read: if isOwner(sid) || canView();
+      allow read: if isOwner(sid) || isTeacher();
       allow delete: if isTeacher();
       allow create, update: if isTeacher();
       allow create: if isOwner(sid) && enrolled(sid)
@@ -337,17 +336,16 @@ service cloud.firestore {
     // 연구 참여 동의 대장: 교사만 읽고 쓴다.
     // 명부(students)에 두지 않는 이유 — 명부는 학급 학생 모두가 읽으므로
     // 누가 연구에서 빠졌는지가 학생끼리 보이게 된다. 동의 여부는 학생 사이에 드러나서는 안 된다.
-    // 가명 대응표 pidMap(학번 → P번호, 반 → C번호)만은 보기 전용 계정(공동 연구자)도 읽는다: 익명 연구 자료를 같은 가명으로 맞춰 보기 위함.
-    // 동의 대장처럼 누가 빠졌는지 드러나는 나머지 문서는 교사만 읽는다.
+    // 가명 대응표 pidMap(학번 → P번호, 반 → C번호)도 학번이 드러나므로 교사만 읽는다.
     match /research/{docId} {
-      allow read: if isTeacher() || (docId == 'pidMap' && isViewer());
+      allow read: if isTeacher();
       allow write: if isTeacher();
     }
 
     // 그 밖의 학급 공용 문서. 「수업 편집」 탭이 고친 차시별 발문·이론·그림·링크가
     // lessonEdits 문서에 쌓인다. 학급 구성원이 읽고 교사만 고친다.
     match /misc/{docId} {
-      allow read: if member();
+      allow read: if member() || (isViewer() && docId == 'lessonEdits');
       allow write: if isTeacher();
     }
 

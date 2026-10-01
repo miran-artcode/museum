@@ -1,7 +1,7 @@
-/* 반 친구 판정 흉내 — 예시 작품의 숨은 품질(q)로 브래들리–테리 판정자를 만든다.
+/* 다른 학생 판정 흉내 — 예시 작품의 숨은 품질(q)로 브래들리–테리 판정자를 만든다.
    판정자마다 변별도(lognormal 0.25)가 다르고, 먼저 놓인 쪽에 0.12 logit 끌림이 있다.
    이유 문장은 이긴 작품의 good(60%) 또는 진 작품의 weak(40%)에서 고른다. */
-import { predPctOf, ranksAndBands, SELF_ITEMS } from "../../src-assess-core.mjs";
+import { predPctOf, ranksAndBands, SELF_ITEMS, SELF_SCALE, topFromRank } from "../../src-assess-core.mjs";
 import { WORKS, workByNo, workOfSid } from "./works.js";
 
 export function rng(seed) {
@@ -24,6 +24,7 @@ export function simulateJudges({ roster, sids, seed = 1, mult = 1, withSelf = tr
   roster.works.forEach((w) => { truth[w.no] = qOf(w.no, mult); });
   const truePct = ranksAndBands(truth).pct;
   const n = roster.works.length;
+  const usedWhy = {};
   sids.forEach((sid, si) => {
     const plan = (roster.plan && roster.plan[sid]) || [];
     const disc = Math.exp(R.normal() * 0.25);
@@ -35,8 +36,13 @@ export function simulateJudges({ roster, sids, seed = 1, mult = 1, withSelf = tr
       const win = R.u() < P ? "a" : "b";
       const winNo = win === "a" ? it.a : it.b, loseNo = win === "a" ? it.b : it.a;
       const useGood = R.u() < 0.6;
+      const target = useGood ? winNo : loseNo;
       const src = useGood ? workByNo(winNo).good : workByNo(loseNo).weak;
-      const pick = src[Math.floor(R.u() * src.length)] || ["두 작품 가운데 이쪽이 더 기록처럼 읽혔다", "whole"];
+      /* 한 작품에 같은 문장이 몰리지 않도록 가장 적게 쓴 문장부터 고른다 */
+      const used = usedWhy[target] || (usedWhy[target] = {});
+      const order = src.map((x, ix) => [x, (used[ix] || 0) + R.u() * 0.5, ix]).sort((p, q) => p[1] - q[1]);
+      const pick = order.length ? order[0][0] : ["두 작품 가운데 이쪽이 더 기록처럼 읽혔다", "whole"];
+      if (order.length) used[order[0][2]] = (used[order[0][2]] || 0) + 1;
       const fast = R.u() < 0.03;
       const ms = fast ? 2500 + Math.floor(R.u() * 2000) : 14000 + Math.floor(R.u() * 52000);
       t += ms + 4000;
@@ -57,11 +63,11 @@ export function simulateJudges({ roster, sids, seed = 1, mult = 1, withSelf = tr
       const clip = (x) => Math.max(0, Math.min(1, x));
       const p1 = clip(truePct[own.no] + 0.06 + R.normal() * 0.25), p2 = clip(truePct[own.no] + 0.03 + R.normal() * 0.17);
       const rankOf = (p) => Math.max(1, Math.min(n, Math.round(n - p * (n - 1))));
-      const sc = (bump) => { const o = {}; SELF_ITEMS.forEach((s) => { o[s.k] = Math.max(1, Math.min(5, Math.round(3.3 + truth[own.no] * 0.6 + bump + R.normal() * 0.7))); }); return o; };
+      const sc = (bump) => { const o = {}; SELF_ITEMS.forEach((s) => { o[s.k] = Math.max(1, Math.min(SELF_SCALE, Math.round(2.7 + truth[own.no] * 0.5 + bump + R.normal() * 0.6))); }); return o; };
       const r1 = rankOf(p1), r2 = rankOf(p2);
       doc.self = {
-        s1: { scores: sc(0.2), why: "흔적의 위치를 쓰임과 이어 보려고 했다", predRank: r1, n, predPct: predPctOf(r1, n), startedAt: new Date(T0 - 600000).toISOString(), submittedAt: new Date(T0 - 300000).toISOString(), durSec: 300 },
-        s2: { scores: sc(0), why: "다른 작품과 견주니 캡션의 설명이 부족해 보인다", predRank: r2, n, predPct: predPctOf(r2, n), lockedAt: new Date(t + 600000).toISOString(), changeCode: R.u() < 0.55 ? "shifted" : "same", changeWhy: "비교하면서 흔적의 원인을 설명했는지를 보게 됐다", startedAt: new Date(t + 300000).toISOString(), submittedAt: new Date(t + 700000).toISOString(), durSec: 400 },
+        s1: { scores: sc(0.2), why: "흔적의 위치를 쓰임과 이어 보려고 했다", predTop: topFromRank(r1, n), predRank: r1, n, predPct: predPctOf(r1, n), startedAt: new Date(T0 - 600000).toISOString(), submittedAt: new Date(T0 - 300000).toISOString(), durSec: 300 },
+        s2: { scores: sc(0), why: "다른 작품과 견주니 캡션의 설명이 부족해 보인다", predTop: topFromRank(r2, n), predRank: r2, n, predPct: predPctOf(r2, n), lockedAt: new Date(t + 600000).toISOString(), changeCode: R.u() < 0.55 ? "shifted" : "same", changeWhy: "비교하면서 흔적의 원인을 설명했는지를 보게 됐다", startedAt: new Date(t + 300000).toISOString(), submittedAt: new Date(t + 700000).toISOString(), durSec: 400 },
       };
     }
     out[sid] = doc;

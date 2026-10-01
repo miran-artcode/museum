@@ -20,7 +20,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
 import {
-  LEVELS, BLOCKS, BLOCK_SIZE, LEVEL_NAMES, LEVEL_WORDS, AREAS, AREA_MIX, CELL_MIN, LEVEL_SEC, BLOCK_END_MIN,
+  LEVELS, BLOCKS, BLOCK_SIZE, LEVEL_NAMES, LEVEL_WORDS, AREAS, AREA_MIX, CELL_MIN, cellShort, LEVEL_SEC, BLOCK_END_MIN,
   LEVEL_TARGET_P, LEVEL_P_RANGE, ITEM_STAT_MIN_N, ITEM_FLAG_MIN_N, TWIN_DIFF, SHORT_BLUR_N, MIN_ANSWERED, MAX_EVENTS,
   RULE_SENTENCES, SCORE_ROWS, SCORE_BOUNDS, FLAG_LABELS, RELIABILITY_NOTE, QUIZ_STAGES, quizCfg,
   parseSeatGrid, halfOf, moveOf, optionOrder, eventLabel, wilson, recompute, resultItems, itemStats, twinStats, levelMonotonic, reliabilityStats, recordSheet,
@@ -62,7 +62,7 @@ const STAGE_CONFIRM = {
 };
 /* 당일 운영 점검표(설계 §6.6). 화면에서 바로 보게 둔다 */
 const CHECKLIST = [
-  "전날: 컴퓨터실 한 대에서 연습 화면까지 실행(전체화면·이미지·서버 시각). OS 알림·메신저·업데이트 알림을 끈다. 좌석표를 입력·출력한다. 은행을 올리고 「은행 상태」가 일치하는지 본다.",
+  "전날: 컴퓨터실 한 대에서 연습 화면까지 실행(전체화면·이미지·서버 시각). OS 알림·메신저·업데이트 알림을 끈다. 좌석표를 입력·출력한다. 점검에 쓴 은행은 끝나면 내린다(scripts/quiz-bank-unpublish.mjs). 당일 아침에 다시 올리고 「은행 상태」가 일치하는지 본다.",
   "0분: 규칙 5문장, 「이탈 3회면 잠기고 선생님이 풀어 준다」, 「문항 오류는 전원 정답 처리」를 말한다.",
   "3분: 연습 시작. 전체화면이 안 되는 자리는 이 단계에서 걸러 자리를 옮긴다(옮기면 반이 바뀔 수 있으므로 좌석표를 갱신).",
   "6분: 「열기」. 15분 안에 전원 시작 확인.",
@@ -385,7 +385,8 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     if (k === "published") { doPublish(); return; }
     let msg = STAGE_CONFIRM[k] || "단계를 바꿉니다.";
     if (k === "open") {
-      if (!bankOk) msg += "\n\n주의: 올린 은행이 없습니다. 학생은 시작할 수 없습니다.";
+      /* 올린 은행만 센다. 파일을 고르기만 한 은행(fileBank)은 학생이 읽을 수 없다(시험 날 아침에 올리는 운영에서 생기기 쉽다) */
+      if (!(bankLive && bankLive.ver)) msg += "\n\n주의: 올린 은행이 없습니다" + (fileBank ? "(파일을 고르기만 했고 「은행 올리기」는 누르지 않았습니다)" : "") + ". 학생은 시작할 수 없습니다.";
       else if (!bankMatch) msg += "\n\n주의: 설정의 은행 버전(" + (cfg.bankVer || "없음") + ")과 올린 은행(" + bank.ver + ")이 다릅니다.";
       if (!String(live.seatGrid || "").trim()) msg += "\n\n주의: 좌석표가 없어 학번 홀짝으로 반을 나눕니다. 앞뒤좌우 이웃과 문항이 겹치지 않는다는 보장이 없습니다.";
       msg += "\n\n시작 마감: 열고 나서 " + Math.round(live.startDeadlineSec / 60) + "분.";
@@ -429,6 +430,10 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     const cur = disabledList.filter((x) => x !== id);
     edit("disabled", on ? [...cur, id] : cur);
   };
+  /* 비활성 때문에 칸이 필요 수 아래로 내려가면 그 급 블록이 반대 반 문항을 꺼내 쓰게 되어
+     앞뒤좌우 좌석과 문항이 겹치지 않는다는 보장이 사라진다(cellShort, 근거 문서 §5.3) */
+  const disShort = useMemo(() => cellShort(bank, disabledList), [bank, disabledList]);
+  const disShortIds = new Set(disShort.flatMap((d) => d.ids));
 
   /* ---- 문항 은행 파일 ---- */
   const [bankBusy, setBankBusy] = useState(false);
@@ -644,27 +649,47 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     });
     const withRes = Object.keys(resultsMap).filter((sid) => !stale.includes(sid));
     const noRes = Object.keys(attempts).filter((sid) => !resultsMap[sid]);
-    const unpub = withRes.filter((sid) => !resultsMap[sid].published);
+    /* 불일치는 추출 재현·급·가채점이 기록과 다르다는 뜻이라 점수 자체를 믿을 수 없다. 기본 공개에서 빼고 따로 묻는다.
+       학생별로 공개를 거두는 기능은 없고 재계산은 공개 표시를 그대로 두므로, 이미 공개된 불일치 학생은 빼도 결과가 보인다. 따로 알린다 */
+    const mism = withRes.filter((sid) => (resultsMap[sid].flags || []).includes("mismatch"));
+    const mismNew = mism.filter((sid) => !resultsMap[sid].published);
+    const mismShown = mism.filter((sid) => resultsMap[sid].published);
+    const plain = withRes.filter((sid) => !mism.includes(sid));
+    const unpub = plain.filter((sid) => !resultsMap[sid].published);
     // 이미 공개된 뒤에도 다시 누를 수 있다 — 별도 응시·재계산으로 뒤늦게 생긴 결과에 공개 표시를 쓰기 위해서다
-    let msg = (cfg.stage === "published" ? "공개 표시를 다시 씁니다. 아직 공개 표시가 없는 결과 " + unpub.length + "건이 학생에게 보입니다." : STAGE_CONFIRM.published)
-      + "\n\n결과가 있는 학생 " + withRes.length + "명에게 공개 표시를 씁니다.";
+    let msg = (cfg.stage === "published" ? "공개 표시를 다시 씁니다." : STAGE_CONFIRM.published)
+      + "\n\n아직 공개 표시가 없는 결과 " + unpub.length + "건에 공개 표시를 씁니다. 이미 공개된 결과는 그대로 둡니다.";
     if (noRes.length) msg += "\n\n주의: 응시했지만 결과가 없는 학생 " + noRes.length + "명(" + noRes.slice(0, 6).join(", ") + (noRes.length > 6 ? " 외" : "") + "). 먼저 「재계산」을 누르세요.";
     if (stale.length) msg += "\n\n건너뜀: 아직 진행 중이거나 완료 뒤에 재계산하지 않은 학생 " + stale.length + "명(" + stale.slice(0, 6).join(", ") + (stale.length > 6 ? " 외" : "") + "). 완료 뒤 「재계산」을 다시 누르고 공개하세요.";
-    const mism = withRes.filter((sid) => (resultsMap[sid].flags || []).includes("mismatch"));
-    if (mism.length) msg += "\n\n주의: 불일치 표시 학생 " + mism.length + "명(" + mism.join(", ") + "). 원응답을 먼저 확인하세요.";
+    if (mismNew.length) msg += "\n\n건너뜀: 불일치 표시 학생 " + mismNew.length + "명(" + mismNew.join(", ") + "). 원응답을 먼저 확인하세요. 확인이 끝났으면 다음 창에서 이 학생들도 함께 공개할 수 있습니다.";
+    if (mismShown.length) msg += "\n\n주의: 불일치 표시 학생 " + mismShown.length + "명(" + mismShown.join(", ") + ")은 이미 공개되어 있어 결과가 계속 보입니다. 학생별로 공개를 거두는 기능은 없습니다.";
     msg += "\n\n계속할까요?";
     if (!window.confirm(msg)) return;
+    /* 불일치 학생은 교사가 분명히 고를 때만 함께 공개한다. confirm 은 Enter 가 「확인」이라 습관처럼 누르면 함께 공개되므로
+       정해진 말을 적게 한다. 비워 두면 빼고 공개하고, 취소(Esc)는 공개 전체를 멈춘다 */
+    let withMism = false;
+    if (mismNew.length) {
+      const typed = window.prompt("불일치 표시 학생 " + mismNew.length + "명(" + mismNew.join(", ") + ")은 빼고 나머지만 공개합니다.\n\n"
+        + "불일치는 추출 재현·급·가채점이 기록과 다르다는 표시입니다. 응시 기록표에서 원응답을 확인했고 점수가 맞아 이 학생들도 함께 공개하려면 「함께 공개」라고 적으세요.\n"
+        + "비워 두고 확인을 누르면 이 학생들만 빼고 공개합니다. 취소를 누르면 아무것도 공개하지 않습니다.", "");
+      if (typed === null) return;
+      withMism = typed.trim() === "함께 공개";
+    }
+    /* 이미 공개된 결과는 다시 쓰지 않는다(학생 결과 화면의 공개 시각이 누를 때마다 바뀌지 않게) */
+    const target = withMism ? unpub.concat(mismNew) : unpub;
     setPubBusy(true); setNote(null);
     const at = nowISO();
     let fail = 0;
-    for (let i = 0; i < withRes.length; i += 1) {
-      const ok = await patchV(withRes[i], { result: { published: true, publishedAt: at } });
+    for (let i = 0; i < target.length; i += 1) {
+      const ok = await patchV(target[i], { result: { published: true, publishedAt: at } });
       if (!ok) fail += 1;
     }
     const ok = cfg.stage === "published" ? true : await saveNow({ stage: "published" });
+    const held = withMism ? 0 : mismNew.length;
     setPubBusy(false);
     setNote(!ok || fail ? { kind: "warn", text: (fail ? fail + "명의 공개 표시를 저장하지 못했습니다. " : "") + (ok ? "" : "단계를 저장하지 못했습니다. ") + "다시 누르세요." }
-      : { kind: "ok", text: "결과를 공개했습니다(" + withRes.length + "명). 학생 화면에 자기 결과가 보입니다." });
+      : { kind: "ok", text: "결과를 공개했습니다(" + target.length + "명)." + (held ? " 불일치 " + held + "명은 공개하지 않았습니다." : "")
+        + (mismShown.length ? " 이미 공개된 불일치 " + mismShown.length + "명의 결과는 계속 보입니다." : "") + " 학생 화면에 자기 결과가 보입니다." });
   };
 
   /* ---- 응시 기록표 ---- */
@@ -700,6 +725,12 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
   const [corrBusy, setCorrBusy] = useState(false);
   const corrections = (keysDoc && Array.isArray(keysDoc.corrections)) ? keysDoc.corrections : [];
   const writeCorrections = async (list, okText) => {
+    /* 정답부가 올라가 있지 않으면(은행을 내려 둔 상태) 병합 쓰기가 문항 없는 quizKeys 문서를 새로 만들고,
+       그 문서가 고른 파일의 정답을 가려(keysDoc = keysLive || fileKeys) 기록표와 정정이 모두 어긋난다. 은행을 먼저 올리게 한다 */
+    if (!keysLive || !keysLive.items) {
+      setNote({ kind: "warn", text: "올라가 있는 정답부가 없어 정정을 저장하지 않았습니다. 「문항 은행」 카드에서 은행을 먼저 올린 뒤 정정을 넣으세요." });
+      return false;
+    }
     setCorrBusy(true);
     const ok = await fbStore.setT("quizKeys", { corrections: list }, { merge: true });
     setCorrBusy(false);
@@ -895,10 +926,20 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
             <button type="button" className="btn small" disabled={sampleMode || !cutIds(disInput).length} title={wr}
               onClick={() => { edit("disabled", [...new Set([...disabledList, ...cutIds(disInput)])]); setDisInput(""); }}>추가</button>
             {disabledList.length === 0 ? <span className="hint">없음</span> : disabledList.map((id) => (
-              <span key={id} className="qt-chip"><span className="mono">{id}</span>
+              <span key={id} className={"qt-chip" + (disShortIds.has(id) ? " qt-chip-warn" : "")}><span className="mono">{id}</span>
                 <button type="button" className="qt-x" disabled={sampleMode} title={wr} aria-label={id + " 비활성 해제"} onClick={() => setDisabled(id, false)}>×</button></span>
             ))}
           </div>
+          {disShort.map((d) => (
+            <p key={d.half + d.level + d.area} className="qt-warn">
+              {d.half}반 {d.level}급 영역 {AREA_MARK[d.area]} 칸에 문항이 {d.left}개만 남았습니다(필요 {d.need}개).
+              그 급의 블록에서 반대 반 문항을 꺼내 쓰므로 앞뒤좌우 좌석과 문항이 겹치지 않는다는 보장이 사라집니다.
+              문항 오류라서 뺀 것이면 그대로 두고, 아니면 비활성을 풀어 주세요.
+            </p>
+          ))}
+          {!bank && disabledList.length > 0 && (
+            <p className="qt-warn">올라간 은행도 고른 은행 파일도 없어 칸이 모자라는지 확인하지 못했습니다. 문항 은행 카드에서 quiz-bank/bank.json 을 고르면 확인합니다.</p>
+          )}
         </div>
       </div>
 
@@ -999,6 +1040,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
                           <td><button type="button" className="btn small ghost" onClick={() => setPreviewId(it.id)}>열기</button></td>
                           <td>
                             <button type="button" className={"btn small ghost" + (off ? " qt-btn-on" : "")} disabled={sampleMode} title={wr} aria-pressed={off} onClick={() => setDisabled(it.id, !off)}>{off ? "비활성" : "활성"}</button>
+                            {off && disShortIds.has(it.id) && <span className="hint" style={{ display: "block", color: "var(--amber)" }}>칸 부족(설정 카드)</span>}
                           </td>
                         </tr>
                       );
@@ -1484,6 +1526,8 @@ const QUIZ_TEACHER_CSS = `
 .qt-grow{flex:1 1 200px}
 .qt-grow input{width:100%}
 .qt-chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);padding:2px 6px;font-size:12px;background:var(--card2)}
+.qt-chip-warn{border-color:var(--amber);color:var(--amber);font-weight:600}
+p.qt-warn{margin:6px 0 0;font-size:12px;line-height:1.6}
 .qt-x{border:none;background:transparent;cursor:pointer;font-size:14px;line-height:1;padding:0 3px;color:var(--sub)}
 .qt-x:hover{color:var(--seal)}
 .qt-x:disabled{opacity:.4;cursor:default}
