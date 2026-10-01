@@ -24,6 +24,10 @@ export const wsLockOn = (cfg) => !!(cfg && cfg.wsLock === true);
 
 /* 학생 화면 전체에 잠금 여부를 내린다. 기본값 false: 교사 화면의 미리 보기 같은 다른 곳은 잠기지 않는다 */
 export const WsLockCtx = React.createContext(false);
+/* 기록지가 서버에 저장된 상태인가(StudentApp이 내린다). 디지털 에스키스가 앞 저장본의 그림 문서를 지울 때를 정한다:
+   새 값이 서버에 저장되기 전에 옛 문서를 지우면, 그 사이 창이 닫혔을 때 서버의 값이 없는 문서를 가리킨다.
+   기본값 true: 기록지 저장과 무관한 곳(교사 미리 보기 등)에서는 바로 지운다 */
+export const WsSavedCtx = React.createContext(true);
 
 /* field-sizing을 지원하지 않는 브라우저(파이어폭스·옛 사파리)에서는 잠긴 글상자를 글 길이만큼 늘린다.
    잠긴 글상자는 스크롤이 되지 않는 브라우저가 있어 긴 답의 뒷부분을 못 읽는다 */

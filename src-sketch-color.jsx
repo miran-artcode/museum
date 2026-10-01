@@ -525,7 +525,9 @@ export const SKETCH_COLOR_CSS = `
   .skc input[type=range].skc-range{height:36px}
   .skc input[type=range].skc-range::-webkit-slider-thumb{width:24px;height:24px;margin-top:-6px}
   .skc input[type=range].skc-range::-moz-range-thumb{width:24px;height:24px}
-  .skc input[type=number].skc-numin,.skc input[type=text].skc-hexin,.skc input[type=text].skc-namein{height:36px}
+  .skc input[type=number].skc-numin,.skc input[type=text].skc-hexin,.skc input[type=text].skc-namein{height:36px;font-size:16px}
+  .skc input[type=number].skc-numin{flex-basis:60px;width:60px}
+  .skc input[type=text].skc-hexin{flex-basis:112px;width:112px}
 }
 `;
 

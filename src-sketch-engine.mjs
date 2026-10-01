@@ -53,7 +53,7 @@ export const BLENDS = [
   ["normal", "보통"], ["multiply", "곱하기"], ["darken", "어둡게"], ["color-burn", "색상 번"],
   ["screen", "스크린"], ["lighten", "밝게"], ["color-dodge", "색상 닷지"],
   ["overlay", "오버레이"], ["soft-light", "소프트 라이트"], ["hard-light", "하드 라이트"],
-  ["difference", "차이"], ["hue", "색조"], ["saturation", "채도"], ["color", "색상"], ["luminosity", "광도"],
+  ["difference", "차이"], ["hue", "색상"], ["saturation", "채도"], ["color", "색(색상+채도)"], ["luminosity", "광도"],
 ];
 const gco = (blend) => (!blend || blend === "normal" ? "source-over" : blend);
 
@@ -103,7 +103,7 @@ const FONT_STACK = {
 export const textFont = (size, font) => (FONT_STACK[font] || FONT_STACK.sans).replace("SIZE", size);
 
 export const ADJUSTS = [
-  { k: "hsl", name: "색조·채도·명도", params: [["h", "색조", -180, 180, 0, "°"], ["s", "채도", -100, 100, 0, ""], ["l", "명도", -100, 100, 0, ""]] },
+  { k: "hsl", name: "색상·채도·명도", params: [["h", "색상", -180, 180, 0, "°"], ["s", "채도", -100, 100, 0, ""], ["l", "명도", -100, 100, 0, ""]] },
   { k: "bc", name: "밝기·대비", params: [["b", "밝기", -100, 100, 0, ""], ["c", "대비", -100, 100, 0, ""]] },
   { k: "blur", name: "흐림", params: [["r", "반지름", 0, 40, 6, "px"]] },
   { k: "sharpen", name: "선명하게", params: [["a", "세기", 0, 100, 40, ""]] },
@@ -141,7 +141,13 @@ export function opLabel(op) {
     case "ladd": return "레이어 추가";
     case "ldel": return "레이어 지우기";
     case "lmove": return "레이어 순서";
-    case "lset": return LSET_NAMES[Object.keys(op.patch || {})[0]] || "레이어 설정";
+    case "lset": {
+      const k = Object.keys(op.patch || {})[0], v = (op.patch || {})[k];
+      if (k === "vis") return v ? "레이어 보이기" : "레이어 숨기기";
+      if (k === "lock") return v ? "레이어 잠금" : "레이어 잠금 해제";
+      if (k === "alock") return v ? "알파 잠금" : "알파 잠금 해제";
+      return LSET_NAMES[k] || "레이어 설정";
+    }
     case "ldup": return "레이어 복제";
     case "lmerge": return "아래 레이어와 합치기";
     case "lflat": return "모두 합치기";
@@ -563,6 +569,7 @@ export class Engine {
   /* list: [{ id, name, op, vis, blend, alock, lock, img }] (없으면 빈 레이어 하나). 과정 기록(past)은 부르는 쪽이 정한다 */
   reset(W, H, list, activeIdx) {
     this.live = null;
+    this.selSeen = null;
     this.freeAll();
     this.setSize(W, H);
     this.layers = []; this.hist = []; this.redo = []; this.past = []; this.nameSeq = 0; this.seq = 1;
@@ -586,8 +593,13 @@ export class Engine {
     const ops = this.hist.concat(this.redo);
     this.hist = []; this.redo = [];
     for (const op of ops) this.release(op, true);
+    const cur = this.sel;
+    this.sel = null;
+    for (const op of ops.concat(this.past)) this.dropSel(op.sel);
+    this.sel = cur;
     for (const op of this.past) { if (op.img && op.img.getContext) freeCanvas(op.img); }
     for (const L of this.layers) { freeCanvas(L.cv); freeCanvas(L.base); }
+    if (this.selSeen) { for (const v of this.selSeen.values()) { freeCanvas(v._mask); freeCanvas(v._m); } this.selSeen = null; }
     if (this.sel) { freeCanvas(this.sel._mask); for (const p of this.sel.parts || []) freeCanvas(p._m); }
     this.sel = null;
     this.preBytes = 0;
@@ -639,6 +651,7 @@ export class Engine {
     this.hist = []; this.redo = [];
     for (const op of hs) { this.shrinkImg(op); this.past.push(op); this.release(op, true); }
     for (const op of rs) this.release(op, true);
+    for (const op of hs.concat(rs)) this.dropSel(op.sel);
     for (const L of this.layers) { freeCanvas(L.base); L.base = null; L.cow = true; }
   }
   /* base를 필요할 때 만든다: cow면 지금 그림이 base다(레이어마다 캔버스를 두 장씩 들지 않으려고) */
@@ -677,7 +690,7 @@ export class Engine {
   }
   /* 그리기 직전의 그림을 작업 범위만큼 떠 둔다(되돌릴 때 그대로 놓는다). src: 떠 올 곳(기본은 레이어) */
   snapPre(op, L, src) {
-    if (op._pre && op._pre[L.id]) return;
+    if (this.noUndo || (op._pre && op._pre[L.id])) return;
     const bb = opBBox(this, op) || { x: 0, y: 0, w: this.W, h: this.H };
     if (bb.w <= 0 || bb.h <= 0) return;
     const c = mkCanvas(bb.w, bb.h);
@@ -753,7 +766,10 @@ export class Engine {
   }
   /* 찍는 붓의 한 점: hard(0~1)까지는 꽉 차고 그 밖으로 흐려진다. wet은 가장자리가 진한 수채 */
   sprite(color, hard = 0, wet = false) {
-    const key = color + "|" + Math.round(hard * 20) + (wet ? "w" : "");
+    // 가장자리 값을 1% 단계로 맞춰 키와 내용이 어긋나지 않게 한다(같은 작업을 다시 그려도 같은 무늬)
+    const q = Math.round(clamp(hard, 0, 1) * 100);
+    hard = q / 100;
+    const key = color + "|" + q + (wet ? "w" : "");
     let c = this.sprites.get(key);
     if (c) return c;
     const S = 128;
@@ -770,7 +786,7 @@ export class Engine {
       gr.addColorStop(h + (1 - h) * 0.35, col(0.6)); gr.addColorStop(h + (1 - h) * 0.7, col(0.18)); gr.addColorStop(1, col(0));
     }
     x.fillStyle = gr; x.fillRect(0, 0, S, S);
-    if (this.sprites.size > 60) this.sprites.clear();
+    if (this.sprites.size > 80) { this.sprites.forEach(freeCanvas); this.sprites.clear(); }
     this.sprites.set(key, c);
     return c;
   }
@@ -817,6 +833,15 @@ export class Engine {
     return m;
   }
   maskOf(sel) { return sel._mask || (sel._mask = this.buildMask(sel)); }
+  /* 더는 쓰이지 않는 선택의 마스크를 놓는다(지금 선택이거나 되돌리기 기록의 작업이 쓰는 선택은 둔다) */
+  dropSel(sel) {
+    if (!sel || sel === this.sel) return;
+    const live = this.hist.concat(this.redo).map((o) => o.sel).filter(Boolean);
+    if (live.includes(sel)) return;
+    if (this.sel) live.push(this.sel);
+    freeCanvas(sel._mask); delete sel._mask; delete sel._arr; delete sel._bbox;
+    for (const p of sel.parts || []) if (p._m && !live.some((x) => (x.parts || []).includes(p))) { freeCanvas(p._m); delete p._m; }
+  }
   selArr(sel) {
     if (sel._arr) return sel._arr;
     const d = this.maskOf(sel).getContext("2d").getImageData(0, 0, this.W, this.H).data;
@@ -830,7 +855,14 @@ export class Engine {
       const bb = maskBBox(this.selArr(sel), this.W, this.H);
       if (!bb) { freeCanvas(sel._mask); sel = null; } else sel._bbox = bb;
     }
+    if (sel) {
+      // 과정 기록을 다시 볼 때 같은 선택(특히 자동 선택)을 한 번만 계산하도록 이름을 붙인다
+      if (!sel.sid) sel.sid = Date.now().toString(36) + "." + (this.selSeq = (this.selSeq || 0) + 1);
+      (sel.parts || []).forEach((p, i) => { if (p.type === "wand" && !p.wid) p.wid = sel.sid + "." + i; });
+    }
+    const old = this.sel;
     this.sel = sel;
+    if (old && old !== sel) this.dropSel(old);
     if (sel) {
       if (!this.selCv) { this.selCv = mkCanvas(this.W, this.H); this.selCv.className = "skx-selcv"; }
       const c = this.selCv.getContext("2d");
@@ -970,24 +1002,33 @@ export class Engine {
     const guard = op.sel || op.alock;
     const before = guard ? keepSnap || copyCanvas(T.cv) : null;
     makeSmudger(this, op, T).add();
-    if (guard) this.guardSmudge(op, T, before);
+    if (guard) { this.guardSmudge(op, T, before); if (before !== keepSnap) freeCanvas(before); }
   }
-  /* 번짐을 레이어에 바로 그린 뒤: 선택 밖은 그리기 전으로 되돌리고, 알파 잠금이면 원래 칠해진 곳만 남긴다 */
+  /* 번짐을 레이어에 바로 그린 뒤, 획의 범위 안에서: 알파 잠금이면 그리기 전 그림 위에 번진 그림을 source-atop으로(원래 알파 유지),
+     선택이 있으면 「그리기 전 × (1 − 마스크) + 번진 그림 × 마스크」로 합친다. 범위 밖은 건드리지 않는다
+     (캔버스 전체에 destination-in을 하면 반투명 픽셀이 획마다 옅어지고, 범위 밖은 _pre로 되돌려지지 않는다) */
   guardSmudge(op, T, before) {
-    const c = T.ctx;
-    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1;
-    if (op.alock) { c.globalCompositeOperation = "destination-in"; c.drawImage(before, 0, 0); }
-    if (op.sel) {
-      const mask = this.maskOf(op.sel);
-      c.globalCompositeOperation = "destination-in"; c.drawImage(mask, 0, 0);
-      this.ensureTmp();
-      const t = this.tctx;
-      t.save(); t.setTransform(1, 0, 0, 1, 0, 0); t.globalAlpha = 1;
-      t.globalCompositeOperation = "copy"; t.drawImage(before, 0, 0);
-      t.globalCompositeOperation = "destination-out"; t.drawImage(mask, 0, 0);
-      t.restore();
-      c.globalCompositeOperation = "source-over"; c.drawImage(this.tmp, 0, 0);
+    const bb = opBBox(this, op);
+    if (!bb || bb.w <= 0 || bb.h <= 0) return;
+    const { x, y, w, h } = bb, c = T.ctx, mask = op.sel ? this.maskOf(op.sel) : null;
+    this.ensureTmp();
+    const t = this.tctx;
+    t.save(); t.setTransform(1, 0, 0, 1, 0, 0); t.globalAlpha = 1;
+    t.clearRect(x, y, w, h);
+    if (op.alock) {
+      t.globalCompositeOperation = "source-over"; t.drawImage(before, x, y, w, h, x, y, w, h);
+      t.globalCompositeOperation = "source-atop"; t.drawImage(T.cv, x, y, w, h, x, y, w, h);
+    } else { t.globalCompositeOperation = "source-over"; t.drawImage(T.cv, x, y, w, h, x, y, w, h); }
+    if (mask) { t.globalCompositeOperation = "destination-in"; t.drawImage(mask, x, y, w, h, x, y, w, h); }
+    t.restore();
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
+    c.clearRect(x, y, w, h);
+    if (mask) {
+      c.drawImage(before, x, y, w, h, x, y, w, h);
+      c.globalCompositeOperation = "destination-out"; c.drawImage(mask, x, y, w, h, x, y, w, h);
+      c.globalCompositeOperation = "lighter";
     }
+    c.drawImage(this.tmp, x, y, w, h, x, y, w, h);
     c.restore();
   }
   /* 변형: 레이어(선택이 있으면 그 안)의 그림을 떼어 행렬 m으로 다시 그린다 */
@@ -1027,28 +1068,29 @@ export class Engine {
     const d = src.getContext("2d").getImageData(0, 0, this.W, this.H).data;
     const a = new Uint8Array(this.W * this.H);
     for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3] > 8 ? 255 : 0;
-    return { L, sel, src, rest, bbox: maskBBox(a, this.W, this.H) };
+    return { L, sel, src, rest, orig: sel ? copyCanvas(L.cv) : null, bbox: maskBBox(a, this.W, this.H) };
   }
   previewXform(x, m, smooth) { this.drawXform(x.L, x.src, x.rest, m, smooth); }
   endXform(x, m, smooth) {
-    this.drawXform(x.L, x.src, x.rest, [1, 0, 0, 1, 0, 0], false);
-    freeCanvas(x.src); freeCanvas(x.rest);
+    if (x.orig) { const c = x.L.ctx; c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = "copy"; c.drawImage(x.orig, 0, 0); c.restore(); }
+    else this.drawXform(x.L, x.src, x.rest, [1, 0, 0, 1, 0, 0], false);
+    freeCanvas(x.src); freeCanvas(x.rest); freeCanvas(x.orig);
     x.L.ver++;
     if (!m) return null;
     return this.commit({ kind: "transform", m: m.slice(), smooth: smooth !== false, sel: x.sel || undefined, layers: [x.L.id] });
   }
   /* 조정 도구가 쓰는 묶음 */
-  beginAdjust(L) { this.touch(L); return { L, orig: L.ctx.getImageData(0, 0, this.W, this.H) }; }
+  beginAdjust(L) { this.touch(L); return { L, sel: this.sel, orig: L.ctx.getImageData(0, 0, this.W, this.H) }; }
   previewAdjust(a, type, params, seed) {
     const d = new ImageData(new Uint8ClampedArray(a.orig.data), this.W, this.H);
-    runAdjust(d.data, this.W, this.H, type, params, seed, this.sel ? this.selArr(this.sel) : undefined);
+    runAdjust(d.data, this.W, this.H, type, params, seed, a.sel ? this.selArr(a.sel) : undefined);
     a.L.ctx.putImageData(d, 0, 0);
   }
   endAdjust(a, type, params, seed) {
     a.L.ctx.putImageData(a.orig, 0, 0);
     a.L.ver++;
     if (!type) return null;
-    return this.commit({ kind: "adjust", type, params: { ...params }, seed, sel: this.sel || undefined, layers: [a.L.id] });
+    return this.commit({ kind: "adjust", type, params: { ...params }, seed, sel: a.sel || undefined, layers: [a.L.id] });
   }
 
   /* ---------- 기록: 실행·되돌리기 ---------- */
@@ -1204,6 +1246,7 @@ export class Engine {
     this.shrinkImg(op);
     this.past.push(op);
     this.release(op, true);
+    this.dropSel(op.sel);
   }
   /* 지워졌지만 되돌리기 기록 안에 아직 살아 있는 레이어 (skip: 이 작업은 빼고 찾는다) */
   buried(id, skip) {
@@ -1220,7 +1263,12 @@ export class Engine {
     const gone = this.redo;
     this.redo = [];
     for (const r of gone) this.release(r, true);
-    while (this.hist.length > HISTORY_MAX) this.bake(this.hist.shift());
+    while (this.hist.length > HISTORY_MAX) {
+      const old = this.hist.shift();
+      this.bake(old);
+      // 묶음(grp)이 한도에서 갈라지면 남은 반쪽만 되돌려져 그림이 사라진다: 묶음째 굳힌다
+      while (old.grp && this.hist.length && this.hist[0].grp === old.grp) this.bake(this.hist.shift());
+    }
     this.trimPre();
   }
   commit(op) {
@@ -1278,7 +1326,7 @@ export class Engine {
   /* 슬라이더처럼 연달아 바뀌는 값은 직전의 같은 작업에 합친다 */
   setLayer(id, patch) {
     const last = this.hist[this.hist.length - 1], key = Object.keys(patch)[0];
-    if (last && last.kind === "lset" && last.id === id && Object.keys(last.patch).length === 1 && key in last.patch && (key === "op" || key === "name") && Date.now() - last.t < 4000) {
+    if (last && last.kind === "lset" && last.id === id && Object.keys(last.patch).length === 1 && key in last.patch && (key === "op" || key === "name") && !this.redo.length && Date.now() - last.t < 4000) {
       Object.assign(last.patch, patch);
       const L = this.layer(id); if (L) Object.assign(L, patch);
       last.t = Date.now();
@@ -1434,16 +1482,39 @@ export class Engine {
     } else if (op.kind === "base") {
       this.reset(op.w, op.h, (op.layers && op.layers.length ? op.layers : [{ id: 1 }]).map((l) => ({ ...l })), op.active);
       this.paper = op.paper || "white";
-      if (op._img) { const L = this.layers[0]; L.ctx.drawImage(op._img, 0, 0, this.W, this.H); }
+      // snap은 보이는 레이어를 이미 합친 그림이므로 맨 아래 레이어를 보통·100%·보임으로 두고 그린다
+      if (op._img) { const L = this.layers[0]; Object.assign(L, { op: 1, vis: true, blend: "normal" }); L.ctx.drawImage(op._img, 0, 0, this.W, this.H); }
     } else if (op.kind === "canvas") {
       const past = this.past;
       this.canvasOp(op.type, { w: op.w, h: op.h, dir: op.dir });
       this.past = past;
     } else {
+      this.noUndo = true;
       const copy = { ...op };
       for (const k of Object.keys(copy)) if (k[0] === "_" && k !== "_img") delete copy[k];
       delete copy.prev;
+      // 선택은 이 엔진의 것으로 따로 둔다(본 엔진의 선택 객체에 마스크를 붙이지 않는다).
+      // 같은 선택(sid)과 같은 자동 선택 조각(wid)은 처음 계산한 것을 다시 쓴다: 저장된 기록에서는 작업마다 선택 객체가 따로라
+      // 그때마다 그 시점 그림으로 자동 선택을 다시 계산하면 선택 안에 그린 둘째 획부터 영역이 달라진다
+      if (copy.sel) {
+        const seen = this.selSeen || (this.selSeen = new Map());
+        const same = copy.sel.sid ? seen.get(copy.sel.sid) : null;
+        if (same) copy.sel = same;
+        else {
+          copy.sel = { parts: (copy.sel.parts || []).map((q) => { const o = { ...q }; delete o._m; return o; }), inv: copy.sel.inv, sid: copy.sel.sid };
+          if (copy.sel.sid) seen.set(copy.sel.sid, copy.sel);
+          for (const q of copy.sel.parts) {
+            if (q.type !== "wand" || !q.wid) continue;
+            const first = seen.get("w:" + q.wid);
+            if (!first) seen.set("w:" + q.wid, q);
+            else if (first._m) q._m = first._m;
+          }
+        }
+      }
+      const own = copy.sel && !copy.sel.sid ? copy.sel : null;
       this.perform(copy);
+      this.release(copy, true);
+      if (own) { freeCanvas(own._mask); delete own._mask; delete own._arr; }
     }
   }
 }

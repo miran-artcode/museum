@@ -9,11 +9,10 @@ import { ReplayPlayer } from "./src-sketch-history.jsx";
 const num = (x) => (typeof x === "number" && isFinite(x) ? x : 0);
 const IDLE = { key: "", state: "idle", ops: null, open: false }; // state: idle · loading · ready · error
 
-/* 저장 버전을 오래된 것부터. 모두 n(버전 번호)이 있으면 그 순서, 아니면 저장 시각 순서 */
+/* 저장 버전을 오래된 것부터(저장 시각 순서). n은 그 저장본의 작업 수다 */
 function sortVersions(list) {
   const rows = (Array.isArray(list) ? list : []).filter((x) => x && x.ref);
-  const byN = rows.every((x) => num(x.n) > 0);
-  const key = (x) => (byN ? x.n : typeof x.at === "number" ? x.at : Date.parse(x.at) || 0);
+  const key = (x) => (typeof x.at === "number" ? x.at : Date.parse(x.at) || 0);
   return rows.map((x, i) => ({ x, i })).sort((a, b) => key(a.x) - key(b.x) || a.i - b.i).map((o) => o.x);
 }
 
@@ -127,8 +126,8 @@ export function SketchRead({ f, v, owner, store, MediaThumb, fmtTime }) {
             <ol className="skr-strip" tabIndex={0} aria-label={f.label + " 저장 버전, 오래된 것부터"}>
               {versions.map((x, i) => (
                 <li key={x.ref + ":" + i}>
-                  <MediaThumb owner={owner} refId={x.ref} alt={f.label + " 저장 버전 " + (num(x.n) || i + 1)} size={84} />
-                  <span className="skr-cap">v{num(x.n) || i + 1}{x.at ? " " + fmtTime(x.at) : ""}</span>
+                  <MediaThumb owner={owner} refId={x.ref} alt={f.label + " 저장 버전 " + (x.at ? fmtTime(x.at) : i + 1)} size={84} />
+                  <span className="skr-cap">{x.at ? fmtTime(x.at) : "저장 버전 " + (i + 1)}{num(x.n) ? " · 작업 " + x.n + "개" : ""}</span>
                 </li>
               ))}
             </ol>

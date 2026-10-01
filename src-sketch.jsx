@@ -28,11 +28,12 @@
      collectMediaRefs(src-app.jsx)가 안쪽의 ref를 모두 모으므로 학번 변경·기록 초기화 때 함께 옮겨지고 지워진다.
    ============================================================ */
 import React, { useState, useEffect, useRef, useContext } from "react";
-import { WsLockCtx } from "./src-ws-lock.jsx";
+import { flushSync } from "react-dom";
+import { WsLockCtx, WsSavedCtx } from "./src-ws-lock.jsx";
 import { clamp, fitShape, guideLines, assistSnap, matTRS, matApply } from "./src-sketch-core.mjs";
 import {
   Engine, BRUSHES, BRUSH, RATIOS, PAPERS, paperColor, MAX_LAYERS, ADJUSTS, TEXT_FONTS, textFont, PART_MAX, LOG_PREFIX,
-  encodeOpaque, encodeLayer, blobOf, loadImg, packLog, unpackLog, putParts, fetchLog, fetchLayer, readDoc, FAILED, refsOf, logStats, opLabel, freeCanvas,
+  encodeOpaque, encodeLayer, blobOf, loadImg, packLog, unpackLog, putParts, getParts, fetchLayer, readDoc, FAILED, refsOf, logStats, opLabel, freeCanvas,
 } from "./src-sketch-engine.mjs";
 import { Icon, IconBtn, Seg, Range, PanelHead } from "./src-sketch-ui.jsx";
 import { ColorPanel, SKETCH_COLOR_CSS } from "./src-sketch-color.jsx";
@@ -69,7 +70,7 @@ const EXTRA = [
   { k: "select", name: "선택", key: "m" },
   { k: "xform", name: "변형", key: "v" },
   { k: "picker", name: "스포이트", key: "i" },
-  { k: "hand", name: "이동", key: "h" },
+  { k: "hand", name: "화면 이동", key: "h" },
 ];
 const TOOL = { ...BRUSH, ...Object.fromEntries(EXTRA.map((t) => [t.k, t])) };
 const isDrawBrush = (k) => !!BRUSH[k] && !BRUSH[k].erase && BRUSH[k].eng !== "smudge";
@@ -134,6 +135,21 @@ const idb = (() => {
     usable: () => ok !== false,
   };
 })();
+
+/* 같은 학생이 탭을 둘 열면 초안이 서로 덮인다: 탭 하나만 초안을 쓰게 한다(Web Locks, 페이지가 닫히면 풀린다).
+   돌려주는 값: 이 탭이 초안을 써도 되는가. 잠금을 지원하지 않는 브라우저는 지금처럼 쓴다 */
+const draftOwner = {};
+function ownDraft(dkey) {
+  if (draftOwner[dkey]) return draftOwner[dkey];
+  return (draftOwner[dkey] = new Promise((ready) => {
+    try {
+      if (typeof navigator === "undefined" || !navigator.locks || !navigator.locks.request) return ready(true);
+      navigator.locks.request("skx:" + dkey, { ifAvailable: true }, (lock) => { ready(!!lock); return lock ? new Promise(() => {}) : undefined; }).catch(() => ready(true));
+    } catch (e) { ready(true); }
+  }));
+}
+/* 저장 뒤 지울 옛 문서 목록: 기록지 쓰기가 확인되기 전에 화면을 떠나면 다음에 열 때 이어서 처리한다 */
+const pendingCleanup = new Map();
 
 function defaultPrefs() {
   const o = {
@@ -214,6 +230,7 @@ function Guides({ g, W, H }) {
 
 export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, confirmDel, fmtTime, prefsV }) {
   const locked = useContext(WsLockCtx);
+  const wsSaved = useContext(WsSavedCtx);       // 기록지가 서버에 저장된 상태인가
   const cur = v && typeof v === "object" && v.ref ? v : null;
   const rootRef = useRef(null), viewRef = useRef(null), stageRef = useRef(null), hostRef = useRef(null);
   const cursorRef = useRef(null), fileRef = useRef(null), selPathRef = useRef(null);
@@ -221,7 +238,15 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   if (!engRef.current) engRef.current = new Engine();
   const eng = engRef.current;
 
-  const [prefs, setPrefs] = useState(() => mergePrefs(prefsV && typeof prefsV === "object" ? prefsV : ss.get(PREFS_KEY)));
+  const [prefs, setPrefs] = useState(() => {
+    // 손가락으로 그리기와 펜 자동 전환은 기기마다 다르므로 이 탭의 값만 쓴다(기록지의 _skp에는 넣지 않는다)
+    const local = ss.get(PREFS_KEY), lo = local && typeof local === "object" ? local : null;
+    const base = prefsV && typeof prefsV === "object" ? { ...prefsV } : { ...(lo || {}) };
+    delete base.finger; delete base.penAuto;
+    if (lo && "finger" in lo) base.finger = lo.finger;
+    if (lo && "penAuto" in lo) base.penAuto = lo.penAuto;
+    return mergePrefs(base);
+  });
   const [tool, setTool] = useState("pencil");
   const [lastBrush, setLastBrush] = useState("pencil");
   const [color, setColor] = useState("#111111");
@@ -246,6 +271,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   const [autoFail, setAutoFail] = useState(0);      // 자동 저장이 연달아 실패한 횟수
   const [remote, setRemote] = useState(false);      // 그리는 동안 다른 기기에서 저장된 그림이 들어옴
   const [refImg, setRefImg] = useState(null);       // 참고 그림(이 기기에서만 보인다)
+  const [hold, setHold] = useState(false);          // autoHold의 화면 표시용
 
   const view = useRef({ s: 0.5, r: 0, fx: 1, tx: 0, ty: 0, fit: true });
   const drag = useRef(null);
@@ -273,6 +299,11 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   const remoteRef = useRef(false);
   const loadFailRef = useRef(false);
   const refCv = useRef(null), refFile = useRef(null);
+  const applied = useRef(null);                   // flush가 기다리는 것: 저장한 값이 기록지 상태로 내려옴
+  const noDraft = useRef(false);                  // 다른 탭이 초안의 주인이다: 이 탭은 초안을 읽지도 쓰지도 않는다
+  const autoHold = useRef(false);                 // 「저장된 스케치 지우기」 뒤: 다시 그리기 전에는 자동으로 저장하지 않는다
+  const opener = useRef(null);                    // 창을 연 버튼(닫을 때 포커스를 돌려준다)
+  const textInRef = useRef(null);
   const xfRef = useRef(null);                     // 변형 중: { x, cx, cy, w, h, tx, ty, rot, sx, sy }
   const xfDrag = useRef(null);
   const adjRef = useRef(null);                    // 조정 중: { a, type, params, seed }
@@ -284,6 +315,8 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   st.current = { tool, prefs, color, locked, loading, full, textAt, busy, guide, panel, adj, loadFail };
   const fn = useRef({});
   const dkey = owner + ":" + fieldKey;
+  // 앞서 화면을 떠날 때 미뤄 둔 정리 목록을 이어받는다(첫 렌더에서: 정리 effect가 처음 돌 때 이미 들고 있게)
+  if (cleanup.current === null && pendingCleanup.has(dkey)) { cleanup.current = pendingCleanup.get(dkey); pendingCleanup.delete(dkey); }
   const bump = () => setTick((t) => t + 1);
 
   const flash = (msg) => {
@@ -294,15 +327,25 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
 
   /* ---------- 설정 (붓·팔레트): 이 탭(sessionStorage)과 기록지(_skp)에 둔다 ---------- */
 
+  const sendPrefs = (n) => {
+    const o = { ...n };
+    delete o.finger; delete o.penAuto;
+    const s = JSON.stringify(o);
+    if (s === prefsSent.current || st.current.locked) return;
+    prefsSent.current = s;
+    try { setField(PREFS_FIELD, o); } catch (e) {}
+  };
   const storePrefs = (n) => {
     ss.set(PREFS_KEY, n);
     clearTimeout(prefsTimer.current);
-    prefsTimer.current = setTimeout(() => {
-      const s = JSON.stringify(n);
-      if (s === prefsSent.current || st.current.locked || !aliveRef.current) return;
-      prefsSent.current = s;
-      try { setField(PREFS_FIELD, n); } catch (e) {}
-    }, 4000);
+    prefsTimer.current = setTimeout(() => { prefsTimer.current = 0; if (aliveRef.current) sendPrefs(n); }, 4000);
+  };
+  /* 대기 중인 설정 변경을 바로 보낸다(화면을 떠날 때) */
+  const flushPrefs = () => {
+    if (!prefsTimer.current) return;
+    clearTimeout(prefsTimer.current);
+    prefsTimer.current = 0;
+    sendPrefs(st.current.prefs);
   };
   const setPref = (patch) => setPrefs((p) => { const n = { ...p, ...patch }; storePrefs(n); return n; });
   const setToolPref = (k, patch) => setPrefs((p) => { const n = { ...p, [k]: { ...p[k], ...patch } }; storePrefs(n); return n; });
@@ -411,6 +454,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
 
   const writeDraft = async () => {
     const D = draft.current;
+    if (noDraft.current) return;
     if (D.writing) { D.again = true; return; }
     // 획·변형·조정 미리보기가 레이어를 건드리는 동안에는 뜨지 않는다(반쯤 지운 그림이 초안에 들어가지 않게)
     if (aliveRef.current && (eng.live || drag.current || xfRef.current || adjRef.current)) { clearTimeout(D.timer); D.timer = setTimeout(writeDraft, 600); return; }
@@ -425,13 +469,17 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
           saved: L.saved && L.saved.ver === L.ver ? L.saved.parts : null });
       }
       if (ver === D.ver && dirtyRef.current) {
-        const rec = { v: 2, base: loadedRef.current || null, w: eng.W, h: eng.H, paper: eng.paper, active: eng.layers.indexOf(eng.active()), layers, log: packLog(eng.log()), guide: st.current.guide, at: Date.now() };
+        const rec = { v: 2, base: loadedRef.current || null, w: eng.W, h: eng.H, paper: eng.paper, active: eng.layers.indexOf(eng.active()), layers, log: packLog(eng.log()), guide: st.current.guide, hold: autoHold.current, at: Date.now() };
         const ok = await idb.put(dkey, rec);
         D.failed = !ok;
         if (ok && ver === D.ver) D.fresh = true;
         if (aliveRef.current && dirtyRef.current) sketchDirty.current = !ok;
       }
-    } catch (e) {}
+    } catch (e) {
+      // 그림을 뜨지 못했다(메모리 부족 등): 초안이 없으므로 이동하기 전에 묻게 한다
+      D.failed = true;
+      if (aliveRef.current && dirtyRef.current) sketchDirty.current = true;
+    }
     D.writing = false;
     if (D.again) { D.again = false; writeDraft(); }
     else if (!aliveRef.current) eng.dispose();     // 화면을 떠난 뒤 마지막 초안까지 썼으면 캔버스를 놓는다
@@ -443,6 +491,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     idb.del(dkey);
   };
   const changed = () => {
+    if (autoHold.current) { autoHold.current = false; setHold(false); }
     setDirty(true);
     dirtyRef.current = true;
     changeSeq.current++;
@@ -451,7 +500,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     draft.current.ver++;
     sketchDirty.unsaved = true;
     // 화면을 떠날 때도 초안을 쓰므로(정리 함수), 초안 저장소를 쓸 수 없을 때만 「이동하면 사라진다」를 묻게 한다
-    sketchDirty.current = !idb.usable() || draft.current.failed;
+    sketchDirty.current = noDraft.current || !idb.usable() || draft.current.failed;
     clearTimeout(draft.current.timer);
     draft.current.timer = setTimeout(writeDraft, 1200);
   };
@@ -498,7 +547,12 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
             const imgs = await Promise.all(datas.map(loadImg));
             list = val.layers.map((l, i) => ({ id: l.id, name: l.name, op: l.op, vis: l.vis, blend: l.blend, alock: l.alock, lock: l.lock, img: imgs[i] }));
             savedParts = val.layers.map((l) => (Array.isArray(l.parts) ? l.parts : l.ref ? [{ ref: l.ref }] : null));
-            if (val.log) past = await fetchLog(store, owner, val.log);
+            if (val.log && Array.isArray(val.log.parts) && val.log.parts.length) {
+              // 과정 기록을 읽지 못했으면(없음과 다르다) 여기서 멈춘다: 그대로 열면 다음 저장이 옛 기록을 지운다
+              const ls = await getParts(store, owner, val.log.parts);
+              if (ls === FAILED) throw new Error("net");
+              past = typeof ls === "string" && ls.startsWith(LOG_PREFIX) ? unpackLog(ls.slice(LOG_PREFIX.length)) : null;
+            }
           } else flat = true;
         }
         if (!list) {
@@ -512,6 +566,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
         } else size = sizeFor(val.w, val.h);
       }
       if (seq !== loadSeq.current) return;
+      abortModes();   // 하던 획·변형·조정을 옛 레이어가 살아 있을 때 거둔다
       eng.reset(size.W, size.H, list, active);
       eng.paper = PAPERS.some((p) => p.k === paper) ? paper : "white";
       eng.past = past && past.length ? past : [list ? baseOp() : { kind: "new", w: eng.W, h: eng.H, paper: eng.paper, id: eng.layers[0].id, name: eng.layers[0].name, t: Date.now() }];
@@ -526,10 +581,11 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       loadedRef.current = dr ? dr.base : val ? val.ref : null;
       remoteRef.current = !!opt.stale; setRemote(!!opt.stale);
       refit();
-      if (dr) { changed(); draft.current.fresh = true; sketchDirty.current = false; flash(opt.stale ? "이 기기에서 그리던 그림을 불러왔습니다. 그 사이 다른 기기에서 저장된 그림은 저장 버전에 보관됩니다." : "저장하지 않은 그림을 다시 불러왔습니다."); }
+      if (dr) { changed(); draft.current.fresh = true; sketchDirty.current = false; if (dr.hold) { autoHold.current = true; setHold(true); sketchDirty.unsaved = false; } flash(opt.stale ? "이 기기에서 그리던 그림을 불러왔습니다. 그 사이 다른 기기에서 저장된 그림은 저장 버전에 보관됩니다." : "저장하지 않은 그림을 다시 불러왔습니다."); }
       else { markClean(); if (flat) flash("레이어를 찾지 못해 한 장으로 열었습니다."); }
     } catch (e) {
       if (seq !== loadSeq.current) return;
+      abortModes();
       eng.reset(RATIOS[0].W, RATIOS[0].H, null);
       eng.past = [{ kind: "new", w: eng.W, h: eng.H, paper: eng.paper, id: eng.layers[0].id, name: eng.layers[0].name, t: Date.now() }];
       setDims({ W: eng.W, H: eng.H });
@@ -551,18 +607,25 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   /* 처음 열 때: 이 브라우저의 초안 → 저장된 스케치 → 빈 캔버스.
      다른 기기에서 저장해 값이 바뀌면 저장 안 한 변경이 없을 때만 다시 읽는다 */
   const curRef = cur ? cur.ref : null;
+  /* 앞 저장본의 문서와 초안은 새 값이 기록지에 실리고(curRef) 그 기록지가 서버에 저장된(wsSaved) 뒤에 지운다.
+     그 전에 지우면, 기록지 쓰기 전에 페이지가 닫혔을 때 서버의 값이 없는 문서를 가리키고 초안도 없다 */
   useEffect(() => {
-    if (cleanup.current && cleanup.current.ref === curRef) {
-      cleanup.current.olds.forEach((r) => store.remove(owner, r));
-      cleanup.current = null;
-    }
+    const c = cleanup.current;
+    if (!c || c.ref !== curRef || !wsSaved) return;
+    c.olds.forEach((r) => store.remove(owner, r));
+    if (c.draft && !dirtyRef.current) clearDraft();
+    cleanup.current = null;
+  }, [curRef, wsSaved]);
+  useEffect(() => {
+    if (applied.current && curRef === loadedRef.current) { applied.current(); applied.current = null; }
     const valNow = () => (vRef.current && typeof vRef.current === "object" && vRef.current.ref ? vRef.current : null);
     if (loadedRef.current === undefined) {
       loadedRef.current = null;
       (async () => {
+        noDraft.current = !(await ownDraft(dkey));
         const keys = await idb.keys();
         for (const k of keys || []) if (typeof k === "string" && !k.startsWith(owner + ":")) idb.del(k);
-        const dr = await idb.get(dkey);
+        const dr = noDraft.current ? null : await idb.get(dkey);
         const now = valNow();
         const okDraft = dr && dr.v === 2 && Array.isArray(dr.layers) && dr.layers.length;
         if (okDraft && dr.base === (now ? now.ref : null)) await loadFrom(null, dr);
@@ -575,6 +638,9 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       })();
       return;
     }
+    if (!initDone.current || curRef === loadedRef.current) return;
+    // 올리는 중에 다른 기기의 값이 들어왔다: 저장이 끝날 때 그 값을 버전으로 두게 표시만 한다
+    if (savingRef.current) { remoteRef.current = true; return; }
     if (!initDone.current || curRef === loadedRef.current || savingRef.current) return;
     if (dirtyRef.current) {
       // 그리는 동안 다른 기기에서 저장했거나 지웠다: 지금 그림은 그대로 두고, 저장할 때 그쪽 그림을 버전으로 둔다
@@ -619,14 +685,16 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       sketchDirty.flush = null;
       clearTimeout(draft.current.timer);
       clearTimeout(noteTimer.current);
-      clearTimeout(prefsTimer.current);
+      fn.current.flushPrefs();
       cancelAnimationFrame(rafRef.current);
       fn.current.abortModes();
+      if (cleanup.current) pendingCleanup.set(dkey, cleanup.current);
       if (dirtyRef.current && !draft.current.fresh) writeDraft();   // 끝나면 writeDraft가 엔진을 놓는다
       else if (!draft.current.writing) eng.dispose();
       if (refCv.current) { freeCanvas(refCv.current); refCv.current = null; }
+      // 서버에 저장하지 못한 채 떠났으면 unsaved를 그대로 둔다(나가기·창 닫기에서 알 수 있게)
       sketchDirty.current = false;
-      sketchDirty.unsaved = false;
+      if (!dirtyRef.current) sketchDirty.unsaved = false;
     };
   }, []);
 
@@ -637,15 +705,41 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     setPanel(null);
     setFull(false);
     // 잠그는 순간까지 그린 내용은 저장한다(잠금 중에도 올리기가 끝난 참조는 기록지에 적을 수 있다: setField의 upload)
-    if (dirtyRef.current && initDone.current) fn.current.save({ auto: true, force: true });
+    if (dirtyRef.current && initDone.current && !autoHold.current) fn.current.save({ auto: true, force: true });
   }, [locked]);
+
+  /* 창을 닫으면 포커스를 연 버튼(없으면 그리기 도구)으로 돌려준다: body로 빠지면 단축키가 듣지 않는다 */
+  useEffect(() => {
+    if (panel) { if (!opener.current) opener.current = document.activeElement; return; }
+    const o = opener.current;
+    opener.current = null;
+    if (!o) return;
+    const a = document.activeElement;
+    if (a && a !== document.body) return;
+    const to = o !== document.body && document.contains(o) && !o.disabled ? o : rootRef.current;
+    if (to) to.focus({ preventScroll: true });
+  }, [panel]);
 
   /* 크게 그리기: 페이지 스크롤을 막고, 포커스가 밖에 있어도 단축키가 듣게 한다 */
   useEffect(() => {
     if (!full) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const kd = (e) => { if (!rootRef.current || !rootRef.current.contains(e.target)) fn.current.onKey(e); };
+    const kd = (e) => {
+      const root = rootRef.current;
+      if (e.key === "Tab" && root && !root.querySelector(".skh-rp")) {
+        // 화면을 덮고 있으므로 Tab이 뒤에 가려진 기록지 칸으로 나가지 않게 한다
+        const els = Array.from(root.querySelectorAll("button:not(:disabled),input:not(:disabled),select:not(:disabled),summary,[tabindex='0']")).filter((x) => x.offsetParent !== null);
+        if (els.length) {
+          const first = els[0], last = els[els.length - 1], a = document.activeElement;
+          if (!root.contains(a)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+          else if (e.shiftKey && (a === first || a === root)) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+        }
+        return;
+      }
+      if (!root || !root.contains(e.target)) fn.current.onKey(e);
+    };
     const ku = (e) => { if (!rootRef.current || !rootRef.current.contains(e.target)) fn.current.onKeyUp(e); };
     document.addEventListener("keydown", kd);
     document.addEventListener("keyup", ku);
@@ -669,9 +763,10 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     }
   };
   const selectTool = (k) => {
-    if (st.current.locked) return;
+    if (st.current.locked || drag.current || eng.live) return;
     if (textRef.current) commitText();
     if (adjRef.current) endAdjust(true);
+    if (k === "xform" && tool === "xform" && !xfRef.current) { if (enterXform()) { setPanel(null); bump(); } return; }
     if (k === tool) { if (isDrawBrush(k) || k === "eraser" || k === "smudge") setPanel((p) => (p === "brush" ? null : "brush")); return; }
     if (xfRef.current) applyXform();
     if (k === "xform") { if (!enterXform()) return; setPanel(null); }
@@ -746,6 +841,8 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   const xfMove = (e) => {
     const d = xfDrag.current, X = xfRef.current;
     if (!d || !X || d.id !== e.pointerId) return;
+    // 버튼을 누르지 않은 마우스 움직임에는 반응하지 않는다(끌기가 끝난 것을 놓친 경우)
+    if (e.pointerType === "mouse" && e.buttons === 0) { xfDrag.current = null; return; }
     const q = toCanvas(e.clientX, e.clientY);
     if (d.mode === "move") { X.tx = d.s.tx + (q.x - d.q.x); X.ty = d.s.ty + (q.y - d.q.y); }
     else {
@@ -768,7 +865,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     }
     xfPreview();
   };
-  const xfUp = (e) => { if (xfDrag.current && xfDrag.current.id === e.pointerId) xfDrag.current = null; };
+  const xfUp = (e) => { if (xfDrag.current && xfDrag.current.id === e.pointerId) { xfDrag.current = null; bump(); } };
 
   /* ---------- 조정 ---------- */
 
@@ -781,11 +878,11 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   };
   const startAdjust = (type) => {
     const L = eng.active(), def = ADJUSTS.find((a) => a.k === type);
-    if (!def || !L) return;
+    if (!def || !L || drag.current || eng.live) return;
     if (!L.vis) return flash("숨긴 레이어는 조정할 수 없습니다.");
     if (L.lock) return flash("잠긴 레이어는 조정할 수 없습니다.");
     if (textRef.current) commitText();
-    if (xfRef.current) applyXform();
+    if (xfRef.current) { applyXform(); setTool(prevTool.current === "xform" ? lastBrush : prevTool.current); }
     if (adjRef.current) endAdjust(true);
     const params = Object.fromEntries(def.params.map((p) => [p[0], p[4]]));
     const A = { a: eng.beginAdjust(L), type, params, seed: (Math.random() * 1e9) | 0 };
@@ -850,12 +947,14 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     }
   };
   const clearSelArea = () => {
+    if (drag.current || eng.live) return;
     const L = eng.active();
     if (!L || L.lock) return flash("잠긴 레이어는 지울 수 없습니다.");
     eng.commit({ kind: "clear", sel: eng.sel || undefined, layers: [L.id] });
     touched();
   };
   const fillSelArea = () => {
+    if (drag.current || eng.live) return;
     const L = eng.active();
     if (!L || L.lock || !L.vis) return flash("잠겼거나 숨긴 레이어에는 칠할 수 없습니다.");
     eng.commit({ kind: "shape", shape: "rect", x0: -2, y0: -2, x1: eng.W + 2, y1: eng.H + 2, color: st.current.color, size: 1, opacity: 1, dash: "solid", fill: true, sel: eng.sel || undefined, alock: L.alock || undefined, layers: [L.id] });
@@ -863,6 +962,9 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     touched();
   };
   const liftSel = (cut) => {
+    if (drag.current || eng.live) return;
+    const L0 = eng.active();
+    if (cut && L0 && L0.lock) return flash("잠긴 레이어는 잘라 낼 수 없습니다.");
     if (eng.layers.length >= MAX_LAYERS) return flash("레이어는 " + MAX_LAYERS + "장까지 만들 수 있습니다.");
     if (eng.liftSel(cut)) { eng.setSel(null); touched(); }
   };
@@ -918,7 +1020,11 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     if (d.mode === "draw" || d.mode === "shape" || d.mode === "quick") eng.cancelLive();
     if (d.mode === "sel") drawSelPreview(null);
     if (d.mode === "pick" && d.back) setTool(prevTool.current);
-    if (d.mode === "xf") xfDrag.current = null;
+    if (d.mode === "xf") {
+      const s0 = xfDrag.current && xfDrag.current.s, X0 = xfRef.current;
+      if (s0 && X0) { Object.assign(X0, s0); xfPreview(); }
+      xfDrag.current = null;
+    }
     if (viewRef.current) viewRef.current.classList.remove("panning");
   };
   const startPinch = () => {
@@ -1003,6 +1109,34 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     d.mode = "quick"; d.op = sop;
     flash((QUICK_NAMES[fit.type === "ellipse" && fit.circle ? "circle" : fit.type] || "도형") + "으로 바로잡았습니다.");
   };
+  /* 누르는 순간 실행되는 도구(채우기·글자·자동 선택). 손가락으로는 뗄 때 실행한다(두 손가락 동작과 겹치지 않게) */
+  const runTap = (t, q) => {
+    const S = st.current;
+    if (t === "select") {
+      addSelPart({ type: "wand", x: Math.floor(q.x), y: Math.floor(q.y), tol: S.prefs.wandTol, ref: S.prefs.fillRef, layer: eng.activeId });
+      return;
+    }
+    const L = eng.active();
+    if (!L) return;
+    if (!L.vis) return flash("숨긴 레이어에는 그릴 수 없습니다. 레이어 창에서 눈 모양 버튼을 눌러 보이게 하세요.");
+    if (L.lock) return flash("잠긴 레이어에는 그릴 수 없습니다. 레이어 창에서 잠금을 푸세요.");
+    if (q.x < 0 || q.y < 0 || q.x >= eng.W || q.y >= eng.H) return;
+    if (t === "text") {
+      // 입력칸은 화면에 똑바로 놓이므로, 뒤집히거나 돌아간 화면에서는 쓴 글자의 위치와 어긋난다: 화면을 바로 놓는다
+      if (view.current.fx < 0 || view.current.r % 360 !== 0) { turnView({ fx: 1, r: 0 }); flash("글자를 쓰는 동안 화면을 바로 놓았습니다."); }
+      textRef.current = { x: q.x, y: q.y };
+      // 누른 동작 안에서 입력칸에 포커스를 줘야 태블릿의 화면 키보드가 뜬다
+      flushSync(() => { setTextVal(""); setTextAt(textRef.current); });
+      if (textInRef.current) textInRef.current.focus({ preventScroll: true });
+      return;
+    }
+    if (t === "fill") {
+      eng.commit({ kind: "fill", x: Math.floor(q.x), y: Math.floor(q.y), color: S.color, opacity: S.prefs.fillT.op, tol: S.prefs.fillTol, ref: S.prefs.fillRef,
+        layers: [L.id], sel: eng.sel || undefined, alock: L.alock || undefined });
+      pushRecent(S.color);
+      touched();
+    }
+  };
 
   const seePen = (e) => {
     lastPen.current = performance.now();
@@ -1010,7 +1144,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     if (!S.prefs.penAuto) {
       // 펜을 처음 쓸 때 한 번만 손가락 그리기를 끈다. 그 뒤에는 학생이 고른 대로 둔다
       setPref({ finger: false, penAuto: true });
-      if (S.prefs.finger) flash("펜이 감지되어 손가락으로는 화면 이동·확대만 합니다.");
+      if (S.prefs.finger) flash("펜을 쓰기 시작해 손가락 그리기를 껐습니다. 손가락으로는 화면 이동·확대만 합니다.");
     }
   };
   const onPointerDown = (e) => {
@@ -1024,14 +1158,18 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       if (performance.now() - lastPen.current < 500) { ignored.current.add(e.pointerId); return; }
     }
     if (rootRef.current && document.activeElement !== rootRef.current && !textRef.current) rootRef.current.focus({ preventScroll: true });
-    if (textRef.current) { commitText(); return; }
+    if (e.pointerType !== "touch" && textRef.current) { commitText(); return; }
     if (e.pointerType === "touch") {
       const d0 = drag.current;
       if (d0 && d0.ptype !== "touch") { ignored.current.add(e.pointerId); return; } // 펜·마우스로 그리는 중에 닿은 손(손바닥)은 무시
       if (e.isPrimary) touches.current.clear();
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY, w: Math.max(e.width || 0, e.height || 0) });
+      // 글자를 쓰던 중이면 확정한다. 이 손가락은 그 일만 하고(dead), 둘째 손가락이 오면 두 손가락 동작으로 넘어간다
+      const hadText = !!textRef.current;
+      if (hadText) commitText();
       if (touches.current.size >= 2) { startPinch(); return; }
       if (d0 && d0.mode === "pinch") return;
+      if (hadText) { drag.current = { mode: "tap", id: e.pointerId, ptype: "touch", dead: true }; return; }
       if (!S.prefs.finger || S.tool === "hand") { startPan(e); return; }
     } else if (drag.current && drag.current.ptype === "touch") {
       // 펜·마우스가 손가락 조작보다 앞선다: 손바닥으로 시작된 이동·획을 거두고(화면도 되돌리고) 펜으로 그린다
@@ -1051,7 +1189,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
 
     const q = toCanvas(e.clientX, e.clientY);
     const penEraser = e.pointerType === "pen" && (e.button === 5 || (e.buttons & 32));
-    const t = penEraser ? "eraser" : S.tool;
+    const t = xfRef.current ? "xform" : penEraser ? "eraser" : S.tool;   // 변형 중에는 펜의 지우개 쪽도 옮기기로
     const capture = () => { try { viewRef.current.setPointerCapture(e.pointerId); } catch (x) {} };
     if (t === "xform") { xfDown(e, "move"); drag.current = { mode: "xf", id: e.pointerId, ptype: e.pointerType }; capture(); return; }
     if (t === "picker" || (e.altKey && BRUSH[t])) {
@@ -1060,40 +1198,24 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       capture();
       return;
     }
+    const instant = t === "fill" || t === "text" || (t === "select" && S.prefs.selKind === "wand");
+    if (instant) {
+      e.preventDefault();
+      if (e.pointerType === "touch") { drag.current = { mode: "tap", id: e.pointerId, ptype: "touch", tool: t, q, cx: e.clientX, cy: e.clientY }; capture(); return; }
+      runTap(t, q);
+      return;
+    }
     if (t === "select") {
-      const kind = S.prefs.selKind;
-      if (kind === "wand") {
-        addSelPart({ type: "wand", x: Math.floor(q.x), y: Math.floor(q.y), tol: S.prefs.wandTol, ref: S.prefs.fillRef, layer: eng.activeId });
-        return;
-      }
-      drag.current = { mode: "sel", id: e.pointerId, ptype: e.pointerType, kind, x0: q.x, y0: q.y, x1: q.x, y1: q.y, pts: [q.x, q.y] };
+      drag.current = { mode: "sel", id: e.pointerId, ptype: e.pointerType, kind: S.prefs.selKind, x0: q.x, y0: q.y, x1: q.x, y1: q.y, pts: [q.x, q.y] };
       capture();
       return;
     }
     const L = eng.active();
     const blocked = !L.vis ? "숨긴 레이어에는 그릴 수 없습니다. 레이어 창에서 눈 모양 버튼을 눌러 보이게 하세요." : L.lock ? "잠긴 레이어에는 그릴 수 없습니다. 레이어 창에서 잠금을 푸세요." : "";
-    if (t === "text") {
-      if (blocked) return flash(blocked);
-      if (q.x < 0 || q.y < 0 || q.x > eng.W || q.y > eng.H) return;
-      e.preventDefault();
-      // 입력칸은 화면에 똑바로 놓이므로, 뒤집히거나 돌아간 화면에서는 쓴 글자의 위치와 어긋난다: 화면을 바로 놓는다
-      if (view.current.fx < 0 || view.current.r % 360 !== 0) { turnView({ fx: 1, r: 0 }); flash("글자를 쓰는 동안 화면을 바로 놓았습니다."); }
-      setTextVal("");
-      textRef.current = { x: q.x, y: q.y };
-      setTextAt(textRef.current);
-      return;
-    }
     if (blocked) return flash(blocked);
     const common = { layers: [L.id], sel: eng.sel || undefined, alock: L.alock || undefined };
     const g = S.guide;
     const sym = g.kind === "sym" ? { kind: g.sym, cx: eng.W / 2, cy: eng.H / 2, n: g.n } : undefined;
-    if (t === "fill") {
-      if (q.x < 0 || q.y < 0 || q.x >= eng.W || q.y >= eng.H) return;
-      eng.commit({ kind: "fill", x: Math.floor(q.x), y: Math.floor(q.y), color: S.color, opacity: S.prefs.fillT.op, tol: S.prefs.fillTol, ref: S.prefs.fillRef, ...common });
-      pushRecent(S.color);
-      touched();
-      return;
-    }
     capture();
     if (t === "shape") {
       const sk = S.prefs.shapeKind;
@@ -1218,7 +1340,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       if (Math.hypot(q.x - op.pts[n - 3], q.y - op.pts[n - 2]) > 0.75 / view.current.s) { op.pts.push(q.x, q.y, d.p); if (op.tl) op.tl.push(op.tl[op.tl.length - 1] || 0); }
     }
     if (op.tl && !op.tl.some((x) => x > 0)) delete op.tl;
-    eng.endLive();
+    if (!eng.endLive()) { bump(); return; }   // 그 사이 캔버스를 다시 불러와 엔진이 받지 않은 획
     if (op.kind === "stroke" && !d.T.erase) pushRecent(op.color);
     touched();
   };
@@ -1255,6 +1377,8 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       else addSelPart({ type: "ellipse", cx: (d.x0 + d.x1) / 2, cy: (d.y0 + d.y1) / 2, rx: w / 2, ry: h / 2 });
     } else if (d.mode === "pick") {
       if (d.back) setTool(prevTool.current);
+    } else if (d.mode === "tap") {
+      if (!d.dead && Math.hypot(e.clientX - d.cx, e.clientY - d.cy) < 10 * deltaK()) runTap(d.tool, d.q);
     }
   };
   const onPointerCancel = (e) => {
@@ -1328,11 +1452,14 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     const typing = t && (t.tagName === "TEXTAREA" || t.tagName === "SELECT" || (t.tagName === "INPUT" && !["range", "color", "checkbox", "button", "file"].includes(t.type)));
     if (typing) return;
     const k = keyOf(e), mod = e.ctrlKey || e.metaKey;
+    // 긋거나 끄는 중에는 스페이스 말고는 받지 않는다(진행 중인 획과 엔진의 기준 그림이 어긋나지 않게)
+    const dg = drag.current;
+    if (dg && dg.mode !== "pinch" && dg.mode !== "pan" && k !== " ") { if (mod) e.preventDefault(); return; }
     if (mod && (k === "z" || k === "Z")) { e.preventDefault(); if (e.shiftKey) doRedo(); else doUndo(); return; }
     if (mod && (k === "y" || k === "Y")) { e.preventDefault(); doRedo(); return; }
     if (mod && (k === "s" || k === "S")) { e.preventDefault(); if (dirtyRef.current) save(); return; }
-    if (mod && (k === "a" || k === "A")) { e.preventDefault(); selectAll(); return; }
-    if (mod && (k === "d" || k === "D")) { e.preventDefault(); setSel(null); return; }
+    if (mod && (k === "a" || k === "A")) { e.preventDefault(); if (!xfRef.current && !adjRef.current) selectAll(); return; }
+    if (mod && (k === "d" || k === "D")) { e.preventDefault(); if (!xfRef.current && !adjRef.current) setSel(null); return; }
     if (mod || e.altKey) return;
     if (k === " ") {
       if (t === rootRef.current || t === viewRef.current || t === document.body) {
@@ -1349,6 +1476,8 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       return;
     }
     if (k === "Enter") {
+      // 버튼에 포커스가 있으면 그 버튼이 Enter를 처리한다(「취소」에서 Enter를 눌렀는데 적용되지 않게). 변형 손잡이는 예외
+      if (t && t !== rootRef.current && t.closest && t.closest("button:not(.skx-h),a,summary")) return;
       if (xfRef.current) { e.preventDefault(); applyXform(); setTool(prevTool.current === "xform" ? lastBrush : prevTool.current); }
       else if (adjRef.current) { e.preventDefault(); endAdjust(true); }
       return;
@@ -1356,8 +1485,16 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     if (xfRef.current && /^Arrow/.test(k)) {
       // 변형 중 화살표 키: 1px(Shift는 10px)씩 옮긴다
       e.preventDefault();
-      const n = e.shiftKey ? 10 : 1, X = xfRef.current;
-      xfPatch({ tx: X.tx + (k === "ArrowLeft" ? -n : k === "ArrowRight" ? n : 0), ty: X.ty + (k === "ArrowUp" ? -n : k === "ArrowDown" ? n : 0) });
+      // 손잡이에 포커스가 있으면 그 손잡이의 일을 한다: 크기(1%, Shift는 10%), 회전(1°, Shift는 15°)
+      const hm = t && t.classList && t.classList.contains("skx-h") ? t.dataset.mode : "";
+      if (hm === "scale") { const f = 1 + (k === "ArrowUp" || k === "ArrowRight" ? 1 : -1) * (e.shiftKey ? 0.1 : 0.01); xfPatch((x) => ({ sx: x.sx * f, sy: x.sy * f })); return; }
+      if (hm === "rot") { const dr = ((k === "ArrowRight" || k === "ArrowDown" ? 1 : -1) * (e.shiftKey ? 15 : 1) * Math.PI) / 180; xfPatch((x) => ({ rot: x.rot + dr })); return; }
+      // 옮기기: 화면에서 누른 방향대로(좌우 반전·회전해서 보는 중에도)
+      const n = e.shiftKey ? 10 : 1, X = xfRef.current, V = view.current;
+      const dxs = k === "ArrowLeft" ? -n : k === "ArrowRight" ? n : 0, dys = k === "ArrowUp" ? -n : k === "ArrowDown" ? n : 0;
+      const rad = (V.r * Math.PI) / 180, c = Math.cos(rad), sn = Math.sin(rad);
+      const u = c * dxs + sn * dys, w = -sn * dxs + c * dys;
+      xfPatch({ tx: X.tx + (V.fx < 0 ? -u : u), ty: X.ty + w });
       return;
     }
     if (xfRef.current || adjRef.current) return;
@@ -1378,7 +1515,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     if (k === "c" || k === "C") { e.preventDefault(); setPanel((p) => (p === "color" ? null : "color")); return; }
     if (k === "x" || k === "X") { e.preventDefault(); turnView({ fx: -view.current.fx }); return; }
     const T = Object.values(TOOL).find((x) => x.key && x.key === k.toLowerCase());
-    if (T) { e.preventDefault(); if (T.k !== S.tool) selectTool(T.k); }
+    if (T) { e.preventDefault(); if (T.k !== S.tool || (T.k === "xform" && !xfRef.current)) selectTool(T.k); }
   };
   const onKeyUp = (e) => {
     if (e.key === " " && spaceRef.current) {
@@ -1526,7 +1663,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     chooseColor("#" + [d[0], d[1], d[2]].map((n) => n.toString(16).padStart(2, "0")).join("").toUpperCase());
   };
   const clearAll = () => {
-    if (!eng.hasContent()) return;
+    if (drag.current || eng.live || !eng.hasContent()) return;
     const ids = eng.layers.filter((L) => !L.lock).map((L) => L.id);
     if (!ids.length) return flash("모든 레이어가 잠겨 있습니다.");
     eng.commit({ kind: "clear", layers: ids });
@@ -1537,7 +1674,11 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   /* ---------- 저장 ---------- */
 
   const save = (opt = {}) => {
-    if (savePromise.current) return savePromise.current;
+    if (savePromise.current) {
+      if (!opt.force) return savePromise.current;
+      // 잠그는 순간의 저장: 진행 중인 저장이 끝난 뒤, 그 저장이 시작된 다음에 그린 내용이 남아 있으면 한 번 더 저장한다
+      return savePromise.current.then(() => (aliveRef.current && dirtyRef.current && st.current.locked ? save(opt) : true));
+    }
     const p = doSave(opt).finally(() => { if (savePromise.current === p) savePromise.current = null; });
     savePromise.current = p;
     return p;
@@ -1561,7 +1702,11 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       freeCanvas(whole);
       if (!comp) throw new Error("big");
       const Ls = eng.layers.slice(), metas = eng.layersMeta(), vers = Ls.map((L) => L.ver);
-      const reuse = Ls.map((L) => !!(L.saved && L.saved.ver === L.ver));
+      // 바뀌지 않은 레이어는 앞 저장의 문서를 그대로 쓴다. 단, 지금 저장 값이 실제로 가리키는 문서일 때만
+      // (지웠다 되돌린 레이어는 그 사이 저장이 문서를 지웠을 수 있다)
+      const live0 = new Set(refsOf(vRef.current));
+      const reuse = Ls.map((L) => !!(L.saved && L.saved.ver === L.ver && L.saved.parts.every((x) => live0.has(x.ref))));
+      const reParts = Ls.map((L, i) => (reuse[i] ? L.saved.parts : null));
       const enc = Ls.map((L, i) => (reuse[i] ? null : encodeLayer(L.cv)));
       if (enc.some((d, i) => !reuse[i] && !d)) throw new Error("big");
       const log = eng.log(), stats = logStats(log);
@@ -1573,7 +1718,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       if (!(await store.putT(owner, ref, comp))) throw new Error("net");
       const layers = [];
       for (let i = 0; i < Ls.length; i++) {
-        const parts = reuse[i] ? Ls[i].saved.parts : await putParts(store, owner, ref + ".L" + metas[i].id, enc[i]);
+        const parts = reuse[i] ? reParts[i] : await putParts(store, owner, ref + ".L" + metas[i].id, enc[i]);
         if (!parts) throw new Error("net");        // 한 장이라도 못 올리면 저장하지 않는다(레이어를 버리고 합쳐 저장하지 않는다)
         if (!reuse[i]) made.push(...parts.map((p) => p.ref));
         layers.push({ ...metas[i], parts });
@@ -1582,6 +1727,9 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       if (logStr) { logParts = await putParts(store, owner, ref + ".log", logStr); if (logParts) made.push(...logParts.map((p) => p.ref)); }
       // 3) 값. 앞의 저장본은 버전으로 두거나(keep) 지운다
       const pv = vRef.current, prev = pv && typeof pv === "object" && pv.ref ? pv : null;
+      // 올리는 사이 값이 바뀌어(다른 기기, 지우기) 다시 쓰려던 문서가 사라졌으면 이번 저장은 버리고 다음에 새로 올린다
+      const liveNow = new Set(prev ? refsOf(prev) : []);
+      if (reParts.some((ps) => ps && !ps.every((x) => liveNow.has(x.ref)))) { Ls.forEach((L) => { L.saved = null; }); throw new Error("net"); }
       let versions = prev && Array.isArray(prev.versions) ? prev.versions.filter((x) => x && x.ref) : [];
       const lastKept = Math.max(0, ...versions.map((x) => +new Date(x.at) || 0), prev && prev.keep ? +new Date(prev.at) || 0 : 0);
       // 다른 기기에서 들어온 저장본(remote)은 이 기기가 본 적 없는 그림이므로 항상 버전으로 둔다
@@ -1591,19 +1739,20 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       if (logParts) val.log = { parts: logParts, n: log.length };
       if (versions.length) val.versions = versions;
       if (g && g.kind !== "none") val.guide = { kind: g.kind, step: g.step, vp: g.vp ? g.vp.map((p) => ({ x: p[0], y: p[1] })) : null, sym: g.sym, n: g.n, assist: !!g.assist };
-      const lockedNow = st.current.locked;
-      if (!aliveRef.current || (lockedNow && !opt.force)) throw new Error("lock");
+      // 여기까지 온 저장은 잠금 전에 시작했거나 잠그는 순간의 저장(force)이다: 잠긴 뒤에 끝나도 적는다(setField의 upload)
+      if (!aliveRef.current) throw new Error("lock");
+      if (setField(fieldKey, val, st.current.locked ? { upload: true } : undefined) === false) throw new Error("lock");   // 기록지가 쓰기를 받지 않음(초기화·이관 직후)
       const keep = new Set(refsOf(val));
-      cleanup.current = { ref, olds: prev ? refsOf(prev).filter((r) => !keep.has(r)) : [] };
+      cleanup.current = { ref, olds: [...(cleanup.current ? cleanup.current.olds : []), ...(prev ? refsOf(prev) : [])].filter((r) => !keep.has(r)), draft: false };
       loadedRef.current = ref;
-      setField(fieldKey, val, lockedNow ? { upload: true } : undefined);
       Ls.forEach((L, i) => { L.saved = { ver: vers[i], parts: layers[i].parts }; });
       remoteRef.current = false; setRemote(false);
       ok = true;
       lastSaveAt.current = ts;
       setSavedAt(ts);
       setAutoFail(0);
-      if (seq === changeSeq.current) { clearDraft(); markClean(); }
+      // 초안은 기록지 쓰기가 확인된 뒤에 지운다(위의 정리 effect)
+      if (seq === changeSeq.current) { cleanup.current.draft = true; clearTimeout(draft.current.timer); markClean(); }
       else { draft.current.fresh = false; draft.current.ver++; clearTimeout(draft.current.timer); draft.current.timer = setTimeout(writeDraft, 600); }
       if (!logParts && !opt.auto && logStr === null) flash("과정 기록이 너무 길어 그림만 저장했습니다.");
     } catch (e) {
@@ -1618,7 +1767,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   };
   const autoTick = () => {
     const S = st.current;
-    if (!S.prefs.autosave || !dirtyRef.current || savingRef.current || S.locked || S.loading || S.loadFail || drag.current || xfRef.current || adjRef.current || textRef.current) return;
+    if (!S.prefs.autosave || autoHold.current || !dirtyRef.current || savingRef.current || S.locked || S.loading || S.loadFail || drag.current || xfRef.current || adjRef.current || textRef.current) return;
     if (typeof navigator !== "undefined" && navigator.onLine === false) return;
     const now = Date.now();
     // 실패한 뒤에는 간격을 벌린다(오프라인에서 쓰기가 대기열에 쌓이지 않게)
@@ -1628,16 +1777,21 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   const onHide = () => {
     if (!dirtyRef.current) return;
     if (!draft.current.fresh) { clearTimeout(draft.current.timer); writeDraft(); }
-    if (st.current.prefs.autosave && Date.now() - lastTry.current > 20000 && !drag.current) save({ auto: true });
+    if (st.current.prefs.autosave && !autoHold.current && Date.now() - lastTry.current > 20000 && !drag.current) save({ auto: true });
   };
   /* 나가기 전에 src-app.jsx가 부른다: 진행 중인 저장을 기다리고, 남은 변경이 있으면 한 번 저장해 본다 */
   const flush = async () => {
+    flushPrefs();
+    if (autoHold.current) return true;
     if (savePromise.current) await savePromise.current;
     if (dirtyRef.current && !st.current.locked) { abortModes(); await save({ auto: true }); }
+    // 저장한 값이 기록지 상태로 내려온 것을 본 뒤에 끝낸다(바로 이어지는 기록지 저장에 함께 실리게)
+    const vr = vRef.current && typeof vRef.current === "object" ? vRef.current.ref || null : null;
+    if (aliveRef.current && !dirtyRef.current && loadedRef.current && vr !== loadedRef.current) await new Promise((res) => { applied.current = res; setTimeout(res, 1500); });
     return !dirtyRef.current;
   };
   const revertToSaved = () => {
-    if (!cur) return;
+    if (!cur || savingRef.current) return;
     if (!window.confirm("저장한 뒤에 그린 내용을 버리고 저장한 그림으로 되돌릴까요?")) return;
     abortModes();
     clearDraft();
@@ -1646,14 +1800,19 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   };
   const retryLoad = () => { abortModes(); loadFrom(cur, null); };
   const removeSaved = async () => {
-    if (!cur || !confirmDel()) return;
-    const refs = refsOf(cur);
+    if (!cur || savingRef.current || !confirmDel()) return;
+    const refs = [...refsOf(cur), ...(cleanup.current ? cleanup.current.olds : [])];
+    if (setField(fieldKey, "") === false) return;
     cleanup.current = null;
     loadedRef.current = null;
-    setField(fieldKey, "");
     refs.forEach((r) => store.remove(owner, r));
     eng.layers.forEach((L) => { L.saved = null; });
-    if (eng.hasContent()) changed(); else { clearDraft(); markClean(); }
+    if (eng.hasContent()) {
+      // 캔버스의 그림은 그대로 두되, 학생이 지운 저장본이 자동 저장으로 되살아나지 않게 한다
+      changed();
+      autoHold.current = true; setHold(true);
+      sketchDirty.unsaved = false;
+    } else { clearDraft(); markClean(); }
   };
   /* 저장 버전을 불러온다. layer: 새 레이어로(지금 그림은 그대로), replace: 지금 그림을 그 버전으로 바꾼다. 둘 다 되돌릴 수 있다 */
   const restoreVersion = async (ver, mode) => {
@@ -1665,6 +1824,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       if (typeof data !== "string" || !data.startsWith("data:image")) throw new Error("missing");
       const img = await loadImg(data);
       if (st.current.locked || !aliveRef.current) return;
+      abortModes();   // 불러오는 사이 시작된 획·변형·조정을 거둔 뒤에 넣는다
       const c = document.createElement("canvas");
       c.width = eng.W; c.height = eng.H;
       const s = Math.min(eng.W / img.naturalWidth, eng.H / img.naturalHeight);
@@ -1676,7 +1836,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
         const B = eng.layers[0];
         if (B.lock) eng.commit({ kind: "lset", id: B.id, patch: { lock: false }, grp });
         eng.commit({ kind: "image", paste: true, img: c, x: 0, y: 0, w: eng.W, h: eng.H, layers: [B.id], grp });
-        flash("그 버전으로 되돌렸습니다. 되돌리기로 취소할 수 있습니다.");
+        flash("그 버전으로 바꿨습니다. 되돌리기 버튼으로 취소할 수 있습니다.");
       } else {
         const N = eng.commit({ kind: "ladd", name: "저장 버전 " + fmtTime(ver.at), index: eng.layers.length, grp })._L;
         eng.commit({ kind: "image", paste: true, img: c, x: 0, y: 0, w: eng.W, h: eng.H, layers: [N.id], grp });
@@ -1686,7 +1846,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     } catch (e) { flash("저장 버전을 불러오지 못했습니다."); }
   };
 
-  fn.current = { onWheel, onKey, onKeyUp, autoTick, onHide, abortModes, save, flush };
+  fn.current = { onWheel, onKey, onKeyUp, autoTick, onHide, abortModes, save, flush, flushPrefs };
 
   /* ---------- 그리기 ---------- */
 
@@ -1741,14 +1901,15 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       wide: X.w * Math.abs(X.sx) * vs > 64, tall: X.h * Math.abs(X.sy) * vs > 64 };
   })() : null;
   const handle = (p, mode, hx, hy, label, cls = "") => (
-    <button key={label} type="button" className={"skx-h " + cls} style={{ left: p[0], top: p[1] }} aria-label={label} title={label}
-      onPointerDown={(e) => xfDown(e, mode, hx, hy)} onPointerMove={xfMove} onPointerUp={xfUp} onPointerCancel={xfUp} />
+    <button key={label} type="button" className={"skx-h " + cls} style={{ left: p[0], top: p[1] }} aria-label={label + " (화살표 키로도 됩니다)"} title={label} data-mode={mode}
+      onPointerDown={(e) => xfDown(e, mode, hx, hy)} onPointerMove={xfMove} onPointerUp={xfUp} onPointerCancel={xfUp} onLostPointerCapture={xfUp} />
   );
 
   return (
     <div className="field span2">
       <label>{f.label}</label>
-      <div ref={rootRef} className={"skx" + (full ? " skx-full" : "")} tabIndex={-1} onKeyDown={onKey} onKeyUp={onKeyUp}
+      <div ref={rootRef} className={"skx" + (full ? " skx-full" : "") + (touchDev ? " skx-touch" : "")} tabIndex={-1} onKeyDown={onKey} onKeyUp={onKeyUp}
+        role={full ? "dialog" : undefined} aria-modal={full || undefined} aria-label={full ? "디지털 에스키스" : undefined}
         onClick={(e) => { if (e.detail > 0 && e.target.closest && e.target.closest("button") && !textRef.current && !replay) rootRef.current.focus({ preventScroll: true }); }}>
         <div className="skx-bar">
           <div className="skx-grp">
@@ -1907,18 +2068,25 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
               {xfCorners && !locked && (
                 <>
                   {xfCorners.c.map((p, i) => handle(p, "scale", [-1, 1, 1, -1][i], [-1, -1, 1, 1][i], ["왼쪽 위", "오른쪽 위", "오른쪽 아래", "왼쪽 아래"][i] + " 모서리: 크기 바꾸기"))}
-                  {xfCorners.sides.map((p, i) => ((i % 2 ? xfCorners.wide : xfCorners.tall) ? handle(p, "scale", [0, 1, 0, -1][i], [-1, 0, 1, 0][i], ["위", "오른쪽", "아래", "왼쪽"][i] + " 변: 한쪽으로 늘이기", "side") : null))}
+                  {xfCorners.sides.map((p, i) => ((i % 2 ? xfCorners.wide : xfCorners.tall) || xfDrag.current ? handle(p, "scale", [0, 1, 0, -1][i], [-1, 0, 1, 0][i], ["위", "오른쪽", "아래", "왼쪽"][i] + " 변: 한쪽으로 늘이기", "side") : null))}
                   {handle(xfCorners.rot, "rot", 0, 0, "돌리기", "rot")}
                 </>
               )}
               {vps && !modal && !locked && vps.map((p, i) => (
-                <button key={i} type="button" className="skx-h vp" style={{ left: p[0], top: p[1] }} aria-label={"소실점 " + (i + 1) + ": 끌어서 옮기기"} title="소실점: 끌어서 옮기기"
-                  onPointerDown={(e) => vpDown(e, i)} onPointerMove={(e) => vpMove(e, i)} />
+                <button key={i} type="button" className="skx-h vp" style={{ left: p[0], top: p[1] }} aria-label={"소실점 " + (i + 1) + ": 끌거나 화살표 키로 옮기기"} title="소실점: 끌어서 옮기기"
+                  onPointerDown={(e) => vpDown(e, i)} onPointerMove={(e) => vpMove(e, i)}
+                  onKeyDown={(e) => {
+                    const dv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+                    if (!dv) return;
+                    e.preventDefault(); e.stopPropagation();
+                    const n = e.shiftKey ? 50 : 10;
+                    setGuide((g) => { const vp = (vps || []).map((x) => x.slice()); vp[i] = [vp[i][0] + dv[0] * n, vp[i][1] + dv[1] * n]; return { ...g, vp }; });
+                  }} />
               ))}
             </div>
             <div ref={cursorRef} className="skx-cursor" />
             {textAt && textPos && (
-              <input className="skx-textin" autoFocus value={textVal} placeholder="글자 입력" aria-label="캔버스에 쓸 글자"
+              <input ref={textInRef} className="skx-textin" autoFocus value={textVal} placeholder="글자 입력" aria-label="캔버스에 쓸 글자"
                 style={textStyle(textPos, prefs.text.size * view.current.s, color, prefs.font)}
                 onChange={(e) => setTextVal(e.target.value)} onBlur={commitText} onPointerDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => {
@@ -2064,6 +2232,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
           {dirty && !busy && (
             <span className="hint" style={{ color: "var(--seal)" }}>
               {locked ? "잠금 전에 저장하지 못한 그림이 있습니다. 잠금이 풀리면 저장해 주세요."
+                : hold ? "저장된 스케치를 지웠습니다. 캔버스의 그림은 「스케치 저장」을 눌러야 다시 저장됩니다."
                 : autoFail >= 2 ? "자동 저장에 실패했습니다. 연결을 확인하고 「스케치 저장」을 눌러 주세요."
                 : "저장하지 않은 변경이 있습니다." + (prefs.autosave ? " 잠시 뒤 자동으로 저장됩니다." : "")}
             </span>
@@ -2074,8 +2243,8 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
             <>
               <span className="hint">저장된 스케치 {fmtTime(cur.at)}</span>
               <MediaThumb owner={owner} refId={cur.ref} alt="저장된 스케치" size={48} />
-              {dirty && <button type="button" className="mm-del" onClick={revertToSaved}>저장한 그림으로 되돌리기</button>}
-              <button type="button" className="mm-del" onClick={removeSaved}>저장된 스케치 지우기</button>
+              {dirty && <button type="button" className="mm-del" disabled={busy} onClick={revertToSaved}>저장한 그림으로 되돌리기</button>}
+              <button type="button" className="mm-del" disabled={busy} onClick={removeSaved}>저장된 스케치 지우기</button>
             </>
           )}
           {err && <span className="hint" role="alert" style={{ color: "var(--seal)", flex: "1 1 100%" }}>{err}</span>}
@@ -2086,7 +2255,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
               <li>펜을 쓰면 손가락으로는 그려지지 않습니다(손바닥이 닿아도 선이 생기지 않음). 「손가락으로 그리기」로 바꿀 수 있습니다.</li>
               <li>선을 긋고 떼지 않은 채 잠깐 멈추면 직선·원·사각형으로 바뀝니다. Shift를 누른 채 그리면 직선, Alt를 누른 채 누르면 스포이트</li>
               <li>Ctrl+휠 확대·축소, 스페이스바나 휠 버튼을 누른 채 끌면 이동, 0 화면 맞춤, X 좌우 반전 보기, F 크게 그리기</li>
-              <li>1~9 붓, E 지우개, S 번짐, G 채우기, U 도형, T 글자, M 선택, V 변형, I 스포이트, H 이동, [ ] 굵기, L 레이어, C 색</li>
+              <li>1~9 브러시, E 지우개, S 번짐, G 채우기, U 도형, T 글자, M 선택, V 변형, I 스포이트, H 화면 이동, [ ] 굵기, L 레이어, C 색</li>
               <li>Ctrl+Z 되돌리기, Ctrl+Shift+Z 다시 실행, Ctrl+S 저장, Ctrl+A 전체 선택, Ctrl+D 선택 해제, Delete 선택 영역 지우기</li>
               <li>변형: 모서리를 끌면 크기, 위쪽 점을 끌면 회전(Shift는 15°씩), 화살표 키로 1px씩 옮기기, Enter 적용, Esc 취소</li>
             </ul>
@@ -2160,7 +2329,9 @@ export const SKETCH_CSS = `
 .skx-h.side{border-radius:2px;width:14px;height:14px;margin:-7px 0 0 -7px;cursor:ew-resize}
 .skx-h.rot{background:#0069be;cursor:grab}
 .skx-h.vp{background:#0069be;border-color:#fff;box-shadow:0 0 0 2px #0069be;cursor:move}
-@media (pointer:coarse){.skx-h{width:26px;height:26px;margin:-13px 0 0 -13px}.skx-h.side{width:22px;height:22px;margin:-11px 0 0 -11px}}
+.skx-touch .skx-h{width:26px;height:26px;margin:-13px 0 0 -13px}
+.skx-touch .skx-h.side{width:22px;height:22px;margin:-11px 0 0 -11px}
+html[data-ax-targets] .skx .skx-h{min-height:0;width:26px;height:26px;margin:-13px 0 0 -13px}
 .skx-cursor{position:absolute;left:0;top:0;display:none;border-radius:50%;border:1px solid rgba(0,0,0,.75);box-shadow:0 0 0 1px rgba(255,255,255,.85);pointer-events:none}
 .skx .skx-textin,.skx .skx-textin:focus{position:absolute;z-index:4;width:auto;min-width:140px;padding:0;margin:0;border:0;outline:1px dashed #0069be;outline-offset:2px;background:rgba(255,255,255,.72)}
 .skx-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.6);font-size:13px;color:var(--sub)}
@@ -2192,7 +2363,18 @@ export const SKETCH_CSS = `
 .skx-help ul{margin:6px 0 0;padding-left:18px;line-height:1.7}
 .skx select{width:auto}
 /* 크게 그리기: 화면 가득 */
-.skx.skx-full{position:fixed;inset:0;z-index:5000;height:100vh;height:100dvh;border:0;overflow:auto}
+.skx.skx-full{position:fixed;inset:0;z-index:5000;height:calc(100vh / var(--ax-zoom,1));height:calc(100dvh / var(--ax-zoom,1));border:0;overflow:auto}
+html[data-ax-cap] .skx.skx-full{bottom:var(--ax-cap-h,0px);height:auto}
+.skx-full>.skx-bar,.skx-full>.skx-opts,.skx-full>.skx-colors,.skx-full>.skx-foot{flex:0 0 auto}
+@media (max-width:640px),(max-height:520px){
+  .skx-full .skx-colors{display:none}
+  .skx-full .skx-bar,.skx-full .skx-grp,.skx-full .skx-opts{flex-wrap:nowrap}
+  .skx-full .skx-bar,.skx-full .skx-opts{overflow-x:auto;overscroll-behavior-x:contain}
+  .skx-full .skx-bar>*,.skx-full .skx-grp>*,.skx-full .skx-opts>*{flex:0 0 auto}
+  .skx-full .skx-opt{flex-wrap:nowrap}
+  .skx-full .skx-chip,.skx-full .skx-tip{white-space:nowrap}
+  .skx-full .skx-view-grp{margin-left:0}
+}
 .skx-full .skx-main{flex:1 1 auto;min-height:260px;display:flex}
 .skx-full .skx-view{flex:1;height:auto;max-height:none;aspect-ratio:auto!important}
 .skx-full .skx-help{display:none}
@@ -2202,8 +2384,15 @@ export const SKETCH_CSS = `
   .skx input[type=range]{width:96px}
   .skx-opts{gap:8px 12px}
   .skx-pop{width:calc(100% - 16px)}
+  .skx-pop .skb-lib,.skx-pop .skh-ops{max-height:none;overflow:visible}
 }
 @media (pointer:coarse){.skx-sw{width:32px;height:32px}.skx-ib{width:40px;height:40px}.skx-chip{padding:8px 12px}.skx-seg button{padding:8px 11px}}
+.skx .mm-del:disabled{opacity:.4;cursor:default}
+/* 학습 지원의 어두운 화면: 페이지 전체가 뒤집히므로 그리는 면과 색 견본은 한 번 더 뒤집어 실제 색으로 보인다
+   (캔버스는 학습 지원 쪽 규칙이 이미 되돌리지만 종이는 div라 뒤집힌 채 남아 검은 종이에 검은 선이 된다) */
+html[data-ax-contrast="dark"] .skx-stage{filter:invert(1) hue-rotate(180deg)}
+html[data-ax-contrast="dark"] .skx-stage canvas{filter:none}
+html[data-ax-contrast="dark"] :is(.skx-sw,.skx-colorbtn i,.skx-dot i,.skc-sw,.skc-now,.skc-prev,.skc-sv,.skc-range,.skx-textin,.skx-ref img,.skl-thumb,.skb canvas,.skh-rp canvas){filter:invert(1) hue-rotate(180deg)}
 /* 학습지 입력 잠금 */
 .ws-lockset:disabled .skx-view{pointer-events:none;cursor:not-allowed}
 .ws-lockset:disabled .skx-pop{display:none}

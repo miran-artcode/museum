@@ -31,7 +31,7 @@ import { makeDirtyTracker, changedTokens, mergeRemote, buildEntries, mergeTraceF
 import { isAskKey, askTrace } from "./src-asks-core.mjs";
 import { AskScope, AskReader, AskClassCard, AskStyle, askFieldMeta, askResearchFile, ASK_RESEARCH_VARS, ASK_VAR_NEED } from "./src-asks.jsx";
 import { LegacyEcho } from "./src-legacy-fields.jsx";
-import { WsLockCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
+import { WsLockCtx, WsSavedCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
 import { AccessProvider, AccessButton, AccessLessonTerms, AccessMemo, AccessStyle, MediaText, MediaTextRead, GateLangHelp } from "./src-access.jsx";
 import { AccessTeacherPanel, AccessTeacherStyle, CaptionOnAir } from "./src-access-teacher.jsx";
 import { A11yStyle, A11yRuntime } from "./src-access-a11y.jsx";
@@ -5203,8 +5203,8 @@ function StudentApp({ me, onExit, onGallery }) {
   /* opts.upload: 사진·녹음·영상 올리기가 끝나 참조를 적는 쓰기. 잠금 전에 시작한 올리기는 잠긴 뒤에 끝나도 적는다
      (안 적으면 올라간 파일이 아무도 가리키지 않는 채 남는다). 잠긴 동안에는 올리기 입력칸이 비활성이라 새로 시작할 수 없다 */
   const setField = (k, v, opts) => {
-    if (!loaded || removedRef.current) return;
-    if (wsLockRef.current && !(opts && opts.upload)) return; // 입력 잠금 중에는 어떤 칸도 쓰지 않는다
+    if (!loaded || removedRef.current) return false;
+    if (wsLockRef.current && !(opts && opts.upload)) return false; // 입력 잠금 중에는 어떤 칸도 쓰지 않는다
     const fn = typeof v === "function";
     const upd = (p) => {
       const val = fn ? v(p[k]) : v;
@@ -5257,6 +5257,7 @@ function StudentApp({ me, onExit, onGallery }) {
     setSaveState("dirty");
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(doSave, 600); // 입력이 멈추면 0.6초 안에 저장
+    return true;
   };
 
   /* 붙여넣기 기록 — 막지 않고 남긴다.
@@ -5485,8 +5486,17 @@ function StudentApp({ me, onExit, onGallery }) {
 
   /* 전시장으로: 기다리던 입력을 먼저 저장에 태운다 (화면이 닫힌 뒤에도 그 저장은 끝까지 간다).
      돌아왔을 때 같은 차시의 방문 횟수를 다시 세지 않도록 표시해 둔다 */
-  const toGallery = () => {
-    if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
+  /* 스케치를 그리던 화면을 떠나기 전: 그림 문서를 올려야 하므로 저장을 한 번 해 보고(최대 8초), 못 했으면 묻는다.
+     저장하지 못한 그림은 이 기기의 초안에만 있다(초안도 쓸 수 없는 브라우저에서는 사라진다) */
+  const sketchGate = async () => {
+    if (sketchDirty.flush && sketchDirty.unsaved) await Promise.race([sketchDirty.flush(), new Promise((res) => setTimeout(res, 8000))]);
+    if (!sketchDirty.unsaved) return true;
+    return window.confirm(sketchDirty.current
+      ? "스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?"
+      : "스케치를 저장하지 못했습니다. 지금 이동하면 그린 내용은 이 기기에만 보관되고 다른 기기에서는 보이지 않습니다. 이동할까요?");
+  };
+  const toGallery = async () => {
+    if (!(await sketchGate())) return;
     flush();
     svFlush();
     galleryTripSid = me.sid;
@@ -5510,14 +5520,15 @@ function StudentApp({ me, onExit, onGallery }) {
       return;
     }
     exitedRef.current = true;
+    sketchDirty.unsaved = false; // 다음에 들어오는 학생에게 이어지지 않게
     await authApi.leave();
     onExit();
   };
 
   /* 최종 평가·쪽지시험 화면으로. 탭 버튼과 탭 줄 위의 이동 안내가 함께 쓴다 */
-  const goStage = (which) => {
+  const goStage = async (which) => {
     if (which === "assess" ? assessOn : quizOn) return;
-    if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
+    if (!(await sketchGate())) return;
     flush();
     setAssessOn(which === "assess");
     setQuizOn(which === "quiz");
@@ -5529,12 +5540,12 @@ function StudentApp({ me, onExit, onGallery }) {
     if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [tab, loaded, assessOn, quizOn]);
 
-  const switchTab = (s) => {
+  const switchTab = async (s) => {
     if (assessOn) setAssessOn(false);   // 최종 평가 화면에서 차시 탭을 누르면 그 차시로 돌아간다
     if (quizOn) setQuizOn(false);
     if (s === tab) return;
-    // 스케치의 미저장 획은 컴포넌트 안에만 있어 탭이 바뀌면(언마운트) 사라진다
-    if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
+    // 스케치를 그리던 탭을 떠나면 화면에서 내려간다: 먼저 저장해 본다
+    if (!(await sketchGate())) return;
     wsRef.current = { ...wsRef.current, _lastTab: s }; // 다음 입장 때 이 차시로 이어서 연다
     setWs(wsRef.current);
     dirtyKeys.mark(["_lastTab"]);
@@ -5550,9 +5561,9 @@ function StudentApp({ me, onExit, onGallery }) {
   const secs = SCHEMA.filter((s) => s.session === tab);
 
   /* 단계 표시줄·단계 3 카드가 다른 차시 탭의 카드로 갈 때 쓴다: 탭을 옮긴 뒤 그 카드로 스크롤 */
-  const navGo = (session, secId) => {
+  const navGo = async (session, secId) => {
     if (!isOpen(openMap, session)) return;
-    if (session !== tab) switchTab(session);
+    if (session !== tab) await switchTab(session);
     let tries = 0;
     const hop = () => {
       const el = document.getElementById("sec-" + secId);
@@ -5566,6 +5577,7 @@ function StudentApp({ me, onExit, onGallery }) {
     <AccessProvider sid={me.sid} ws={ws} setField={setField} cfgAll={cfgAll} session={tab} loaded={loaded}
       where={quizOn ? "quiz" : assessOn ? "assess" : "lesson"}>
     <WsLockCtx.Provider value={wsLocked || removed}>
+    <WsSavedCtx.Provider value={saveState === "saved"}>
     <NavCtx.Provider value={{ openMap, go: navGo }}>
     <div>
       <div className="topbar">
@@ -5757,6 +5769,7 @@ function StudentApp({ me, onExit, onGallery }) {
       )}
     </div>
     </NavCtx.Provider>
+    </WsSavedCtx.Provider>
     </WsLockCtx.Provider>
     </AccessProvider>
   );

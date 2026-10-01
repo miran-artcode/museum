@@ -71,8 +71,8 @@ export function HistoryPanel({ eng, tick, versions = [], cur, owner, MediaThumb,
       <div className="skh-veract">
         <button type="button" className="btn small ghost" disabled={!!busy} aria-label={"새 레이어로 불러오기, " + name}
           onClick={() => onRestore(v, "layer")}>새 레이어로 불러오기</button>
-        <button type="button" className="btn small ghost" disabled={!!busy} aria-label={"이 버전으로 되돌리기, " + name}
-          onClick={() => onRestore(v, "replace")}>이 버전으로 되돌리기</button>
+        <button type="button" className="btn small ghost" disabled={!!busy} aria-label={"이 버전으로 바꾸기, " + name}
+          onClick={() => onRestore(v, "replace")}>이 버전으로 바꾸기</button>
       </div>
     </div>
   );
@@ -342,7 +342,7 @@ export function ReplayPlayer({ ops, title = "과정 다시 보기", onClose }) {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 30000);
-      if (!st.dead) setMsg("영상을 저장했습니다.");
+      if (!st.dead) setMsg("영상 파일을 내려받았습니다.");
     };
     st.rec = R; st.mode = "rec"; st.next = 0;
     setRec(true); setPlaying(false); setMsg("");
@@ -467,7 +467,7 @@ export function ReplayPlayer({ ops, title = "과정 다시 보기", onClose }) {
               {msg && !rec && <span className="skh-rpnote" role="status">{msg}</span>}
               {recOk && !rec && (
                 <button type="button" className="skh-rb" disabled={!ready} onClick={startRec}>
-                  <Icon k="download" size={18} />영상으로 저장
+                  <Icon k="download" size={18} />영상 파일로 내려받기
                 </button>
               )}
               {rec && (
@@ -497,7 +497,7 @@ export const SKETCH_HISTORY_CSS = `
 .skh-tab[aria-selected=true]{background:var(--ink);color:#fff}
 .skh .skh-tab:focus-visible{outline-offset:-3px}
 .skh .skh-tab[aria-selected=true]:focus-visible{outline-color:#fff}
-.skh-ops{position:relative;list-style:none;margin:0;padding:0;max-height:min(46vh,340px);overflow-y:auto;overscroll-behavior:contain;border-bottom:1px solid var(--line2)}
+.skh-ops{position:relative;list-style:none;margin:0;padding:0;max-height:min(46vh,340px);overflow-y:auto;border-bottom:1px solid var(--line2)}
 .skh-ops li{margin:0;padding:0;border-top:1px solid var(--line2)}
 .skh-ops li:first-child{border-top:0}
 .skh-op{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:4px 10px 4px 7px;border:0;border-left:3px solid transparent;background:#fff;color:var(--ink);font-size:12.5px;line-height:1.3;text-align:left}
@@ -526,6 +526,7 @@ export const SKETCH_HISTORY_CSS = `
 .skh-stat{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
 
 .skh-rp{position:fixed;inset:0;z-index:6000;display:flex;flex-direction:column;box-sizing:border-box;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);background:rgba(17,17,17,.95);color:#fff;font-family:var(--sans,sans-serif);font-size:13px;line-height:1.4;text-align:left;outline:none}
+html[data-ax-cap] .skh-rp{bottom:var(--ax-cap-h,0px)}
 .skh-rp *,.skh-rp *::before,.skh-rp *::after{box-sizing:border-box}
 .skh-rp button{margin:0;border-radius:0;font-family:inherit;cursor:pointer}
 .skh-rp button:disabled{cursor:default}

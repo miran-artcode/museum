@@ -70,6 +70,12 @@ test("opLabel: 모든 작업 종류에 이름이 있다", () => {
   for (const op of ops) { const s = opLabel(op); assert.ok(typeof s === "string" && s.length > 0, JSON.stringify(op)); assert.ok(!s.includes("—"), s); }
   assert.equal(opLabel({ kind: "stroke", tool: "pencil" }), "연필");
   assert.match(opLabel({ kind: "shape", shape: "ellipse", quick: true }), /바로잡기/);
+  // 레이어 설정은 값에 따라 이름이 달라진다(숨긴 작업이 「보이기」로 적히지 않게)
+  assert.equal(opLabel({ kind: "lset", patch: { vis: false } }), "레이어 숨기기");
+  assert.equal(opLabel({ kind: "lset", patch: { vis: true } }), "레이어 보이기");
+  assert.equal(opLabel({ kind: "lset", patch: { lock: false } }), "레이어 잠금 해제");
+  assert.equal(opLabel({ kind: "lset", patch: { alock: true } }), "알파 잠금");
+  assert.equal(opLabel({ kind: "lset", patch: { op: 0.5 } }), "레이어 불투명도");
 });
 
 test("logStats: 획 수·도구·그린 시간(60초 넘는 간격은 쉬는 시간)", () => {

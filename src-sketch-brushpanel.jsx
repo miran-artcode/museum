@@ -172,7 +172,7 @@ export function BrushPanel({ tool, prefs, color, onPick, onParam, onReset, onClo
 export const SKETCH_BRUSH_CSS = `
 .skb{min-width:0;font-family:var(--sans);font-size:13px;color:var(--ink);background:#fff}
 .skb-h{padding:8px 10px 5px;font-size:12px;font-weight:700;color:var(--sub)}
-.skb-lib{max-height:40vh;overflow:auto;overscroll-behavior:contain;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)}
+.skb-lib{max-height:40vh;overflow:auto;border-top:1px solid var(--line2);border-bottom:1px solid var(--line2)}
 .skb-gh{padding:6px 10px 2px;font-size:11px;color:var(--sub)}
 .skb-row{display:flex;align-items:center;gap:8px;width:100%;min-height:42px;margin:0;padding:4px 8px 4px 10px;border:0;background:transparent;border-radius:0;-webkit-appearance:none;appearance:none;font-family:var(--sans);font-size:13px;line-height:1.25;color:var(--ink);text-align:left;cursor:pointer}
 .skb-row:hover{background:#f3f3f3}
