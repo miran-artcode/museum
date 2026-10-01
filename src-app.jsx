@@ -26,7 +26,7 @@ import { ReadingCard, LessonMap } from "./src-reading.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
 import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, InquiryStyle, inquiryTraceRows } from "./src-inquiry.jsx";
 import { makeSnapshotter, WsHistoryCard } from "./src-ws-history.jsx";
-import { makeDirtyTracker, changedTokens, mergeRemote, buildEntries, mergeTraceForSave, reconcileTrace, tok as wsTok } from "./src-ws-sync.mjs";
+import { makeDirtyTracker, changedTokens, mergeRemote, buildEntries, mergeTraceForSave, reconcileTrace, tok as wsTok, mergeSurvey, surveyEntries, submittedBlocks } from "./src-ws-sync.mjs";
 import { LegacyEcho } from "./src-legacy-fields.jsx";
 import { WsLockCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
 import { AccessProvider, AccessButton, AccessLessonTerms, AccessMemo, AccessStyle, MediaText, MediaTextRead, GateLangHelp } from "./src-access.jsx";
@@ -4779,6 +4779,9 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
 }
 /* ---------- 학생 화면 (실시간 저장) ---------- */
 
+/* 전시장에 다녀오는 학번. 학생 화면은 전시장에 가면 닫혔다가 돌아오면 새로 열린다 (방문 횟수를 다시 세지 않기 위함) */
+let galleryTripSid = "";
+
 function StudentApp({ me, onExit, onGallery }) {
   useContent();                              // 교사가 수업 내용을 고치면 이 화면도 다시 그린다
   useEffect(() => watchContent(), []);
@@ -4787,6 +4790,13 @@ function StudentApp({ me, onExit, onGallery }) {
   const dirtyKeys = useRef(makeDirtyTracker()).current; // 고치는 중·저장 중인 키. 바뀐 키만 저장하고, 서버 값을 받을 때 이 키는 지킨다 (src-ws-sync.mjs)
   const docExistsRef = useRef(false);   // 서버에 기록지 문서가 있는가. 없으면 첫 저장만 통째로 만든다
   const serverRef = useRef({});         // 이 탭이 본 마지막 서버 사본. 흔적 배열(_log·_paste)을 저장 전에 이것과 합친다 (src-ws-sync.mjs)
+  // 선생님이 이 학번의 기록지를 지웠다(초기화·학번 이관). 옛 사본으로 문서를 되살리지 않도록 저장을 멈추고 칸을 잠근다.
+  // 학생이 「다시 불러오기」를 누르면 서버의 지금 상태로 새로 시작한다
+  const removedRef = useRef(false);
+  const [removed, setRemoved] = useState(false);
+  const enteredRef = useRef(false); // 이 화면에서 입장 방문을 이미 셌다
+  const [liveErr, setLiveErr] = useState(false); // 실시간 구독이 끊김 (fbStore.watchDocMeta가 다시 잇는 중)
+  const [leaving, setLeaving] = useState(false); // 「나가기」: 남은 저장을 마치는 중
   const [ws, setWs] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [readErr, setReadErr] = useState(false); // 최초 로드 실패 — 덮어쓰기를 막으려 학습지를 잠근다
@@ -4918,9 +4928,19 @@ function StudentApp({ me, onExit, onGallery }) {
     setStaleWarn(!!(res.fromCache || svRes.fromCache));
     const saved = res.data;
     docExistsRef.current = !!saved;
+    if (removedRef.current) {
+      // 지워진 뒤 다시 불러옴: 서버의 지금 상태(대개 빈 기록지)에서 새로 시작한다
+      removedRef.current = false;
+      setRemoved(false);
+      dirtyKeys.clear();
+      dirtyRef.current = false;
+      wsRef.current = saved || {};
+      setWs(saved || {});
+    }
     serverRef.current = saved || {};
     if (saved) { setWs(saved); wsRef.current = saved; setSavedAt(saved._updatedAt || null); }
-    setSurvey(svRes.data || {});
+    svServerRef.current = svRes.data || null;
+    setSurveyNow(svRes.data || {});
     if (gRes.ok) setGrade(gRes.data);
     const cfg = cfgRes.ok ? cfgRes.data : null;
       const om = (cfg && cfg.open) || DEFAULT_OPEN;
@@ -4933,7 +4953,11 @@ function StudentApp({ me, onExit, onGallery }) {
       if (saved && saved._lastTab && isOpen(om, saved._lastTab)) t0 = saved._lastTab;
       else { const lastOpen = [...SESSIONS].reverse().find((s) => isOpen(om, s)); if (lastOpen) t0 = lastOpen; }
     setTab(t0);
-    accAct(t0, { visits: 1 }); // 입장 방문은 실제로 열린 차시에 귀속
+    // 입장 방문은 실제로 열린 차시에 귀속. 전시장에 다녀온 것과 「다시 불러오기」는 새 방문으로 세지 않는다
+    const back = galleryTripSid === me.sid;
+    galleryTripSid = "";
+    if (!back && !enteredRef.current) accAct(t0, { visits: 1 });
+    enteredRef.current = true;
     loadedRef.current = true;
     setLoaded(true);
   };
@@ -4949,11 +4973,7 @@ function StudentApp({ me, onExit, onGallery }) {
         // 선생님이 기록을 초기화했거나 다른 학번으로 옮겼다. 빈 기록지에서 다시 시작한다 (옛 사본으로 문서를 되살리지 않는다).
         // 이 기기의 미전송 쓰기가 섞인 스냅샷(hasPendingWrites)은 서버 확인이 아니므로 건너뛴다
         if (!docExistsRef.current || s.hasPendingWrites) return;
-        docExistsRef.current = false;
-        dirtyKeys.clear();
-        wsRef.current = {};
-        setWs({});
-        setCloseNote("선생님이 이 학번의 기록을 초기화하거나 다른 학번으로 옮겼습니다. 계속 쓰면 새 기록지에 저장됩니다. 학번을 잘못 입력했다면 나가서 다시 들어오세요.");
+        markRemoved();
         return;
       }
       docExistsRef.current = true;
@@ -4968,7 +4988,7 @@ function StudentApp({ me, onExit, onGallery }) {
         return merged;
       });
       if (!dirtyRef.current && !savingRef.current && remote._updatedAt) setSavedAt(remote._updatedAt);
-    });
+    }, () => setLiveErr(true), () => setLiveErr(false));
     return un;
   }, [loaded]);
 
@@ -4979,9 +4999,35 @@ function StudentApp({ me, onExit, onGallery }) {
     return () => { un1(); un2(); };
   }, []);
 
-  const doSave = async () => {
-    if (!loadedRef.current || savingRef.current) return;
+  const markRemoved = () => {
+    removedRef.current = true;
+    docExistsRef.current = false;
+    dirtyKeys.clear();
+    dirtyRef.current = false;
+    if (timer.current) clearTimeout(timer.current);
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    setRemoved(true);
+    setSaveState("saved");
+  };
+
+  /* 화면이 닫힌 뒤(전시장으로 가거나 나가기) 옛 화면의 저장·재시도가 계속 도는 일을 막는다.
+     닫힐 때 남은 것은 한 번만 저장하고(afterExitRef), 실패해도 재시도하지 않는다 (오프라인이면 기기 큐에 남는다) */
+  const aliveRef = useRef(true);
+  const afterExitRef = useRef(0);
+  const exitedRef = useRef(false); // 「나가기」로 저장을 마치고 로그아웃함
+  const savePromiseRef = useRef(null);
+  const doSave = () => {
+    if (!loadedRef.current || savingRef.current || removedRef.current) return Promise.resolve(false);
+    if (!aliveRef.current) {
+      if (afterExitRef.current <= 0) return Promise.resolve(false);
+      afterExitRef.current -= 1;
+    }
     savingRef.current = true;
+    const p = saveOnce();
+    savePromiseRef.current = p;
+    return p;
+  };
+  const saveOnce = async () => {
     dirtyRef.current = false;
     setSaveState("saving");
     const before = wsRef.current;
@@ -4998,7 +5044,13 @@ function StudentApp({ me, onExit, onGallery }) {
     let ok = false, created = false;
     if (docExistsRef.current) {
       ok = await fbStore.updatePathsT(WSKEY, entries);
-      if (ok === "missing") { docExistsRef.current = false; ok = false; }
+      if (ok === "missing") {
+        // 있던 문서가 저장하는 사이에 사라졌다: 학생은 기록지를 지울 수 없으므로 선생님이 지운 것이다.
+        // 지우기 전에 만든 data로 다시 만들면 초기화·이관한 기록이 되살아나므로 만들지 않고 멈춘다
+        savingRef.current = false;
+        markRemoved();
+        return false;
+      }
     }
     if (!ok && !docExistsRef.current) {
       // 서버에 문서가 없을 때(첫 저장)만 통째로 만든다. 두 탭이 동시에 첫 저장을 해도 먼저 만든 쪽의 칸이 지워지지 않게 병합으로 쓴다
@@ -5032,11 +5084,13 @@ function StudentApp({ me, onExit, onGallery }) {
       snapWs.current(data);
       if (dirtyRef.current) { setSaveState("dirty"); doSave(); }
       else setSaveState("saved");
+      return true;
     } else {
       dirtyKeys.fail();
       // 저장 직전에 바뀐 보조 항목(_act·합친 흔적 등)도 다시 저장 대상에 올린다. 안 그러면 실패한 저장분이 다음 저장에서 빠진다
       dirtyKeys.mark(entries.map((e) => (e[0].length > 1 ? wsTok(e[0][0], e[0][1]) : e[0][0])));
       dirtyRef.current = true;
+      if (!aliveRef.current) return false; // 닫힌 화면은 재시도하지 않는다
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         // 오프라인 시간 초과는 실패가 아니라 대기다 — 내용은 이 기기 큐에 담겨 있고
         // 연결이 돌아오면 online 핸들러가 저장한다. 여기서 5초 재시도를 돌리면
@@ -5047,7 +5101,24 @@ function StudentApp({ me, onExit, onGallery }) {
         if (retryTimer.current) clearTimeout(retryTimer.current);
         retryTimer.current = setTimeout(doSave, 5000); // 실패 시 5초 뒤 자동 재시도
       }
+      return false;
     }
+  };
+
+  /* 나가기 전: 진행 중인 저장을 기다리고, 남은 입력과 활동 시간을 한 번 더 저장한다. 성공하면 true */
+  const saveAllNow = async () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    if (retryTimer.current) { clearTimeout(retryTimer.current); retryTimer.current = null; }
+    const sv = svFlush();
+    let ok = true;
+    for (let i = 0; i < 6; i++) {
+      if (removedRef.current) break;
+      if (savingRef.current && savePromiseRef.current) { await savePromiseRef.current; continue; }
+      if (dirtyRef.current || dirtyKeys.size || Object.keys(actAccRef.current).length) { ok = await doSave(); if (!ok) break; continue; }
+      break;
+    }
+    const svOk = await sv;
+    return ok && svOk && !dirtyRef.current;
   };
 
   const flush = () => {
@@ -5058,7 +5129,7 @@ function StudentApp({ me, onExit, onGallery }) {
   /* v 자리에 함수를 주면 그 칸의 지금 값(다른 기기에서 받은 값·방금 고친 값까지 반영된 최신 값)을 받아 새 값을 돌려준다.
      사진 올리기처럼 await 뒤에 쓰는 곳과 _inq처럼 여러 항목이 든 맵은 이렇게 써야, 렌더 때의 낡은 값으로 다른 항목을 되돌리지 않는다. */
   const setField = (k, v) => {
-    if (!loaded || wsLockRef.current) return; // 입력 잠금 중에는 어떤 칸도 쓰지 않는다
+    if (!loaded || wsLockRef.current || removedRef.current) return; // 입력 잠금 중에는 어떤 칸도 쓰지 않는다
     const fn = typeof v === "function";
     const upd = (p) => {
       const val = fn ? v(p[k]) : v;
@@ -5172,7 +5243,7 @@ function StudentApp({ me, onExit, onGallery }) {
     const onOn = () => {
       setOnline(true);
       if (dirtyRef.current) doSave();
-      if (svSaveRef.current === "err") svPersist(); // 끊긴 사이 실패로 남은 설문 응답도 다시 밀어 넣는다
+      if (svSaveRef.current === "err" || svDirty.size) svPersist(); // 끊긴 사이 실패로 남은 설문 응답도 다시 밀어 넣는다
     };
     const onOff = () => setOnline(false);
     window.addEventListener("visibilitychange", onHide);
@@ -5188,101 +5259,173 @@ function StudentApp({ me, onExit, onGallery }) {
       window.removeEventListener("beforeunload", onBefore);
       window.removeEventListener("online", onOn);
       window.removeEventListener("offline", onOff);
-      if (timer.current) clearTimeout(timer.current);
       if (retryTimer.current) clearTimeout(retryTimer.current);
-      if (svTimer.current) clearTimeout(svTimer.current);
+      // 화면이 닫힌다(전시장으로 이동 등). 기다리던 입력은 버리지 않고 한 번만 저장한다. 재시도는 하지 않는다.
+      // 「나가기」는 이미 저장을 마치고 로그아웃했으므로 여기서 다시 쓰지 않는다
+      aliveRef.current = false;
+      const pending = !!timer.current || dirtyRef.current || Object.keys(actAccRef.current).length > 0;
+      if (timer.current) clearTimeout(timer.current);
+      if (!exitedRef.current) {
+        afterExitRef.current = 1;
+        if (pending) doSave();
+        svFlush();
+      } else if (svTimer.current) clearTimeout(svTimer.current);
     };
   }, []);
 
-  /* 설문 — 응답은 0.8초 뒤 자동 저장(중간 이탈 분석용), 제출하면 잠긴다 */
+  /* 설문 — 응답은 0.8초 뒤 자동 저장(중간 이탈 분석용), 제출하면 잠긴다.
+     문서를 통째로 쓰지 않고 고친 블록(pre·post·anchor·stance.pre·stance.post)만 쓴다 (src-ws-sync.mjs).
+     통째로 쓰면 다른 기기에서 막 제출한 블록을 이 탭의 옛 사본으로 「제출 전」으로 되돌렸다.
+     자기 설문 문서를 구독해 다른 기기의 응답과 제출을 받는다. 서버에서 제출된 블록은 언제나 이긴다 */
+  const SVKEY = "survey:" + me.sid;
+  const svDirty = useRef(makeDirtyTracker()).current; // 고치는 중·저장 중인 블록 토큰 ("pre", "stance.post" …)
+  const svServerRef = useRef(null);                   // 이 탭이 본 마지막 서버 사본
+  const svSubmittingRef = useRef(new Set());          // 제출을 쓰는 중인 블록: 구독이 옛 서버 값으로 되돌리지 않게 지킨다
+  const svSavingRef = useRef(null);                   // 진행 중인 자동 저장 (겹쳐 보내지 않는다)
+  const svAgainRef = useRef(false);
+  const setSurveyNow = (next) => { surveyRef.current = next; setSurvey(next); };
+  /* 블록 단위로 쓴다. 문서가 아직 없을 때(첫 응답)만 지금 화면의 설문 전체로 만든다 */
+  const svWrite = async (entries, full) => {
+    if (!entries.length) return true;
+    let ok = await fbStore.updatePathsT(SVKEY, entries);
+    if (ok === "missing") ok = await store.setT(SVKEY, full || {});
+    return ok === true;
+  };
   const svPersist = () => {
     // 응답 자동 저장 — 결과를 배지로 보여 준다. "자동 저장됩니다"라고 말해 놓고
     // 실패를 침묵하면 학생이 24문항을 잃고도 모른다.
-    const seq = ++svSeq.current;
+    if (svSavingRef.current) { svAgainRef.current = true; return svSavingRef.current; }
+    const toks = svDirty.take();
+    if (!toks.length) return Promise.resolve(true);
+    ++svSeq.current;
     setSvSave("saving"); svSaveRef.current = "saving";
-    store.setT("survey:" + me.sid, surveyRef.current).then((ok) => {
-      // 뒤 저장이 "저장됨"을 띄운 다음에 앞 저장의 시간 초과가 늦게 도착해
-      // "실패"로 도로 뒤집는 일이 없도록, 마지막으로 나간 저장만 배지를 정한다
-      if (seq !== svSeq.current) return;
+    const p = (async () => {
+      const ok = await svWrite(surveyEntries(surveyRef.current, toks, svServerRef.current), surveyRef.current);
+      if (ok) svDirty.done(); else svDirty.fail();
+      svSavingRef.current = null;
       setSvSave(ok ? "saved" : "err"); svSaveRef.current = ok ? "saved" : "err";
-    });
+      if (svAgainRef.current) { svAgainRef.current = false; if (ok && svDirty.size) return svPersist(); }
+      return ok;
+    })();
+    svSavingRef.current = p;
+    return p;
   };
-  const svChange = (phase, block) => {
-    const next = { ...(surveyRef.current || {}), ver: SURVEY_VER, [phase]: block };
-    setSurvey(next);
+  /* 대기 중인 설문 저장을 바로 보낸다 (나가기·화면 닫힘) */
+  const svFlush = () => {
+    if (svTimer.current) { clearTimeout(svTimer.current); svTimer.current = null; }
+    return svDirty.size || svSavingRef.current ? svPersist() : Promise.resolve(true);
+  };
+  const svQueue = (block, next, ms) => {
+    setSurveyNow(next);
+    svDirty.mark([block]);
     if (svTimer.current) clearTimeout(svTimer.current);
-    svTimer.current = setTimeout(svPersist, 800);
+    svTimer.current = setTimeout(svPersist, ms);
+  };
+  /* 제출: 그 블록만 한 번 쓴다. 쓰는 동안 구독이 옛 값으로 되돌리지 않게 지키고, 실패하면 알린다 */
+  const svSubmitWrite = async (block, next, entries, failMsg, restore) => {
+    const cur = surveyRef.current || {};
+    setSvBusy(true);
+    if (svTimer.current) { clearTimeout(svTimer.current); svTimer.current = null; }
+    svDirty.drop([block]);
+    svSubmittingRef.current.add(block);
+    setSurveyNow(next);
+    const ok = await svWrite(entries, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
+    svSubmittingRef.current.delete(block);
+    setSvBusy(false);
+    if (!ok) {
+      alert(failMsg);
+      if (restore) { setSurveyNow(cur); svDirty.mark([block]); }
+    }
+  };
+  const blockDone = (block) => {
+    const started = block.startedAt || now();
+    const sub = now();
+    return { ...block, startedAt: started, submittedAt: sub, durSec: Math.max(0, Math.round((new Date(sub) - new Date(started)) / 1000)) };
+  };
+
+  const svChange = (phase, block) => {
+    svQueue(phase, { ...(surveyRef.current || {}), ver: SURVEY_VER, [phase]: block }, 800);
   };
   const svSubmit = async (phase) => {
     const cur = surveyRef.current || {};
-    const block = cur[phase] || {};
-    const started = block.startedAt || now();
-    const sub = now();
-    const next = {
-      ...cur, ver: SURVEY_VER,
-      [phase]: { ...block, startedAt: started, submittedAt: sub, durSec: Math.max(0, Math.round((new Date(sub) - new Date(started)) / 1000)) },
-    };
-    setSvBusy(true);
-    if (svTimer.current) clearTimeout(svTimer.current);
-    setSurvey(next);
-    const ok = await store.setT("survey:" + me.sid, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
-    setSvBusy(false);
-    if (!ok) { alert("제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요."); setSurvey(cur); }
+    const done = blockDone(cur[phase] || {});
+    await svSubmitWrite(phase, { ...cur, ver: SURVEY_VER, [phase]: done }, [[["ver"], SURVEY_VER], [[phase], done]],
+      "제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.", true);
   };
 
   /* 평가자 성향 설문(s1) — 같은 surveys/{학번} 문서의 stance 블록. v1 응답은 건드리지 않는다 */
   const stChange = (phase, block) => {
     const cur = surveyRef.current || {};
-    const next = { ...cur, stance: { ...(cur.stance || {}), ver: STANCE_VER, [phase]: block } };
-    setSurvey(next);
-    if (svTimer.current) clearTimeout(svTimer.current);
-    svTimer.current = setTimeout(svPersist, 800);
+    svQueue("stance." + phase, { ...cur, stance: { ...(cur.stance || {}), ver: STANCE_VER, [phase]: block } }, 800);
   };
   const stSubmit = async (phase) => {
     const cur = surveyRef.current || {};
     const st = cur.stance || {};
-    const block = st[phase] || {};
-    const started = block.startedAt || now();
-    const sub = now();
-    const next = {
-      ...cur,
-      stance: {
-        ...st, ver: STANCE_VER,
-        [phase]: { ...block, startedAt: started, submittedAt: sub, durSec: Math.max(0, Math.round((new Date(sub) - new Date(started)) / 1000)) },
-      },
-    };
-    setSvBusy(true);
-    if (svTimer.current) clearTimeout(svTimer.current);
-    setSurvey(next);
-    const ok = await store.setT("survey:" + me.sid, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
-    setSvBusy(false);
-    if (!ok) { alert("제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요."); setSurvey(cur); }
+    const done = blockDone(st[phase] || {});
+    await svSubmitWrite("stance." + phase, { ...cur, stance: { ...st, ver: STANCE_VER, [phase]: done } },
+      [[["stance", "ver"], STANCE_VER], [["stance", phase], done]],
+      "제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.", true);
   };
 
   /* 앵커 판정 — 같은 surveys/{학번} 문서의 anchor 블록.
      상호평가(assess 컬렉션)가 아직 없어 임시로 여기 얹는다. */
   const anChange = (blk) => {
-    const cur = surveyRef.current || {};
-    const next = { ...cur, anchor: { ...blk, ver: ANCHOR_VER } };
-    setSurvey(next);
-    if (svTimer.current) clearTimeout(svTimer.current);
-    svTimer.current = setTimeout(() => { store.set("survey:" + me.sid, surveyRef.current); }, 500);
+    svQueue("anchor", { ...(surveyRef.current || {}), anchor: { ...blk, ver: ANCHOR_VER } }, 500);
   };
   const anSubmit = async (blk) => {
     const cur = surveyRef.current || {};
-    const started = (blk && blk.startedAt) || now();
-    const at = now();
-    const next = {
-      ...cur,
-      anchor: { ...blk, ver: ANCHOR_VER, startedAt: started, submittedAt: at,
-        durSec: Math.max(0, Math.round((new Date(at) - new Date(started)) / 1000)) },
-    };
-    setSvBusy(true);
-    if (svTimer.current) clearTimeout(svTimer.current);
-    setSurvey(next);
-    const ok = await store.setT("survey:" + me.sid, next); // 오프라인이면 8초 뒤 실패로 알리고 버튼을 되살린다
-    setSvBusy(false);
-    if (!ok) alert("판정을 저장하지 못했습니다. 인터넷 연결을 확인해 주세요.");
+    const done = { ...blockDone(blk || {}), ver: ANCHOR_VER };
+    await svSubmitWrite("anchor", { ...cur, anchor: done }, [[["anchor"], done]],
+      "판정을 저장하지 못했습니다. 인터넷 연결을 확인해 주세요.", false);
+  };
+
+  /* 자기 설문 문서 구독: 다른 기기의 응답·제출을 받는다. 고치는 중·제출 중인 블록은 이 탭의 값을 지킨다 */
+  useEffect(() => {
+    if (!loaded) return;
+    let existed = !!svServerRef.current;
+    const keep = () => new Set([...svDirty.all(), ...svSubmittingRef.current]);
+    const un = fbStore.watchDocMeta(SVKEY, (s) => {
+      if (s.fromCache) return;
+      if (!s.exists) {
+        // 선생님이 설문 문서를 지웠다: 고치는 중이 아닌 블록은 비운다
+        if (!existed || s.hasPendingWrites) return;
+        existed = false;
+        svServerRef.current = null;
+        const m = mergeSurvey(surveyRef.current, {}, keep());
+        if (m !== surveyRef.current) setSurveyNow(m);
+        return;
+      }
+      existed = true;
+      const remote = s.data || {};
+      svServerRef.current = remote;
+      svDirty.drop(submittedBlocks(remote)); // 서버에서 제출된 블록은 더 자동 저장하지 않는다
+      const m = mergeSurvey(surveyRef.current, remote, keep());
+      if (m !== surveyRef.current) setSurveyNow(m);
+    }, () => setLiveErr(true), () => setLiveErr(false));
+    return un;
+  }, [loaded]);
+
+  /* 전시장으로: 기다리던 입력을 먼저 저장에 태운다 (화면이 닫힌 뒤에도 그 저장은 끝까지 간다).
+     돌아왔을 때 같은 차시의 방문 횟수를 다시 세지 않도록 표시해 둔다 */
+  const toGallery = () => {
+    flush();
+    svFlush();
+    galleryTripSid = me.sid;
+    onGallery();
+  };
+  /* 나가기: 진행 중인 저장과 남은 입력을 마친 뒤(최대 6초) 로그아웃한다.
+     확인하지 못하면 묻는다: 로그아웃하면 이 기기에 담긴 저장분은 같은 학번으로 다시 들어올 때까지 보내지지 않는다 */
+  const leave = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    const ok = await Promise.race([saveAllNow(), new Promise((res) => setTimeout(() => res(false), 6000))]);
+    if (!ok && !removedRef.current && !window.confirm("마지막으로 쓴 내용의 저장을 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.\n지금 나가면 그 내용이 저장되지 않을 수 있습니다. 그래도 나갈까요?")) {
+      setLeaving(false);
+      return;
+    }
+    exitedRef.current = true;
+    await authApi.leave();
+    onExit();
   };
 
   /* 최종 평가·쪽지시험 화면으로. 탭 버튼과 탭 줄 위의 이동 안내가 함께 쓴다 */
@@ -5336,7 +5479,7 @@ function StudentApp({ me, onExit, onGallery }) {
   return (
     <AccessProvider sid={me.sid} ws={ws} setField={setField} cfgAll={cfgAll} session={tab} loaded={loaded}
       where={quizOn ? "quiz" : assessOn ? "assess" : "lesson"}>
-    <WsLockCtx.Provider value={wsLocked}>
+    <WsLockCtx.Provider value={wsLocked || removed}>
     <NavCtx.Provider value={{ openMap, go: navGo }}>
     <div>
       <div className="topbar">
@@ -5346,19 +5489,30 @@ function StudentApp({ me, onExit, onGallery }) {
             <span>{me.nick}</span>
             <span translate="no"
               className={"save-pill " + (saveState === "dirty" || saveState === "saving" || saveState === "queued" ? "dirty" : saveState === "err" ? "err" : "")}>
-              {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "queued" ? "연결 대기(기기에 담아 둠)" : saveState === "err" ? "저장 실패, 5초 뒤 재시도" : "저장됨 " + fmtTime(savedAt)}
+              {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "queued" ? "연결 대기(기기에 담아 둠)" : saveState === "err" ? "저장 실패, 5초 뒤 재시도" : savedAt ? "저장됨 " + fmtTime(savedAt) : "아직 저장 기록 없음"}
             </span>
             <span className="ax-sr" role={saveState === "err" ? "alert" : "status"}>
               {saveState === "err" ? "저장하지 못했습니다. 5초 뒤 다시 저장합니다." : saveState === "queued" ? "인터넷 연결을 기다립니다. 쓴 내용은 이 기기에 담아 두었습니다." : ""}
             </span>
             {saveState === "err" && <button className="btn small" onClick={doSave}>지금 저장</button>}
             <AccessButton />
-            <button className="btn small ghost" onClick={onGallery}>전시장</button>
-            <button className="btn small ghost" onClick={async () => { await doSave(); await authApi.leave(); onExit(); }}>나가기</button>
+            <button className="btn small ghost" onClick={toGallery}>전시장</button>
+            <button className="btn small ghost" disabled={leaving} onClick={leave}>{leaving ? "저장하는 중…" : "나가기"}</button>
           </div>
         </div>
       </div>
       <div className="wrap" role="main" id="main">
+        {removed && (
+          <div className="warn-note" role="alert" style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ flex: 1, minWidth: 200 }}>선생님이 이 학번의 기록을 초기화했거나 다른 학번으로 옮겨 저장을 멈췄습니다. 「다시 불러오기」를 누르거나, 학번이 바뀌었다면 나가서 새 학번으로 들어오세요.</span>
+            <button className="btn small" onClick={loadAll}>다시 불러오기</button>
+          </div>
+        )}
+        {liveErr && !removed && (
+          <div className="warn-note" role="status" style={{ marginBottom: 10 }}>
+            실시간 연결이 끊겨 다시 연결하는 중입니다. 다른 기기에서 쓴 내용이 보이지 않으면 새로고침하세요.
+          </div>
+        )}
         {!online && (
           <div className="warn-note" role="alert" style={{ marginBottom: 10 }}>
             인터넷이 끊겼습니다. 지금 쓰는 내용은 이 기기에 임시로 담겨 있다가 연결이 돌아오면 자동으로 저장됩니다. 그전에 창을 닫지 마세요.

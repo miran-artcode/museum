@@ -220,3 +220,66 @@ export function reconcileTrace(cur, before, saved) {
   const fresh = C.filter((e) => !seen.has(traceId(e)));
   return fresh.length ? [...saved, ...fresh] : saved;
 }
+
+/* ---------- 설문 (surveys/{학번}) ----------
+   설문 문서도 블록(pre·post·anchor·stance.pre·stance.post) 단위로 저장하고 구독한다 (2026-09-28).
+   예전에는 답 하나 고를 때마다 문서를 통째로 써서, 다른 기기에서 제출한 블록을 옛 사본이 「제출 전」으로 되돌릴 수 있었다.
+   서버에서 제출된 블록은 언제나 이긴다 (제출 취소 없음). */
+
+/* 블록 경로. 토큰은 경로를 점으로 이은 것 ("stance.pre") */
+export const SURVEY_BLOCKS = ["pre", "post", "anchor", "stance.pre", "stance.post"];
+const getIn = (o, path) => path.reduce((x, k) => (isObj(x) ? x[k] : undefined), o);
+export const isSubmitted = (b) => !!(isObj(b) && b.submittedAt);
+
+/* 서버 사본을 화면의 설문에 합친다.
+   ① 서버에서 제출된 블록은 언제나 서버 값 (다른 기기에서 제출했으면 이 화면도 제출됨으로 바뀐다)
+   ② 이 탭이 고치는 중·제출 중인 블록은 이 탭의 값
+   ③ 나머지는 서버 값. 판 표시(ver·stance.ver)는 서버에 있으면 서버 값.
+   바뀐 것이 없으면 local을 그대로 돌려준다. */
+export function mergeSurvey(local, remote, skip) {
+  const l = isObj(local) ? local : {}, r = isObj(remote) ? remote : {};
+  const keep = skip || new Set();
+  const out = { ...r };
+  if (!("ver" in r) && "ver" in l) out.ver = l.ver;
+  const lst = isObj(l.stance) ? l.stance : {}, rst = isObj(r.stance) ? r.stance : {};
+  const st = { ...rst };
+  if (!("ver" in rst) && "ver" in lst) st.ver = lst.ver;
+  for (const b of SURVEY_BLOCKS) {
+    const path = b.split(".");
+    const rv = getIn(r, path), lv = getIn(l, path);
+    const v = isSubmitted(rv) ? rv : keep.has(b) ? lv : rv;
+    const tgt = path.length > 1 ? st : out;
+    const k = path[path.length - 1];
+    if (v === undefined) delete tgt[k]; else tgt[k] = v;
+  }
+  if (Object.keys(st).length) out.stance = st; else delete out.stance;
+  return deepEq(l, out) ? (local || l) : out;
+}
+
+/* 설문 자동 저장 항목. toks는 고친 블록 토큰.
+   제출된 블록(이 화면이든 서버든)은 자동 저장으로 다시 쓰지 않는다: 제출은 제출 함수가 한 번 쓰고, 규칙이 그 뒤를 잠근다.
+   블록과 함께 그 판 표시(ver·stance.ver)를 싣는다 (값이 있을 때만). */
+export function surveyEntries(cur, toks, server) {
+  const c = isObj(cur) ? cur : {};
+  const out = [];
+  const vers = new Set();
+  for (const b of toks || []) {
+    if (!SURVEY_BLOCKS.includes(b)) continue;
+    const path = b.split(".");
+    if (isSubmitted(getIn(server, path)) || isSubmitted(getIn(c, path))) continue;
+    const v = getIn(c, path);
+    if (v === undefined) continue;
+    out.push([path, v]);
+    if (path[0] === "anchor") continue; // 앵커 판은 블록 안에 있다
+    const vp = path.length > 1 ? [...path.slice(0, -1), "ver"] : ["ver"];
+    const vk = vp.join(".");
+    const vv = getIn(c, vp);
+    if (!vers.has(vk) && vv !== undefined) { vers.add(vk); out.push([vp, vv]); }
+  }
+  return out;
+}
+
+/* 서버에서 제출된 블록 토큰 (이 화면의 자동 저장 대상에서 뺀다) */
+export function submittedBlocks(server) {
+  return SURVEY_BLOCKS.filter((b) => isSubmitted(getIn(server, b.split("."))));
+}

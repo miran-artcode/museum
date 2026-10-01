@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   makeDirtyTracker, changedKeys, changedTokens, mergeRemote, buildEntries, deepEq, tok, untok, SEP,
   unionTrace, mergeTraceForSave, reconcileTrace, TRACE_CAPS,
+  mergeSurvey, surveyEntries, submittedBlocks,
 } from "./src-ws-sync.mjs";
 
 /* entries → { "경로": 값 } (비교하기 쉽게) */
@@ -184,4 +185,42 @@ test("reconcileTrace: 저장한 배열 + 저장하는 사이 새로 붙은 항�
   const cur = [old, kept, fresh];       // 저장하는 사이 fresh가 붙음
   assert.deepEqual(reconcileTrace(cur, before, saved), [kept, fresh]);
   assert.equal(reconcileTrace(before, before, saved), saved);
+});
+
+test("mergeSurvey: 다른 기기에서 제출한 블록은 고치는 중이어도 서버 값 (제출 취소 없음)", () => {
+  const local = { ver: "v1", pre: { ans: { a: 3 }, startedAt: "s" } };
+  const remote = { ver: "v1", pre: { ans: { a: 5 }, startedAt: "s", submittedAt: "t" } };
+  const out = mergeSurvey(local, remote, new Set(["pre"]));
+  assert.equal(out.pre.submittedAt, "t");
+  assert.deepEqual(out.pre.ans, { a: 5 });
+});
+
+test("mergeSurvey: 고치는 중인 블록은 지키고, 나머지 블록은 서버 값을 받는다", () => {
+  const local = { ver: "v1", pre: { ans: { a: 3 } }, stance: { ver: "s1", pre: { ans: { x: 1 } } } };
+  const remote = { ver: "v1", pre: { ans: { a: 1 } }, stance: { ver: "s1", pre: { ans: { x: 2 } }, post: { ans: { y: 1 } } }, anchor: { items: [1] } };
+  const out = mergeSurvey(local, remote, new Set(["pre"]));
+  assert.deepEqual(out.pre, { ans: { a: 3 } });
+  assert.deepEqual(out.stance, { ver: "s1", pre: { ans: { x: 2 } }, post: { ans: { y: 1 } } });
+  assert.deepEqual(out.anchor, { items: [1] });
+});
+
+test("mergeSurvey: 같은 내용이면 같은 객체, 서버에 없는 블록은 고치는 중일 때만 남는다", () => {
+  const local = { ver: "v1", pre: { ans: { a: 1 } } };
+  assert.equal(mergeSurvey(local, { pre: { ans: { a: 1 } }, ver: "v1" }, new Set()), local);
+  const typed = { ver: "v1", post: { ans: { a: 2 } } };
+  assert.deepEqual(mergeSurvey(typed, { ver: "v1" }, new Set(["post"])).post, { ans: { a: 2 } });
+  assert.equal(mergeSurvey(typed, { ver: "v1" }, new Set()).post, undefined);
+});
+
+test("surveyEntries: 고친 블록과 그 판 표시만, 제출된 블록은 자동 저장하지 않는다", () => {
+  const cur = { ver: "v1", pre: { ans: { a: 1 } }, post: { ans: { a: 2 }, submittedAt: "t" }, stance: { ver: "s1", pre: { ans: {} } }, anchor: { ver: "a1", items: [] } };
+  const m = asMap(surveyEntries(cur, ["pre", "post", "stance.pre", "anchor"], {}));
+  assert.deepEqual(Object.keys(m).sort(), ["anchor", "pre", "stance > pre", "stance > ver", "ver"]);
+  const m2 = asMap(surveyEntries(cur, ["pre"], { pre: { submittedAt: "서버에서 제출" } }));
+  assert.deepEqual(m2, {});
+});
+
+test("submittedBlocks: 서버에서 제출된 블록 토큰", () => {
+  assert.deepEqual(submittedBlocks({ pre: { submittedAt: "t" }, stance: { post: { submittedAt: "u" } } }), ["pre", "stance.post"]);
+  assert.deepEqual(submittedBlocks(null), []);
 });
