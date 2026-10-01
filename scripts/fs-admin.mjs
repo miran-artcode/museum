@@ -5,8 +5,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+/* 저장소 루트. new URL(import.meta.url).pathname 은 공백·한글을 %xx 로 남겨 경로가 어긋나므로 fileURLToPath 로 만든 이 값을 쓴다 */
+export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const BACKUP_DIR = path.join(ROOT, ".backup");
 
 export function projectId() {
@@ -116,3 +118,50 @@ export const stamp = (d = new Date()) => {
   const p = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
 };
+
+/* .backup/ 의 폴더를 담긴 자료의 시각 순(오래된 것 먼저)으로 돌려준다. 이름순으로 고르면 안 된다:
+   「은행내림_…」「복구문구_…」「firestore-…」처럼 날짜로 시작하지 않는 폴더가 날짜 폴더보다 늘 뒤에 오고,
+   --at 시점 백업은 이름의 시각(실행한 때)과 담긴 시점이 다르다. 시각은 INFO.json 의 readTime(시점 백업) → savedAt(백업)
+   → takenDownAt(은행 내림) 순으로 보고, INFO.json 이 없으면 폴더 수정 시각을 쓴다. before(ms)를 주면 그 시각까지의 것만 */
+export function backupDirsByTime(filter = () => true, { before = Infinity } = {}) {
+  if (!fs.existsSync(BACKUP_DIR)) return [];
+  const timeOf = (d) => {
+    try {
+      const info = JSON.parse(fs.readFileSync(path.join(BACKUP_DIR, d, "INFO.json"), "utf8"));
+      const t = Date.parse(info.readTime || info.savedAt || info.takenDownAt || "");
+      if (Number.isFinite(t)) return t;
+    } catch (e) { /* INFO.json 이 없는 폴더 */ }
+    return fs.statSync(path.join(BACKUP_DIR, d)).mtimeMs;
+  };
+  return fs.readdirSync(BACKUP_DIR)
+    .filter((d) => fs.statSync(path.join(BACKUP_DIR, d)).isDirectory() && filter(d))
+    .map((d) => ({ d, t: timeOf(d) }))
+    .filter((x) => x.t <= before)
+    .sort((a, b) => a.t - b.t || (a.d < b.d ? -1 : a.d > b.d ? 1 : 0))
+    .map((x) => x.d);
+}
+
+/* 은행 문서(quizBank·quizKeys)의 값. 교사 화면은 { v, updatedAt } 봉투로 쓰고 scripts/quiz-bank-upload.mjs 는 필드를 그대로 쓴다.
+   스크립트로 올린 문서에 교사 화면이 정정을 병합하면(setT("quizKeys", { corrections }, { merge: true })) 한 문서에 두 꼴이 섞이므로
+   바깥 필드 위에 v 를 덮어 셋 다 받는다. listCollection·getDoc 이 붙인 _createTime·_updateTime 은 뺀다 */
+export function bankDocValue(d) {
+  if (!d || typeof d !== "object") return null;
+  const out = { ...d, ...(d.v !== null && typeof d.v === "object" ? d.v : {}) };
+  delete out.v; delete out._createTime; delete out._updateTime; delete out.updatedAt;
+  return out;
+}
+
+/* 정답이 든 파일(은행·정답표·열람 HTML)을 p 에 써도 되는가. 저장소 밖이거나 .gitignore 가 가리는 자리여야 한다.
+   공개 저장소라 그 밖의 자리에 두면 git add -A 한 번으로 정답이 올라간다. git 을 부르지 못하면 안전하다고 보지 않는다.
+   public/ 은 .gitignore 가 가려도(public/quiz-bank/ 등) firebase deploy 가 그대로 올리는 사이트 폴더이고,
+   .tmpbuild/ 는 배포용 임시 트리라 둘 다 받지 않는다 */
+export function secretPathOk(p) {
+  const rel = path.relative(ROOT, path.resolve(p));
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return true;
+  const top = rel.split(path.sep)[0].toLowerCase();   // Windows 경로는 대소문자를 가리지 않는다
+  if (top === "public" || top === ".tmpbuild") return false;
+  try {
+    execFileSync("git", ["check-ignore", "-q", "--", rel.split(path.sep).join("/")], { cwd: ROOT, stdio: "ignore" });
+    return true;
+  } catch (e) { return false; }
+}

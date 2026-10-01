@@ -38,7 +38,7 @@ const K_MIN = K_FLOOR, K_MAX = 30;   // 작품당 20회 노출(k≥10)이 SSR .8
 const STAGE_CONFIRM = {
   closed: "「닫힘」으로 바꿉니다. 학생 화면에서 상호평가가 사라지고 어떤 단계도 진행할 수 없게 됩니다.",
   submit: "「제출」 단계로 바꿉니다. 학생은 기록지의 최종 작품(대표 이미지·작품 캡션·작가 노트)을 확인하고 제출을 확정합니다. 확정한 제출은 학생이 고칠 수 없습니다.",
-  self1: "「자기평가 ①」 단계로 바꿉니다. 학생은 자기 작품을 다섯 문항으로 평정하고 학급 안 등수를 예측합니다. 작품 제출은 이 시점에 닫힙니다.",
+  self1: "「자기평가 ①」 단계로 바꿉니다. 학생은 자기 작품을 옆에 두고 여섯 문항을 네 수준으로 평가하고, 2학년 전체에서 앞에서 몇 % 안에 들지 예측합니다. 단계는 다섯 반에 한꺼번에 적용되므로 작품 제출도 모든 반에서 닫힙니다.",
   peer: "「동료 비교」 단계로 바꿉니다. 학생은 확정된 명단에서 배정된 쌍을 차례로 비교합니다. 고른 것은 되돌릴 수 없습니다.",
   self2: "「자기평가 ②」 단계로 바꿉니다. 학생은 ①의 답을 보지 않은 채 다시 평정해 확정한 뒤, ①과 나란히 놓고 변화 사유를 씁니다.",
   result: "「결과 공개」 단계로 바꿉니다. 집계된 결과가 「공개 범위」 설정대로(밴드·백분위·등수) 학생에게 보입니다.",
@@ -46,7 +46,7 @@ const STAGE_CONFIRM = {
 const REVEALS = [
   { k: "band", label: "밴드(상·중·하)" }, { k: "pct", label: "백분위" }, { k: "rank", label: "등수" }, { k: "none", label: "보이지 않음" },
 ];
-const TIMING = "100분 운영표: 0~5분 설명·예시 한 쌍 시연 · 5~12분 자기평가① · 12~30분 쌍대비교(쌍당 60~90초) · 30~33분 집계 실행·신뢰도 확인 · 33~45분 자기평가② · 45~60분 결과 공개·토의";
+const TIMING = "반마다 100분 운영표: 0~5분 설명·예시 한 쌍 시연 · 5~12분 자기평가① · 12~30분 쌍대비교(쌍당 60~90초) · 30~33분 진행 현황 확인 · 33~45분 자기평가② · 수업이 끝나면 단계를 「닫힘」으로. 집계·결과 공개·토의는 다섯 반의 판정이 끝난 뒤 별도 차시";
 
 /* ---------- 작은 도우미 ---------- */
 
@@ -359,7 +359,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
   };
 
   /* ---- 표시용 ---- */
-  const wr = sampleMode ? "표본 학급" : undefined;   // 쓰기 버튼의 title
+  const wr = sampleMode ? "표본 명단" : undefined;   // 쓰기 버튼의 title
   const q = (shownAgg && shownAgg.quality) || null;
   const judgesFit = q && q.judges ? Object.keys(q.judges).sort() : [];
   const flagged = (f) => !!f && (f.flag || (f.againstRate != null && f.againstRate > 0.4) || (f.fastN != null && f.fastN >= 3));
@@ -397,10 +397,10 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
 
       {/* ---------------- 카드 1 · 단계 ---------------- */}
       <div className="card at-card">
-        <div className="card-head"><span className="card-code">상호평가 1</span><span className="card-title">단계: 학급 전체를 한 스위치로</span>
+        <div className="card-head"><span className="card-code">상호평가 1</span><span className="card-title">단계: 2학년 다섯 반을 한 스위치로</span>
           <span className="card-sess">{cfg.stage}</span></div>
         <div className="card-note">
-          단계는 학급 전체에 한꺼번에 적용됩니다. 앞 단계로 되돌리는 것도 막지 않지만, 학생이 이미 확정한 제출·판정은 되돌아가지 않습니다.
+          단계는 2학년 다섯 반 전체에 한꺼번에 적용됩니다. 한 반 수업에서 연 단계는 다른 반 학생에게도 열리므로, 수업이 끝나면 「닫힘」으로 돌려 두고 다음 반 수업에서 다시 여세요. 앞 단계로 되돌리는 것도 막지 않지만, 학생이 이미 확정한 제출·판정은 되돌아가지 않습니다.
         </div>
         <div className="card-body">
           <div className="seg at-stage">
@@ -451,8 +451,8 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
             <textarea rows={2} value={live.question || ""} maxLength={300} disabled={sampleMode} onChange={(e) => edit("question", e.target.value)} />
           </div>
           <p className="hint">
-            k와 반복 수는 <b>명단을 확정하는 순간</b> 배정표에 고정됩니다. 확정 뒤에 바꾸면 다음 확정부터 적용됩니다.
-            작품 n점·판정자 n명이면 작품당 약 2k회 노출됩니다. k=12·24명이면 작품당 24회입니다.
+            k와 반복 수는 <b>명단을 확정하는 순간</b> 배정표에 고정됩니다. 명단은 다섯 반이 모두 제출한 뒤 한 번만 확정하므로 k도 그 전에 정합니다(시간이 허락하면 15를 권합니다).
+            작품 n점·판정자 n명이면 작품당 2k회 노출됩니다. k=12면 2학년 145명 전체에서도 작품당 24회입니다.
           </p>
         </div>
       </div>
@@ -462,7 +462,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
         <div className="card-head"><span className="card-code">상호평가 2</span><span className="card-title">명단: 제출 현황과 비교 명단 확정</span>
           <span className="card-sess">제출 {nSubmitted}/{ids.length} · 비교 가능 {nReady}</span></div>
         <div className="card-note">
-          <b>비교 가능</b> = 제출을 확정했고 작품 번호와 이미지가 있는 작품. 명단은 문서 하나로 고정해 두어야 모든 학생이 같은 배정을 봅니다. 확정 뒤에 들어온 제출은 판정에는 참여하되 자기 작품은 다음 확정 때 들어갑니다.
+          <b>비교 가능</b> = 제출을 확정했고 작품 번호와 이미지가 있는 작품. 명단은 문서 하나로 고정해 두어야 모든 학생이 같은 배정을 봅니다. 명단은 다섯 반이 모두 제출한 뒤 한 번만 확정합니다. 확정 뒤에 들어온 제출은 판정에는 참여하지만 자기 작품은 비교되지 않습니다.
         </div>
         <div className="card-body">
           <div className="at-row">
@@ -475,7 +475,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
                 {peer.stats ? " · 노출 " + peer.stats.exposureMin + "~" + peer.stats.exposureMax + "회 · 쌍 " + peer.stats.distinctPairs + " · " + (peer.stats.connected ? "연결됨" : "연결되지 않음")
                   + (peer.stats.sideDevMax != null ? " · 좌우 편차 ≤ " + peer.stats.sideDevMax + (peer.stats.sideDevMaxRep != null ? "(반복 포함 " + peer.stats.sideDevMaxRep + ")" : "") : "") : ""}
               </span>
-            ) : <span className="hint">아직 확정된 명단이 없습니다. 제출 마감 뒤 한 번 누릅니다.</span>}
+            ) : <span className="hint">아직 확정된 명단이 없습니다. 다섯 반이 모두 제출을 마친 뒤 한 번 누릅니다. 작품 번호가 2학년 전체에서 겹치지 않아야 합니다.</span>}
           </div>
           {fixErrors.length > 0 && (
             <div className="warn-note"><b>명단을 확정하지 못했습니다.</b>
@@ -484,7 +484,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
           )}
           {peer && outside.length > 0 && (
             <div className="warn-note">명단 확정 뒤에 들어온 제출 {outside.length}건: {outside.map((r) => r.id + (r.sub && r.sub.no ? "(" + r.sub.no + ")" : "")).join(", ")}.
-              판정에는 참여하지만 자기 작품은 비교되지 않습니다. 다시 확정하면 들어갑니다.</div>
+              판정에는 참여하지만 자기 작품은 비교되지 않습니다. 다시 확정하면 들어가지만, 그 전에 판정한 반의 기록은 새 명단의 집계에서 빠집니다.</div>
           )}
           {notReady.length > 0 && (
             <p className="hint" style={{ marginBottom: 8 }}>제출은 했지만 이미지 또는 번호가 없어 비교할 수 없는 학생 {notReady.length}명: {notReady.map((r) => r.id).join(", ")}</p>
@@ -572,13 +572,13 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
           </div>
 
           {!shownAgg ? (
-            <p className="hint">{peer ? "「집계 실행」을 누르면 순위표와 품질 지표가 나타나고 학생별 결과가 저장됩니다. 판정이 더 모이면 다시 실행해도 됩니다." : "비교 명단을 먼저 확정하세요."}</p>
+            <p className="hint">{peer ? "「집계 실행」을 누르면 순위표와 품질 지표가 나타나고 학생별 결과가 저장됩니다. 판정이 더 모이면 다시 실행해도 됩니다. 다섯 반의 판정이 끝나기 전에는 작품당 비교가 모자라 「기준 미달」로 나오는 것이 정상입니다." : "비교 명단을 먼저 확정하세요."}</p>
           ) : (
             <div>
               {shownAgg.ok === false && (
                 <div className="warn-note"><b>신뢰도 기준 미달. 결과 공개를 보류하세요.</b>
                   <ul className="at-errs">{(shownAgg.reasons || []).map((r, i) => <li key={i}>{r}</li>)}</ul>
-                  같은 자료에 즉석 쌍을 덧붙이지 말고, 미완료 학생의 판정을 받은 뒤 다시 집계합니다.
+                  같은 자료에 즉석 쌍을 덧붙이지 말고, 마지막 반까지 판정을 받은 뒤 다시 집계합니다.
                 </div>
               )}
               {shownAgg.ok !== false && !shownAgg.caution && <div className="ok-note">신뢰도 기준을 통과했습니다. 결과를 공개할 수 있습니다.</div>}
@@ -645,7 +645,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
                 </table>
               </div>
 
-              <div className="sv-block-t">판정자 적합도 <span className="hint" style={{ fontWeight: 400 }}>(붉은 줄은 infit이 {INFIT_BAND[0]}~{INFIT_BAND[1]} 밖이거나 학급 평균+2SD 위, 역방향률 &gt; 40%, {FAST_SEC}초 미만 3건 이상 가운데 하나. <b>성적이 아니라 수업 자료이므로 제외하지 않습니다.</b> 판단 경향이 학급 합의와 다르다는 뜻이지 오류가 아닙니다.)</span></div>
+              <div className="sv-block-t">판정자 적합도 <span className="hint" style={{ fontWeight: 400 }}>(붉은 줄은 infit이 {INFIT_BAND[0]}~{INFIT_BAND[1]} 밖이거나 판정자 전체 평균+2SD 위, 역방향률 &gt; 40%, {FAST_SEC}초 미만 3건 이상 가운데 하나. <b>성적이 아니라 수업 자료이므로 제외하지 않습니다.</b> 판단 경향이 2학년 전체의 합의와 다르다는 뜻이지 오류가 아닙니다.)</span></div>
               <div className="tbl-scroll">
                 <table className="roster at-click">
                   <thead><tr><th>학번</th><th>별명</th><th>판정 수</th><th>infit</th><th>역방향률</th><th>좌측률</th><th>중앙 초</th><th>{FAST_SEC}초 미만</th><th>중복 이유</th></tr></thead>
@@ -691,7 +691,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
           </div>
           <p className="hint">
             파일 이름은 <span className="mono">상호평가_&lt;종류&gt;_&lt;yymmdd&gt;.csv</span>. 셀 앞의 <span className="mono">'</span>는 수식 주입을 막는 표시이니 그대로 두세요.
-            다섯 파일에는 학급 전원이 들어갑니다. 논문용 집계에서는 「연구」 탭의 동의 대장을 기준으로 동의하지 않은 학생의 P 번호를 빼고 쓰세요.
+            다섯 파일에는 2학년 전원(명단 기준)이 들어갑니다. 논문용 집계에서는 「연구」 탭의 동의 대장을 기준으로 동의하지 않은 학생의 P 번호를 빼고 쓰세요.
             집계 CSV는 이 화면에서 마지막으로 실행한 집계를 내려받습니다.
           </p>
         </div>

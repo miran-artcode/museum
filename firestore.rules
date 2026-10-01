@@ -27,9 +27,8 @@ service cloud.firestore {
     function isOwner(id) {
       return signedIn() && uid() == id;
     }
-    // 보기 전용 교사 계정(viewer@museum.class, 관리자 코드 자리에 admin): 수업 참관자·공동 연구자에게 나눠 주는 코드다.
-    // 수업 기록(기록지·채점·설문·상호평가·응시 기록·은행)은 읽되 아무것도 쓰지 못하고, 여러 사람이 아는 코드이므로
-    // 정답 키(quizKeys)·연구 동의 대장(research)·기록지 시점 사본(wsHistory)·media 전체 목록은 교사(teacher)만 읽는다.
+    // 보기 전용 계정(viewer@museum.class): 참관자에게 나눠 주는 코드다. 수업 설정(meta/config)과 수업 자료(misc)만 읽는다.
+    // 학생 개인 기록(기록지·채점·설문·상호평가·응시 기록)과 학번이 드러나는 문서(명부·제출작·media·명단)는 읽지 못하고, 아무것도 쓰지 못한다.
     function isViewer() {
       return signedIn() && uid() == 'viewer';
     }
@@ -61,13 +60,13 @@ service cloud.firestore {
 
     // 차시 공개 설정: 로그인한 사람은 읽고, 교사만 쓴다
     match /meta/{docId} {
-      allow read: if signedIn();
+      allow read: if signedIn() && (!isViewer() || docId == 'config');
       allow write: if isTeacher();
     }
 
     // 학생 명부(학번과 별명만): 로그인한 사람은 읽고, 본인과 교사만 쓴다
     match /students/{sid} {
-      allow read: if signedIn();
+      allow read: if signedIn() && !isViewer();
       allow create: if isTeacher()
                     || (isOwner(sid) && !rosterLocked() && studentNickOk()
                         && request.resource.data.keys().hasOnly(['nick', 'updatedAt']));
@@ -79,7 +78,7 @@ service cloud.firestore {
 
     // 창작 기록지: 본인과 교사만 읽는다. 쓰기는 본인, 그리고 학생 관리(학번 이관·전시 내리기)를 위한 교사
     match /worksheets/{sid} {
-      allow read: if isOwner(sid) || canView();
+      allow read: if isOwner(sid) || isTeacher();
       allow create: if isTeacher() || (isOwner(sid) && enrolled(sid));
       allow update: if isOwner(sid) || isTeacher();
       allow delete: if isTeacher();
@@ -100,13 +99,13 @@ service cloud.firestore {
 
     // 채점 기록: 본인은 읽기만, 쓰기는 교사만
     match /grades/{sid} {
-      allow read: if isOwner(sid) || canView();
+      allow read: if isOwner(sid) || isTeacher();
       allow write: if isTeacher();
     }
 
     // 사전·사후 창의성 설문: 본인과 교사만 읽고, 본인만 쓴다 (연구용 수집 데이터)
     match /surveys/{sid} {
-      allow read: if isOwner(sid) || canView();
+      allow read: if isOwner(sid) || isTeacher();
       allow create: if isOwner(sid) && enrolled(sid);
       allow update: if isOwner(sid);
       allow delete: if isTeacher();
@@ -118,7 +117,7 @@ service cloud.firestore {
     // 기록지는 본인·교사만 읽지만 그 안의 사진·음성·영상은 전시를 위해 문서 이름을 아는 사람이 읽는다.
     // 컬렉션 전체 목록(list)은 교사만: 학생 화면은 문서 이름으로만 읽으므로 목록이 열리면 학급 전체 미디어를 내려받을 수 있다.
     match /media/{mediaId} {
-      allow get: if signedIn();
+      allow get: if signedIn() && !isViewer();
       allow list: if isTeacher();
       allow create: if isTeacher() || (signedIn() && mediaId.split('_')[0] == uid() && enrolled(uid()) && mediaSizeOk());
       allow update: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher()) && mediaSizeOk();
@@ -130,7 +129,7 @@ service cloud.firestore {
     // 확정(locked)된 제출은 학생이 고칠 수 없다 — 비교 도중 작품이 바뀌면 판정자마다 다른 작품을 본 것이 된다.
     // 해제는 교사만 한다 (locked:false를 써 넣으면 학생이 다시 고쳐 제출할 수 있다).
     match /submissions/{sid} {
-      allow read: if signedIn();
+      allow read: if signedIn() && !isViewer();
       allow create: if isTeacher() || (isOwner(sid) && enrolled(sid));
       allow update: if isTeacher() || (isOwner(sid) && resource.data.get('v', {}).get('locked', false) != true);
       allow delete: if isTeacher();
@@ -148,7 +147,7 @@ service cloud.firestore {
       return before.get('submittedAt', null) == null || after == before;
     }
     match /assess/{sid} {
-      allow read: if isOwner(sid) || canView();
+      allow read: if isOwner(sid) || isTeacher();
       allow delete: if isTeacher();
       allow create, update: if isTeacher();
       allow create: if isOwner(sid) && enrolled(sid) && !('result' in assessV(request.resource));
@@ -228,7 +227,7 @@ service cloud.firestore {
       return after == before || after == request.time;
     }
     match /quizBank/{docId} {
-      allow read: if canView() || (signedIn() && quizStage() != 'closed');
+      allow read: if isTeacher() || (signedIn() && !isViewer() && quizStage() != 'closed');
       allow write: if isTeacher();
     }
     match /quizKeys/{docId} {
@@ -236,7 +235,7 @@ service cloud.firestore {
       allow write: if isTeacher();
     }
     match /quiz/{sid} {
-      allow read: if isOwner(sid) || canView();
+      allow read: if isOwner(sid) || isTeacher();
       allow delete: if isTeacher();
       allow create, update: if isTeacher();
       allow create: if isOwner(sid) && enrolled(sid)
@@ -272,7 +271,7 @@ service cloud.firestore {
     // 그 밖의 학급 공용 문서. 「수업 편집」 탭이 고친 차시별 발문·이론·그림·링크가
     // lessonEdits 문서에 쌓인다. 학생은 읽기만 하고 교사만 고친다.
     match /misc/{docId} {
-      allow read: if signedIn();
+      allow read: if signedIn() && (!isViewer() || docId == 'lessonEdits');
       allow write: if isTeacher();
     }
 

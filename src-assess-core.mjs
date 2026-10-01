@@ -18,40 +18,151 @@
    근거 문헌은 쌍대비교_구현_근거.md 에 정리한다. 이 파일의 상수는 그 문서의 결정을 그대로 옮긴 것이다.
    ============================================================ */
 
-export const ASSESS_VER = "v1";
+/* v2(2026-09-29): 자기평가를 네 수준 기술형 6문항으로 바꾸고 등수 예측을 2학년 전체 기준 「상위 몇 %」로 받는다. v1 자료는 없다 */
+export const ASSESS_VER = "v2";
 export const ROSTER_VER = "r1";
 
-/* 평가 4축 — 자기평가와 결정적 축 태그가 같은 말을 쓴다 (src-anchor.jsx의 ANCHOR_TAGS와 동일한 키) */
+/* 평가 4축 — 자기평가 문항·결정적 축 태그·앵커 쌍(src-anchor.jsx ANCHOR_TAGS)이 같은 키와 같은 이름을 쓴다.
+   이름은 학생이 수업에서 쓴 말(흔적과 쓰임·크기 짐작·작품 캡션)로 둔다. v1의 「이미지의 핍진성·흔적의 인과·작품 캡션의 작동·문제의 전달」과 키는 같다 */
 export const CRITERIA = [
-  { k: "veri", label: "이미지의 핍진성", desc: "유물 기록 사진의 형식(배경·조명·스케일)이 성립하는가" },
-  { k: "cause", label: "흔적의 인과", desc: "닳고 부서지고 수리된 자리가 그 물건의 쓰임과 이어지는가" },
-  { k: "plate", label: "작품 캡션의 작동", desc: "작품 캡션을 읽은 뒤 이미지의 읽기가 실제로 달라지는가" },
-  { k: "voice", label: "문제의 전달", desc: "어떤 사회문제가 어떤 태도(고발·경고·공감·기록·질문)로 읽히는가" },
+  { k: "veri", label: "기록 사진의 형식", desc: "배경·빛과 그림자·크기를 짐작할 단서가 발굴 기록 사진처럼 맞는가" },
+  { k: "cause", label: "흔적과 쓰임", desc: "닳고 깨지고 고친 흔적이 물건을 쓴 반복 동작과 이어지는가" },
+  { k: "plate", label: "작품 캡션", desc: "작품 캡션을 읽은 뒤 이미지가 더 구체적으로 읽히는가" },
+  { k: "voice", label: "사회 문제와 태도", desc: "어떤 사회 문제를 어떤 태도(고발·경고·공감·기록·질문)로 다루는지 읽히는가" },
 ];
 
-/* 자기평가 5문항 — 종합 1 + 4축. 종합 문항이 쌍대비교의 질문과 직접 맞닿는 주지표다 */
+/* 자기평가 — 문항마다 네 수준을 관찰 가능한 작품 특징으로 기술한다(동의 척도 대신). ①·②가 같은 문항이다.
+   overall이 쌍대비교의 질문과 맞닿는 주지표, veri·cause·plate·voice는 판정 태그의 네 축, process는 AI 결과물의 선별·수정(전유).
+   std는 문항이 기대는 성취기준, look은 학생이 살펴볼 곳. 점수는 1~SELF_SCALE로 저장한다 */
+export const SELF_SCALE = 4;
+export const SELF_LABELS = ["아직", "일부", "대체로", "충분히"];
 export const SELF_ITEMS = [
-  { k: "overall", label: "종합 설득력", text: "이 작품은 실재한 적 없는 유물을 설득력 있게 성립시킨다 (이미지·작품 캡션·허구 고지가 함께 작동해서)." },
-  { k: "veri", label: "이미지의 핍진성", text: "유물 기록 이미지의 형식인 배경·조명·스케일이 서로 어긋나지 않고 성립한다." },
-  { k: "cause", label: "흔적의 인과", text: "마모·파손·오염·수리의 위치와 모습이 이 물건의 쓰임과 구체적으로 이어진다." },
-  { k: "plate", label: "작품 캡션의 작동", text: "작품 캡션을 읽고 나면 이미지가 무엇을 뜻하는지 더 구체적으로 읽힌다." },
-  { k: "voice", label: "문제의 전달", text: "작품이 다루는 사회문제와 태도(고발·경고·공감·기록·질문)를 작품 안에서 읽을 수 있다." },
+  {
+    "k": "veri",
+    "group": "이미지",
+    "label": "기록 사진의 형식",
+    "std": "[12미02-03]",
+    "axis": "veri",
+    "text": "대표 이미지가 발굴 기록 사진처럼 찍혀 있나요?",
+    "look": "배경 · 빛과 그림자 · 크기를 짐작할 단서 · 모양이 뭉개지거나 어긋난 곳",
+    "levels": [
+      "배경이나 빛이 기록 사진과 다르다(어두운 거리, 광고 사진, 공상 과학 장면 등). 유물 기록으로 보기 어렵다.",
+      "기록 사진처럼 찍혔지만 배경, 빛과 그림자, 크기 단서 가운데 어긋나는 곳이 한눈에 보인다.",
+      "배경·빛·크기 단서가 기록 사진과 맞는다. 어색한 곳은 가까이 들여다봐야 보인다.",
+      "중립 배경, 고른 빛, 크기를 짐작할 단서가 모두 맞고, 모양이 뭉개지거나 어긋난 곳도 찾기 어렵다."
+    ]
+  },
+  {
+    "k": "cause",
+    "group": "이미지",
+    "label": "흔적과 쓰임",
+    "std": "[12미02-01]",
+    "axis": "cause",
+    "text": "닳고, 깨지고, 고친 흔적이 이 물건을 쓴 반복 동작에서 생긴 것으로 보이나요?",
+    "look": "흔적의 위치 · 모양 · 한쪽에만 생긴 차이",
+    "levels": [
+      "흔적이 없거나, 오래된 물건이면 어디에나 생길 낡음뿐이다.",
+      "흔적은 있지만 왜 하필 그 위치에 생겼는지 설명하기 어렵다.",
+      "흔적의 위치가 물건의 쓰임과 이어진다. 다만 어떤 동작을 얼마나 반복했는지는 드러나지 않는다.",
+      "흔적의 위치와 모양만 보고도 누가 어떤 동작을 얼마나 되풀이했는지 짐작할 수 있다."
+    ]
+  },
+  {
+    "k": "plate",
+    "group": "작품 캡션",
+    "label": "작품 캡션과 이미지",
+    "std": "[12미02-03]",
+    "axis": "plate",
+    "text": "작품 캡션을 읽고 나면 이미지가 무엇을 말하는지 더 분명해지나요?",
+    "look": "유물 명칭 · 추정 연대 · 재질 · 크기 · 출토 맥락이 이미지와 맞는지",
+    "levels": [
+      "작품 캡션에 빈칸이 있거나, 이미지에 보이는 것을 다시 적은 정도다.",
+      "기록처럼 쓰였지만, 이미지의 흔적과 이어지는 내용은 적다.",
+      "출토 맥락이 흔적이 생긴 까닭을 설명해서, 읽고 나면 이미지가 다르게 보인다.",
+      "작품 캡션의 내용이 서로 맞고 이미지와도 맞아서, 읽을수록 물건의 쓰임과 그 뒤의 사회 문제가 함께 드러난다."
+    ]
+  },
+  {
+    "k": "voice",
+    "group": "주제",
+    "label": "사회 문제와 태도",
+    "std": "[12미02-01]",
+    "axis": "voice",
+    "text": "내 작품이 어떤 사회 문제를 어떤 태도로 다루는지 보는 사람이 읽을 수 있나요?",
+    "look": "작가 노트 없이 이미지와 작품 캡션만으로 읽히는지 · 태도: 고발·경고·공감·기록·질문",
+    "levels": [
+      "작가 노트를 읽어야 어떤 문제인지 알 수 있다.",
+      "문제의 분야(노동, 환경 등)는 짐작되지만, 구체적으로 무엇을 말하는지는 흐릿하다.",
+      "어떤 문제인지는 읽힌다. 다만 고발·경고·공감·기록·질문 가운데 어떤 태도인지는 분명하지 않다.",
+      "이미지와 작품 캡션만으로 어떤 문제를 어떤 태도로 다루는지 분명하게 읽힌다."
+    ]
+  },
+  {
+    "k": "process",
+    "group": "과정",
+    "label": "AI 결과물을 고르고 고친 판단",
+    "std": "[12미02-04]",
+    "axis": "",
+    "text": "AI가 만든 결과물을 내 의도에 맞게 고르고 고쳤나요?",
+    "look": "5~6차시의 생성 기록 · 이중 점검 · 고른 이유와 뺀 이유 · 고치기 전후",
+    "levels": [
+      "처음 나온 결과를 거의 그대로 썼다.",
+      "여러 번 만들어 보았지만, 왜 이 결과를 골랐는지 말하기 어렵다.",
+      "여러 결과를 설계와 견주어 고른 이유와 뺀 이유를 말할 수 있다.",
+      "고른 이유와 뺀 이유를 말할 수 있고, 성립하지 않던 곳을 알맞은 방법(재생성·부분 수정·화면 편집)으로 고친 전후 차이도 설명할 수 있다."
+    ]
+  },
+  {
+    "k": "overall",
+    "group": "작품 전체",
+    "label": "유물로서의 설득력",
+    "std": "[12미02-04]",
+    "axis": "whole",
+    "text": "이미지와 작품 캡션을 함께 볼 때, 내 작품은 실재한 적 없는 유물을 설득력 있게 보여 주나요?",
+    "look": "이미지와 작품 캡션을 함께 볼 때 먼저 눈에 띄는 곳 · 허구 고지",
+    "levels": [
+      "유물보다 AI가 만든 그림으로 먼저 보인다.",
+      "유물처럼 보이는 부분이 있지만, 이미지나 작품 캡션에서 어색한 곳이 먼저 눈에 띈다.",
+      "이미지와 작품 캡션을 함께 보면 유물로 보이고, 어색한 곳은 한두 군데뿐이다.",
+      "이미지와 작품 캡션이 서로 어긋나지 않아, 허구 고지를 읽은 뒤에도 있을 법한 유물로 보인다."
+    ]
+  }
 ];
-export const SELF_LABELS = ["전혀 그렇지 않다", "그렇지 않은 편이다", "보통이다", "그런 편이다", "매우 그렇다"];
+/* 자기평가 화면의 안내와 질문 — 교사 화면 설계 카드도 이 값을 그대로 보여 준다 */
+export const SELF_TEXT = {
+  note1: "정답은 없고 성적과 관계없습니다. 내 작품을 보면서 문항마다 지금 모습에 가장 가까운 설명을 고르세요.",
+  note2: "처음 평가와 같은 문항입니다. 처음 답과 같게 고를 필요는 없습니다. 지금 보이는 대로 고르세요.",
+  whyQ: "점수를 정할 때 가장 크게 본 내 작품의 특징 한 가지",
+  whyEx: "예: 손잡이 오른쪽만 닳은 까닭을 출토 맥락에서 설명했다",
+  rankQ: "2학년 전체 {n}점을 설득력이 큰 순서로 한 줄로 세운다면, 내 작품은 앞에서 몇 % 안에 들까요?",
+};
 export const CONF_LABELS = ["전혀 확신하지 않음", "별로 확신하지 않음", "보통", "대체로 확신함", "매우 확신함"];
 export const CHANGE_CODES = [
-  { k: "shifted", label: "처음과 다르게 중요하게 본 기준이나 근거가 있음" },
-  { k: "same", label: "처음과 비슷한 기준과 근거로 판단함" },
-  { k: "unclear", label: "이유가 분명하지 않거나 기억나지 않음" },
-  { k: "other", label: "그 밖의 이유" },
+  {
+    "k": "shifted",
+    "label": "처음과 다른 기준이나 근거를 더 중요하게 보았다"
+  },
+  {
+    "k": "same",
+    "label": "처음과 같은 기준과 근거로 판단했다"
+  },
+  {
+    "k": "unclear",
+    "label": "이유가 분명하지 않거나 기억나지 않는다"
+  },
+  {
+    "k": "other",
+    "label": "그 밖의 이유가 있다"
+  }
 ];
 
 /* 결정적 축 태그 — 4축 + 「전체 인상」. 고른 뒤에 묻는 태그이므로 총체적 판단(Leech & Chambers 2022)을 억지로
    한 축에 끼워 넣지 않게 다섯째 보기를 둔다. 「노력」은 두지 않는다(AI 고지 감점의 통로가 노력 지각이다 — Bellaiche 2023·Magni 2023) */
-export const TAG_OPTIONS = CRITERIA.concat([{ k: "whole", label: "전체 인상", desc: "어느 한 축이 아니라 전체가 그렇게 보였다" }]);
+export const TAG_OPTIONS = CRITERIA.concat([{ k: "whole", label: "전체 인상", desc: "어느 하나가 아니라 작품 전체가 그렇게 보였다" }]);
 
+/* 2026-09-29: 「성립시킨」(사동)과 비교 화면에 보이지 않는 「허구 고지」를 뺐다. 허구라는 사실은 2학년 공통 배너가 알린다 */
 export const PEER_QUESTION =
-  "두 작품 가운데, 실재한 적 없는 유물을 더 설득력 있게 성립시킨 쪽은 어디인가요? (이미지 · 작품 캡션 · 허구 고지가 함께 작동해서)";
+  "두 작품 가운데, 실재한 적 없는 유물을 더 설득력 있게 보여 주는 쪽은 어느 작품인가요? (이미지와 작품 캡션을 함께 보고)";
 
 export const STAGES = [
   { k: "closed", label: "닫힘" },
@@ -151,6 +262,10 @@ export function wilson(k, n, z = 1.96) {
   return [Math.max(0, c - h), Math.min(1, c + h)];
 }
 export const predPctOf = (predRank, n) => (n > 1 && predRank >= 1 ? (n - predRank) / (n - 1) : null);
+/* 등수 예측은 2학년 전체(약 145점)에서 「앞에서 몇 % 안」으로 받는다(1이 가장 앞). 등수와 백분위는 이 값에서 계산해 함께 저장한다 */
+export const RANK_TICKS = [10, 25, 50, 75];
+export const rankFromTop = (top, n) => (n >= 1 && top >= 1 ? Math.min(n, Math.max(1, Math.round((top / 100) * n))) : null);
+export const topFromRank = (rank, n) => (n >= 1 && rank >= 1 ? Math.min(100, Math.max(1, Math.round((rank / n) * 100))) : null);
 
 /* ---------- 제출 초안 ---------- */
 
@@ -165,7 +280,7 @@ export function submissionFromWs(ws, sid) {
     plate: {
       relic: trimStr(d["s6b.relic"]), year: trimStr(d["s6b.year"]) || "2300년", era: trimStr(d["s6b.era"]),
       mat: trimStr(d["s6b.mat"]), size: trimStr(d["s6b.size"]), context: trimStr(d["s6b.context"]),
-      coll: trimStr(d["s6b.coll"]) || "학급 가상 컬렉션",
+      coll: trimStr(d["s6b.coll"]) || "2학년 가상 컬렉션",
       notice: trimStr(d["s6b.notice"]) || "이 이미지는 생성형 AI로 제작한, 실재한 적 없는 유물입니다.",
     },
     aiLevel: trimStr(d["s6b.aiLevel"]),
@@ -214,6 +329,14 @@ export function dSequence(n, k, seed) {
     return false;
   };
   return dfs(1, n) ? ds : null;
+}
+
+/* 순환 규칙에 넣는 명단 순서 — 작품 번호순이 아니라 seed로 섞은 순서다. 번호가 반별로 매겨져 있으면(1반 작품이 연달아 있으면)
+   번호순에서는 판정자 j의 앞자리 작품 j+r이 대부분 같은 반 작품이 된다(반 29명·k=12이면 약 78%). 섞으면 같은 반 비율이 우연 수준으로 내려간다.
+   같은 명단·seed면 늘 같은 순서이고, 입력 배열 순서와는 무관하다 */
+function circulantOrder(list, seed) {
+  const byNo = list.slice().sort((a, b) => cmp(a.no, b.no));
+  return shuffled(byNo, mulberry32(stableHash(String(seed || "") + "::order")));
 }
 
 function normalizeWorks(works) {
@@ -344,9 +467,10 @@ export function makePlan({ works, judges, k, repeat = 1, seed }) {
   if (!judgeIds.length) errors.push("판정자 명단이 비어 있습니다.");
   if (errors.length) return { plan: {}, hash: "", stats: { n, nJudges: judgeIds.length }, errors, kEff: 0 };
   const kEff = Math.max(1, Math.min(k | 0 || 1, n - 1));
-  const nos = list.map((w) => w.no);
+  const order = circulantOrder(list, seed);
+  const nos = order.map((w) => w.no);
   const idxOfSid = {};
-  list.forEach((w, i) => { idxOfSid[w.sid] = i; });
+  order.forEach((w, i) => { idxOfSid[w.sid] = i; });
   const ds = dSequence(n, kEff, seed);
   if (!ds) {
     errors.push("배정을 만들지 못했습니다 (작품 " + n + "점 · k " + kEff + "). 판정 수 k를 바꾸거나 다시 확정하세요.");
@@ -439,7 +563,7 @@ export function makePlan({ works, judges, k, repeat = 1, seed }) {
   const hash = planHash(plan);
   const errs = validatePlan({ plan, works: list, judges: judgeIds, k: kEff, repeat });
   if (!stats.connected) errs.push("비교 그래프가 하나로 이어지지 않습니다. k를 올리거나 다시 확정하세요.");
-  return { plan, hash, stats: { ...stats, kEff, ds }, errors: errs, kEff };
+  return { plan, hash, stats: { ...stats, kEff, ds, order: nos }, errors: errs, kEff };
 }
 
 function planStats(plan, nos, judgeIds) {
@@ -530,7 +654,7 @@ export function pairsForLateJudge({ works, sid, k, repeat = 1, seed }) {
   const n = list.length;
   if (n < 2) return [];
   const kEff = Math.max(1, Math.min(k | 0 || 1, n - 1));
-  const nos = list.map((w) => w.no);
+  const nos = circulantOrder(list, seed).map((w) => w.no);
   const ds = dSequence(n, kEff, seed);
   if (!ds) return [];
   const own = (list.find((w) => w.sid === trimStr(sid)) || {}).no || null;
@@ -610,7 +734,7 @@ export function collectJudgements(assessMap, roster, opts) {
 
 /* Hunter(2004)의 MM: p_i ← W_i / Σ_j n_ij/(p_i+p_j). 가상 기준 작품(p=1 고정)과 각 작품이
    1회 비교해 prior(0.5)승을 거둔 것으로 두면 전승·전패 작품도 유한한 값에 머문다 —
-   그 값은 정확히 "기준보다 얼마나 나은가"라 비교 척도의 원점이 된다. 최종 θ는 학급 평균 0으로 옮긴다.
+   그 값은 정확히 "기준보다 얼마나 나은가"라 비교 척도의 원점이 된다. 최종 θ는 명단(2학년 전체) 평균 0으로 옮긴다.
    표준오차는 관측 정보 행렬의 대각 성분 Σ_j n_ij p_i p_j/(p_i+p_j)² 의 역제곱근(비대각 무시한 근사). */
 export function bradleyTerry(judgements, workNos, opts = {}) {
   const prior = opts.prior == null ? 0.5 : opts.prior;
@@ -759,7 +883,7 @@ export function judgeFit(judgements, theta) {
       knowN: items.filter((J) => J.knowAuthor).length,
     };
   });
-  // 상대 기준 — 학급 평균 + 2SD 위의 infit도 표시한다 (Pollitt 2012의 ACJ 관행)
+  // 상대 기준 — 판정자 전체 평균 + 2SD 위의 infit도 표시한다 (Pollitt 2012의 ACJ 관행)
   const infits = Object.values(out).map((f) => f.infit).filter((x) => Number.isFinite(x));
   const mu = mean(infits);
   const sd = infits.length > 1 ? Math.sqrt(infits.reduce((a, x) => a + (x - mu) ** 2, 0) / (infits.length - 1)) : 0;
@@ -1020,7 +1144,8 @@ export function csvJudges({ agg, pidOf }) {
 
 export function csvSelf({ roster, assessMap, pidOf }) {
   const pid = pidFn(pidOf);
-  const head = ["pid", "phase", "overall", "veri", "cause", "plate", "voice", "why", "pred_rank", "n", "pred_pct", "started_at", "submitted_at", "dur_sec", "locked_at", "change_code", "change_why"];
+  const keys = SELF_ITEMS.map((it) => it.k);
+  const head = ["pid", "phase"].concat(keys, ["why", "pred_top", "pred_rank", "n", "pred_pct", "started_at", "submitted_at", "dur_sec", "locked_at", "change_code", "change_why"]);
   const rows = [];
   Object.keys(assessMap || {}).sort(cmp).forEach((sid) => {
     const self = (assessMap[sid] && assessMap[sid].self) || {};
@@ -1028,8 +1153,8 @@ export function csvSelf({ roster, assessMap, pidOf }) {
       const s = self[ph];
       if (!s || !(s.submittedAt || (ph === "s2" && s.lockedAt))) return;
       const sc = s.scores || {};
-      rows.push([pid(sid), ph, sc.overall, sc.veri, sc.cause, sc.plate, sc.voice, s.why, s.predRank, s.n,
-        r3(Number.isFinite(s.predPct) ? s.predPct : predPctOf(s.predRank, s.n)), s.startedAt, s.submittedAt, s.durSec, s.lockedAt, s.changeCode, s.changeWhy].map(cell));
+      rows.push([pid(sid), ph].concat(keys.map((k) => sc[k]), [s.why, s.predTop, s.predRank, s.n,
+        r3(Number.isFinite(s.predPct) ? s.predPct : predPctOf(s.predRank, s.n)), s.startedAt, s.submittedAt, s.durSec, s.lockedAt, s.changeCode, s.changeWhy]).map(cell));
     });
   });
   return { head, rows };
@@ -1084,14 +1209,14 @@ export function buildSampleAssess(ids) {
         ms: 9000 + Math.floor(rnd() * 40000), plateOpened: rnd() < 0.6, at: "2026-04-02T05:3" + (it.i % 10) + ":00.000Z" };
     });
     const own = works.find((w) => w.sid === sid);
-    const sc = (bias) => { const o = {}; SELF_ITEMS.forEach((it, j) => { o[it.k] = Math.max(1, Math.min(5, 3 + bias + ((si + j) % 3) - 1)); }); return o; };
+    const sc = (bias) => { const o = {}; SELF_ITEMS.forEach((it, j) => { o[it.k] = Math.max(1, Math.min(SELF_SCALE, 2 + bias + ((si + j) % 3) - 1)); }); return o; };
     const pr1 = own ? Math.max(1, Math.min(n, rankTrue[own.no] - 3 + (si % 4))) : null;
     const pr2 = own ? Math.max(1, Math.min(n, rankTrue[own.no] - 1 + (si % 3))) : null;
     assessMap[sid] = {
       ver: ASSESS_VER,
       self: own ? {
-        s1: { scores: sc(1), why: "손잡이의 마모가 쓰임과 이어져 보인다", predRank: pr1, n, predPct: predPctOf(pr1, n), startedAt: "2026-04-02T05:05:00.000Z", submittedAt: "2026-04-02T05:10:00.000Z", durSec: 300 },
-        s2: { scores: sc(0), why: "다른 작품과 견주니 배경 처리가 약해 보인다", predRank: pr2, n, predPct: predPctOf(pr2, n), lockedAt: "2026-04-02T06:00:00.000Z", changeCode: si % 2 ? "shifted" : "same", changeWhy: "비교하며 조명 방향을 보게 됐다", startedAt: "2026-04-02T05:55:00.000Z", submittedAt: "2026-04-02T06:03:00.000Z", durSec: 480 },
+        s1: { scores: sc(1), why: "손잡이의 마모가 쓰임과 이어져 보인다", predTop: topFromRank(pr1, n), predRank: pr1, n, predPct: predPctOf(pr1, n), startedAt: "2026-04-02T05:05:00.000Z", submittedAt: "2026-04-02T05:10:00.000Z", durSec: 300 },
+        s2: { scores: sc(0), why: "다른 작품과 견주니 배경 처리가 약해 보인다", predTop: topFromRank(pr2, n), predRank: pr2, n, predPct: predPctOf(pr2, n), lockedAt: "2026-04-02T06:00:00.000Z", changeCode: si % 2 ? "shifted" : "same", changeWhy: "비교하며 조명 방향을 보게 됐다", startedAt: "2026-04-02T05:55:00.000Z", submittedAt: "2026-04-02T06:03:00.000Z", durSec: 480 },
       } : {},
       judge: { p1: { rosterVer: fixedAt, planHash: made.hash, k: made.kEff, repeat: cfg.repeat, items, startedAt: "2026-04-02T05:12:00.000Z", submittedAt: "2026-04-02T05:40:00.000Z" } },
     };
