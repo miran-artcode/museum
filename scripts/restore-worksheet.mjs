@@ -119,5 +119,5 @@ if (cur) {
 }
 // ② 본 문서를 쓴다
 const next = { ...fromWs, _updatedAt: nowIso, _restored: [...(cur && Array.isArray(cur._restored) ? cur._restored : []), { from: fromWs._updatedAt || fromLabel, at: nowIso, by: "script" }].slice(-20) };
-await putDoc(token, "worksheets", target, { v: next });
+await putDoc(token, "worksheets", target, { v: next, cv: 2 }); // 판 표시: 옛 번들의 통째 쓰기를 규칙이 거부하게 한다
 console.log(`완료: worksheets/${target} 를 ${fromLabel} 상태로 되돌렸습니다.`);

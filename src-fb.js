@@ -154,13 +154,11 @@ function route(key) {
   // 반별 비교 명단: peerRoster:{반} → meta/peerRoster_{반} (반은 src-class.mjs의 classOf, 미상 "?"는 "_"가 된다)
   if (key.startsWith("peerRoster:")) return { kind: "doc", path: ["meta", "peerRoster_" + safe(key.slice(11))] };
   // 전시장 출품: 기록지의 「공개」 작품 캡션 사본. 기록지는 본인·교사만 읽으므로 전시장은 이 컬렉션을 읽는다
-  if (key.startsWith("exhibit:")) return { kind: "doc", path: ["exhibit", safe(key.slice(8))] };
   if (key.startsWith("sub:")) return { kind: "doc", path: ["submissions", safe(key.slice(4))] };
   if (key.startsWith("assess:")) return { kind: "doc", path: ["assess", safe(key.slice(7))] };
   // 적응형 쪽지시험: 은행(공개부)·정답 키·응시 기록 (src-quiz-core.mjs 계약)
   if (key === "quizBank") return { kind: "doc", path: ["quizBank", "v1"] };
   if (key === "quizKeys") return { kind: "doc", path: ["quizKeys", "v1"] };
-  if (key.startsWith("exhibit:")) return { kind: "doc", path: ["exhibit", safe(key.slice(8))] };
   if (key.startsWith("quiz:")) return { kind: "doc", path: ["quiz", safe(key.slice(5))] };
   return { kind: "doc", path: ["misc", safe(key)] };
 }
