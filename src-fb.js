@@ -160,6 +160,7 @@ function route(key) {
   // 적응형 쪽지시험: 은행(공개부)·정답 키·응시 기록 (src-quiz-core.mjs 계약)
   if (key === "quizBank") return { kind: "doc", path: ["quizBank", "v1"] };
   if (key === "quizKeys") return { kind: "doc", path: ["quizKeys", "v1"] };
+  if (key.startsWith("exhibit:")) return { kind: "doc", path: ["exhibit", safe(key.slice(8))] };
   if (key.startsWith("quiz:")) return { kind: "doc", path: ["quiz", safe(key.slice(5))] };
   return { kind: "doc", path: ["misc", safe(key)] };
 }
@@ -444,12 +445,13 @@ export const fbStore = {
     } catch (e) { console.error("allOf fail", name, e); return { ok: false, data: null, fromCache: false }; }
   },
 
-  watchCollection(name, cb) {
+  /* onErr: 권한 거부 등으로 구독이 끊길 때 (전시장이 「불러오는 중」에 멈추지 않게) */
+  watchCollection(name, cb, onErr) {
     return onSnapshot(collection(db, safe(name)), (snap) => {
       const out = {};
       snap.forEach((d) => { const x = d.data(); out[d.id] = x && x.v !== undefined ? x.v : x; });
       cb(out);
-    }, () => {});
+    }, (e) => { if (onErr) onErr(e); });
   },
 
   /* 학생 한 명의 명부 문서. 입장 화면이 자기 별명을 확인할 때 쓴다.
