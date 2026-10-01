@@ -313,7 +313,12 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
   const generic = INQ_GENERIC[f.qtype] || INQ_GENERIC["개념"];
   const [showV1, setShowV1] = useState(false);
 
-  const setTr = (patch) => setField("_inq", { ...all, [key]: { ...tr, ...patch } });
+  /* _inq는 모든 탐구 질문의 흔적이 든 맵이다. 렌더 때의 all로 통째로 쓰면 다른 기기에서 막 받은 다른 질문의 흔적을
+     옛 값으로 되돌리므로, 최신 맵을 받아 이 질문의 항목만 바꾼다 (저장도 _inq의 이 항목만 간다: src-ws-sync.mjs) */
+  const setTr = (patch) => setField("_inq", (cur) => {
+    const m = cur && typeof cur === "object" && !Array.isArray(cur) ? cur : {};
+    return { ...m, [key]: { ...(m[key] || {}), ...patch } };
+  });
   const sOrder = seededOrder(specific.length, seed + "|s");
   const gOrder = seededOrder(generic.length, seed + "|g");
   const drawn = tr.drawn || { s: 0, g: 0 };

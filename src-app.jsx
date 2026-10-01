@@ -24,7 +24,7 @@ import { LabelCompare } from "./src-label-compare.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
 import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, InquiryStyle, inquiryTraceRows } from "./src-inquiry.jsx";
 import { makeSnapshotter, WsHistoryCard } from "./src-ws-history.jsx";
-import { makeDirtyTracker, changedKeys, mergeRemote, buildPatch } from "./src-ws-sync.mjs";
+import { makeDirtyTracker, changedTokens, mergeRemote, buildEntries, mergeTraceForSave, reconcileTrace, tok as wsTok } from "./src-ws-sync.mjs";
 import { LegacyEcho } from "./src-legacy-fields.jsx";
 import { WsLockCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
 import {
@@ -3305,7 +3305,6 @@ function CandsField({ f, fieldKey, v, setField, ws }) {
 
 /* 단계 6: 흔적 네 칸(자리·자국·동작·반복). 표 대신 세로 칸 격자라 폰에서도 옆으로 밀지 않는다 */
 function TracesField({ f, fieldKey, v, setField, ws }) {
-  const d = ws || {};
   const rows = padRows(v, 2, { spot: "", shape: "", act: "", freq: "" });
   const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
   const hasRow = (r) => r && (filled(r.spot) || filled(r.shape) || filled(r.act) || filled(r.freq));
@@ -3318,8 +3317,7 @@ function TracesField({ f, fieldKey, v, setField, ws }) {
     const wd = findSymbol(val);
     if (wd && wd !== warnRef.current) {
       warnRef.current = wd;
-      const log = Array.isArray(d._symWarn) ? d._symWarn : [];
-      setField("_symWarn", [...log, { word: wd, at: now() }].slice(-20));
+      setField("_symWarn", (log) => [...(Array.isArray(log) ? log : []), { word: wd, at: now() }].slice(-20));
     }
     if (!wd) warnRef.current = "";
   };
@@ -3511,7 +3509,7 @@ function LadderSummaryBox({ ws, setField }) {
   const edited = (x) => filled(d["s3b." + x]) && String(d["s3b." + x]).trim() !== String(auto[x] || "").trim();
   const restore = (x) => {
     setField("s3b." + x, auto[x]);
-    setField("_s3bAuto", { ...(d._s3bAuto || {}), [x]: auto[x] });
+    setField("_s3bAuto", (m) => ({ ...(m || {}), [x]: auto[x] }));
   };
   const row = (l, x, val, extra) => (
     <div className="row">
@@ -4904,7 +4902,7 @@ function StudentApp({ me, onExit, onGallery }) {
   const snapWs = useRef(makeSnapshotter(me.sid)); // 저장 성공 때마다 1시간 단위 사본 (src-ws-history.jsx)
   const dirtyKeys = useRef(makeDirtyTracker()).current; // 고치는 중·저장 중인 키. 바뀐 키만 저장하고, 서버 값을 받을 때 이 키는 지킨다 (src-ws-sync.mjs)
   const docExistsRef = useRef(false);   // 서버에 기록지 문서가 있는가. 없으면 첫 저장만 통째로 만든다
-  const lastSavedAtRef = useRef(null);  // 이 탭이 마지막으로 저장한 _updatedAt. 구독이 되돌려 준 자기 저장분을 가려낸다
+  const serverRef = useRef({});         // 이 탭이 본 마지막 서버 사본. 흔적 배열(_log·_paste)을 저장 전에 이것과 합친다 (src-ws-sync.mjs)
   const [ws, setWs] = useState({});
   const [loaded, setLoaded] = useState(false);
   const [readErr, setReadErr] = useState(false); // 최초 로드 실패 — 덮어쓰기를 막으려 학습지를 잠근다
@@ -5036,7 +5034,8 @@ function StudentApp({ me, onExit, onGallery }) {
     setStaleWarn(!!(res.fromCache || svRes.fromCache));
     const saved = res.data;
     docExistsRef.current = !!saved;
-    if (saved) { setWs(saved); wsRef.current = saved; setSavedAt(saved._updatedAt || null); lastSavedAtRef.current = saved._updatedAt || null; }
+    serverRef.current = saved || {};
+    if (saved) { setWs(saved); wsRef.current = saved; setSavedAt(saved._updatedAt || null); }
     setSurvey(svRes.data || {});
     if (gRes.ok) setGrade(gRes.data);
     const cfg = cfgRes.ok ? cfgRes.data : null;
@@ -5075,7 +5074,9 @@ function StudentApp({ me, onExit, onGallery }) {
       }
       docExistsRef.current = true;
       const remote = s.data || {};
-      if (remote._updatedAt && remote._updatedAt === lastSavedAtRef.current) return; // 이 탭이 방금 저장한 그대로
+      serverRef.current = remote;
+      // _updatedAt이 이 탭의 마지막 저장과 같아도 건너뛰지 않는다: 다른 기기가 같은 시각 안에 쓴 칸이나
+      // 맵 항목이 함께 와 있을 수 있다. 바뀐 것이 없으면 mergeRemote가 같은 객체를 돌려줘 다시 그리지 않는다.
       // 함수형 갱신: 아직 화면에 반영되지 않은 키 입력(대기 중인 갱신)이 있어도 그 위에 합쳐진다
       setWs((p) => {
         const merged = mergeRemote(p, remote, dirtyKeys.all());
@@ -5100,30 +5101,46 @@ function StudentApp({ me, onExit, onGallery }) {
     dirtyRef.current = false;
     setSaveState("saving");
     const before = wsRef.current;
-    const data = pruneTrace({ ...drainAct(), _updatedAt: now() });
-    // 바뀐 키만 보낸다: 고치던 칸 + 저장 직전에 바뀐 보조 키(_act·_updatedAt·덜어 낸 _log 등).
+    const toks = dirtyKeys.take();
+    // 흔적 배열(_log·_paste)은 이 탭이 본 마지막 서버 사본과 항목 단위로 합친 뒤 상한(300·200)을 적용한다.
+    // 옛 탭의 짧은 배열이 다른 기기가 늘린 서버 배열을 덮지 못하게 하고, 덜어 낸 건수는 _pruned에 더한다.
+    const data = pruneTrace(mergeTraceForSave({ ...drainAct(), _updatedAt: now() }, serverRef.current, toks));
+    // 바뀐 것만 보낸다: 고치던 칸 + 저장 직전에 바뀐 보조 키(_act·_updatedAt·합친 _log 등).
+    // 보조 맵(_inq·_t·_act)은 안쪽 항목(칸·섹션·차시) 단위로 보낸다. 맵을 통째로 쓰면 다른 기기가 쓴 항목을 지운다.
     // 문서를 통째로 쓰면 다른 탭·기기가 그 사이에 쓴 칸을 이 탭의 옛 사본으로 지운다 (src-ws-sync.mjs).
     // 오프라인이면 쓰기가 거부되지 않고 미해결로 남아 "저장 중…"에 영원히 갇힌다.
     // 8초 안에 답이 없으면 실패로 치고 재시도 루프에 태운다 (늦게 성공해도 같은 내용이라 무해).
-    const patch = buildPatch(before, data, dirtyKeys.take());
-    let ok = false;
+    const entries = buildEntries(before, data, toks);
+    let ok = false, created = false;
     if (docExistsRef.current) {
-      ok = await store.updateFieldsT(WSKEY, patch);
+      ok = await fbStore.updatePathsT(WSKEY, entries);
       if (ok === "missing") { docExistsRef.current = false; ok = false; }
     }
     if (!ok && !docExistsRef.current) {
-      // 서버에 문서가 없을 때(첫 저장)만 통째로 만든다
-      ok = await store.setT(WSKEY, data);
-      if (ok) docExistsRef.current = true;
+      // 서버에 문서가 없을 때(첫 저장)만 통째로 만든다. 두 탭이 동시에 첫 저장을 해도 먼저 만든 쪽의 칸이 지워지지 않게 병합으로 쓴다
+      ok = await store.setT(WSKEY, data, { merge: true });
+      if (ok) { docExistsRef.current = true; created = true; }
     }
     savingRef.current = false;
     if (ok) {
       dirtyKeys.done();
-      lastSavedAtRef.current = data._updatedAt;
-      // 덜어 낸 것이 있으면 화면의 기록도 저장된 것과 같게 맞춘다. 아니면 저장 시각만 맞춘다
-      if (data._pruned && data._pruned !== (wsRef.current._pruned || 0)) {
-        wsRef.current = data;
-        setWs((p) => (p === before ? data : { ...p, _log: data._log, _paste: data._paste, _pruned: data._pruned, _updatedAt: data._updatedAt }));
+      // 이 탭이 쓴 흔적 배열은 서버 사본에도 바로 반영한다. 구독이 되돌려 주기 전에 다음 저장이 옛 사본과 합쳐
+      // 덜어 낸 항목을 되살리고 두 번 세는 일을 막는다
+      const wrote = new Set(entries.map((e) => e[0][0]));
+      if (created) serverRef.current = data;
+      else if (wrote.has("_log") || wrote.has("_paste") || wrote.has("_pruned")) {
+        const s = { ...serverRef.current };
+        for (const k of ["_log", "_paste", "_pruned"]) if (wrote.has(k)) { if (data[k] === undefined) delete s[k]; else s[k] = data[k]; }
+        serverRef.current = s;
+      }
+      // 흔적 배열을 합치거나 덜어 냈으면 화면의 기록도 저장된 것과 맞춘다 (저장하는 사이 새로 붙은 항목은 남긴다). 아니면 저장 시각만 맞춘다
+      if (data._log !== before._log || data._paste !== before._paste || data._pruned !== before._pruned) {
+        setWs((p) => {
+          const n = { ...p, _log: reconcileTrace(p._log, before._log, data._log), _paste: reconcileTrace(p._paste, before._paste, data._paste), _pruned: data._pruned, _updatedAt: data._updatedAt };
+          for (const k of ["_log", "_paste", "_pruned"]) if (n[k] === undefined) delete n[k];
+          wsRef.current = n;
+          return n;
+        });
       } else {
         setWs((p) => (p._updatedAt === data._updatedAt ? p : { ...p, _updatedAt: data._updatedAt }));
       }
@@ -5133,6 +5150,8 @@ function StudentApp({ me, onExit, onGallery }) {
       else setSaveState("saved");
     } else {
       dirtyKeys.fail();
+      // 저장 직전에 바뀐 보조 항목(_act·합친 흔적 등)도 다시 저장 대상에 올린다. 안 그러면 실패한 저장분이 다음 저장에서 빠진다
+      dirtyKeys.mark(entries.map((e) => (e[0].length > 1 ? wsTok(e[0][0], e[0][1]) : e[0][0])));
       dirtyRef.current = true;
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         // 오프라인 시간 초과는 실패가 아니라 대기다 — 내용은 이 기기 큐에 담겨 있고
@@ -5152,24 +5171,30 @@ function StudentApp({ me, onExit, onGallery }) {
     if (dirtyRef.current || saveState === "dirty") doSave();
   };
 
+  /* v 자리에 함수를 주면 그 칸의 지금 값(다른 기기에서 받은 값·방금 고친 값까지 반영된 최신 값)을 받아 새 값을 돌려준다.
+     사진 올리기처럼 await 뒤에 쓰는 곳과 _inq처럼 여러 항목이 든 맵은 이렇게 써야, 렌더 때의 낡은 값으로 다른 항목을 되돌리지 않는다. */
   const setField = (k, v) => {
     if (!loaded || wsLockRef.current) return; // 입력 잠금 중에는 어떤 칸도 쓰지 않는다
+    const fn = typeof v === "function";
     const upd = (p) => {
-      const next = { ...p, [k]: v };
+      const val = fn ? v(p[k]) : v;
+      if (fn && val === p[k]) return p; // 바뀐 것이 없다
+      const next = { ...p, [k]: val };
       // 밑줄 키(_inq 같은 보조 기록)는 고쳐 쓰기 이력·붙여넣기·차시 시각 장부를 건드리지 않는다
       if (String(k).charAt(0) === "_") return next;
       // 사고 변화를 볼 자리는 고쳐 쓰기 전의 문장을 남겨 둠.
       // 길이 차만 보면 길이는 그대로인 채 내용만 갈아엎은 개작을 놓치므로 어휘 겹침도 함께 본다.
-      if (TRACKED.includes(k) && typeof p[k] === "string" && typeof v === "string") {
+      if (TRACKED.includes(k) && typeof p[k] === "string" && typeof val === "string") {
         const prev = p[k].trim();
-        const cur = v.trim();
+        const cur = val.trim();
         const log = p._log || [];
         const last = log.filter((e) => e.k === k).slice(-1)[0];
         const gapOk = !last || Date.now() - new Date(last.at).getTime() > 120000;
         const grew = Math.abs(cur.length - prev.length) > 8;
         const reworded = cur.length > 15 && jaccard(gramSet(prev), gramSet(cur)) < 0.6;
         if (prev.length > 15 && gapOk && (grew || reworded)) {
-          next._log = [...log, { k, at: now(), prev: prev.slice(0, 400) }].slice(-300);
+          // 300건 상한은 저장할 때 서버 사본과 합친 뒤 한 번만 적용하고 덜어 낸 수를 _pruned에 센다 (mergeTraceForSave)
+          next._log = [...log, { k, at: now(), prev: prev.slice(0, 400) }];
         }
       }
       /* 붙여넣은 뒤 그 칸을 마지막으로 손댈 때까지의 초 — 붙이고 바로 넘어갔는지 붙잡고 고쳤는지.
@@ -5194,7 +5219,7 @@ function StudentApp({ me, onExit, onGallery }) {
       // 발상 단계의 결론(s3b.*)은 학생이 다시 적지 않고 여기서 끌어온다
       return DERIVE_KEYS.includes(k) ? deriveSummary(next, p) : next;
     };
-    setWs((p) => { const out = upd(p); dirtyKeys.mark(changedKeys(p, out)); return out; }); // 바뀐 키만 저장 대상에 올린다
+    setWs((p) => { const out = upd(p); dirtyKeys.mark(changedTokens(p, out)); return out; }); // 바뀐 키(보조 맵은 바뀐 항목)만 저장 대상에 올린다
     dirtyRef.current = true;
     setSaveState("dirty");
     if (timer.current) clearTimeout(timer.current);
@@ -5229,7 +5254,8 @@ function StudentApp({ me, onExit, onGallery }) {
         head: body.slice(0, 120),
         base: strLen(readAt(wsRef.current, k)),
       };
-      setWs((p) => ({ ...p, _paste: [...(Array.isArray(p._paste) ? p._paste : []), entry].slice(-200) }));
+      // 200건 상한은 저장할 때 서버 사본과 합친 뒤 한 번만 적용하고 덜어 낸 수를 _pruned에 센다 (mergeTraceForSave)
+      setWs((p) => ({ ...p, _paste: [...(Array.isArray(p._paste) ? p._paste : []), entry] }));
       dirtyKeys.mark(["_paste"]);
       dirtyRef.current = true;
       setSaveState("dirty");
