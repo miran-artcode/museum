@@ -8540,7 +8540,19 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
    학생 상세의 「학생 완전 삭제」는 한 명씩이라 열댓 개를 지우려면 번거롭다.
    지우는 것: 기록지 · 미디어 · 채점 · 설문 · 명부 · 동의 대장의 그 학생 칸.
    지우지 못하는 것: 로그인 계정 자체 (Firebase 콘솔에서만 지울 수 있다). */
-function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
+/* 기록지에 학생이 쓴 것이 하나라도 있는가 (밑줄 키는 보조 기록이라 뺀다). 진행률 0%만 보면
+   설문·사진만 한 1차시 학생이 「기록 없음」으로 골라진다 */
+function wsHasContent(w) {
+  const walk = (v) => {
+    if (typeof v === "string") return v.trim().length > 0;
+    if (Array.isArray(v)) return v.some(walk);
+    if (v && typeof v === "object") return Object.keys(v).some((k) => walk(v[k]));
+    return v != null && v !== "";
+  };
+  return Object.keys(w || {}).some((k) => k.charAt(0) !== "_" && walk(w[k])) || collectMediaRefs(w || {}).length > 0;
+}
+
+function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone, loadFail }) {
   const [sel, setSel] = useState({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -8551,6 +8563,25 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
 
   const [tone, setTone] = useState("ok"); // 성공·진행은 초록, 실패·취소만 붉게 — 삭제 성공이 경고색으로 뜨면 실패로 오독한다
   const say = (t, text) => { setTone(t); setMsg(text); };
+  /* 「기록 없음」= 기록지가 없거나 쓴 칸·미디어가 없고, 설문·상호평가 제출·평가 기록·쪽지시험 응시 기록도 없음.
+     목록 화면에 없는 컬렉션은 지금 서버에서 읽고, 하나라도 못 읽거나 기록지를 못 읽은 학생은 고르지 않는다 */
+  const pickEmpty = async () => {
+    setBusy(true); say("ok", "학생별 기록을 확인하는 중…");
+    const cols = await Promise.all(["surveys", "submissions", "assess", "quiz"].map((n) => fbStore.allOfSafe(n)));
+    setBusy(false);
+    if (cols.some((r) => !r.ok || r.fromCache)) return say("warn", "설문·상호평가·쪽지시험 기록을 모두 확인하지 못해 고르지 않았습니다. 연결을 확인하고 다시 누르세요.");
+    const fail = loadFail || {};
+    const m = {};
+    ids.forEach((id) => {
+      if (fail[id] || wsHasContent(wsMap[id])) return;
+      if (cols.some((r) => r.data[id])) return;
+      m[id] = true;
+    });
+    setSel(m);
+    const nf = ids.filter((id) => fail[id]).length;
+    say("ok", "기록이 없는 학생 " + Object.keys(m).length + "명을 골랐습니다(기록지·미디어·설문·상호평가·쪽지시험 확인)." + (nf ? " 기록지를 불러오지 못한 " + nf + "명은 고르지 않았습니다." : ""));
+  };
+
   const del = async () => {
     if (sampleMode || !chosen.length) return;
     const names = chosen.map((id) => id + (roster[id] && roster[id].nick ? "(" + roster[id].nick + ")" : "")).join(", ");
@@ -8604,7 +8635,7 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
         {msg && <div role="status" className={tone === "warn" ? "warn-note" : "ok-note"} style={{ marginBottom: 10 }}>{msg}</div>}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
           <button className="btn small ghost" disabled={busy} onClick={() => pick(() => true)}>전체 고르기</button>
-          <button className="btn small ghost" disabled={busy} onClick={() => pick((id) => pctOf(id) === 0)}>기록이 없는 학생만</button>
+          <button className="btn small ghost" disabled={busy} onClick={pickEmpty}>기록이 없는 학생만</button>
           <button className="btn small ghost" disabled={busy} onClick={() => setSel({})}>고른 것 해제</button>
         </div>
         <div className="tbl-scroll" style={{ maxHeight: 320, overflow: "auto" }}>
@@ -8625,7 +8656,7 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
                     </td>
                     <td className="mono">{id}</td>
                     <td>{(roster[id] || {}).nick || ""}</td>
-                    <td className="mono">{pctOf(id)}%</td>
+                    <td className="mono">{(loadFail || {})[id] ? "불러오기 실패" : pctOf(id) + "%"}</td>
                     <td className="mono">{mediaCount(w)}</td>
                     <td className="mono">{nDone}/2</td>
                     <td className="mono" style={{ fontSize: 11 }}>{w._updatedAt ? fmtTime(w._updatedAt) : "—"}</td>
