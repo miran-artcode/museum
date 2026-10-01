@@ -32,6 +32,7 @@ import { isAskKey, askTrace } from "./src-asks-core.mjs";
 import { AskScope, AskReader, AskClassCard, AskStyle, askFieldMeta, askResearchFile, ASK_RESEARCH_VARS, ASK_VAR_NEED } from "./src-asks.jsx";
 import { LegacyEcho } from "./src-legacy-fields.jsx";
 import { WsLockCtx, WsSavedCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
+import { ContentGuard, GuardNotice, GuardCard, GuardStyle } from "./src-guard.jsx";
 import { AccessProvider, AccessButton, AccessLessonTerms, AccessMemo, AccessStyle, MediaText, MediaTextRead, GateLangHelp } from "./src-access.jsx";
 import { AccessTeacherPanel, AccessTeacherStyle, CaptionOnAir } from "./src-access-teacher.jsx";
 import { A11yStyle, A11yRuntime } from "./src-access-a11y.jsx";
@@ -2901,6 +2902,7 @@ function LessonPanel({ L, teacher, onReading }) {
       </div>
       {!teacher && <AccessMemo L={L} />}
       {!teacher && <div className="lesson-guide">읽기 자료를 읽은 뒤 「배움 확인 {L.n}」, 「탐구 질문 {L.n}」에 답합니다. 답은 자동으로 저장됩니다.</div>}
+      {!teacher && <GuardNotice />}
     </div>
   );
 }
@@ -5753,6 +5755,8 @@ function StudentApp({ me, onExit, onGallery }) {
         ))}
       </div>
 
+      {/* 수업 자료 보호(src-guard.jsx): 복사·저장 막기, 캡처 순간 가리기, 학번 워터마크. 입력칸·붙여넣기는 막지 않는다 */}
+      <ContentGuard sid={me.sid} cfgAll={cfgAll} quiz={quizOn} />
       {pasteAsk && (
         <div className="paste-ask" role="dialog" aria-label="붙여넣은 문장의 출처">
           <div className="paste-ask-in">
@@ -9457,6 +9461,7 @@ function TeacherApp({ onExit, onGallery }) {
                   </div>
                 </div>
                 <WsLockCard cfgAll={cfgAll} setCfgAll={setCfgAll} setMsg={setMsg} ids={ids} roster={roster} wsMap={wsMap} sampleMode={sampleMode} />
+                <GuardCard cfgAll={cfgAll} setCfgAll={setCfgAll} setMsg={setMsg} />
                 <div className="card">
                   <div className="card-head"><span className="card-code">설문</span><span className="card-title">사전·사후 창의성 설문 열기와 닫기</span></div>
                   <div className="card-body">
@@ -10449,6 +10454,7 @@ function App() {
       <QuizTeacherStyle />
       <InquiryStyle />
       <WsLockStyle />
+      <GuardStyle />
       <AccessStyle /><AccessTeacherStyle /><A11yStyle /><A11yRuntime />
       <SketchStyle />
       <LadderStyle />
