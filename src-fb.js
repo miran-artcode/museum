@@ -107,7 +107,30 @@ export const authApi = {
     try { await updatePassword(u, pwOf(id, newCode)); return true; } catch (e) { return false; }
   },
 
-  async leave() { try { await signOut(auth); } catch (e) {} },
+  /* 입장 도중에 되돌릴 때(별명 없음·명단 밖): 로그아웃만 한다. 오류 문구를 보여 줘야 하므로 새로 고치지 않는다 */
+  async cancelEnter() { try { await signOut(auth); } catch (e) {} },
+
+  /* 나가기. 컴퓨터실처럼 여러 사람이 쓰는 PC에서 다음 사람이 앞사람의 기록을 읽지 못하게,
+     로그아웃한 뒤 이 브라우저의 Firestore 캐시(IndexedDB)를 지우고 새로 고친다.
+     캐시 사본은 오프라인 읽기에서 규칙을 거치지 않으므로 로그아웃만으로는 남는다.
+     서버에 못 간 쓰기가 5초 안에 다 가지 않으면 지우지 않는다: 그 쓰기는 이 계정의 대기열에 남았다가 같은 학번이 다시 들어오면 전송된다.
+     대기열 확인은 로그아웃 전에 한다(로그아웃 뒤에는 다른 사용자의 빈 대기열을 보게 되어 곧바로 끝난 것으로 보인다).
+     부르는 쪽은 화면을 먼저 내리고(App의 leaving) 부른다. 이 함수 뒤에는 앱이 이어지지 않는다. */
+  async leave() {
+    let flushed = false;
+    try {
+      flushed = await Promise.race([
+        waitForPendingWrites(db).then(() => true),
+        new Promise((res) => setTimeout(() => res(false), 5000)),
+      ]);
+    } catch (e) { flushed = false; }
+    try { await signOut(auth); } catch (e) {}
+    if (flushed) {
+      // 다른 탭이 같은 캐시를 쓰고 있으면 지우기가 거부된다. 그때는 새로 고치기만 한다
+      try { await terminate(db); await clearIndexedDbPersistence(db); } catch (e) {}
+    }
+    try { location.reload(); } catch (e) {}
+  },
 };
 
 /* ---------- 키 → 문서 경로 ---------- */
@@ -373,7 +396,17 @@ export const fbStore = {
     }, () => {});
   },
 
-  /* 교사용 학생 관리 — 명부 문서를 학번 지정으로 쓰고 지운다 (규칙이 교사만 허용) */
+  /* 학생 한 명의 명부 문서. 입장 화면이 자기 별명을 확인할 때 쓴다.
+     명부 전체(students 컬렉션)는 명부에 오른 사람만 읽으므로(규칙 member()) 처음 입장하는 학생은 읽지 못한다.
+     실패와 없음을 구분한다 */
+  async getStudent(sid) {
+    try {
+      const s = await getDoc(doc(db, "students", safe(sid)));
+      return { ok: true, data: s.exists() ? s.data() : null };
+    } catch (e) { console.error("getStudent fail", sid, e); return { ok: false, data: null }; }
+  },
+
+  /* 교사용 학생 관리 —명부 문서를 학번 지정으로 쓰고 지운다 (규칙이 교사만 허용) */
   async setStudent(sid, data) {
     if (isViewerNow()) return false;
     try {
