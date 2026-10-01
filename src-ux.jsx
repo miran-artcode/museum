@@ -72,6 +72,28 @@ export const UX_CSS = `
 /* ---------- 입장 화면: 폰에서는 영문 스트립을 접는다 (주 내비게이션과 목적지가 같다) ---------- */
 @media(max-width:700px){.g4 .g4-strip{display:none}}
 
+/* ---------- 교사 화면의 표를 폰에서 (2026-09-28 검토) ----------
+   좁은 화면에서 표가 카드 너비에 맞춰 줄면 「가져온 문장의 앞머리」 열이 한 글자, 수업 흐름의 활동·발문 칸이 15px로 접히고,
+   현황 명단의 「열람」 버튼이 화면 밖으로 밀렸다. 표에 최소 너비를 주고 카드 안에서만 가로로 밀리게 한다.
+   교사 화면만 .wrap.wide를 쓰므로 학생 학습지 표에는 걸리지 않는다. */
+@media(max-width:700px){
+  .wrap.wide .card-body{overflow-x:auto}
+  .wrap.wide .card-body .tbl{min-width:600px}
+  .wrap.wide .card-body .tbl td:last-child .btn{white-space:nowrap}
+  .ed-flow{min-width:560px}
+  .card-body:has(> .ed-flow){overflow-x:auto}
+}
+
+/* ---------- 남은 작은 글자와 한글 모노스페이스 (2026-09-28 검토) ----------
+   한글이 들어가는 자리는 모노스페이스 글꼴과 자간을 함께 쓰지 않고, 글자는 11px 아래로 내리지 않는다. */
+.lz-notice-tag,.lz-asks-h{font-size:11px}
+.lz-cr,.iaid-sb{font-family:var(--sans);letter-spacing:0;font-size:11px}
+.sess-tab .lock{font-size:11px}
+.lt.stack td::before{font-family:var(--sans);letter-spacing:0;font-size:11px}
+.ld-step .hw,.hw-chip,.carry .cr .l,.tf .tf-l,.tf-sub,.sum-box .h,.sum-edit,.stmt-prev b{font-size:11px}
+.sum-edit{font-family:var(--sans);letter-spacing:0}
+.g4 .g4-units-cap,.g4 .g4-logo .g4-logo-kr{letter-spacing:0}
+
 /* ---------- 두 단계 확인 버튼 ---------- */
 .cfm{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--seal);background:var(--seal-bg);padding:8px 10px;max-width:100%}
 .cfm-q{font-size:13px;color:var(--ink);line-height:1.5}
