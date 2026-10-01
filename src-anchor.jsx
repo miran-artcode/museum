@@ -22,6 +22,7 @@
    ============================================================ */
 
 import React, { useState, useEffect, useRef } from "react";
+import { toCSV } from "./src-csv.mjs";
 
 export const ANCHOR_VER = "a2";
 
@@ -321,8 +322,7 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
       });
       return r;
     });
-    const esc = (c) => { let s = String(c == null ? "" : c); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
-    const csv = "﻿" + [head, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+    const csv = toCSV(head, rows);   // 숫자는 숫자로, 수식 주입 방지는 글자에만 (src-csv.mjs)
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;

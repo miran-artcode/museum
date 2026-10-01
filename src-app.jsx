@@ -40,6 +40,7 @@ import { QuizPanel, QuizTeacherStyle } from "./src-quiz-teacher.jsx";
 import { quizCfg } from "./src-quiz-core.mjs";
 import { startDwell } from "./src-dwell.js";
 import { imgPresetOf, prepareImage, imgErrText, imgHintText, BLUR_CONFIRM } from "./src-media-img.js";
+import { csvCell, toCSV } from "./src-csv.mjs";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -6611,12 +6612,7 @@ function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
         r.pre && r.pre.total != null ? round2(r.pre.total) : "",
         r.post && r.post.total != null ? round2(r.post.total) : ""];
     });
-    const esc = (c) => {
-      let s = String(c);
-      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-      return '"' + s.replace(/"/g, '""') + '"';
-    };
-    const csv = "\uFEFF" + [head, ...rws].map((r) => r.map(esc).join(",")).join("\n");
+    const csv = toCSV(head, rws);   // 숫자는 숫자로, 수식 주입 방지는 글자에만 (src-csv.mjs)
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -6654,12 +6650,8 @@ function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
         an && anchorScore(an) != null ? anchorScore(an) : "",
         an && anchorPlateRate(an) != null ? num(anchorPlateRate(an)) : ""];
     });
-    const esc = (c) => {
-      let v = String(c == null ? "" : c);
-      if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
-      return '"' + v.replace(/"/g, '""') + '"';
-    };
-    const csv = "\uFEFF" + [head, ...rws].map((r) => r.map(esc).join(",")).join("\n");
+    const csv = toCSV(head, rws);   // afn(b28 − b29)처럼 음수가 되는 점수가 있다. 숫자로 내보낸다
+
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -7013,13 +7005,8 @@ function TeacherGuide() {
    사고 과정 대시보드와 연구 자료 변환
    ============================================================ */
 
-/* 파일 내려받기 공용 도우미 */
-const csvCell = (c) => {
-  let s = c == null ? "" : String(c);
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;   // 스프레드시트 수식 주입 방지
-  return '"' + s.replace(/"/g, '""') + '"';
-};
-const toCSV = (head, rows) => "﻿" + [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
+/* 파일 내려받기 공용 도우미 — CSV 셀 규칙은 src-csv.mjs 한 곳에 둔다
+   (숫자는 따옴표 없이, 수식 주입 방지는 글자에만, NaN·Infinity는 빈칸) */
 const fileStamp = () => new Date().toISOString().slice(2, 10).replace(/-/g, "");
 function download(name, text, mime) {
   const url = URL.createObjectURL(new Blob([text], { type: (mime || "text/plain") + ";charset=utf-8" }));
@@ -8796,12 +8783,7 @@ function TeacherApp({ onExit, onGallery }) {
         OBS_ITEMS.filter((_, i) => g["o" + i]).length,
         g.obsMemo || "", g.fbForm || "", g.fbConcept || "", w._updatedAt || ""];
     });
-    const esc = (c) => {
-      let s = String(c);
-      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // 스프레드시트 수식 주입 방지
-      return '"' + s.replace(/"/g, '""') + '"';
-    };
-    const csv = "\uFEFF" + [head, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+    const csv = toCSV(head, rows);   // 설문 변화량은 음수가 된다. 숫자로 내보낸다
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
