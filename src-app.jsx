@@ -11,7 +11,7 @@ import {
 } from "./src-stance.jsx";
 import {
   AnchorCard, AnchorPanel, AnchorStyle, DEFAULT_ANCHOR, ANCHOR_VER, AI_LEVELS,
-  anchorOpen, anchorDone, anchorScore, anchorPlateRate,
+  anchorOpen, anchorDone, anchorScore, anchorPlateRate, anchorCounts,
 } from "./src-anchor.jsx";
 import { SurveyStyle, SurveyScaleBar, LikertRow, useTopbarHeight, prefersReducedMotion } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
@@ -47,6 +47,9 @@ import { QuizPanel, QuizTeacherStyle } from "./src-quiz-teacher.jsx";
 import { quizCfg } from "./src-quiz-core.mjs";
 import { startDwell } from "./src-dwell.js";
 import { imgPresetOf, prepareImage, imgErrText, imgHintText, BLUR_CONFIRM } from "./src-media-img.js";
+import { csvCell, toCSV } from "./src-csv.mjs";
+import { classOf, groupByClass, classList, UNKNOWN_CLASS } from "./src-class.mjs";
+import { PID_KEY, normPidMap, pidOfMap, classCodeOf, planPidMap, ensurePidMap, seededRng, byPid, UNKNOWN_CLASS_CODE } from "./src-pid.mjs";
 
 /* ============================================================
    허구의 아카이브 — 학급 창작 기록 시스템
@@ -773,7 +776,7 @@ function surveyScores(ans) {
   const out = {};
   for (const sc of SURVEY_SCALES) {
     const vals = SURVEY_ITEMS.filter((it) => it.s === sc.k)
-      .map((it) => { const v = a[it.k]; return v >= 1 && v <= 5 ? (it.rev ? 6 - v : v) : null; })
+      .map((it) => { const v = Number(a[it.k]); return v >= 1 && v <= 5 ? (it.rev ? 6 - v : v) : null; })   // Number: 글자 "3"이 섞이면 합이 문자열 이어 붙이기가 된다
       .filter((v) => v != null);
     out[sc.k] = vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : null;
   }
@@ -1011,6 +1014,18 @@ const CHANGE_PAIRS = [
 
 const strLen = (v) => (typeof v === "string" ? v.trim().length : 0);
 
+/* 변화 쌍 한쪽의 글. 창의성 지표와 「사전·사후쌍」 CSV가 같은 규칙을 쓴다.
+   진술(stmt)은 { text, versions } 객체라 그대로 쓰면 "[object Object]"가 된다: 앞쪽은 처음 저장한 문장,
+   뒤쪽은 마지막 문장(conc_pre·conc_post와 같은 값). 논쟁(debate)은 ③ 유지·변경, 없으면 ① 입장. */
+function pairText(ws, spec, side) {
+  const d = ws || {};
+  const v = d[spec.k];
+  if (spec.kind === "reflect") return ((v || {}).pos) || "";
+  if (spec.kind === "debate") return ((v || {}).hold || (v || {}).pos) || "";
+  if (spec.kind === "stmt") return (side === "before" ? stmtFirst(v) : stmtNow(v)) || "";
+  return typeof v === "string" ? v : "";
+}
+
 function creativityMetrics(ws) {
   const d = ws || {};
   const rounds = (d["s5b.rounds"] || []).filter((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change) || filled(r.prompt)));
@@ -1020,10 +1035,7 @@ function creativityMetrics(ws) {
   const withGround = notPassed.filter((it) => filled((insp[it.k] || {}).note)).length;
   const peer = d["s8b.peer"] || [];
   const peerSent = peer.reduce((a, b) => a + PEER_VIEWS.filter((v) => filled((((b || {}).views || {})[v.k] || {}).sent)).length, 0);
-  const val = (spec) => spec.kind === "reflect" ? (d[spec.k] || {}).pos
-    : spec.kind === "debate" ? ((d[spec.k] || {}).hold || (d[spec.k] || {}).pos)
-    : spec.kind === "stmt" ? stmtNow(d[spec.k])
-    : d[spec.k];
+  const val = (spec) => pairText(d, spec, "after");
   const changed = CHANGE_PAIRS.filter((p) => {
     if (p.before.kind === "inspect") return notPassed.length > 0 && filled(d[p.after.k]);
     return filled(val(p.before)) && filled(val(p.after));
@@ -1170,7 +1182,7 @@ function mattr(tokens, win) {
   for (let i = 0; i < W; i++) add(tokens[i]);
   sum += types / W; windows++;
   for (let i = W; i < n; i++) { add(tokens[i]); del(tokens[i - W]); sum += types / W; windows++; }
-  return Math.round((sum / windows) * 100);
+  return Math.round((sum / windows) * 1000) / 10;   // 소수 한 자리 (정수 %로 자르면 학생 사이 차이가 뭉개진다)
 }
 
 /* 로그 감마 (Lanczos) — 큰 조합을 로그 공간에서 계산해 넘침을 피한다 */
@@ -1199,7 +1211,7 @@ function hdd(tokens, sample) {
     const pPresent = 1 - (lnAbsent === -Infinity ? 0 : Math.exp(lnAbsent - lnAll));
     sum += pPresent;
   });
-  return Math.round((sum / S) * 100);
+  return Math.round((sum / S) * 1000) / 10;
 }
 
 /* 글의 뼈대 — 어휘가 달라도 구조가 같은 경우를 잡는다.
@@ -1321,21 +1333,26 @@ function creativityAxesAll(wsMap) {
     const a = d["s3c.attitude"]; if (filled(a)) attFreq[a] = (attFreq[a] || 0) + 1;
     const m = d["s7.mode"]; if (filled(m)) modeFreq[m] = (modeFreq[m] || 0) + 1;
   });
+  /* 희소도의 분모는 그 칸에 답한 학생만. 비운 학생까지 넣으면 「겹치지 않은 사람」으로 세어
+     답한 학생이 적은 학급일수록 남다름이 부풀려진다 */
   const rarTok = (tokMap, id) => {
     const mine = tokMap[id];
-    if (!mine.size || N < 2) return null;
-    const dup = ids.filter((o) => o !== id && jaccard(mine, tokMap[o]) >= 0.5).length;
-    return 1 - dup / (N - 1);
+    const resp = ids.filter((o) => tokMap[o].size > 0);
+    if (!mine.size || resp.length < 2) return null;
+    const dup = resp.filter((o) => o !== id && jaccard(mine, tokMap[o]) >= 0.5).length;
+    return 1 - dup / (resp.length - 1);
   };
-  const rarOpt = (freq, v) => (filled(v) && N >= 2 ? 1 - (freq[v] || 1) / N : null);
+  const attN = Object.values(attFreq).reduce((a, b) => a + b, 0);
+  const modeN = Object.values(modeFreq).reduce((a, b) => a + b, 0);
+  const rarOpt = (freq, v, R) => (filled(v) && R >= 2 ? 1 - (freq[v] || 1) / R : null);
   const out = {};
   ids.forEach((id) => {
     const d = wsMap[id] || {};
     out[id] = creativityAxesOne(d, {
       problem: rarTok(probTok, id),
       relic: rarTok(relicTok, id),
-      attitude: rarOpt(attFreq, d["s3c.attitude"]),
-      mode: rarOpt(modeFreq, d["s7.mode"]),
+      attitude: rarOpt(attFreq, d["s3c.attitude"], attN),
+      mode: rarOpt(modeFreq, d["s7.mode"], modeN),
     });
   });
   return out;
@@ -1359,7 +1376,8 @@ const median = (arr) => {
   const a = arr.filter((x) => x != null).sort((x, y) => x - y);
   if (!a.length) return null;
   const mid = Math.floor(a.length / 2);
-  return a.length % 2 ? a[mid] : Math.round((a[mid - 1] + a[mid]) / 2);
+  // 짝수 개면 가운데 두 값의 평균을 그대로 돌려준다. 정수로 반올림하면 3.42·3.58의 중앙값이 4가 된다 (화면 표시의 반올림은 화면에서)
+  return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
 };
 
 /* ---------- 가져온 글과 전유 ----------
@@ -1560,7 +1578,9 @@ function pruneTrace(data) {
 
 /* 붙여넣은 앞머리가 그 글에 얼마나 남아 있는가 (%) */
 function surviveIn(head, finalText) {
-  if (!head || !finalText) return null;
+  if (!head) return null;
+  // 붙인 뒤 칸을 통째로 지웠으면 남은 것이 없다: 잔존 0(전유율 100). 결측으로 두면 그 붙여넣기가 집계에서 사라진다
+  if (!finalText || !String(finalText).trim()) return 0;
   return Math.round(overlapCoef(gramSet(head), gramSet(finalText)) * 100);
 }
 
@@ -1589,7 +1609,11 @@ function pasteMetrics(ws) {
     apSum += 100 - sv; apN++;
   });
 
+  /* settle은 붙인 뒤 2초 넘게 지나 같은 칸을 다시 고쳤을 때만 남는다. 손대지 않은 붙여넣기는 값이 없어
+     중앙값에서 빠지므로(위로 치우침) 그 건수를 따로 센다 */
   const settles = ps.map((e) => e.settle).filter((x) => typeof x === "number");
+  const untouched = ps.length - settles.length;
+  const emptied = ps.filter((e) => e.head && !String(pasteFinal(d, e.k, wmap) || "").trim()).length;
   const srcOf = (k) => ps.filter((e) => e.src === k).length;
   const aiBytes = ps.filter((e) => e.src === "AI").reduce((a, e) => a + (typeof e.b === "number" ? e.b : (e.n || 0) * 3), 0);
 
@@ -1604,11 +1628,14 @@ function pasteMetrics(ws) {
     pasteBytes: bytes,
     writtenLen,
     writtenBytes,
-    srcRatio: writtenLen > 0 ? Math.round(Math.min(1, chars / writtenLen) * 100) : (chars > 0 ? 100 : 0),
-    byteRatio: writtenBytes > 0 ? Math.round(Math.min(1, bytes / writtenBytes) * 100) : (bytes > 0 ? 100 : 0),
-    aiByteRatio: writtenBytes > 0 ? Math.round(Math.min(1, aiBytes / writtenBytes) * 100) : (aiBytes > 0 ? 100 : 0),
+    // 쓴 글도 붙인 글도 없으면 0/0이다. 0으로 두면 결석생이 「가져온 글 0%」로 평균에 들어간다
+    srcRatio: writtenLen > 0 ? Math.round(Math.min(1, chars / writtenLen) * 100) : (chars > 0 ? 100 : null),
+    byteRatio: writtenBytes > 0 ? Math.round(Math.min(1, bytes / writtenBytes) * 100) : (bytes > 0 ? 100 : null),
+    aiByteRatio: writtenBytes > 0 ? Math.round(Math.min(1, aiBytes / writtenBytes) * 100) : (aiBytes > 0 ? 100 : (bytes > 0 ? 0 : null)),
     approp: apN ? Math.round(apSum / apN) : null,
     settleMed: settles.length ? median(settles) : null,
+    untouchedN: untouched,
+    emptiedN: emptied,
     fieldsTouched: new Set(ps.map((e) => e.k)).size,
     keptN: ps.filter((e) => { const s = pasteSurvive(d, e, wmap); return s != null && s >= 60; }).length,
   };
@@ -1732,10 +1759,10 @@ function similarityAll(wsMap) {
     let hap = 0;
     for (const t of toks[id]) if (freq.get(t) === 1) hap++;
     per[id] = {
-      peerSim: cnt ? Math.round((sum / cnt) * 100) : null,
-      nnSim: cnt ? Math.round(mx * 100) : null,
+      peerSim: cnt ? Math.round((sum / cnt) * 1000) / 10 : null,   // 소수 한 자리로 내보낸다
+      nnSim: cnt ? Math.round(mx * 1000) / 10 : null,
       nnId: cnt ? mxId : null,
-      structSim: sc ? Math.round((ss / sc) * 100) : null,
+      structSim: sc ? Math.round((ss / sc) * 1000) / 10 : null,
       hapax: hap,          // 길이 편향이 있어 보조 지표로만 쓴다
       ...lex[id],          // tokensN · mattr · hdd
     };
@@ -1805,8 +1832,11 @@ function aiTypesAll(wsMap) {
   ids.forEach((id) => {
     const m = pm[id];
     let type = null;
-    if (m.pasteN === 0) type = "직접 씀";
-    else if (m.approp != null && aps.length >= 3) type = m.approp >= apMed ? "전유" : "대리 서술";
+    /* 기록한 글이 없는 학생(결석·시험 계정)은 유형을 주지 않는다 — 「직접 씀」으로 세면 그 유형이 부풀려진다.
+       전유는 학급 중앙값을 엄격히 넘고(같으면 대리 서술) 0보다 클 때만. 전유율이 [0,0,0,100,100]이면
+       중앙값 0과 같은 셋이 대리 서술, 100인 둘이 전유다(>= 로 가르면 모두 전유가 된다) */
+    if (m.pasteN === 0) type = m.writtenLen > 0 ? "직접 씀" : null;
+    else if (m.approp != null && aps.length >= 3) type = m.approp > apMed && m.approp > 0 ? "전유" : "대리 서술";
     per[id] = { ...m, type };
   });
   return { per, apMed, srMed, n: aps.length };
@@ -2007,11 +2037,34 @@ const ABST_LEX = [
 ];
 const NUM_RE = /\d+\s*(회|번|년|개월|달|주일|주|일|시간|분|초|cm|mm|kg|명|개|겹|칸|층|센티|밀리|미터)/g;
 
+/* 사전 항목의 적중 수 (항목마다 한 번만 센다).
+   ① 어절 첫머리에서 시작하는 일치만 센다: 「실천하는」의 천, 「지도자」의 도자는 세지 않는다.
+   ② 한 글자 자리는 하나의 일치에만 쓰고 긴 항목을 먼저 본다: 「안쪽으로」는 안쪽으로 하나, 「그을음」은 그을음 하나.
+   ③ 한 글자 명사(쇠·천)는 어절 전체이거나 뒤에 조사만 붙을 때만 센다: 「천천히」·「쇠퇴」는 세지 않는다.
+   형태소 분석이 아니므로 「유리한」(유리)·「고무적」(고무)·「높이 평가」(높이) 같은 오탐은 남는다. */
+const LEX_WHOLE = new Set(["쇠", "천"]);
+const JOSA_ONLY = new RegExp("^" + KO_TAIL.source.replace(/\$$/, "") + "?$");
+const lexSorted = new Map();
 function lexHits(t, lex) {
   const s = String(t || "");
-  let n = 0;
-  for (const w of lex) if (s.includes(w)) n++;
-  return n;
+  let words = lexSorted.get(lex);
+  if (!words) { words = lex.slice().sort((x, y) => y.length - x.length); lexSorted.set(lex, words); }
+  const isTok = (ch) => /[\p{L}\p{N}]/u.test(ch);
+  const used = new Uint8Array(s.length);
+  const hit = new Set();
+  for (let i = 0; i < s.length; i++) {
+    if (used[i] || (i > 0 && isTok(s[i - 1]))) continue;
+    let end = i;
+    while (end < s.length && isTok(s[end])) end++;
+    for (const w of words) {
+      if (!s.startsWith(w, i)) continue;
+      if (LEX_WHOLE.has(w) && !JOSA_ONLY.test(s.slice(i + w.length, end))) continue;
+      for (let j = i; j < i + w.length; j++) used[j] = 1;
+      hit.add(w);
+      break;
+    }
+  }
+  return hit.size;
 }
 function numHits(t) {
   return (String(t || "").match(NUM_RE) || []).length;
@@ -6374,6 +6427,8 @@ function ApproprScatter({ rows, apMed, srMed, hoverId, setHoverId, onSel }) {
   );
 }
 
+/* 화면 표시용 반올림 — 계산값(중앙값 등)은 정확히 두고 보일 때만 소수 한 자리로 */
+const fmt1 = (x) => (x == null ? x : Math.round(x * 10) / 10);
 function AxisStripRow({ axis, rows, first, hoverId, setHoverId, onSel }) {
   const W = 560, H = first ? 42 : 30, Y = 15;
   const pts = rows.filter((r) => r.v != null);
@@ -6384,7 +6439,7 @@ function AxisStripRow({ axis, rows, first, hoverId, setHoverId, onSel }) {
     <div className="hbar" style={{ alignItems: "center" }}>
       <span className="lb" title={axis.desc}>{axis.name}</span>
       <svg viewBox={"0 0 " + W + " " + H} style={{ flex: "1 1 280px", height: H }} role="img" aria-label={axis.name + " 학급 분포"}>
-        <title>{axis.name + ": 기록 " + pts.length + "명" + (med != null ? " · 중앙값 " + med + "점" : "") + ". " + axis.desc}</title>
+        <title>{axis.name + ": 기록 " + pts.length + "명" + (med != null ? " · 중앙값 " + fmt1(med) + "점" : "") + ". " + axis.desc}</title>
         <line x1={0} y1={Y} x2={W} y2={Y} stroke="var(--line)" strokeWidth={1} />
         {[0, W / 2, W].map((x, i) => <line key={i} x1={x} y1={Y - 3} x2={x} y2={Y + 3} stroke="var(--line2)" strokeWidth={1} />)}
         {first && [["0", 0, "start"], ["50", W / 2, "middle"], ["100", W, "end"]].map(([t, x, an]) => (
@@ -6406,7 +6461,7 @@ function AxisStripRow({ axis, rows, first, hoverId, setHoverId, onSel }) {
       <span className="v" style={{ minWidth: 96, textAlign: "right" }}>
         {axis.key === "originality" && rows.length < 2 ? "비교는 2명부터" : (
           <>
-            {med != null ? "중앙값 " + med : "기록 없음"}
+            {med != null ? "중앙값 " + fmt1(med) : "기록 없음"}
             {missing > 0 && <span style={{ color: "var(--seal)" }}> · 미기록 {missing}</span>}
           </>
         )}
@@ -6492,7 +6547,7 @@ function TimeScatter({ rows, hoverId, setHoverId, onSel }) {
 function CreativityPanel({ ids, roster, wsMap, onSel }) {
   const [hoverId, setHoverId] = useState(null);
   const [sortKey, setSortKey] = useState("id");
-  const wsOnly = useMemo(() => Object.fromEntries(ids.map((id) => [id, wsMap[id] || {}])), [ids, wsMap]);
+  const wsOnly = useMemo(() => Object.fromEntries(ids.map((id) => [id, wsMap[id] || {}])), [ids.join("|"), wsMap]);   // ids는 그릴 때마다 새 배열이라 내용으로 비교한다
   const axesAll = useMemo(() => creativityAxesAll(wsOnly), [wsOnly]);
   const aiAll = useMemo(() => aiTypesAll(wsOnly), [wsOnly]);
 
@@ -6547,7 +6602,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
     <div>
       <div className="kpis">
         <div className="kpi"><div className="n">{rows.filter((r) => overallProgress(wsMap[r.id]) > 0).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {ids.length}</span></div><div className="l">기록을 시작한 학생</div></div>
-        <div className="kpi"><div className="n">{meanMed != null ? meanMed : "—"}</div><div className="l">축 평균의 학급 중앙값</div></div>
+        <div className="kpi"><div className="n">{meanMed != null ? fmt1(meanMed) : "—"}</div><div className="l">축 평균의 학급 중앙값</div></div>
         <div className="kpi"><div className="n" style={zeroMedia.length ? { color: "var(--seal)" } : {}}>{zeroMedia.length}</div><div className="l">미디어 0건 학생</div></div>
         <div className="kpi"><div className="n">{editSum}</div><div className="l">고쳐 쓴 흔적 합계</div></div>
       </div>
@@ -6562,7 +6617,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
           ))}
           <p className="hint" style={{ marginTop: 8 }}>
             점 하나가 학생 한 명입니다 (0~100). 굵은 세로선은 학급 중앙값. 점을 누르면 그 학생의 기록으로 들어갑니다.
-            여섯 축을 거미줄 그림으로 겹치지 않은 이유: 25명의 다각형은 겹쳐 읽을 수 없어, 축마다 같은 자 위에 펼쳤습니다.
+            여섯 축을 거미줄 그림으로 겹치지 않은 이유: {ids.length}명의 다각형은 겹쳐 읽을 수 없어, 축마다 같은 자 위에 펼쳤습니다.
           </p>
         </div>
       </div>
@@ -6700,8 +6755,8 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
         <div className="card-head"><span className="card-code">AI 2</span><span className="card-title">학급이 서로 비슷해지고 있는가</span></div>
         <div className="card-body">
           <div className="kpis" style={{ marginBottom: 12 }}>
-            <div className="kpi"><div className="n">{simAll.cls.peerSimMed != null ? simAll.cls.peerSimMed + "%" : "—"}</div><div className="l">서술 유사도 중앙값</div></div>
-            <div className="kpi"><div className="n">{simAll.cls.structSimMed != null ? simAll.cls.structSimMed + "%" : "—"}</div><div className="l">구조 유사도 중앙값</div></div>
+            <div className="kpi"><div className="n">{simAll.cls.peerSimMed != null ? Math.round(simAll.cls.peerSimMed) + "%" : "—"}</div><div className="l">서술 유사도 중앙값</div></div>
+            <div className="kpi"><div className="n">{simAll.cls.structSimMed != null ? Math.round(simAll.cls.structSimMed) + "%" : "—"}</div><div className="l">구조 유사도 중앙값</div></div>
             <div className="kpi"><div className="n">{simAll.cls.lexPool || "—"}</div><div className="l">학급 어휘 풀</div></div>
             <div className="kpi"><div className="n">{simAll.cls.attitudeEnt != null ? simAll.cls.attitudeEnt + "%" : "—"}</div><div className="l">태도 선택의 고름</div></div>
           </div>
@@ -6830,12 +6885,7 @@ function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
         r.pre && r.pre.total != null ? round2(r.pre.total) : "",
         r.post && r.post.total != null ? round2(r.post.total) : ""];
     });
-    const esc = (c) => {
-      let s = String(c);
-      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-      return '"' + s.replace(/"/g, '""') + '"';
-    };
-    const csv = "\uFEFF" + [head, ...rws].map((r) => r.map(esc).join(",")).join("\n");
+    const csv = toCSV(head, rws);   // 숫자는 숫자로, 수식 주입 방지는 글자에만 (src-csv.mjs)
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -6853,7 +6903,7 @@ function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
       ...cols.map((c) => "사후:" + c),
       ...STANCE_DERIVED.map((k) => "사전점수:" + k),
       ...STANCE_DERIVED.map((k) => "사후점수:" + k),
-      "앵커:조건", "앵커:제출시각", "앵커:AI전면선택(0~4)", "앵커:작품 캡션 펼침 비율"];
+      "앵커:조건", "앵커:제출시각", "앵커:AI전면선택(0~4, 제출한 학생만)", "앵커:anchor_n(답한 쌍)", "앵커:anchor_prop(AI전면 ÷ 답한 쌍)", "앵커:작품 캡션 펼침 비율"];
     const rws = rows.map((r) => {
       const st = (r.sv || {}).stance || {};
       const pre = st.pre || {}, post = st.post || {};
@@ -6870,15 +6920,13 @@ function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
         ...STANCE_DERIVED.map((k) => num(so[k])),
         an && an.cond != null ? an.cond : "",
         an && an.submittedAt ? an.submittedAt : "",
-        an && anchorScore(an) != null ? anchorScore(an) : "",
+        an && anchorCounts(an).score != null ? anchorCounts(an).score : "",   // 중간에 멈춘 학생은 0~4 합계로 내보내지 않는다
+        an ? anchorCounts(an).n : "",
+        an && anchorCounts(an).prop != null ? Math.round(anchorCounts(an).prop * 1000) / 1000 : "",
         an && anchorPlateRate(an) != null ? num(anchorPlateRate(an)) : ""];
     });
-    const esc = (c) => {
-      let v = String(c == null ? "" : c);
-      if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
-      return '"' + v.replace(/"/g, '""') + '"';
-    };
-    const csv = "\uFEFF" + [head, ...rws].map((r) => r.map(esc).join(",")).join("\n");
+    const csv = toCSV(head, rws);   // afn(b28 − b29)처럼 음수가 되는 점수가 있다. 숫자로 내보낸다
+
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -7053,7 +7101,7 @@ function TeacherGuide() {
                 <b>측정 설계.</b> 단일집단 사전·사후 설계에 과정 데이터를 더한 혼합 설계입니다. 세 자료를 삼각검증합니다.
                 ① <b>자기보고</b>: 사전·사후 24문항 설문(창의적 자기효능감 Beghetto 2006 · Karwowski 2011, 창의적 정체성 Karwowski 2011,
                 아이디어 행동 RIBS Runco 외 2001, 창의성 성장 신념 Karwowski 2014, 일상 창의 행동, AI 협업 창의성 인식). 같은 문항을 두 번 실시하고
-                역문항 2개로 무성의 응답을 점검합니다. ② <b>행동 지표</b>: 창의성 6축(유창성·융통성·독창성·정교성·과정·멀티모달)을 기록 데이터에서 계산.
+                역문항 3개(a12·a15·a23)로 무성의 응답을 점검합니다. ② <b>행동 지표</b>: 창의성 6축(유창성·융통성·독창성·정교성·과정·멀티모달)을 기록 데이터에서 계산.
                 ③ <b>질적 기록</b>: 변화 쌍 {CHANGE_PAIRS.length}곳(사전·사후로 같은 질문에 두 번 답한 곳), 고쳐 쓰기 이력, 성찰문, 스스로 만든 질문(문제 발견).
                 통제집단이 없으므로 설문 변화만으로 효과를 주장하지 않고, 세 자료가 같은 방향을 가리키는지 서술하는 것이 정직한 분석입니다.
               </p>
@@ -7165,7 +7213,7 @@ function TeacherGuide() {
             <div style={{ fontSize: 13, lineHeight: 1.8, marginTop: 10 }}>
               <p style={{ marginBottom: 10 }}>
                 「연구」 탭은 학급 기록을 논문에 바로 쓸 수 있는 다섯 가지 자료 구조와 세 가지 문서(모두 여덟 파일)로 바꿔 줍니다.
-                내려받는 파일에는 학번·별명·계정 정보가 들어가지 않고, 학번을 정렬해 붙인 익명 번호(P01, P02…)만 남습니다.
+                내려받는 파일에는 학번·별명·계정 정보가 들어가지 않고, 학생마다 한 번 무작위로 정해 고정한 가명 번호(P와 네 글자)와 학급 코드(C1…)만 남습니다.
                 익명 번호와 학번의 대응표는 화면에서만 보이며 파일로 나가지 않으므로, 필요하면 교사가 따로 안전한 곳에 보관하세요.
               </p>
               <table className="match-tbl">
@@ -7187,7 +7235,7 @@ function TeacherGuide() {
                 단계의 완료 판정도 항목이 채워졌는지만 보고 내용의 질은 보지 않습니다. 앱이 내는 수치는 어디를 들여다볼지 가리키는 표지이지 결론이 아닙니다.
               </p>
               <p>
-                <b>통계 처리.</b> 한 학급 단일 집단 자료이므로 유의확률을 산출하지 않습니다. 사전·사후 표의 t 값과 효과크기(Cohen d<sub>z</sub>)는 참고 계산이며,
+                <b>통계 처리.</b> 통제집단이 없는 단일 집단 자료이므로 앱에서는 유의확률을 산출하지 않습니다. 여러 반을 합친 자료는 학급 코드(class) 열로 학급 더미를 넣어 따로 분석하세요. 사전·사후 표의 t 값과 효과크기(Cohen d<sub>z</sub>)는 참고 계산이며,
                 기술통계와 사례 서술을 중심으로 쓰는 것이 정직합니다. 학생이 한 명도 입장하지 않아 표본 학급이 보이는 동안에는
                 내려받는 파일의 이름과 문서 첫머리에 표본 표시가 붙습니다.
               </p>
@@ -7232,13 +7280,8 @@ function TeacherGuide() {
    사고 과정 대시보드와 연구 자료 변환
    ============================================================ */
 
-/* 파일 내려받기 공용 도우미 */
-const csvCell = (c) => {
-  let s = c == null ? "" : String(c);
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;   // 스프레드시트 수식 주입 방지
-  return '"' + s.replace(/"/g, '""') + '"';
-};
-const toCSV = (head, rows) => "﻿" + [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
+/* 파일 내려받기 공용 도우미 — CSV 셀 규칙은 src-csv.mjs 한 곳에 둔다
+   (숫자는 따옴표 없이, 수식 주입 방지는 글자에만, NaN·Infinity는 빈칸) */
 const fileStamp = () => new Date().toISOString().slice(2, 10).replace(/-/g, "");
 function download(name, text, mime) {
   const url = URL.createObjectURL(new Blob([text], { type: (mime || "text/plain") + ";charset=utf-8" }));
@@ -7659,6 +7702,8 @@ const GRADE_NUM = { "상": 3, "중": 2, "하": 1 };
 
 /* 변수 사전 — 내보내기·기술통계·코드북이 이 한 벌을 함께 쓴다 */
 const RESEARCH_VARS = [
+  /* 기록지가 없는 학생(결석·시험 계정)의 기록지 변수는 0이 아니라 빈칸으로 나간다. 이 열로 가른다 */
+  { k: "has_record", name: "기록지 있음", unit: "0/1", def: "기록지 문서에 저장된 값이 하나라도 있으면 1. 0이면 기록지에서 나오는 모든 변수가 빈칸(측정하지 않음)이며 설문·루브릭만 채워질 수 있다", get: (c) => (c.hasRec ? 1 : 0), always: true },
   { k: "progress_pct", name: "전체 기록률", unit: "%", def: "기록지 전체 필수 항목 가운데 채운 비율", get: (c) => overallProgress(c.ws) },
   { k: "stage_depth", name: "연속 도달 단계", unit: "0–7", def: "단계 1(T1)부터 끊기지 않고 모두 채운 마지막 단계의 번호. 2026-09 개정으로 단계 9→7 (옛 T5→4, T6→5, T7→6, T8·T9→7, T4는 돌아보기로)", get: (c) => c.tm.depth },
   { k: "stage_reached", name: "완료 단계 수", unit: "0–7", def: "순서와 무관하게 필수 항목을 모두 채운 단계의 개수", get: (c) => c.tm.reached },
@@ -7691,7 +7736,7 @@ const RESEARCH_VARS = [
   { k: "len_post", name: "문장 길이(마지막 문장)", unit: "자", def: "단계 7 마지막 문장의 글자 수", get: (c) => c.tm.len2 },
   { k: "sym_warn_n", name: "상징어 경고 횟수", unit: "회", def: "단계 6 자국 칸에 상징어(눈물·사슬·마음 등)가 들어와 경고가 뜬 횟수 (막지 않고 기록만)", get: (c) => c.tm.symWarnN },  { k: "cr_fluency", name: "창의성:시도의 양", unit: "0–100", def: "생성 회차·명칭 후보·에스키스의 가짓수", get: (c) => c.ax.fluency },
   { k: "cr_flexibility", name: "창의성:방법 바꾸기", unit: "0–100", def: "다듬기 방법·수정 방법·도구를 옮겨 다닌 폭", get: (c) => c.ax.flexibility },
-  { k: "cr_originality", name: "창의성:남다름", unit: "0–100", def: "문제·유물명·태도·진열 선택의 학급 내 희소도", get: (c) => c.ax.originality },
+  { k: "cr_originality", name: "창의성:남다름", unit: "0–100", def: "문제·유물명·태도·진열 선택의 학급 내 희소도. 학급(반)마다 따로 계산하며 분모는 그 칸에 답한 학생만", get: (c) => c.ax.originality },
   { k: "cr_elaboration", name: "창의성:설정의 촘촘함", unit: "0–100", def: "흔적·일대기·출토 맥락·작품 캡션의 세부 밀도", get: (c) => c.ax.elaboration },
   { k: "cr_process", name: "창의성:다시 보기", unit: "0–100", def: "안 맞는 곳 찾기·제외한 이유·반론·고쳐 쓰기", get: (c) => c.ax.process },
   { k: "cr_multimodal", name: "창의성:모으기의 폭", unit: "0–100", def: "사진·소리·스케치·영상·링크의 고른 사용", get: (c) => c.ax.multimodal },
@@ -7707,9 +7752,9 @@ const RESEARCH_VARS = [
   { k: "rubric_mean", name: "루브릭 평균", unit: "1–3", def: "성취기준 4개 등급(상3·중2·하1)의 평균", get: (c) => {
     const vs = [0, 1, 2, 3].map((i) => GRADE_NUM[(c.g || {})["r" + i]]).filter((x) => x != null);
     return vs.length ? Math.round((vs.reduce((a, b) => a + b, 0) / vs.length) * 100) / 100 : null;
-  } },
-  { k: "survey_pre", name: "창의성 인식 사전", unit: "1–5", def: "사전 설문 전체 척도 평균", get: (c) => (c.svPre ? Math.round(c.svPre.total * 100) / 100 : null) },
-  { k: "survey_post", name: "창의성 인식 사후", unit: "1–5", def: "사후 설문 전체 척도 평균", get: (c) => (c.svPost ? Math.round(c.svPost.total * 100) / 100 : null) },
+  }, always: true },
+  { k: "survey_pre", name: "창의성 인식 사전", unit: "1–5", def: "사전 설문 전체 척도 평균", get: (c) => (c.svPre && c.svPre.total != null ? round2(c.svPre.total) : null), always: true },
+  { k: "survey_post", name: "창의성 인식 사후", unit: "1–5", def: "사후 설문 전체 척도 평균", get: (c) => (c.svPost && c.svPost.total != null ? round2(c.svPost.total) : null), always: true },
 
   /* 가져온 글과 전유 — 붙여넣기를 막는 대신 기록해 얻는 변수들 */
   { k: "paste_n", name: "붙여넣기 건수", unit: "건", def: "기록 칸에 20자 이상을 붙여넣은 횟수", get: (c) => c.pm.pasteN },
@@ -7726,10 +7771,13 @@ const RESEARCH_VARS = [
   /* 이름에 AI를 넣지 않는다 — 이 값은 출처와 무관하게 모든 붙여넣기를 센다.
      학생이 3차시에 쓴 자기 글을 8차시로 옮겨 붙여도 올라간다. 이 도구는 어느 글이
      생성형 도구에서 왔는지 알지 못하므로, 출처를 단정하는 이름을 쓰지 않는다. */
-  { k: "src_ratio", name: "가져온 글의 비중", unit: "%", def: "붙여넣은 글자 수 ÷ 기록지에 쓴 전체 글자 수 (출처를 가리지 않음)", get: (c) => c.pm.srcRatio },
-  { k: "approp", name: "전유율", unit: "%", def: "붙인 앞머리가 최종문에서 사라진 정도 (1 − 잔존율)", get: (c) => (c.pm.approp == null ? null : c.pm.approp) },
-  { k: "paste_settle", name: "붙인 뒤 손댄 시간", unit: "초", def: "붙여넣기부터 그 칸을 마지막으로 고칠 때까지의 중앙값", get: (c) => c.pm.settleMed },
-  { k: "ai_type", name: "유형", unit: "명목", def: "붙여넣기 없음이면 직접 씀, 있으면 학급 전유율 중앙값으로 전유·대리 서술", get: (c) => c.pm.type || "", text: true },
+  { k: "src_ratio", name: "가져온 글의 비중", unit: "%", def: "붙여넣은 글자 수 ÷ 기록지에 쓴 전체 글자 수 (출처를 가리지 않음). 쓴 글도 붙인 글도 없으면 빈칸", get: (c) => c.pm.srcRatio },
+  { k: "approp", name: "전유율", unit: "%", def: "붙인 앞머리가 최종문에서 사라진 정도 (1 − 잔존율). 붙인 뒤 칸을 통째로 비웠으면 잔존 0, 전유율 100으로 세고 paste_emptied_n에 따로 센다", get: (c) => (c.pm.approp == null ? null : c.pm.approp) },
+  { k: "paste_settle", name: "붙인 뒤 손댄 시간", unit: "초", def: "붙인 뒤 같은 칸을 다시 고친 붙여넣기만 대상으로, 붙인 시각부터 그 칸을 마지막으로 고친 시각까지의 초의 중앙값. 붙인 지 1시간이 지난 뒤의 수정과 2초 안의 수정은 반영하지 않고, 같은 칸에 다시 붙여넣으면 앞 건의 값은 그때 멈춘다. 한 번도 고치지 않은 붙여넣기는 값이 없어 이 중앙값에서 빠지므로 paste_untouched_n과 함께 해석한다", get: (c) => c.pm.settleMed },
+  { k: "paste_untouched_n", name: "붙인 뒤 손대지 않은 건수", unit: "건", def: "붙인 뒤 같은 칸을 다시 고친 기록(settle)이 없는 붙여넣기의 수", get: (c) => c.pm.untouchedN },
+  { k: "paste_emptied_n", name: "붙인 뒤 칸을 비운 건수", unit: "건", def: "붙여넣은 칸이 최종적으로 비어 있는 붙여넣기의 수 (잔존 0으로 전유율에 들어감)", get: (c) => c.pm.emptiedN },
+  { k: "ai_type", name: "유형", unit: "명목", def: "붙여넣기가 없고 쓴 글(10자 이상 칸)이 있으면 직접 씀. 붙여넣기가 있으면 같은 학급(반)의 붙여넣은 학생 전유율 중앙값(ap_med)과 견주어, 중앙값을 엄격히 넘고 0보다 크면 전유, 같거나 낮으면 대리 서술. 붙여넣은 학생이 학급에 3명 미만이면 빈칸. 쓴 글이 없으면 빈칸", get: (c) => c.pm.type || "", text: true },
+  { k: "ap_med", name: "학급 전유율 중앙값", unit: "%", def: "ai_type을 가른 기준값. 그 학생이 속한 학급(반)에서 붙여넣기가 있는 학생들의 전유율 중앙값. 같은 학급 안에서는 모두 같은 값", get: (c) => (c.clsStat && c.clsStat.typeN >= 3 ? c.clsStat.apMed : null), noDesc: true },
 
   /* 지우고 다시 쓴 흔적 */
   { k: "rewrite_depth", name: "개작의 깊이", unit: "%", def: "남겨 둔 이전 문장이 최종문과 얼마나 멀어졌는가의 평균", get: (c) => c.rv.depth },
@@ -7744,14 +7792,14 @@ const RESEARCH_VARS = [
   { k: "plan_gap", name: "계획과의 거리", unit: "%", def: "5차시 프롬프트 계획과 첫 회차 실제 프롬프트의 거리", get: (c) => c.pr.planGap },
 
   /* 학급 동질화 — 학급 전체를 규준으로 계산한다 */
-  { k: "peer_sim", name: "학급 평균 유사도", unit: "%", def: "내 서술과 나머지 학생 서술의 3-gram 유사도 평균", get: (c) => c.sim.peerSim },
-  { k: "nn_sim", name: "최근접 유사도", unit: "%", def: "가장 비슷한 한 명과의 유사도", get: (c) => c.sim.nnSim },
-  { k: "struct_sim", name: "구조 유사도", unit: "%", def: "문장 수·나열 표지·연결어의 뼈대가 학급과 얼마나 겹치는가", get: (c) => c.sim.structSim },
+  { k: "peer_sim", name: "학급 평균 유사도", unit: "%", def: "내 서술과 같은 학급(반)의 나머지 학생 서술의 3-gram 유사도 평균 (소수 한 자리)", get: (c) => c.sim.peerSim },
+  { k: "nn_sim", name: "최근접 유사도", unit: "%", def: "같은 학급(반)에서 가장 비슷한 한 명과의 유사도 (소수 한 자리)", get: (c) => c.sim.nnSim },
+  { k: "struct_sim", name: "구조 유사도", unit: "%", def: "문장 수·나열 표지·연결어의 뼈대가 같은 학급(반)과 얼마나 겹치는가 (소수 한 자리)", get: (c) => c.sim.structSim },
   { k: "mattr", name: "어휘 다양성 MATTR", unit: "0–100", def: "토큰 " + MATTR_WIN + "개 창을 한 칸씩 밀며 잰 TTR의 평균. 글 길이에 견고하다. 토큰이 " + MATTR_WIN + "개 미만이면 빈칸", get: (c) => c.sim.mattr },
   { k: "hdd", name: "어휘 다양성 HD-D", unit: "0–100", def: "토큰 " + HDD_SAMPLE + "개를 뽑았을 때 각 단어가 한 번이라도 나올 확률의 합 ÷ " + HDD_SAMPLE + ". 토큰이 " + HDD_SAMPLE + "개 미만이면 빈칸", get: (c) => c.sim.hdd },
   { k: "tokens_n", name: "서술 토큰 수", unit: "개", def: "서술 칸 전체의 어절 토큰 수(조사·어미 제거 후). 어휘 다양성 지표의 포함 기준 판정에 쓴다", get: (c) => c.sim.tokensN },
   /* hapax는 글이 길수록 커져 짧은 글에서는 어휘가 아니라 길이를 잰다 — 보조로만 둔다 */
-  { k: "hapax", name: "나만 쓴 단어 (보조)", unit: "개", def: "학급 전체에서 이 학생만 사용한 어휘의 수. 길이 편향이 있어 주 지표로 쓰지 않으며 tokens_n과 함께 볼 때에만 해석한다", get: (c) => c.sim.hapax },
+  { k: "hapax", name: "나만 쓴 단어 (보조)", unit: "개", def: "같은 학급(반)에서 이 학생만 사용한 어휘의 수. 길이 편향이 있어 주 지표로 쓰지 않으며 tokens_n과 함께 볼 때에만 해석한다", get: (c) => c.sim.hapax },
 ];
 
 /* 사전·사후 대응 자료 */
@@ -7762,27 +7810,46 @@ const RESEARCH_PAIRS = [
 ];
 
 /* 참여자 한 명의 계산 묶음 */
-function researchCases(ids, roster, wsMap, gradeMap, surveyMap, consentMap) {
-  const wsOnly = {};
-  ids.forEach((id) => { wsOnly[id] = wsMap[id] || {}; });
-  const axAll = creativityAxesAll(wsOnly);
-  const simAll = similarityAll(wsOnly);   // 학급을 규준으로 한 동질화 — 개인만 봐서는 계산되지 않는다
-  const typeAll = aiTypesAll(wsOnly);     // 붙여넣기 의존도와 전유율, 그리고 학급 중앙값 기준 유형
-  return ids.map((id, i) => {
+/* 기록지 문서에 저장된 값이 하나라도 있는가 — 없으면 결석·시험 계정이라 기록지 변수를 0이 아니라 결측으로 둔다 */
+const hasRecord = (ws) => !!ws && typeof ws === "object" && Object.keys(ws).length > 0;
+
+/* 학급 규준 지표(유사도·남다름·유형 중앙값·엔트로피)는 학급(반)마다 따로 계산한다.
+   5~6개 반을 한데 넣으면 다른 반 학생과의 유사도가 섞여 값이 낮아지고(같은 반 안 64 → 합치면 30),
+   유형을 가르는 중앙값도 다른 반에 좌우된다. 학번으로 반을 알 수 없는 학생은 따로 한 묶음이다.
+   opts = { classMap, pidMap } — 가명 번호와 학급 코드는 src-pid.mjs의 지도에서 온다 */
+function researchCases(ids, roster, wsMap, gradeMap, surveyMap, consentMap, opts) {
+  const o = opts || {};
+  const pmap = o.pidMap || null;
+  const groups = groupByClass(ids, o.classMap);
+  const axAll = {}, simPer = {}, typePer = {}, clsStat = {};
+  Object.keys(groups).forEach((cl) => {
+    const wsG = {};
+    groups[cl].forEach((id) => { wsG[id] = wsMap[id] || {}; });
+    Object.assign(axAll, creativityAxesAll(wsG));
+    const sa = similarityAll(wsG);
+    const ta = aiTypesAll(wsG);
+    Object.assign(simPer, sa.per);
+    Object.assign(typePer, ta.per);
+    clsStat[cl] = { cl, n: groups[cl].length, sim: sa.cls, apMed: ta.apMed, srMed: ta.srMed, typeN: ta.n };
+  });
+  return ids.map((id) => {
     const sv = (surveyMap || {})[id] || {};
     const w = wsMap[id] || {};
+    const cl = classOf(id, o.classMap);
     return {
-      id, pid: "P" + String(i + 1).padStart(2, "0"),
+      id, pid: pidOfMap(pmap, id),
+      cl, ccode: classCodeOf(pmap, cl),
+      hasRec: hasRecord(wsMap[id]),
+      clsStat: clsStat[cl],
       nick: (roster[id] || {}).nick || "",
       consent: (consentMap || {})[id] || "",
       ws: w,
       tm: translationMetrics(w),
       ax: axAll[id] || {},
-      pm: typeAll.per[id] || {},
+      pm: typePer[id] || {},
       rv: revisionMetrics(w),
       pr: promptMetrics(w),
-      sim: simAll.per[id] || {},
-      cls: simAll.cls,
+      sim: simPer[id] || {},
       g: (gradeMap || {})[id] || {},
       svPre: svDone(sv.pre) ? surveyScores(sv.pre.ans) : null,
       svPost: svDone(sv.post) ? surveyScores(sv.post.ans) : null,
@@ -7794,6 +7861,7 @@ function researchCases(ids, roster, wsMap, gradeMap, surveyMap, consentMap) {
 const VAR_NEED = {
   paste_n: "paste", paste_chars: "paste", paste_bytes: "paste", written_bytes: "paste",
   src_ratio: "paste", byte_ratio: "paste", approp: "paste", paste_settle: "paste", ai_type: "paste",
+  paste_untouched_n: "paste", paste_emptied_n: "paste", ap_med: "paste",
   src_named_n: "paste", src_ai_n: "paste", src_net_n: "paste", ai_byte_ratio: "paste",
   prompt_n: "prompt", prompt_growth: "prompt", prompt_step: "prompt", prompt_even: "prompt", plan_gap: "prompt",
   edit_n: "log", dwell_min: "log", read_min: "log", idle_min: "log",
@@ -7810,6 +7878,7 @@ const varVal = (c, k) => {
   if (!v) return null;
   const need = VAR_NEED[k] || "rec";
   if (c && c.consent !== undefined && !consentAgreed(c.consent, need)) return null;
+  if (c && c.hasRec === false && !v.always) return null;   // 기록지가 없으면 측정하지 않은 것이다 (0이 아님)
   const out = v.get(c);
   return out === undefined ? null : out;
 };
@@ -7831,7 +7900,9 @@ const josaRo = (w) => {
 const mdRow = (cells) => "| " + cells.join(" | ") + " |";
 const mdHead = (cells) => mdRow(cells) + "\n" + mdRow(cells.map(() => "---"));
 
-function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, openMap }) {
+function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, openMap, cfgAll }) {
+  const classMap = (cfgAll && cfgAll.classMap) || null;   // 교사가 지정한 반(학번 규칙보다 먼저)
+  const classKey = JSON.stringify(classMap || {});
   /* 연구 참여 대장 — 수업은 모두가 하고 분석에서만 뺀다.
      명부가 아니라 교사만 읽는 research 문서에 둔다. 명부는 학생끼리도 읽을 수 있어
      누가 연구에서 빠졌는지가 학생 사이에 드러나면 안 되기 때문이다. */
@@ -7885,20 +7956,77 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
      나머지 다섯 항목은 참여는 하되 그 열만 비우므로 여기서 빼지 않는다. */
   const excluded = ids.filter((id) => !consentAgreed((consentMap || {})[id], "rec")).length;
   const partial = ids.filter((id) => { const n = consentCount((consentMap || {})[id]); return n > 0 && n < CONSENT_KEYS.length; }).length;
+  /* ids는 교사 화면이 그릴 때마다 새 배열이라 그대로 의존하면 기록이 들어올 때마다 학급 전체 계산이 다시 돈다 */
+  const idsKey = ids.join("|");
   const analysisIds = useMemo(
     () => (dropExcluded ? ids.filter((id) => consentAgreed((consentMap || {})[id], "rec")) : ids),
-    [ids, consentMap, dropExcluded]);
+    [idsKey, consentMap, dropExcluded]);
+
+  /* 가명 번호 지도(research/pidMap, src-pid.mjs). 화면에서는 읽기만 하고,
+     내려받을 때 없는 학생·학급만 새로 만들어 저장한다(있는 번호는 바꾸지 않는다).
+     표본 학급은 저장하지 않고 고정 씨앗으로 만든 지도를 쓴다. */
+  const [pidMap, setPidMap] = useState(null);
+  const [pidErr, setPidErr] = useState("");
+  const pidRef = useRef(null);
+  const ensureRef = useRef(null);
+  useEffect(() => {
+    if (sampleMode) return;
+    let alive = true;
+    store.getSafe(PID_KEY).then((r) => {
+      if (!alive) return;
+      if (r.ok) { const m = normPidMap(r.data); pidRef.current = m; setPidMap(m); setPidErr(""); }
+      else setPidErr("가명 번호 지도를 읽지 못했습니다. 내려받기 전에 연결을 확인하세요.");
+    });
+    return () => { alive = false; };
+  }, [sampleMode]);
+  const samplePid = useMemo(() => (sampleMode ? planPidMap(null, ids, classMap, seededRng("sample-pid")).next : null), [sampleMode, idsKey, classKey]);
+  const pmap = sampleMode ? samplePid : pidMap;
 
   /* researchCases는 학급 전체의 유사도와 유형을 함께 계산한다 (창의성 탭과 같은 비용).
      연구 탭을 열어 둔 채 수업을 하면 학생이 저장할 때마다 그 계산이 다시 돌아 화면이 멈추므로,
      창의성 탭과 같은 간격으로 따라가게 하고 그 위에서만 다시 셈한다. */
   const wsSlow = useSlow(wsMap, 15000);
   const cases = useMemo(
-    () => researchCases(analysisIds, roster, wsSlow, gradeMap, surveyMap, consentMap),
-    [analysisIds, roster, wsSlow, gradeMap, surveyMap, consentMap]);
-  const pidOf = useMemo(() => new Map(cases.map((c) => [c.id, c.pid])), [cases]);
+    () => researchCases(analysisIds, roster, wsSlow, gradeMap, surveyMap, consentMap, { classMap }),
+    [analysisIds, roster, wsSlow, gradeMap, surveyMap, consentMap, classKey]);
+  /* 가명 번호·학급 코드는 이름표일 뿐이라 계산을 다시 돌리지 않고 붙인다. 파일의 행은 pid 순(학번 순이 남지 않게) */
+  const relabel = (list, m) => list.map((c) => ({ ...c, pid: pidOfMap(m, c.id), ccode: classCodeOf(m, c.cl) }))
+    .sort((a, b) => byPid(a.pid, b.pid) || (hash32(a.id) - hash32(b.id)));
+  const sortedCases = useMemo(() => relabel(cases, pmap), [cases, pmap]);
+  /* 내려받기 직전: 없는 학생·학급의 번호를 만들어 저장하고(교사만), 그 지도로 이름표를 붙인 행을 돌려준다.
+     「한 번에 내려받기」가 파일마다 부르므로 진행 중인 저장은 하나만 둔다(같은 학생에 두 번호가 생기지 않게) */
+  const exportCases = async () => {
+    if (sampleMode) return sortedCases;
+    const cur = pidRef.current;
+    const need = (cur ? ids.filter((id) => !cur.pids[id]).length : 1) + (cur ? classList(ids, classMap).filter((c) => c !== UNKNOWN_CLASS && !cur.classes[c]).length : 0);
+    let m = cur;
+    if (need > 0) {
+      if (!ensureRef.current) ensureRef.current = ensurePidMap(store, ids, classMap).finally(() => { ensureRef.current = null; });
+      const r = await ensureRef.current;
+      if (!r.ok) { alert("가명 번호를 저장하지 못해 내려받기를 멈췄습니다. 연결을 확인하고 다시 눌러 주세요."); return null; }
+      m = r.map; pidRef.current = m; setPidMap(m);
+    }
+    return relabel(cases, m);
+  };
+  const pidOf = useMemo(() => new Map(sortedCases.map((c) => [c.id, c.pid])), [sortedCases]);
   const N = cases.length;
-  const numVars = RESEARCH_VARS.filter((v) => !v.text);
+  /* 원고·표의 표본 서술은 실제 학급 수와 학급별 인원에서 만든다 (「한 학급」으로 고정하면 학급 더미 서술과 어긋난다) */
+  const recN = cases.filter((c) => c.hasRec).length;
+  const clsCounts = {};
+  cases.forEach((c) => { clsCounts[c.cl] = (clsCounts[c.cl] || 0) + 1; });
+  const unknownN = clsCounts[UNKNOWN_CLASS] || 0;
+  const knownNs = Object.keys(clsCounts).filter((k) => k !== UNKNOWN_CLASS).map((k) => clsCounts[k]).sort((a, b) => b - a);
+  const K = knownNs.length;
+  const sampleDesc = K <= 1
+    ? "한 학급 " + N + "명"
+    : K + "개 학급 " + N + "명(학급별 " + knownNs.join("·") + "명" + (unknownN ? ", 학번으로 학급을 알 수 없는 " + unknownN + "명 별도" : "") + ")";
+  const singleGroupNote = K <= 1
+    ? "한 학급 단일 집단 자료이므로"
+    : K + "개 학급을 합친 단일 집단(통제집단 없음) 자료이고 이 계산은 학급 효과를 통제하지 않은 단순 비교이므로";
+  const askNow = pasteAskOn(cfgAll);
+  const srcNamedAll = cases.reduce((a, c) => a + (c.pm.srcNamed || 0), 0);
+  const askUsed = askNow || srcNamedAll > 0;   // 지금 꺼져 있어도 출처 응답이 있으면 묻던 기간이 있었다
+  const numVars = RESEARCH_VARS.filter((v) => !v.text && !v.noDesc);
   const desc = numVars.map((v) => describe(cases, v)).filter((d) => d.n > 0);
   const pairStats = RESEARCH_PAIRS.map((p) => ({
     p, st: prePostStats(cases.map((c) => varVal(c, p.pre)), cases.map((c) => varVal(c, p.post))),
@@ -7911,9 +8039,10 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     : "";
 
   /* ---------- 1. 참여자 단위 (wide) ---------- */
-  const exportWide = () => {
-    const head = ["pid", ...RESEARCH_VARS.map((v) => v.k)];
-    const rows = cases.map((c) => [c.pid, ...RESEARCH_VARS.map((v) => { const x = varVal(c, v.k); return x == null ? "" : x; })]);
+  const exportWide = async () => {
+    const xs = await exportCases(); if (!xs) return;
+    const head = ["pid", "class", ...RESEARCH_VARS.map((v) => v.k)];
+    const rows = xs.map((c) => [c.pid, c.ccode, ...RESEARCH_VARS.map((v) => { const x = varVal(c, v.k); return x == null ? "" : x; })]);
     download("연구자료_참여자단위" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
   };
 
@@ -7921,15 +8050,16 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
      가져온 문장 한 건이 1행. 문구 자체와 그 문구가 겪은 일(얼마나 남았는가, 얼마나 붙잡고 고쳤는가)을
      함께 담아, 논문에서 "가져온 글이 어떻게 되었는가"의 원자료가 되게 한다.
      앞 120자만 나가며 붙여넣은 글 전체는 애초에 저장하지 않는다. */
-  const exportPaste = () => {
-    const head = ["pid", "paste_no", "at", "session", "sec_code", "field_key", "where",
+  const exportPaste = async () => {
+    const xs = await exportCases(); if (!xs) return;
+    const head = ["pid", "class", "paste_no", "at", "session", "sec_code", "field_key", "where",
       "chars", "bytes", "field_len_before", "field_len_final", "src_selfreport", "settle_sec",
       "survive_pct", "approp_pct", "head_text"];
     const rows = [];
-    cases.forEach((c) => {
+    xs.forEach((c) => {
       if (!consentAgreed(c.consent, "paste")) return;   // 붙여넣기 항목에 동의한 학생만
       pasteRows(c.ws).forEach((r) => {
-        rows.push([c.pid, r.no, r.at, r.session, r.code, r.key, r.where,
+        rows.push([c.pid, c.ccode, r.no, r.at, r.session, r.code, r.key, r.where,
           r.chars, r.bytes, r.base, r.finalLen, r.src, r.settle == null ? "" : r.settle,
           r.survive == null ? "" : r.survive, r.approp == null ? "" : r.approp, r.head]);
       });
@@ -7938,14 +8068,16 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
   };
 
   /* ---------- 2. 단계 단위 (long) ---------- */
-  const exportLong = () => {
-    const head = ["pid", "stage_key", "stage_order", "stage_name", "stage_full", "items_total", "items_done",
+  const exportLong = async () => {
+    const xs = await exportCases(); if (!xs) return;
+    const head = ["pid", "class", "stage_key", "stage_order", "stage_name", "stage_full", "items_total", "items_done",
       "completion", "text_chars", "text_units", "sentences", "concreteness", "edits", "first_edit_at", "last_edit_at"];
     const rows = [];
-    cases.forEach((c) => {
+    xs.forEach((c) => {
+      if (!c.hasRec) return;   // 기록지가 없는 학생의 단계 행은 0이 아니라 측정하지 않은 것이다
       c.tm.stages.forEach((s) => {
         const st = TRANSLATE_STAGES.find((x) => x.key === s.key);
-        rows.push([c.pid, s.key, s.n, s.name, st.full + (st.hw ? " (과제)" : ""), s.total, s.done,
+        rows.push([c.pid, c.ccode, s.key, s.n, s.name, st.full + (st.hw ? " (과제)" : ""), s.total, s.done,
           Math.round(s.ratio * 1000) / 1000, s.chars, s.units, s.sentences,
           s.conc == null ? "" : s.conc, s.edits, s.first || "", s.last || ""]);
       });
@@ -7954,12 +8086,13 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
   };
 
   /* ---------- 3. 질적 코딩 시트 (문장 단위) ---------- */
-  const exportCoding = () => {
-    const head = ["pid", "session", "section_code", "section_title", "field_key", "field_label", "stage_key",
+  const exportCoding = async () => {
+    const xs = await exportCases(); if (!xs) return;
+    const head = ["pid", "class", "session", "section_code", "section_title", "field_key", "field_label", "stage_key",
       "unit_no", "sub", "sentence_no", "text", "chars", "has_number", "concrete_hits", "abstract_hits",
       "concreteness", "code_1", "code_2", "memo"];
     const rows = [];
-    cases.forEach((c) => {
+    xs.forEach((c) => {
       SCHEMA.forEach((sec) => {
         sec.fields.forEach((f) => {
           const key = fkey(sec, f);
@@ -7968,7 +8101,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
             const sents = splitSentences(u.text);
             const list = sents.length ? sents : [u.text];
             list.forEach((t, si) => {
-              rows.push([c.pid, sec.session, sec.code, sec.title, key, String(f.label).slice(0, 80),
+              rows.push([c.pid, c.ccode, sec.session, sec.code, sec.title, key, String(f.label).slice(0, 80),
                 STAGE_OF_KEY[key] || "", ui + 1, u.sub, si + 1, t, t.length,
                 numHits(t) > 0 ? 1 : 0, lexHits(t, CONC_LEX), lexHits(t, ABST_LEX),
                 concreteness(t) == null ? "" : concreteness(t), "", "", ""]);
@@ -7981,33 +8114,34 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
   };
 
   /* ---------- 4. 사전·사후 텍스트 쌍 ---------- */
-  const exportPairs = () => {
-    const head = ["pid", "pair_id", "dimension", "pre_where", "pre_text", "post_where", "post_text",
+  const exportPairs = async () => {
+    const xs = await exportCases(); if (!xs) return;
+    const head = ["pid", "class", "pair_id", "dimension", "pre_where", "pre_text", "post_where", "post_text",
       "pre_chars", "post_chars", "pre_concreteness", "post_concreteness", "concreteness_delta", "lexical_overlap"];
     const rows = [];
     const add = (c, id2, dim, pw, pt, ow, ot) => {
       const a = concreteness(pt), b = concreteness(ot);
-      rows.push([c.pid, id2, dim, pw, pt || "", ow, ot || "",
+      rows.push([c.pid, c.ccode, id2, dim, pw, pt || "", ow, ot || "",
         String(pt || "").length, String(ot || "").length,
         a == null ? "" : a, b == null ? "" : b,
         a == null || b == null ? "" : b - a,
         filled(pt) && filled(ot) ? Math.round(jaccard(tokSet(pt), tokSet(ot)) * 100) : ""]);
     };
-    cases.forEach((c) => {
+    xs.forEach((c) => {
       add(c, "translate_stmt", "흔적 문장", "3차시 단계 6 첫 문장", c.tm.stmt1, "3차시 단계 7 마지막 문장", c.tm.stmt2);
       const vs = stmtVersions(c.ws["s3t3.stmt1"]).concat(stmtVersions(c.ws["s3t4.stmt2"]));
       vs.forEach((x, i) => { if (i > 0) add(c, "stmt_v" + i + "_v" + (i + 1), "진술 버전 이동", "v" + i, vs[i - 1].text, "v" + (i + 1), x.text); });
       CHANGE_PAIRS.forEach((p, i) => {
-        const val = (spec) => {
-          if (spec.kind === "reflect") return ((c.ws[spec.k] || {}).pos) || "";
-          if (spec.kind === "inspect") {
+        const val = (spec, side) => {
+          if (spec.kind !== "inspect") return pairText(c.ws, spec, side);
+          {
             const m = c.ws[spec.k] || {};
             return INSPECT_ITEMS.filter((it) => (m[it.k] || {}).status === "불성립")
               .map((it) => it.label + ": " + ((m[it.k] || {}).note || "")).join(" / ");
           }
           return c.ws[spec.k] || "";
         };
-        add(c, "change_" + (i + 1), p.dim, p.before.where, val(p.before), p.after.where, val(p.after));
+        add(c, "change_" + (i + 1), p.dim, p.before.where, val(p.before, "before"), p.after.where, val(p.after, "after"));
       });
     });
     download("연구자료_사전사후쌍" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
@@ -8016,18 +8150,19 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
   /* ---------- 4-2. 탐구 되묻기 단위 ----------
      탐구 질문(개념·설계)마다 첫 답과 고친 답, 받은 되묻기, 스스로 쓴 질문을 한 행에 담는다.
      되묻기 뒤에 답이 움직였는지(changed)가 이 파일의 질문이다. */
-  const exportInquiry = () => {
-    const head = ["pid", "session", "field_key", "qtype", "question", "support_level", "route",
+  const exportInquiry = async () => {
+    const xs = await exportCases(); if (!xs) return;
+    const head = ["pid", "class", "session", "field_key", "qtype", "question", "support_level", "route",
       "v1_text", "final_text", "v1_chars", "final_chars", "char_overlap", "lexical_overlap",
       "v1_concreteness", "final_concreteness", "changed", "probes_n", "probe_ids", "probe_texts", "self_q",
       "v1_at", "rev_at", "sec_v1_to_rev"];
     const rows = [];
-    cases.forEach((c) => {
+    xs.forEach((c) => {
       inquiryTraceRows(c.ws, SCHEMA).forEach((r) => {
         const a = concreteness(r.v1), b = concreteness(r.final);
         const gap = r.v1At && r.revAt ? Math.round((new Date(r.revAt) - new Date(r.v1At)) / 1000) : "";
         const changed = r.v1 ? ((r.sim != null && r.sim < 0.9) || Math.abs(r.final.trim().length - r.v1.trim().length) > 8 ? 1 : 0) : "";
-        rows.push([c.pid, r.session, r.key, r.qtype, r.label.slice(0, 80), r.level, r.route,
+        rows.push([c.pid, c.ccode, r.session, r.key, r.qtype, r.label.slice(0, 80), r.level, r.route,
           r.v1, r.final, r.v1.trim().length, r.final.trim().length,
           r.sim == null ? "" : Math.round(r.sim * 100),
           r.v1 && filled(r.final) ? Math.round(jaccard(tokSet(r.v1), tokSet(r.final)) * 100) : "",
@@ -8056,9 +8191,9 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push(mdHead(["단계", "내용", "완료 n", "완료 %", "평균 글자 수", "평균 구체성"]));
     TRANSLATE_STAGES.forEach((st, i) => {
       const full = cases.filter((c) => c.tm.stages[i].ratio >= 0.999).length;
-      L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, full, N ? Math.round((full / N) * 100) : 0,
-        r2(mean(cases.map((c) => c.tm.stages[i].chars))),
-        r2(mean(cases.map((c) => c.tm.stages[i].conc)))]));
+      L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, full, recN ? Math.round((full / recN) * 100) : 0,
+        r2(mean(cases.filter((c) => c.hasRec).map((c) => c.tm.stages[i].chars))),
+        r2(mean(cases.filter((c) => c.hasRec).map((c) => c.tm.stages[i].conc)))]));
     });
     L.push("");
     L.push("## 표 3. 안 보이는 이유의 선택 분포");
@@ -8100,7 +8235,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push(mdHead(["이유 칸", "기록한 n", "%"]));
     [["관찰 방법이 놓칠 것 (선택 칸)", "obsBlind"], ["가까운 방법의 이유", "engageWhy"], ["태도의 이유", "attWhy"], ["뺀 물건의 이유", "dropWhy"]].forEach((x) => {
       const n = cases.filter((c) => c.tm[x[1]] === 1).length;
-      L.push(mdRow([x[0], n, N ? Math.round((n / N) * 100) : 0]));
+      L.push(mdRow([x[0], n, recN ? Math.round((n / recN) * 100) : 0]));
     });
     L.push("");
     L.push("## 표 5. 사전·사후 대응 비교");
@@ -8114,7 +8249,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
         r2(s.diffM) + " (" + r2(s.diffSD) + ")", r2(s.t), s.df, r2(s.d)]));
     });
     L.push("");
-    L.push("t 값과 효과크기는 참고용 계산이며 유의확률은 산출하지 않았습니다. 한 학급 단일 집단 자료이므로 통계적 일반화보다 기술통계와 사례 서술을 중심으로 해석해야 합니다.");
+    L.push("t 값과 효과크기는 참고용 계산이며 유의확률은 산출하지 않았습니다. " + singleGroupNote + " 통계적 일반화보다 기술통계와 사례 서술을 중심으로 해석해야 합니다. 논문의 추론은 학급 더미를 넣은 공분산분석으로 따로 합니다.");
     L.push("");
     L.push("## 표 6. 주요 지표 간 상관 (Pearson r)");
     L.push("");
@@ -8140,7 +8275,10 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("## 참여자 식별");
     L.push("");
-    L.push("- pid: 학번을 정렬해 P01부터 순서대로 붙인 익명 번호입니다. 학번·별명·계정 정보는 어떤 파일에도 들어가지 않습니다.");
+    L.push("- pid: 학생마다 한 번 무작위로 정해 교사 전용 문서(research/pidMap)에 저장한 가명 번호(P와 네 글자)입니다. 한 번 정한 번호는 바뀌지 않으므로 동의 표시나 명단이 바뀌어도, 「연구」 탭과 「상호평가」 탭 파일 사이에서도 같은 학생은 같은 pid입니다. 학번·별명·계정 정보는 어떤 파일에도 들어가지 않으며, 파일의 행은 학번 순이 아니라 pid 순입니다.");
+    L.push("- class: 학급(반)의 가명 코드(C1, C2…). 반 번호 순이 아니라 무작위 순서로 붙였습니다. CU는 학번 형식으로 학급을 알 수 없는 학생(시험 계정·오입력 등)이며, 분석 전에 확인해 빼거나 교사 설정(config.classMap)으로 반을 지정합니다. 학급 더미 고정효과는 이 열로 만듭니다." + (unknownN ? " 지금 자료에는 CU가 " + unknownN + "명 있습니다." : ""));
+    L.push("- has_record: 기록지가 없는 학생(결석·시험 계정)은 0이며, 그 행의 기록지 변수는 0이 아니라 빈칸입니다. 설문·루브릭 변수는 기록지와 무관하게 채워질 수 있습니다.");
+    L.push("- 학급 규준 지표(peer_sim·nn_sim·struct_sim·hapax·cr_originality·ai_type·ap_med)는 학급(반)마다 따로 계산했습니다. CU 학생은 그들끼리 한 묶음입니다.");
     L.push("- 학생은 실명 대신 별명으로 입장하며, 별명 역시 내보내지 않습니다.");
     L.push("");
     L.push("## 변수 목록");
@@ -8154,7 +8292,8 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push(mdHead(["열", "내용"]));
     [
-      ["pid", "익명 번호"],
+      ["pid", "가명 번호"],
+      ["class", "학급 가명 코드"],
       ["paste_no", "그 학생의 붙여넣기 순번 (시각순)"],
       ["at", "붙여넣은 시각 (ISO 8601)"],
       ["session", "차시"],
@@ -8166,13 +8305,22 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       ["field_len_final", "그 칸의 최종 글자 수"],
       ["bytes", "붙여넣은 글의 UTF-8 바이트 수 (한글은 글자당 3바이트)"],
       ["src_selfreport", "학생이 붙인 직후 고른 출처(AI · 인터넷 · 내 글 · 기타). 「출처 묻기」를 끈 동안에는 비며, 빈칸을 AI로 간주하지 않는다"],
-      ["settle_sec", "붙여넣기부터 그 칸을 마지막으로 고칠 때까지의 초"],
-      ["survive_pct", "붙인 앞머리의 문자 3-gram이 최종문에 남은 비율"],
+      ["settle_sec", "붙여넣기부터 같은 칸을 마지막으로 고칠 때까지의 초(1시간 안, 같은 칸에 다시 붙여넣기 전까지). 붙인 뒤 고친 적이 없으면 빈칸"],
+      ["survive_pct", "붙인 앞머리의 문자 3-gram이 최종문에 남은 비율. 칸을 비웠으면 0"],
       ["approp_pct", "100 − survive_pct. 전유율"],
       ["head_text", "가져온 문장의 앞 120자"],
     ].forEach((r) => L.push(mdRow(r)));
     L.push("");
     L.push("수집 범위는 기록지의 모든 입력 칸입니다. 서술 칸뿐 아니라 표·발상 단계·점검표 안의 칸에 붙여넣은 것도 같은 방식으로 남습니다. 20자 미만의 붙여넣기는 기록하지 않습니다.");
+    L.push("");
+    L.push("## 토큰화의 한계");
+    L.push("");
+    L.push("어휘 지표(MATTR·HD-D·hapax·tokens_n, 남다름의 어휘 비교)는 형태소 분석기 없이 어절 끝의 흔한 조사·어미를 규칙으로 한 번만 잘라 낸 토큰을 씁니다. 그래서 같은 말이 다른 토큰이 되기도 합니다. 「고양이」는 끝 글자 「이」를 조사로 보아 「고양」이 되고, 「고양이는」은 「는」만 떼어 「고양이」가 됩니다(「예술가」는 「예술」, 「예술가는」은 「예술가」도 같습니다). 논문에 싣는 어휘 지표는 내보낸 원문을 형태소 분석기(예: Kiwi, MeCab-ko)로 다시 토큰화해 산출하기를 권합니다.");
+    L.push("");
+    L.push("## 성향 설문·앵커 판정 파일 (「설문」·「연구」 탭, 학번 포함)");
+    L.push("");
+    L.push("- 앵커 판정의 라벨 배정은 무작위가 아니라 학번 끝자리 홀짝에 따른 교대 배정입니다. 조건(0·1)이 「AI 전면」 라벨이 붙는 쪽을 정하고, 쌍마다 그 쪽을 뒤집어 한 학생이 그 라벨을 왼쪽에서 두 번, 오른쪽에서 두 번 봅니다. 학번 끝자리가 학생 특성과 무관하다는 가정 아래 준실험으로 해석합니다.");
+    L.push("- anchor_n: 답한 쌍의 수(0~4). anchor_prop: 「AI 전면」 쪽을 고른 쌍 ÷ 답한 쌍. anchorScore(0~4): 네 쌍을 모두 마치고 제출한 학생만 채우며, 중간에 멈춘 학생은 빈칸입니다(부분 응답을 0~4 합계로 세면 낮은 점수로 오인됩니다).");
     L.push("");
     L.push("## 구체성 지수의 산출식");
     L.push("");
@@ -8182,7 +8330,8 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 밀도항 = min(1, (구체어 적중 + 수량 표현 적중) ÷ max(2, 글자 수 ÷ 45))");
     L.push("- 구체어 사전 " + CONC_LEX.length + "개(위치 · 재질 · 변형 · 수리), 추상어 사전 " + ABST_LEX.length + "개, 수량 표현은 숫자와 단위의 결합으로 인식합니다.");
     L.push("- 8자 미만의 글은 측정하지 않고 결측으로 둡니다.");
-    L.push("- 형태소 분석이 아니라 어간 문자열 일치로 세는 간이 지표입니다. 연구에 쓸 때는 코딩 시트로 표본을 뽑아 사람이 교차 검토한 뒤 신뢰도를 보고해야 합니다.");
+    L.push("- 적중은 사전 항목마다 한 번만 셉니다. 어절 첫머리에서 시작하는 일치만 세고(「실천하는」의 천, 「지도자」의 도자는 세지 않음), 한 글자 자리는 하나의 일치에만 쓰며 긴 항목을 먼저 봅니다(「안쪽으로」는 안쪽으로 하나). 한 글자 명사(쇠·천)는 어절 전체이거나 조사만 붙을 때만 셉니다(「천천히」는 세지 않음).");
+    L.push("- 형태소 분석이 아니라 어간 문자열 일치로 세는 간이 지표입니다. 「유리한」(유리)·「고무적」(고무)처럼 어절 첫머리가 같은 오탐은 남습니다. 연구에 쓸 때는 코딩 시트로 표본을 뽑아 사람이 교차 검토한 뒤 신뢰도를 보고해야 합니다.");
     L.push("");
     L.push("## 단계와 기록 칸의 대응");
     L.push("");
@@ -8249,7 +8398,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("### 2.1 연구 참여자");
     L.push("");
-    L.push("고등학교 2학년 미술 수업의 한 학급 " + N + "명이 참여했다. 학생은 학번과 별명으로 입장하며 실명·얼굴 사진·개인정보를 입력하지 않는다. 자료 분석에는 학번을 정렬해 붙인 익명 번호(P01–P" + String(N).padStart(2, "0") + ")만 사용했다. 「연구자 서술: 연구 윤리 심의와 동의 절차」");
+    L.push("고등학교 2학년 미술 수업의 " + sampleDesc + "이 참여했다. 이 가운데 기록지가 있는 학생은 " + recN + "명이며, 기록지가 없는 학생의 기록지 변수는 결측으로 두었다. 학생은 학번과 별명으로 입장하며 실명·얼굴 사진·개인정보를 입력하지 않는다. 자료 분석에는 학생마다 무작위로 정해 고정한 가명 번호와 무작위 순서로 붙인 학급 코드만 사용했다. 「연구자 서술: 연구 윤리 심의와 동의 절차」");
     L.push("");
     L.push("### 2.2 수업 설계");
     L.push("");
@@ -8281,7 +8430,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 기록지의 모든 서술문과 표 입력값 (단계·차시·항목 단위로 구분됨)");
     L.push("- 흔적 문장을 저장한 이력 (학생이 「이 문장 저장하기」를 누를 때마다 그 시점의 문장이 따로 저장됨)");
     L.push("- 고쳐 쓰기 이력 (앞선 기록에서 2분 이상 지난 뒤 길이가 8자를 넘게 달라지거나 어휘 겹침이 0.6 미만으로 떨어지면 이전 문장을 보관. 길이는 그대로인 채 내용만 바뀐 개작을 놓치지 않기 위해 두 조건을 함께 둔다)");
-    L.push("- 붙여넣기 기록 (기록 칸에 20자 이상이 붙여넣어진 시각·칸·글자 수·UTF-8 바이트 수·붙이기 직전 그 칸의 길이·앞 120자. 클립보드 전문은 저장하지 않으며, 출처는 수집하지 않는다)");
+    L.push("- 붙여넣기 기록 (기록 칸에 20자 이상이 붙여넣어진 시각·칸·글자 수·UTF-8 바이트 수·붙이기 직전 그 칸의 길이·앞 120자. 클립보드 전문은 저장하지 않는다" + (askUsed ? ". 붙여넣은 직후 학습자가 고른 출처 자기보고(AI로 만든 글 · 인터넷·자료에서 · 내가 앞서 쓴 글 · 그 밖, 답하지 않고 닫을 수 있음)도 함께 저장한다)" : ". 출처는 수집하지 않는다)"));
     L.push("- 생성 회차마다 실제로 사용한 프롬프트 전문");
     L.push("- 항목별 최초·최종 입력 시각과 편집 횟수");
     L.push("- 차시별 머문 시간과 강의 노트 열람 시간 (창에 초점이 있고 30초 안에 움직임, 2분 안에 클릭·키 입력·스크롤이 있던 5초 단위만 누적. 조건에 못 미친 시간은 「켜 둔 채 비활동」으로 따로 누적)");
@@ -8303,9 +8452,15 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     }
     L.push("붙여넣기는 차단하지 않고 기록했다. 이 단원이 발산을 생성형 도구에, 수렴과 전유를 학생에 두는 구조이므로 외부 텍스트를 가져오는 행위는 금지 대상이 아니라 관찰 대상이며, 기술적으로도 우클릭 차단은 붙여넣기를 막지 못한 채 보조기기 사용만 제한한다.");
     L.push("");
-    L.push("기록은 학습자 화면에 어떤 방식으로도 표시되지 않는다. 붙여넣기가 감지되어도 학습자에게는 아무 반응이 나타나지 않으며, 기록은 교사 화면에서만 확인된다. 관찰이 수행 중의 행동을 바꾸지 않게 하려는 설계이지만, 그 대가로 수집 사실을 알리는 통로가 앱 밖으로 옮겨 간다. 따라서 「붙여넣기 기록」 동의 항목과 사전 안내가 고지의 전부이며, 이 둘이 실제로 이루어졌는지가 본 수집의 정당성을 좌우한다. 「연구자 서술: 동의 절차와 고지 문안」");
+    if (askUsed) {
+      L.push("붙여넣기가 감지되면 학습자 화면 아래에 「방금 붙여넣은 문장은 어디에서 왔나요?」라는 한 줄이 나타나 출처를 고르게 하며, 학습자는 답하지 않고 닫을 수 있다. 붙여넣기 자체는 막지 않는다. 이 질문은 수집이 이루어진다는 사실을 수행 중에 알리는 통로이기도 하므로, 관찰이 학습자의 행동을 바꿨을 가능성이 있다." + (askNow ? "" : " 다만 이 설정은 현재 꺼져 있어, 출처를 물은 기간과 묻지 않은 기간이 섞여 있을 수 있다.") + " 「연구자 서술: 출처 묻기를 켠 기간, 동의 절차와 고지 문안」");
+    } else {
+      L.push("기록은 학습자 화면에 어떤 방식으로도 표시되지 않는다. 붙여넣기가 감지되어도 학습자에게는 아무 반응이 나타나지 않으며, 기록은 교사 화면에서만 확인된다. 관찰이 수행 중의 행동을 바꾸지 않게 하려는 설계이지만, 그 대가로 수집 사실을 알리는 통로가 앱 밖으로 옮겨 간다. 따라서 「붙여넣기 기록」 동의 항목과 사전 안내가 고지의 전부이며, 이 둘이 실제로 이루어졌는지가 본 수집의 정당성을 좌우한다. 「연구자 서술: 동의 절차와 고지 문안」");
+    }
     L.push("");
-    L.push("출처는 학습자에게 묻지 않으며 저장하지 않는다. 따라서 본 자료는 「외부에서 들어온 글」까지만 말하고 그 글이 생성형 도구에서 왔는지는 말하지 않는다. 생성형 도구의 사용량으로 해석하려면 프롬프트 전문과 산출물 기록을 함께 읽어 연구자가 판정해야 한다.");
+    L.push(askUsed
+      ? "출처는 학습자의 자기보고로만 알 수 있으며 응답하지 않은 건이 섞인다(출처를 고른 붙여넣기 " + srcNamedAll + "건). 빈 응답을 생성형 도구에서 온 것으로 간주하지 않았고, 생성형 도구의 사용량으로 해석하려면 프롬프트 전문과 산출물 기록을 함께 읽어 연구자가 판정해야 한다."
+      : "출처는 학습자에게 묻지 않으며 저장하지 않는다. 따라서 본 자료는 「외부에서 들어온 글」까지만 말하고 그 글이 생성형 도구에서 왔는지는 말하지 않는다. 생성형 도구의 사용량으로 해석하려면 프롬프트 전문과 산출물 기록을 함께 읽어 연구자가 판정해야 한다.");
     L.push("");
     L.push("### 2.4 측정 도구");
     L.push("");
@@ -8327,7 +8482,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("특정 참여자만 사용한 어휘의 수(hapax)는 글이 길수록 커져 짧은 글에서는 어휘의 다양성이 아니라 분량을 재게 되므로 주 지표로 쓰지 않고, 토큰 수와 함께 볼 때에만 보조적으로 해석한다.");
     L.push("");
-    L.push("토큰화는 형태소 분석기를 쓰지 않고 어절 끝의 흔한 조사·어미를 규칙으로 잘라 내는 방식이다. 형태소 분석기와 품사 필터를 적용한 값과는 직접 비교할 수 없으므로, 다른 연구의 수치와 나란히 놓지 않는다.");
+    L.push("토큰화는 형태소 분석기를 쓰지 않고 어절 끝의 흔한 조사·어미를 규칙으로 한 번 잘라 내는 방식이다. 그래서 「고양이」와 「고양이는」이 「고양」과 「고양이」라는 다른 토큰이 되는 일이 생긴다. 형태소 분석기와 품사 필터를 적용한 값과는 직접 비교할 수 없으므로 다른 연구의 수치와 나란히 놓지 않으며, 논문의 어휘 지표는 형태소 분석기로 다시 토큰화해 산출한다. 「연구자 서술: 재토큰화에 쓴 분석기」");
     L.push("");
     L.push("학급 내 유사도는 참여자 " + N + "명의 모든 쌍을 견주므로 비교 횟수가 참여자 수의 제곱에 비례한다. 글 전체의 3-gram을 그대로 대조하면 계산량이 감당하기 어려워지므로, 각 참여자의 3-gram 가운데 해시값이 작은 " + SKETCH_K + "개를 뽑아 만든 축약본 위에서 자카드를 산출하였다(k-최소값 추정). 같은 3-gram은 언제나 같은 해시를 가지므로 두 참여자에게서 같은 조각이 함께 뽑히며, 축약본을 다 채우지 못할 만큼 글이 짧은 경우에는 전체를 대조한 값과 일치한다. 앞부분만 잘라 비교하는 방식은 뒤쪽 차시의 서술이 통째로 빠지므로 사용하지 않았다.");
     L.push("");
@@ -8341,13 +8496,15 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("동질화 지표는 분석 단위가 둘로 나뉜다. 학생 한 명이 학급의 나머지와 얼마나 겹치는가(개인 수준)와 학급 전체의 어휘 풀·선택 분포가 얼마나 좁아졌는가(학급 수준)는 서로 다른 질문이며, 두 수준의 결론이 엇갈릴 수 있다. 두 수준을 함께 보고한다.");
     L.push("");
-    L.push("학급 간 차이는 학급을 더미변수로 투입한 고정효과 모형으로 통제하였다. 학급 수가 다수준 분석에서 권장되는 하한에 미치지 못해 집단 수준 분산을 안정적으로 추정할 수 없다고 판단하였기 때문이다. 「연구자 서술: 학급 수와 모형 선택의 근거」");
+    L.push(K >= 2
+      ? "학급 간 차이는 학급(" + K + "개)을 더미변수로 투입한 고정효과 모형으로 통제하였다. 학급 수가 다수준 분석에서 권장되는 하한에 미치지 못해 집단 수준 분산을 안정적으로 추정할 수 없다고 판단하였기 때문이다. 학급을 규준으로 삼는 지표(유사도·남다름·유형)는 학급마다 따로 계산하였다." + (unknownN ? " 학번으로 학급을 알 수 없는 " + unknownN + "명은 따로 묶었다(class = " + UNKNOWN_CLASS_CODE + "). 「연구자 서술: 이들의 처리」" : "") + " 「연구자 서술: 학급 수와 모형 선택의 근거」"
+      : "자료가 한 학급에서 나왔으므로 학급 효과는 추정하지 않았다.");
     L.push("");
     L.push("학업 수준과 사전 성향에 따른 차이는 조절효과에 해당하나, 상호작용 검정은 주효과보다 훨씬 큰 표본을 요구하므로 본 연구의 표본으로는 검정력이 충분하지 않다. 따라서 이 부분은 유의성 검정 대신 집단별 기술통계와 효과크기를 제시하고 질적 자료로 뒷받침하는 탐색적 분석으로 한정하였다.");
     L.push("");
     L.push("설계상 단일집단이고 무작위 배정이 없으므로 생성형 도구의 사용과 창의성 지표 사이의 관계는 인과로 해석하지 않는다. 창의적 자기효능감이 낮은 학생이 애초에 도구에 더 기댔을 가능성(역방향의 설명)을 배제할 수 없어, 사전 자기효능감을 공변량으로 통제한 뒤에도 남는 관계만을 보고한다.");
     L.push("");
-    L.push("단일 학급 자료이므로 통계적 일반화 대신 기술통계와 사례 서술을 중심에 두었다. 질적 자료는 문장 단위 코딩 시트에 1차 자동 표지(단계·항목·구체어 적중 수)를 붙인 뒤 「연구자 서술: 코딩 절차와 범주 생성 방식」");
+    L.push((K <= 1 ? "단일 학급 자료이므로" : "통제집단이 없는 단일 집단 자료이므로") + " 통계적 일반화 대신 기술통계와 사례 서술을 중심에 두었다. 질적 자료는 문장 단위 코딩 시트에 1차 자동 표지(단계·항목·구체어 적중 수)를 붙인 뒤 「연구자 서술: 코딩 절차와 범주 생성 방식」");
     L.push("");
     L.push("## 3. 결과");
     L.push("");
@@ -8360,11 +8517,11 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       const kept = cases.reduce((a, c) => a + (c.pm.keptN || 0), 0);
       const tCount = (t) => cases.filter((c) => c.pm.type === t).length;
       L.push("전 과정에서 기록된 붙여넣기는 " + pasteTotal + "건이며, 한 건이라도 붙여넣은 학생은 " + withP.length + "명(" +
-        (N ? Math.round((withP.length / N) * 100) : 0) + "%)이었다. 이 가운데 학생이 출처를 표시한 것은 " + named + "건이고 그중 생성형 도구라고 답한 것은 " + aiN + "건이다. " +
+        (recN ? Math.round((withP.length / recN) * 100) : 0) + "%, 기록지가 있는 " + recN + "명 기준)이었다. 이 가운데 학생이 출처를 표시한 것은 " + named + "건이고 그중 생성형 도구라고 답한 것은 " + aiN + "건이다. " +
         "출처가 비어 있는 건은 미응답이며 생성형 도구에서 온 것으로 간주하지 않았다.");
       L.push("");
       L.push("가져온 문장이 최종 서술문에 거의 그대로(잔존율 60% 이상) 남은 것은 " + kept + "건이었다. 유형별 분포는 " +
-        AI_TYPES.map((t) => t + " " + tCount(t) + "명").join(" · ") + "이며, 유형은 학급 전유율 중앙값을 기준으로 가른 상대 구분이다.");
+        AI_TYPES.map((t) => t + " " + tCount(t) + "명").join(" · ") + "이며, 유형은 학급(반)마다 붙여넣은 학생의 전유율 중앙값을 기준으로 가른 상대 구분이다(중앙값을 엄격히 넘고 0보다 클 때 전유, 같으면 대리 서술). 붙여넣은 학생이 3명 미만인 학급과 쓴 글이 없는 학생은 유형을 매기지 않았다.");
       L.push("");
       L.push(mdHead(["지표", "평균", "표준편차", "중앙값", "최소", "최대", "n"]));
       ["paste_n", "src_ratio", "approp", "paste_settle", "rewrite_depth", "peer_sim", "nn_sim", "struct_sim", "mattr", "hdd", "tokens_n"].forEach((k) => {
@@ -8380,12 +8537,12 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     }
     L.push("### 3.1 단계의 도달");
     L.push("");
-    L.push("참여자 " + N + "명의 연속 도달 단계는 평균 " + say("stage_depth") + "이었고, 일곱 단계를 모두 채운 학생은 " + fullCount + "명(" + (N ? Math.round((fullCount / N) * 100) : 0) + "%)이었다. 단계별 완료 비율은 다음과 같다.");
+    L.push("기록지가 있는 참여자 " + recN + "명의 연속 도달 단계는 평균 " + say("stage_depth") + "이었고, 일곱 단계를 모두 채운 학생은 " + fullCount + "명(" + (recN ? Math.round((fullCount / recN) * 100) : 0) + "%)이었다. 단계별 완료 비율은 다음과 같다.");
     L.push("");
     L.push(mdHead(["단계", "내용", "완료 n", "완료 %"]));
     TRANSLATE_STAGES.forEach((st, i) => {
       const full = cases.filter((c) => c.tm.stages[i].ratio >= 0.999).length;
-      L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, full, N ? Math.round((full / N) * 100) : 0]));
+      L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, full, recN ? Math.round((full / recN) * 100) : 0]));
     });
     L.push("");
     L.push("「연구자 서술: 도달이 급격히 줄어드는 단계에 대한 해석」");
@@ -8412,7 +8569,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push(mdHead(["방법", "짚은 n", "%"]));
     ENGAGE_MODES.forEach((m) => L.push(mdRow([m.label, mc2[m.k] || 0, mt2 ? Math.round(((mc2[m.k] || 0) / mt2) * 100) : 0])));
     L.push("");
-    L.push("선택에 딸린 이유의 기록률은 다음과 같다. 가까운 방법의 이유 " + cases.filter((c) => c.tm.engageWhy).length + "명, 태도 " + cases.filter((c) => c.tm.attitude).length + "명, 태도의 이유 " + cases.filter((c) => c.tm.attWhy).length + "명, 관찰 방법이 놓칠 것(선택 칸) " + cases.filter((c) => c.tm.obsBlind).length + "명 (모두 N = " + N + ").");
+    L.push("선택에 딸린 이유의 기록률은 다음과 같다. 가까운 방법의 이유 " + cases.filter((c) => c.tm.engageWhy).length + "명, 태도 " + cases.filter((c) => c.tm.attitude).length + "명, 태도의 이유 " + cases.filter((c) => c.tm.attWhy).length + "명, 관찰 방법이 놓칠 것(선택 칸) " + cases.filter((c) => c.tm.obsBlind).length + "명 (기록지가 있는 " + recN + "명 기준).");
     L.push("");
     L.push("「연구자 서술: 선택의 이유를 코딩 시트에서 인용해 유형화. 방법을 고르기만 한 경우와 이유까지 쓴 경우의 차이」");
     L.push("");
@@ -8445,7 +8602,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("### 3.6 짝에게 읽히기와 수정");
     L.push("");
-    L.push("짝에게 읽힌 기록은 모두 " + cases.reduce((a, c) => a + c.tm.reverseN, 0) + "건이었다. 의도와 거의 같게 읽힌 경우가 " + cases.reduce((a, c) => a + c.tm.gapSame, 0) + "건, 다르게 읽힌 경우가 " + cases.reduce((a, c) => a + c.tm.gapDiff, 0) + "건이었다. 앞 단계로 되돌아가 고친 기록은 " + revisitTotal + "회이며 " + revisitAny + "명(" + (N ? Math.round((revisitAny / N) * 100) : 0) + "%)에게서 나타났다.");
+    L.push("짝에게 읽힌 기록은 모두 " + cases.reduce((a, c) => a + c.tm.reverseN, 0) + "건이었다. 의도와 거의 같게 읽힌 경우가 " + cases.reduce((a, c) => a + c.tm.gapSame, 0) + "건, 다르게 읽힌 경우가 " + cases.reduce((a, c) => a + c.tm.gapDiff, 0) + "건이었다. 앞 단계로 되돌아가 고친 기록은 " + revisitTotal + "회이며 " + revisitAny + "명(" + (recN ? Math.round((revisitAny / recN) * 100) : 0) + "%)에게서 나타났다.");
     L.push("");
     const bc = {};
     cases.forEach((c) => c.tm.backStages.forEach((b) => { bc[b] = (bc[b] || 0) + 1; }));
@@ -8477,14 +8634,18 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("### 연구의 제한점");
     L.push("");
-    L.push("- 한 학급 " + N + "명의 단일 집단 자료이므로 결과를 다른 학교·학년으로 일반화할 수 없다.");
+    L.push("- " + sampleDesc + "의 단일 집단 자료이므로 결과를 다른 학교·학년으로 일반화할 수 없다.");
     L.push("- 구체성 지수는 어휘 사전에 기반한 간이 지표이며 형태소 분석이나 문맥 판단을 하지 않는다.");
     L.push("- 머문 시간은 조작이 있는 동안만 누적하므로 화면을 보며 생각한 시간은 과소 집계될 수 있다. 화면을 켜 둔 채 자리를 비우는 일이 잦아 부풀리는 쪽보다 줄이는 쪽을 택했으며, 걸러 낸 양은 「켜 둔 채 비활동」으로 함께 보고한다.");
     L.push("- 단계의 완료 판정은 항목이 채워졌는지만 보고 내용의 질을 보지 않는다.");
     L.push("- 관찰 방법과 가까운 방법의 선택 분포는 교사가 제시한 다섯 방법·여덟 방법 안에서만 나온 것이므로, 선택지를 달리 짜면 분포도 달라진다.");
     L.push("- 사전·사후 비교의 t 값과 효과크기는 참고 계산이며 유의확률을 산출하지 않았다.");
-    L.push("- 붙여넣기 기록은 외부 텍스트가 들어온 시점과 분량을 알려 줄 뿐 출처를 알려 주지 않는다. 출처를 수집하지 않으므로 생성형 도구에서 온 것인지, 검색 결과인지, 본인이 앞 차시에 쓴 글을 옮긴 것인지 자료만으로는 구분되지 않는다. 붙여넣기 관련 지표를 생성형 도구 의존의 지표로 읽지 않는다.");
-    L.push("- 학습자 화면에 수집의 단서가 전혀 없으므로, 참여자가 자신의 자료가 수집되고 있음을 아는 경로는 동의 절차와 사전 안내뿐이다. 이 조건에서 고지의 충실성은 자료의 윤리적 정당성에 직결된다.");
+    L.push(askUsed
+      ? "- 붙여넣기의 출처는 학습자가 고른 자기보고뿐이며 응답하지 않은 건이 섞인다. 자기보고가 없는 건은 생성형 도구에서 온 것인지, 검색 결과인지, 본인이 앞 차시에 쓴 글을 옮긴 것인지 자료만으로는 구분되지 않으므로, 붙여넣기 관련 지표를 생성형 도구 의존의 지표로 읽지 않는다."
+      : "- 붙여넣기 기록은 외부 텍스트가 들어온 시점과 분량을 알려 줄 뿐 출처를 알려 주지 않는다. 출처를 수집하지 않으므로 생성형 도구에서 온 것인지, 검색 결과인지, 본인이 앞 차시에 쓴 글을 옮긴 것인지 자료만으로는 구분되지 않는다. 붙여넣기 관련 지표를 생성형 도구 의존의 지표로 읽지 않는다.");
+    L.push(askUsed
+      ? "- 붙여넣을 때마다 출처를 묻는 줄이 나타나므로 학습자는 수집 사실을 수행 중에 알 수 있었다. 이 질문 자체가 붙여넣기 행동을 바꿨을 가능성을 배제할 수 없다."
+      : "- 학습자 화면에 수집의 단서가 전혀 없으므로, 참여자가 자신의 자료가 수집되고 있음을 아는 경로는 동의 절차와 사전 안내뿐이다. 이 조건에서 고지의 충실성은 자료의 윤리적 정당성에 직결된다.");
     L.push("- 전유율은 붙여넣은 문장의 앞 120자만을 근거로 어림한 값이므로 긴 글에서는 정밀도가 떨어진다. 클립보드 전문을 저장하지 않기로 한 수집 원칙에 따른 제한이다.");
     L.push("- 유사도 지표는 모두 학급을 규준으로 한 상대값이다. 학급 구성이 바뀌면 값도 바뀌며, 같은 과제를 충실히 수행한 학생들 사이에서 값이 높아지는 것이 정상이다. 표절이나 부정행위의 판정 근거로 사용하지 않았다.");
     L.push("- 머문 시간과 짧은 접속 기록은 몰입이나 이탈 의도를 재지 못한다. 수업 종료, 기기 반납, 통신 끊김이 로그상으로 구분되지 않으므로 차시 시각표와 대조해 해석하였다.");
@@ -8540,7 +8701,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       p: "모든 변수의 조작적 정의, 구체성 지수의 산출식, 단계와 기록 칸의 대응표. 연구 방법 절의 측정 도구 서술에 씁니다.", go: () => download("변수사전" + tag + "_" + stamp + ".md", codebookMD(), "text/markdown") },
     { k: "support", h: "학습 지원 사용 자료", fn: "연구자료_학습지원" + tag + "_" + stamp + ".csv",
       p: "참여자 1명이 1행. 학생이 켠 학습 지원(글자 크기·대비·읽어 주기·도움 언어·자막 등)과 지원별 사용 횟수를 담습니다. 장애나 출신을 짐작하게 할 수 있어 동의 항목 「학습 지원 사용」에 동의한 학생만 넣습니다.",
-      go: () => download("연구자료_학습지원" + tag + "_" + stamp + ".csv", "\uFEFF" + supportCsv(cases.filter((c) => consentAgreed(c.consent, "support")).map((c) => ({ pid: c.pid, ws: c.ws }))), "text/csv") },
+      go: () => download("연구자료_학습지원" + tag + "_" + stamp + ".csv", "\uFEFF" + supportCsv(sortedCases.filter((c) => consentAgreed(c.consent, "support")).map((c) => ({ pid: c.pid, ws: c.ws }))), "text/csv") },
     { k: "manuscript", h: "원고 초안", fn: "원고초안" + tag + "_" + stamp + ".md",
       p: "연구 방법과 결과의 사실 서술을 수치까지 채워 넣은 초안. 해석·논의는 「연구자 서술」 자리로 비워 둡니다.", go: () => download("원고초안" + tag + "_" + stamp + ".md", manuscriptMD(), "text/markdown") },
   ];
@@ -8557,9 +8718,15 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
         <div className="card-head"><span className="card-code">연구 1</span><span className="card-title">익명 처리</span></div>
         <div className="card-body">
           <p style={{ fontSize: 13, marginBottom: 10 }}>
-            학번을 정렬해 P01부터 익명 번호를 붙입니다. 내려받는 파일에는 학번·별명·계정 정보가 들어가지 않습니다.
+            학생마다 한 번 무작위로 정한 가명 번호(P와 네 글자)와 무작위 순서의 학급 코드(C1…)를 붙입니다. 번호는 처음 내려받을 때 만들어 저장하고 다시 바꾸지 않습니다. 내려받는 파일에는 학번·별명·계정 정보가 들어가지 않고, 행은 가명 번호 순입니다.
             아래 대응표는 이 화면에서만 보이며 파일로 나가지 않으므로, 필요하면 교사가 따로 안전한 곳에 보관하세요.
           </p>
+          {pidErr && !sampleMode && <div className="warn-note" style={{ marginBottom: 10 }}>{pidErr}</div>}
+          {unknownN > 0 && (
+            <div className="warn-note" style={{ marginBottom: 10 }}>
+              학번으로 반을 알 수 없는 학생 {unknownN}명은 학급 코드 {UNKNOWN_CLASS_CODE}로 따로 묶여 그들끼리 학급 규준을 계산합니다. 시험 계정이면 명부에서 지우고, 실제 학생이면 설정의 classMap으로 반을 지정하세요.
+            </div>
+          )}
           {CONSENT_ON && consentErr && !sampleMode && (
             <div className="warn-note" style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ flex: 1, minWidth: 200 }}>동의 대장을 불러오지 못했습니다. 지금 보이는 빈 표 위에서 체크하면 기존 표시와 어긋날 수 있어 저장을 잠갔습니다.</span>
@@ -8639,7 +8806,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
           <p className="hint" style={{ marginTop: 4 }}>
             기록지 서술에 동의하지 않은 학생은 행만 빠지는 것이 아니라 <b>학급 규준에서도 빠집니다.</b> 학급 어휘 풀·유사도 평균·유형을 가르는
             전유율 중앙값이 모두 분석 대상 {N}명으로만 계산되므로, 남은 학생의 값이 빠진 학생의 글에 좌우되지 않습니다.
-            익명 번호도 분석 대상에게만 붙으며, 표시를 바꾸면 번호가 다시 매겨집니다.
+            가명 번호는 동의 표시와 관계없이 학생마다 고정되어 바뀌지 않습니다.
           </p>
           </>) : (
             <p className="hint" style={{ marginTop: 8 }}>
@@ -8713,7 +8880,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
               </tbody>
             </table>
           </div>
-          <p className="hint" style={{ marginTop: 8 }}>유의확률은 계산하지 않습니다. 한 학급 단일 집단 자료라 통계적 일반화보다 기술통계와 사례 서술이 맞습니다.</p>
+          <p className="hint" style={{ marginTop: 8 }}>유의확률은 계산하지 않습니다. {singleGroupNote} 통계적 일반화보다 기술통계와 사례 서술이 맞습니다.</p>
         </div>
       </div>
 
@@ -9107,12 +9274,7 @@ function TeacherApp({ onExit, onGallery }) {
         OBS_ITEMS.filter((_, i) => g["o" + i]).length,
         g.obsMemo || "", g.fbForm || "", g.fbConcept || "", w._updatedAt || ""];
     });
-    const esc = (c) => {
-      let s = String(c);
-      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // 스프레드시트 수식 주입 방지
-      return '"' + s.replace(/"/g, '""') + '"';
-    };
-    const csv = "\uFEFF" + [head, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+    const csv = toCSV(head, rows);   // 설문 변화량은 음수가 된다. 숫자로 내보낸다
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a");
     const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, "");
@@ -9426,7 +9588,7 @@ function TeacherApp({ onExit, onGallery }) {
             ) : tab === "연구" ? (
               <div>
                 {msg && <div className="ok-note">{msg}</div>}
-                <ResearchPanel ids={ids} roster={roster} wsMap={wsMap} gradeMap={gradeMap} surveyMap={surveyMap} sampleMode={sampleMode} openMap={openMap} />
+                <ResearchPanel ids={ids} roster={roster} wsMap={wsMap} gradeMap={gradeMap} surveyMap={surveyMap} sampleMode={sampleMode} openMap={openMap} cfgAll={cfgAll} />
                 <AnchorPanel ids={ids} roster={roster} surveyMap={surveyMap} cfg={anCfg} sampleMode={sampleMode}
                   onSave={async (patch) => {
                     // 패널이 준 필드(pairs 또는 open)만 병합해 쓴다 — config를 읽어 와 통째로

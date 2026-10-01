@@ -18,6 +18,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
+import { ensurePidMap, planPidMap, pidOfMap, seededRng } from "./src-pid.mjs";
 import {
   STAGES, STAGE_ORDER, TAG_OPTIONS, ROSTER_VER, FAST_MS, INFIT_BAND, QUALITY_MIN, K_FLOOR,
   peerCfg, subReady, makePlan, aggregate, judgeBlockOf, myPairs,
@@ -337,15 +338,23 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     setStageBusy(false);
   };
 
-  /* ---- CSV: pid는 「연구」 탭과 같은 규칙 — 학번 정렬 순 P01… ---- */
-  const pidMap = useMemo(() => {
-    const m = new Map();
-    (ids || []).slice().sort().forEach((id, i) => m.set(id, "P" + String(i + 1).padStart(2, "0")));
-    return m;
-  }, [idsKey]);
-  const pidOf = (sid) => pidMap.get(sid) || "P--";
+  /* ---- CSV: pid는 「연구」 탭과 같은 가명 번호 지도(research/pidMap, src-pid.mjs) — 학번 순 번호는
+     명단이 바뀌면 밀리고 「연구」 탭 파일과 이을 수 없다. 내려받을 때 없는 학생만 새로 만든다.
+     표본 화면은 저장하지 않고 고정 씨앗의 지도를 쓴다 ---- */
+  const pidBusy = useRef(null);
   const stamp = () => new Date().toISOString().slice(2, 10).replace(/-/g, "");
-  const exportKind = (kind) => {
+  const exportKind = async (kind) => {
+    const sids = [...new Set([...(ids || []), ...Object.keys(subMap || {}), ...Object.keys(assessMap || {}),
+      ...(((peer && peer.works) || []).map((w) => w && w.sid).filter(Boolean))])];
+    let pmap;
+    if (sampleMode) pmap = planPidMap(null, sids, (cfgAll && cfgAll.classMap) || null, seededRng("sample-pid")).next;
+    else {
+      if (!pidBusy.current) pidBusy.current = ensurePidMap(fbStore, sids, (cfgAll && cfgAll.classMap) || null).finally(() => { pidBusy.current = null; });
+      const r = await pidBusy.current;
+      if (!r.ok) { setNote({ kind: "warn", text: "가명 번호를 저장하지 못해 내려받기를 멈췄습니다. 연결을 확인하고 다시 눌러 주세요." }); return; }
+      pmap = r.map;
+    }
+    const pidOf = (sid) => pidOfMap(pmap, sid);
     let out;
     try {
       out = kind === "submissions" ? csvSubmissions({ roster: peer, subMap, pidOf })
