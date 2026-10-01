@@ -18,7 +18,7 @@ import { LESSONS_DEF } from "./src-lessons.jsx";
 import { CardMedia, CardMediaStyle } from "./src-card-media.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
-import { UxStyle, ConfirmButton, session, TeacherTabs, VIEWER_TABS } from "./src-ux.jsx";
+import { UxStyle, ConfirmButton, session, TeacherTabs, VIEWER_TABS, TEACHER_TAB_GROUPS } from "./src-ux.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { useExhibitPublisher, useExhibits, exhibitOf } from "./src-exhibit.jsx";
 import { ArExpoEntry, ArDeepLink, ArStyle } from "./src-ar.jsx";
@@ -8525,7 +8525,12 @@ function TeacherApp({ onExit, onGallery }) {
   useContent();
   useEffect(() => watchContent(), []);
   const viewerOnly = authApi.isViewer();
-  const [tab, setTab] = useState(viewerOnly ? VIEWER_TABS[0] : "현황");
+  /* 새로고침해도 보던 탭과 열어 둔 학생으로 돌아온다 (sessionStorage 표, src-ux.jsx) */
+  const saved0 = useRef(session.read() || {}).current;
+  const [tab, setTab] = useState(() => {
+    const ok = viewerOnly ? VIEWER_TABS : TEACHER_TAB_GROUPS.flatMap((g) => g.tabs);
+    return saved0.tTab && ok.includes(saved0.tTab) ? saved0.tTab : (viewerOnly ? VIEWER_TABS[0] : "현황");
+  });
   const [roster, setRoster] = useState({});
   const [wsMap, setWsMap] = useState({});
   const [gradeMap, setGradeMap] = useState({});
@@ -8534,6 +8539,17 @@ function TeacherApp({ onExit, onGallery }) {
   const [selTab, setSelTab] = useState(null); // 학생 상세를 열 때 곧장 보여 줄 서브탭 (예: 「변화 보기」→사고 변화)
   const openStudent = (id, tab2) => { setSelTab(tab2 || null); setSel(id); };
   const [loading, setLoading] = useState(true);
+  const restoreSel = useRef(viewerOnly ? null : saved0.tSel || null); // 명부가 들어온 뒤에 연다 (표본·실제 판별이 명부에 달려 있다)
+  useEffect(() => {
+    if (loading || !restoreSel.current) return;
+    const id = restoreSel.current;
+    restoreSel.current = null;
+    if (roster[id]) setSel(id);
+  }, [loading, roster]);
+  useEffect(() => {
+    const s0 = session.read();
+    if (s0 && s0.role === "teacher") session.save({ ...s0, tTab: tab, tSel: restoreSel.current || sel || null });
+  }, [tab, sel]);
   const [msg, setMsg] = useState("");
   const [openMap, setOpenMap] = useState(DEFAULT_OPEN);
   const [svCfg, setSvCfg] = useState(DEFAULT_SURVEY);
@@ -9770,6 +9786,42 @@ function App() {
     return () => { un(); clearTimeout(t); };
   }, []);
 
+  /* 브라우저 뒤로 가기: 앱이 history를 쓰지 않아 뒤로 가기 한 번에 사이트를 떠났다.
+     화면이 바뀔 때마다 기록을 하나 쌓고, 뒤로 가기는 전시장 → 들어온 곳, 예시 기록지 → 입장 화면으로 돌린다.
+     학생·교사 화면에서는 기록을 다시 쌓고 머문다 (나가기는 화면의 「나가기」 버튼으로). */
+  const backTo = () => (view === "gallery" ? (galFrom === "student" && !me ? "gate" : galFrom) : "gate");
+  const popRef = useRef(false);     // popstate가 바꾼 화면이면 기록을 다시 쌓지 않는다
+  const firstRef = useRef(true);    // 복원이 끝난 뒤 첫 화면은 현재 기록을 바꿔 쓴다 (새로고침 뒤 중복 방지)
+  useEffect(() => {
+    if (restoring) return;
+    try {
+      if (popRef.current) { popRef.current = false; return; }
+      const st = window.history.state;
+      if (firstRef.current) { firstRef.current = false; window.history.replaceState({ museumView: view }, ""); return; }
+      if (st && st.museumView === view) return;
+      window.history.pushState({ museumView: view, pushed: true }, "");
+    } catch (e) {}
+  }, [view, restoring]);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const backRef = useRef(backTo);
+  backRef.current = backTo;
+  useEffect(() => {
+    const onPop = () => {
+      const cur = viewRef.current;
+      if (cur === "gallery" || cur === "demo") { popRef.current = true; setView(backRef.current()); return; }
+      if (cur === "student" || cur === "teacher") { try { window.history.pushState({ museumView: cur }, ""); } catch (e) {} }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  /* 화면 안의 「돌아가기」 버튼도 방금 쌓은 기록을 되감아, 뒤로 가기를 눌렀을 때 같은 화면이 두 번 나오지 않게 한다 */
+  const leave = () => {
+    const st = window.history.state;
+    if (st && st.museumView === view && st.pushed) window.history.back();
+    else setView(backTo());
+  };
+
   return (
     <div className="app">
       <style>{CSS}</style>
@@ -9798,9 +9850,9 @@ function App() {
         onDemo={() => setView("demo")} />}
       {view === "student" && me && <StudentApp me={me} onGallery={() => goGallery("student")} onExit={() => { session.clear(); setMe(null); setMediaOwner("preview"); setView("gate"); }} />}
       {view === "teacher" && <TeacherApp onGallery={() => goGallery("teacher")} onExit={() => { session.clear(); setView("gate"); }} />}
-      {view === "gallery" && <Gallery onBack={() => setView(galFrom === "student" && !me ? "gate" : galFrom)}
+      {view === "gallery" && <Gallery onBack={leave}
         backLabel={galFrom === "student" && me ? "기록실로 돌아가기" : galFrom === "teacher" ? "교사 화면으로" : "입장 화면으로"} />}
-      {view === "demo" && <DemoView onBack={() => setView("gate")} />}
+      {view === "demo" && <DemoView onBack={leave} />}
       <ArDeepLink />
     </div>
   );
