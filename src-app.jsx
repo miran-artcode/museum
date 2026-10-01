@@ -20,6 +20,7 @@ import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
 import { UxStyle, ConfirmButton, session, TeacherTabs, VIEWER_TABS } from "./src-ux.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
+import { useExhibitPublisher, useExhibits, exhibitOf } from "./src-exhibit.jsx";
 import { ArExpoEntry, ArDeepLink, ArStyle } from "./src-ar.jsx";
 import { LabelCompare } from "./src-label-compare.jsx";
 import { ReadingCard, LessonMap } from "./src-reading.jsx";
@@ -4791,6 +4792,7 @@ function StudentApp({ me, onExit, onGallery }) {
   const lastSavedAtRef = useRef(null);  // 이 탭이 마지막으로 저장한 _updatedAt. 구독이 되돌려 준 자기 저장분을 가려낸다
   const [ws, setWs] = useState({});
   const [loaded, setLoaded] = useState(false);
+  useExhibitPublisher(me.sid, loaded ? ws : null); // 「전시 공개」인 동안 전시장용 출품 문서를 맞춰 둔다 (src-exhibit.jsx)
   const [readErr, setReadErr] = useState(false); // 최초 로드 실패 — 덮어쓰기를 막으려 학습지를 잠근다
   const [staleWarn, setStaleWarn] = useState(false); // 서버 대신 이 기기의 캐시 사본으로 열림 — 다른 기기 기록을 덮어쓸 수 있다는 경고
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
@@ -9395,52 +9397,35 @@ function buildSampleClass() {
 
 function Gallery({ onBack, backLabel }) {
   useTopbarHeight(); // 관람 전환 막대(.gal-controls)의 sticky top이 상단바 높이를 따라간다
-  const [works, setWorks] = useState(null);
   const [showPlate, setShowPlate] = useState(false); // 1차 관람: 작품 캡션 가림
-  const [lastLoad, setLastLoad] = useState(null); // 자동 갱신(30초)이 언제 기준인지 보여 준다
   const [numQ, setNumQ] = useState(""); // 작품 번호로 찾기 — 번호 관람 전제인데 번호로 찾을 수단이 없던 문제
-
-  const load = async () => {
-    const sample = buildSampleClass();
-    const all = { ...sample.ws };
-    const roster = (await store.get("roster")) || {};
-    const ids = Object.keys(roster);
-    await Promise.all(ids.map(async (id) => { all[id] = (await store.get("ws:" + id)) || {}; }));
-    const preview = await store.get("ws:preview");
-    if (preview) all["미리보기"] = preview;
-    const list = [];
-    Object.keys(all).forEach((id) => {
-      const w = all[id] || {};
-      if (w["s7x.show"] !== "공개") return;
-      // 표본 학급의 출품작 가운데 자료집 예시와 제목이 같은 것은 걸지 않는다 —
-      // 위의 예시 벽면에 완성된 형태로 이미 걸려 있어, 작품 캡션이 빈 채로 겹쳐 걸리면 혼란만 준다.
-      if (w._sample && EXHIBIT_SAMPLES.some((s) => s.title === w["s6b.title"])) return;
-      list.push({
-        owner: id,
-        no: (w["s7x.no"] || "무번호").slice(0, 20),
-        img: w["s7x.img"] || "",
-        title: w["s6b.title"] || "무제",
-        relic: w["s6b.relic"] || "",
-        year: w["s6b.year"] || "2300년",
-        era: w["s6b.era"] || "",
-        mat: w["s6b.mat"] || "",
-        size: w["s6b.size"] || "",
-        context: w["s6b.context"] || "",
-        coll: w["s6b.coll"] || "학급 가상 컬렉션",
-        aiScope: w["s6b.aiScope"] || "",
-        notice: w["s6b.notice"] || "이 이미지는 생성형 AI로 제작한, 실재한 적 없는 유물입니다.",
-        note: w["s7.note"] || "",
-      });
-    });
-    list.sort((a, b) => a.no.localeCompare(b.no, "ko"));
-    setWorks(list);
-    setLastLoad(new Date());
-  };
-  useEffect(() => {
-    load();
-    const iv = setInterval(load, 30000);
-    return () => clearInterval(iv);
+  /* 출품 문서(exhibit/{학번})를 실시간 구독한다 (src-exhibit.jsx). 예전에는 명부와 기록지 전체를 30초마다 읽어
+     학생 화면에서는 권한 오류가 학급 수만큼 나고, 프로젝터는 매번 학급 기록지를 통째로 내려받았다.
+     옛 「ws:preview」(단일 파일 시절의 교사 미리보기 기록)는 Firebase로 옮긴 뒤 쓰는 곳이 없어 읽지 않는다. */
+  const ex = useExhibits();
+  const toWork = (id, w) => ({
+    owner: w.owner || id,
+    no: (w.no || "무번호").slice(0, 20),
+    img: w.img || "",
+    title: w.title || "무제",
+    relic: w.relic || "",
+    year: w.year || "2300년",
+    era: w.era || "", mat: w.mat || "", size: w.size || "", context: w.context || "",
+    coll: w.coll || "학급 가상 컬렉션",
+    aiScope: w.aiScope || "",
+    notice: w.notice || "이 이미지는 생성형 AI로 제작한, 실재한 적 없는 유물입니다.",
+    note: w.note || "",
+  });
+  const real = ex.status === "ok"
+    ? Object.keys(ex.docs).map((id) => toWork(id, ex.docs[id] || {})).sort((a, b) => a.no.localeCompare(b.no, "ko")) : [];
+  /* 표본 학급의 출품작은 실제 작품이 하나도 없을 때만 건다 (실제 작품 옆에 표본 D-03이 섞이지 않게).
+     자료집 예시와 제목이 같은 것은 위의 예시 벽면에 이미 완성된 형태로 걸려 있어 뺀다. */
+  const sampleWorks = useMemo(() => {
+    const sw = buildSampleClass().ws;
+    return Object.keys(sw).filter((id) => sw[id]["s7x.show"] === "공개" && !EXHIBIT_SAMPLES.some((s) => s.title === sw[id]["s6b.title"]))
+      .map((id) => toWork(id, exhibitOf(id, sw[id])));
   }, []);
+  const works = ex.status === "loading" ? null : real.length ? real : ex.status === "ok" ? sampleWorks : [];
 
   return (
     <div>
@@ -9471,19 +9456,21 @@ function Gallery({ onBack, backLabel }) {
           <div className="gal-tools">
             <input className="gal-find" inputMode="text" placeholder="작품 번호로 찾기 (예: A-01)"
               value={numQ} onChange={(e) => setNumQ(e.target.value)} aria-label="작품 번호로 찾기" />
-            <span className="gal-when">
-              {lastLoad ? "마지막 갱신 " + String(lastLoad.getHours()).padStart(2, "0") + ":" + String(lastLoad.getMinutes()).padStart(2, "0") : ""}
-              <button className="btn small ghost" style={{ marginLeft: 6 }} onClick={load}>새로고침</button>
-            </span>
           </div>
         </div>
-        {works !== null && works.length === 0 && (
-          <div className="warn-note" style={{ maxWidth: 640, margin: "0 auto 16px" }}>
-            아직 출품된 학급 작품이 없습니다. 아래 세 점은 자료집의 예시 작품입니다.
-            학생용 학습지의 7차시 「기록 R 전시 출품」에서 작품 번호를 적고 전시 공개로 바꾸면 이 벽면에 걸립니다.
-          </div>
+        {ex.status === "signedOut" && (
+          <div className="warn-note" style={{ maxWidth: 640, margin: "0 auto 16px" }}>학급 작품은 로그인한 뒤에 볼 수 있습니다. 아래는 자료집의 예시 작품입니다.</div>
         )}
-        {works && works.length > 0 ? (
+        {ex.status === "viewer" && (
+          <div className="warn-note" style={{ maxWidth: 640, margin: "0 auto 16px" }}>보기 전용 계정에서는 학급 작품이 보이지 않습니다. 아래는 자료집의 예시 작품입니다.</div>
+        )}
+        {ex.status === "error" && (
+          <div className="warn-note" style={{ maxWidth: 640, margin: "0 auto 16px" }}>학급 작품을 불러오지 못했습니다. 아래는 자료집의 예시 작품입니다.</div>
+        )}
+        {ex.status === "ok" && !real.length && (
+          <div className="warn-note" style={{ maxWidth: 640, margin: "0 auto 16px" }}>아직 출품된 학급 작품이 없습니다. 아래는 자료집의 예시 작품입니다.</div>
+        )}
+        {real.length > 0 ? (
           /* 학급 작품이 걸리면 예시 구간은 접어 둔다. 폰에서 자기 반 작품까지 다섯 화면을 내려야 했다 */
           <details className="gal-samples">
             <summary>전시 진열 예시와 예시 작품 세 점 보기</summary>
@@ -9499,10 +9486,10 @@ function Gallery({ onBack, backLabel }) {
           if (!shown.length) return <p style={{ textAlign: "center", color: "var(--sub)", fontSize: 13 }}>「{numQ}」에 맞는 작품 번호가 없습니다.</p>;
           return (
           <div className="gal-grid">
-            {shown.map((w, i) => (
-              <div className="work" key={i}>
+            {shown.map((w) => (
+              <div className="work" key={w.owner}>
                 <div className="work-img">
-                  {w.img && w.img.ref ? <MediaThumb owner={w.owner === "미리보기" ? "preview" : w.owner} refId={w.img.ref} alt={"작품 " + w.no} size={9999} /> : typeof w.img === "string" && w.img ? <img src={w.img} alt={"작품 " + w.no} /> : <span className="ph">대표 이미지가 아직 없습니다</span>}
+                  {w.img && w.img.ref ? <MediaThumb owner={w.owner} refId={w.img.ref} alt={"작품 " + w.no} size={9999} /> : typeof w.img === "string" && w.img ? <img src={w.img} alt={"작품 " + w.no} /> : <span className="ph">대표 이미지가 아직 없습니다</span>}
                 </div>
                 <div className="work-no">작품 {w.no}</div>
                 <div className="work-title">{showPlate ? "「" + w.title + "」" : "무제 (2차 관람에서 공개)"}</div>
