@@ -6,6 +6,7 @@ import {
   bradleyTerry, scaleSeparation, splitHalf, judgeFit, positionBias, connectivity, repeatAgreement, ranksAndBands,
   collectJudgements, aggregate, csvJudgements, csvScores, csvSelf, csvSubmissions, csvJudges, buildSampleAssess, judgeBlockOf,
   wilson, predPctOf, simText, submissionFromWs, subReady, stableHash, peerCfg, DEFAULT_PEER, TAG_OPTIONS, QUALITY_MIN,
+  spearmanBrown,
   SELF_ITEMS, SELF_SCALE, SELF_LABELS, SELF_TEXT, CHANGE_CODES, CRITERIA, rankFromTop, topFromRank,
 } from "./src-assess-core.mjs";
 
@@ -477,6 +478,72 @@ test("비교 0회 작품은 순위 분모에서 빠지고 표 맨 뒤로, SSR은
   const firstNull = ranks.indexOf(null);
   assert.ok(firstNull === -1 || ranks.slice(firstNull).every((r) => r == null));
   assert.equal(buildSampleAssess(sids(3)).roster, null);
+});
+
+test("스피어만–브라운은 r > 0에만 쓰고, 반쪽 상관이 0 이하면 보정 없이 r을 둔다 (−1 아래로 내려가지 않는다)", () => {
+  assert.equal(spearmanBrown(-0.8), -0.8);                 // 식을 그대로 대면 −8
+  assert.equal(spearmanBrown(0), 0);
+  assert.ok(Math.abs(spearmanBrown(0.5) - 2 / 3) < 1e-12);
+  assert.equal(spearmanBrown(null), null);
+  assert.equal(spearmanBrown(NaN), null);
+  // 두 무리: 판정자 넷은 번호가 큰 작품을, 넷은 작은 작품을 고른다 → 판정자를 반으로 가르면 대개 두 반쪽의 θ가 거꾸로 선다
+  const nos = Array.from({ length: 8 }, (_, i) => "W" + i);
+  const J = [];
+  for (let j = 0; j < 8; j += 1) {
+    for (let x = 0; x < 8; x += 1) {
+      for (let y = x + 1; y < 8; y += 1) {
+        const up = j < 4;
+        J.push({ judge: "J" + j, i: J.length, a: nos[x], b: nos[y], win: up ? "b" : "a", rep: null });
+      }
+    }
+  }
+  const sh = splitHalf(J, nos, { by: "judges", reps: 25, seed: "camps" });
+  assert.ok(sh.nonPos > 0, "음의 반쪽 상관이 한 번은 나와야 한다");
+  assert.equal(sh.values.length, sh.raw.length);
+  sh.values.forEach((v, i) => {
+    assert.ok(v >= -1 - 1e-12 && v <= 1 + 1e-12, "범위 밖 " + v);
+    if (sh.raw[i] <= 0) assert.equal(v, sh.raw[i]);
+    else assert.ok(v >= sh.raw[i]);
+  });
+  assert.ok(sh.median >= -1 && sh.median <= 1);
+  assert.ok(sh.medianRaw <= sh.median + 1e-9);
+});
+
+test("CSV 다섯 파일의 맨 뒤 class 열 — 학번 가운데 두 자리, 설정의 classMap이 먼저, 반을 알 수 없으면 빈칸", () => {
+  const { ids, works, roster, assessMap } = simulate({ n: 8, k: 6 });   // 20301~20308 → 3반
+  const pidOf = new Map(ids.map((sid, i) => [sid, "P" + String(i + 1).padStart(2, "0")]));
+  const classMap = { [ids[1]]: "5" };                                   // 교사가 한 학생을 5반으로 지정
+  const want = (sid) => (sid === ids[1] ? "05" : /^\d{5}$/.test(sid) ? "03" : "");
+  const subMap = {};
+  works.forEach((w) => { subMap[w.sid] = { no: w.no, title: "t", plate: {}, locked: true, img: { owner: w.sid, ref: "x" }, submittedAt: "t" }; });
+  subMap["000"] = { no: "T-1", title: "시험 계정", plate: {}, locked: true, img: null, submittedAt: "t" };   // 학번 형식이 아닌 시험 계정
+  const withSelf = structuredClone(assessMap);
+  withSelf[ids[1]].self = { s1: { scores: { overall: 3 }, why: "근거", predRank: 2, n: 8, submittedAt: "t" } };
+  withSelf["000"] = { self: { s1: { scores: { overall: 4 }, why: "근거", predRank: 1, n: 8, submittedAt: "t" } } };
+  const agg = aggregate({ roster, assessMap, subMap: {}, cfg: DEFAULT_PEER, splitReps: 2 });
+  const outs = {
+    submissions: csvSubmissions({ roster, subMap, pidOf, classMap }),
+    judgements: csvJudgements({ roster, assessMap: withSelf, pidOf, classMap }),
+    self: csvSelf({ roster, assessMap: withSelf, pidOf, classMap }),
+    scores: csvScores({ agg, pidOf, classMap }),
+    judges: csvJudges({ agg, pidOf, classMap }),
+  };
+  const sidOfPid = new Map([...pidOf].map(([s, p]) => [p, s]));
+  Object.entries(outs).forEach(([kind, out]) => {
+    assert.equal(out.head[out.head.length - 1], "class", kind);
+    assert.equal(out.head[0], "pid", kind);                             // 기존 열 순서는 그대로
+    assert.ok(out.rows.length > 0, kind);
+    out.rows.forEach((r) => {
+      assert.equal(r.length, out.head.length, kind);
+      const sid = sidOfPid.get(r[0]) || "000";
+      assert.equal(r[r.length - 1], want(sid), kind + " " + sid);
+    });
+  });
+  assert.ok(outs.submissions.rows.some((r) => r[r.length - 1] === ""));   // 시험 계정은 빈칸
+  assert.ok(outs.scores.rows.some((r) => r[r.length - 1] === "05"));
+  // classMap 없이 부르면 학번 규칙만 쓴다
+  const plain = csvScores({ agg, pidOf });
+  plain.rows.forEach((r) => assert.equal(r[r.length - 1], "03"));
 });
 
 test("자기평가 v2 — 문항마다 네 수준 문장, 네 축과 종합·과정 문항, 변화 사유 키 유지", () => {

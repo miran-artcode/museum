@@ -49,6 +49,12 @@ const REVEALS = [
 ];
 const TIMING = "반마다 100분 운영표: 0~5분 설명·예시 한 쌍 시연 · 5~12분 자기평가① · 12~30분 쌍대비교(쌍당 60~90초) · 30~33분 진행 현황 확인 · 33~45분 자기평가② · 수업이 끝나면 단계를 「닫힘」으로. 집계·결과 공개·토의는 다섯 반의 판정이 끝난 뒤 별도 차시";
 
+/* 마지막 집계 — 순위표·진행 현황에서 학생을 열면 이 탭이 언마운트되어 useState의 집계가 사라지고,
+   돌아오면 「결과 공개」와 집계·판정자 CSV가 다시 집계할 때까지 잠겼다. 모듈에 두고, 같은 명단(fixedAt·hash)일 때만
+   되살린다. 새로 고침하면 사라지는 것은 전과 같다(학생별 결과는 이미 assess 문서에 저장돼 있다) */
+let lastAgg = null;   // { key, agg, aggAt }
+const rosterKey = (r) => (r ? String(r.fixedAt || "") + "|" + String(r.hash || "") : "");
+
 /* ---------- 작은 도우미 ---------- */
 
 const fmtT = (iso) => {
@@ -269,6 +275,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     setFixBusy(false);
     if (!ok) { setFixErrors(["명단을 저장하지 못했습니다. 연결을 확인하고 다시 누르세요."]); return; }
     // 옛 명단으로 낸 집계는 이 명단의 것이 아니다 — 지워서 「결과 공개」가 옛 결과를 내보내지 않게 한다
+    lastAgg = null;
     setAgg(null); setAggAt(null); setAggProg(null); setOverride(false);
     const st = res.stats || {};
     setNote({ kind: "ok", text: "비교 명단을 확정했습니다. 작품 " + st.n + "점 · 판정자 " + st.nJudges + "명 · 1인당 " + kEff + "쌍" + (kEff < c.k ? "(설정 " + c.k + "을 작품 수에 맞춰 줄임)" : "") + " · 노출 " + st.exposureMin + "~" + st.exposureMax + "회 · 서로 다른 쌍 " + st.distinctPairs + " · " + (st.connected ? "연결됨" : "연결되지 않음") });
@@ -306,8 +313,12 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
   const [aggBusy, setAggBusy] = useState(false);
   const [aggProg, setAggProg] = useState(null);   // { done, total, fail }
   const [override, setOverride] = useState(false);
-  const peerHash = peer && peer.hash;
-  useEffect(() => { setAgg(null); setAggAt(null); setAggProg(null); setOverride(false); }, [peerHash]);
+  const peerKey = rosterKey(peer);
+  // 명단이 바뀌면 집계를 비우고, 같은 명단의 마지막 집계가 모듈에 있으면(탭을 나갔다 온 경우) 그것을 되살린다
+  useEffect(() => {
+    const keep = !sampleMode && peerKey && lastAgg && lastAgg.key === peerKey ? lastAgg : null;
+    setAgg(keep ? keep.agg : null); setAggAt(keep ? keep.aggAt : null); setAggProg(null); setOverride(false);
+  }, [peerKey]); // eslint-disable-line
   const runAgg = async () => {
     if (sampleMode || aggBusy) return;
     if (!peer) { setNote({ kind: "warn", text: "비교 명단이 없어 집계할 수 없습니다. 먼저 「비교 명단 확정」을 누르세요." }); return; }
@@ -315,7 +326,9 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     let res;
     try { res = aggregate({ roster: peer, assessMap, subMap, cfg, splitReps: SPLIT_REPS }); }
     catch (e) { setNote({ kind: "warn", text: "집계 중 오류: " + ((e && e.message) || e) }); setAggBusy(false); return; }
-    setAgg(res); setAggAt(res.aggAt ? new Date(res.aggAt) : new Date());
+    const at = res.aggAt ? new Date(res.aggAt) : new Date();
+    setAgg(res); setAggAt(at);
+    lastAgg = { key: rosterKey(peer), agg: res, aggAt: at };
     // 학생별 결과를 순서대로 쓴다 — 한꺼번에 던지면 실패한 학생을 알 수 없다
     const sids = Object.keys(res.results || {});
     let fail = 0;
@@ -356,12 +369,13 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
     }
     const pidOf = (sid) => pidOfMap(pmap, sid);
     let out;
+    const classMap = (cfgAll && cfgAll.classMap) || null;   // class 열 — 학번 가운데 두 자리, 설정의 classMap이 먼저 (src-class.mjs)
     try {
-      out = kind === "submissions" ? csvSubmissions({ roster: peer, subMap, pidOf })
-        : kind === "judgements" ? csvJudgements({ roster: peer, assessMap, pidOf })
-          : kind === "self" ? csvSelf({ roster: peer, assessMap, pidOf })
-          : kind === "judges" ? csvJudges({ agg: shownAgg, pidOf })
-            : csvScores({ agg: shownAgg, pidOf });
+      out = kind === "submissions" ? csvSubmissions({ roster: peer, subMap, pidOf, classMap })
+        : kind === "judgements" ? csvJudgements({ roster: peer, assessMap, pidOf, classMap })
+          : kind === "self" ? csvSelf({ roster: peer, assessMap, pidOf, classMap })
+          : kind === "judges" ? csvJudges({ agg: shownAgg, pidOf, classMap })
+            : csvScores({ agg: shownAgg, pidOf, classMap });
     } catch (e) { setNote({ kind: "warn", text: "CSV를 만들지 못했습니다: " + ((e && e.message) || e) }); return; }
     if (!out || !out.head) { setNote({ kind: "warn", text: "내려받을 행이 없습니다." }); return; }
     downloadCsv("상호평가_" + kind + (sampleMode ? "_표본" : "") + "_" + stamp() + ".csv", out.head, out.rows || []);
