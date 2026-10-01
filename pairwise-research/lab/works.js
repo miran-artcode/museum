@@ -1,7 +1,7 @@
-/* 쌍대비교 체험실 — 예시 학급 12점
+/* 쌍대비교 체험실 — 예시 작품 12점(2학년 전체 145명을 12명으로 줄인 것)
    예시 A·B·C(오른손·수위선 1.2m·37번 열쇠)는 앱의 「자료집 예시 작품」(src-exhibit-samples.jsx)과 같은 글·도판이다.
    나머지 9점은 체험용으로 쓴 가상의 작품이고 도판은 relics-draw.js가 캔버스로 그린다.
-   q는 반 친구 11명의 판정을 흉내 낼 때 쓰는 「숨은 품질」(logit)이다. 실제 수업에는 이런 값이 없다.
+   q는 다른 학생 11명의 판정을 흉내 낼 때 쓰는 「숨은 품질」(logit)이다. 실제 수업에는 이런 값이 없다.
    이유 문장(good·weak)은 흉내 낸 판정자가 쓰는 문장이다: 이긴 작품의 good 또는 진 작품의 weak에서 고른다. */
 import { EXHIBIT_SAMPLES } from "../../src-exhibit-samples.jsx";
 import exA from "../../public/img/examples/ex-a.jpg";
@@ -9,7 +9,7 @@ import exB from "../../public/img/examples/ex-b.jpg";
 import exC from "../../public/img/examples/ex-c.jpg";
 
 const ex = (id) => EXHIBIT_SAMPLES.find((w) => w.id === id);
-const COLL = "○○고등학교 2학년 ○반 가상 컬렉션";
+const COLL = "○○고등학교 2학년 가상 컬렉션";
 const NOTICE = "이 이미지는 생성형 AI로 제작한, 실재한 적 없는 유물입니다.";
 const fromEx = (id) => {
   const w = ex(id);

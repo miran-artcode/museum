@@ -18,15 +18,22 @@ import { LESSONS_DEF } from "./src-lessons.jsx";
 import { CardMedia, CardMediaStyle } from "./src-card-media.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
-import { UxStyle, ConfirmButton, session, TeacherTabs } from "./src-ux.jsx";
+import { UxStyle, ConfirmButton, session, TeacherTabs, VIEWER_TABS } from "./src-ux.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
+import { ArExpoEntry, ArDeepLink, ArStyle } from "./src-ar.jsx";
 import { LabelCompare } from "./src-label-compare.jsx";
+import { ReadingCard, LessonMap } from "./src-reading.jsx";
 import { InquirySource } from "./src-inquiry-aids.jsx";
 import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, InquiryStyle, inquiryTraceRows } from "./src-inquiry.jsx";
 import { makeSnapshotter, WsHistoryCard } from "./src-ws-history.jsx";
 import { makeDirtyTracker, changedKeys, mergeRemote, buildPatch } from "./src-ws-sync.mjs";
 import { LegacyEcho } from "./src-legacy-fields.jsx";
 import { WsLockCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
+import { AccessProvider, AccessButton, AccessLessonTerms, AccessMemo, AccessStyle, MediaText, MediaTextRead, GateLangHelp } from "./src-access.jsx";
+import { AccessTeacherPanel, AccessTeacherStyle, CaptionOnAir } from "./src-access-teacher.jsx";
+import { A11yStyle, A11yRuntime } from "./src-access-a11y.jsx";
+import { supportCsv, SUPPORT_CODEBOOK } from "./src-access-core.mjs";
+import { SketchPad, SketchStyle, sketchDirty } from "./src-sketch.jsx";
 import {
   ATTITUDES, ATTITUDE_HINTS, LADDER_INTRO, TRANSLATE_STAGES, REFLECT_KEYS, DERIVE_KEYS,
   LEGACY_BACK, normBack, backLabel, SYMBOL_WORDS, findSymbol, SCHEMA_REV, REV_SECTIONS,
@@ -460,7 +467,7 @@ const SCHEMA_DEF = [
     fields: [
       { k: "eskis", t: "area", label: "서로 다른 시점의 에스키스 세 점에 대한 메모 (구조·시점·스케일·배경·빛)" },
       { k: "eskisImg", t: "images", opt: true, label: "에스키스 사진 (최대 3장): 손으로 그린 세 점을 찍어 올립니다.", mm: true },
-      { k: "sketchpad", t: "sketch", opt: true, label: "디지털 에스키스: 화면에 직접 그려 저장합니다. 종이 스케치 사진과 함께 남겨도 됩니다.", mm: true },
+      { k: "sketchpad", t: "sketch", opt: true, label: "디지털 에스키스: 화면에 직접 그려 저장합니다. 종이 스케치 사진과 함께 올려도 됩니다.", mm: true },
       { k: "pairRead", t: "text", label: "짝이 읽어 준 내용" },
       { k: "final", t: "area", label: "최종 선택한 장면과 선택 이유" },
       { k: "checks", t: "checks", opts: ["구조·재질", "시점·스케일", "빛·배경", "마모·파손·수리 흔적의 위치"], label: "화면 설계 확인" },
@@ -1375,6 +1382,8 @@ const CONSENT_ITEMS = [
   { k: "log", label: "활동 흔적", desc: "머문 시간·고쳐 쓴 이력", need: "별도 근거 필요" },
   { k: "survey", label: "사전·사후 설문", desc: "창의성 인식 24문항과 성향 문항", need: "별도 근거 필요" },
   { k: "media", label: "사진·음성·영상", desc: "관찰 사진·현장 소리·스케치·전시 영상", need: "별도 근거 필요" },
+  // 켠 학습 지원(자막·읽어 주기·도움 언어 등)은 장애·출신을 짐작하게 할 수 있어(개인정보 보호법 제23조 민감정보) 따로 묻는다
+  { k: "support", label: "학습 지원 사용", desc: "학생이 켠 학습 지원과 지원별 사용 횟수", need: "별도 근거 필요" },
 ];
 const CONSENT_KEYS = CONSENT_ITEMS.map((x) => x.k);
 
@@ -2480,12 +2489,6 @@ body{background:var(--bg)}
 .mm-del{border:none;background:none;font-family:var(--sans);font-size:12px;color:var(--seal);cursor:pointer;padding:6px 8px;text-decoration:underline}
 .mm-load{font-family:var(--mono);font-size:11px;color:var(--sub)}
 .mm-rec{font-family:var(--mono);font-size:12px;color:var(--seal)}
-.sketch-box{border:1px dashed var(--line);background:#fff;padding:10px}
-.sketch-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-.sk-color{width:24px;height:24px;border:2px solid #fff;outline:1px solid var(--line);cursor:pointer;padding:0}
-.sk-color.on{outline:2px solid var(--seal)}
-.sketch-cv{width:100%;max-width:720px;border:1px solid var(--line2);background:#fff;touch-action:none;cursor:crosshair;display:block}
-.sketch-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
 .link-row{display:grid;grid-template-columns:2fr 1fr;gap:6px;margin-bottom:6px}
 @media(max-width:640px){.link-row{grid-template-columns:1fr}}
 
@@ -2734,7 +2737,6 @@ body{background:var(--bg)}
   .ivt button{padding:8px 10px;font-size:13px}
   .mm-del{padding:10px 10px}
   .back-link{padding:8px 0}
-  .sk-color{width:34px;height:34px}
   .chk{padding:9px 12px}
   .toggle-row button{padding:10px 14px}
   /* 폰에서 표는 거의 항상 가로 스크롤 안에 갇힌다 — 밀 수 있음을 알려 준다 */
@@ -2781,7 +2783,7 @@ function LessonPanel({ L, teacher, onReading }) {
     <div className="lesson">
       <div className="lesson-head">
         <span className="lesson-n">{L.n}차시 {teacher ? "수업 안내" : "강의 노트"}</span>
-        <span className="lesson-title">{L.title}</span>
+        <span className="lesson-title" role="heading" aria-level="2">{L.title}</span>
         {teacher && <span className="lesson-min">{total}MIN</span>}
       </div>
       <div className="lesson-body" ref={bodyRef}>
@@ -2789,6 +2791,7 @@ function LessonPanel({ L, teacher, onReading }) {
         <ul className="goal-list">
           {L.goals.map((g, i) => <li key={i}>{g}</li>)}
         </ul>
+        {!teacher && <AccessLessonTerms L={L} />}
         {teacher && (
           <div className="std-chips">
             {L.stds.map((s, i) => <span className="std-chip" key={i}>{s}</span>)}
@@ -2809,44 +2812,24 @@ function LessonPanel({ L, teacher, onReading }) {
             </div>
           </details>
         )}
+        <LessonMap L={L} bodyRef={bodyRef} />
         {L.readings.length > 1 && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 8px" }}>
             <span className="hint">읽기 자료 {L.readings.length}개입니다. 수업 진행 순서대로 정리되어 있습니다.</span>
             <button type="button" className="btn small ghost" onClick={expandAll}>모두 펼치기</button>
           </div>
         )}
+        {/* 본문·도판·도식을 한 흐름으로 짜는 일은 src-reading.jsx가 맡는다 */}
         {L.readings.map((rd, i) => (
-          <details className="reading" key={i}
+          <ReadingCard key={i} rd={rd} i={i} count={L.readings.length} L={L} seen={!!seen[i]}
+            /* 2차시 도입의 "캡션 두 장" 실험: 강의 노트에서도 실제 자료를 보여 준다 */
+            extra={L.n === 2 && rd.stage === "도입" ? <LabelCompare /> : null}
             onToggle={(e) => {
               if (e.target.open) setSeen((p) => (p[i] ? p : { ...p, [i]: true }));
               const bulk = e.target.open && bulkRef.current > 0;
               if (bulk) bulkRef.current -= 1;
               onReading && onReading(e.target.open, bulk);
-            }}>
-            <summary>
-              <span className="stage-tag">{rd.stage}</span>
-              <span className="rd-i">{i + 1}/{L.readings.length}</span>{rd.h}
-              {seen[i] && <span className="rd-seen" aria-label="펼쳐 본 자료">✓</span>}
-            </summary>
-            <div className="reading-in">
-              {rd.p.map((para, j) => <p key={j}>{para}</p>)}
-              <LessonImages images={rd.images} />
-              {/* 2차시 도입의 "캡션 두 장" 실험 — 강의 노트에서도 실제 자료를 보여 준다 */}
-              {L.n === 2 && rd.stage === "도입" && <LabelCompare />}
-              <LessonAsks asks={rd.asks} />
-              {rd.works && rd.works.length > 0 && (
-                <table className="works-tbl">
-                  <caption>작품·문헌 살펴보기</caption>
-                  <thead><tr><th>작가·구분</th><th>작품·자료</th><th>연도</th><th>보는 이유</th></tr></thead>
-                  <tbody>
-                    {rd.works.map((w, j) => (
-                      <tr key={j}><td>{w.a}</td><td>{w.w}</td><td>{w.y}</td><td>{w.d}<WorkLinks links={w.links} /></td></tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </details>
+            }} />
         ))}
         {teacher && L.pedagogy && (
           <details className="reading pedagogy">
@@ -2857,6 +2840,7 @@ function LessonPanel({ L, teacher, onReading }) {
           </details>
         )}
       </div>
+      {!teacher && <AccessMemo L={L} />}
       {!teacher && <div className="lesson-guide">읽기 자료를 읽은 뒤 「배움 확인 {L.n}」, 「탐구 질문 {L.n}」에 답합니다. 답은 자동으로 저장됩니다.</div>}
     </div>
   );
@@ -4049,6 +4033,7 @@ function FieldReader({ sec, f, ws, owner }) {
       <div className="read-block">
         <div className="rl">{f.label}</div>
         {cur ? <div><MediaAudio owner={owner || OWNER} refId={cur.ref} /><span className="hint">길이 약 {cur.sec || "?"}초</span></div> : <div className="rv empty">녹음 없음</div>}
+        <MediaTextRead ws={ws} fieldKey={key} />
       </div>
     );
   }
@@ -4067,6 +4052,7 @@ function FieldReader({ sec, f, ws, owner }) {
       <div className="read-block">
         <div className="rl">{f.label}</div>
         {cur ? <div><MediaVideo owner={owner || OWNER} refId={cur.ref} /><span className="hint">길이 약 {cur.sec || "?"}초</span></div> : <div className="rv empty">영상 없음</div>}
+        <MediaTextRead ws={ws} fieldKey={key} />
       </div>
     );
   }
@@ -4352,121 +4338,17 @@ function AudioField({ f, fieldKey, v, setField }) {
           <button className="btn small ghost" onClick={start}>{cur ? "다시 녹음하기" : "녹음 시작"}</button>
         )}
         <span className="hint">최대 {MAX}초 · 약 0.5MB까지 저장됩니다.</span>
+        <MediaText fieldKey={fieldKey} kind="audio" v={cur} />
         {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
       </div>
     </div>
   );
 }
 
-/* 스케치 캔버스 (디지털 에스키스) — 그린 뒤 저장하면 JPEG로 줄여 media 컬렉션에 남긴다 */
-
-const SKETCH_COLORS = ["#26241E", "#8A3B2E", "#4A5A6A"];
-
-/* 화면 어딘가의 스케치에 저장 안 된 획이 있는지 — 차시 이동·창 닫기 전 확인에 쓴다.
-   스케치 획은 컴포넌트 상태로만 있어 언마운트되면 소리 없이 사라지기 때문. */
-const sketchDirty = { current: false };
-
-function SketchField({ f, fieldKey, v, setField }) {
-  const cvRef = useRef(null);
-  const strokesRef = useRef([]);
-  const liveRef = useRef(null);
-  const [color, setColor] = useState(SKETCH_COLORS[0]);
-  const [wide, setWide] = useState(false);
-  const [eraser, setEraser] = useState(false);
-  const [dirty, setDirty] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
-  const cur = typeof v === "string" ? null : v;
-
-  useEffect(() => {
-    sketchDirty.current = dirty;
-    return () => { sketchDirty.current = false; };
-  }, [dirty]);
-
-  const redraw = () => {
-    const cv = cvRef.current;
-    if (!cv) return;
-    const ctx = cv.getContext("2d");
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    for (const st of strokesRef.current) {
-      ctx.strokeStyle = st.c;
-      ctx.lineWidth = st.w;
-      ctx.beginPath();
-      st.pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
-      ctx.stroke();
-    }
-  };
-  useEffect(() => { redraw(); }, []);
-
-  const posOf = (e) => {
-    const cv = cvRef.current;
-    const r = cv.getBoundingClientRect();
-    return [((e.clientX - r.left) / r.width) * cv.width, ((e.clientY - r.top) / r.height) * cv.height];
-  };
-  const down = (e) => {
-    e.preventDefault();
-    cvRef.current.setPointerCapture(e.pointerId);
-    liveRef.current = { c: eraser ? "#FFFFFF" : color, w: eraser ? 22 : wide ? 6 : 2.5, pts: [posOf(e)] };
-    strokesRef.current.push(liveRef.current);
-    setDirty(true);
-  };
-  const move = (e) => {
-    if (!liveRef.current) return;
-    liveRef.current.pts.push(posOf(e));
-    redraw();
-  };
-  const up = () => { liveRef.current = null; };
-  const undo = () => { strokesRef.current.pop(); redraw(); };
-  const clearAll = () => { strokesRef.current = []; redraw(); };
-
-  const save = async () => {
-    setErr(""); setBusy(true);
-    try {
-      const data = cvRef.current.toDataURL("image/jpeg", 0.85);
-      if (data.length > 400000) { setBusy(false); return setErr("스케치가 너무 큽니다. 지우개로 정리한 뒤 다시 저장하세요."); }
-      if (cur) await mediaStore.remove(OWNER, cur.ref);
-      const ref = fieldKey + "." + Date.now();
-      const ok = await mediaStore.put(OWNER, ref, data);
-      if (ok) { setField(fieldKey, { ref, at: now() }); setDirty(false); }
-      else setErr("스케치 저장에 실패했습니다.");
-    } catch (e) { setErr("스케치를 저장하지 못했습니다."); }
-    setBusy(false);
-  };
-
-  return (
-    <div className="field span2">
-      <label>{f.label}</label>
-      <div className="sketch-box">
-        <div className="sketch-tools">
-          {SKETCH_COLORS.map((c) => (
-            <button key={c} className={"sk-color" + (!eraser && color === c ? " on" : "")} style={{ background: c }}
-              onClick={() => { setColor(c); setEraser(false); }} aria-label={"펜 색 " + c} />
-          ))}
-          <button className={"btn small " + (wide ? "" : "ghost")} onClick={() => setWide(!wide)}>굵게</button>
-          <button className={"btn small " + (eraser ? "" : "ghost")} onClick={() => setEraser(!eraser)}>지우개</button>
-          <button className="btn small ghost" onClick={undo}>되돌리기</button>
-          <button className="btn small ghost" onClick={clearAll}>모두 지우기</button>
-        </div>
-        <canvas ref={cvRef} width={720} height={480} className="sketch-cv"
-          onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />
-        <div className="sketch-foot">
-          <button className="btn small" disabled={busy || !dirty} onClick={save}>{busy ? "저장 중…" : "스케치 저장"}</button>
-          {dirty && !busy && <span className="hint" style={{ color: "var(--seal)" }}>아직 저장되지 않은 획이 있습니다. 「스케치 저장」을 눌러야 남습니다.</span>}
-          {cur && (
-            <>
-              <span className="hint">저장된 스케치 {fmtTime(cur.at)}</span>
-              <MediaThumb owner={OWNER} refId={cur.ref} alt="저장된 스케치" size={64} />
-              <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, cur.ref); setField(fieldKey, ""); }}>지우기</button>
-            </>
-          )}
-          {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
-        </div>
-      </div>
-    </div>
-  );
+/* 스케치 캔버스 (디지털 에스키스) — 도구·레이어·확대·저장은 src-sketch.jsx.
+   값 { ref, at, w, h, paper, layers } 중 ref(합친 그림)만 교사 화면·집계가 읽는다 */
+function SketchField(props) {
+  return <SketchPad {...props} owner={OWNER} store={mediaStore} MediaThumb={MediaThumb} confirmDel={confirmDel} fmtTime={fmtTime} />;
 }
 
 /* 짧은 영상 (카메라 녹화, 저해상도) — 문서 크기 한도 안에서 10초 안팎을 담는다 */
@@ -4551,6 +4433,7 @@ function VideoField({ f, fieldKey, v, setField }) {
           <button className="btn small ghost" disabled={busy} onClick={start}>{busy ? "저장 중…" : cur ? "다시 찍기" : "녹화 시작"}</button>
         )}
         <span className="hint">화질을 낮춰 {MAX}초 안팎만 저장됩니다. 소리는 담기지 않습니다.</span>
+        <MediaText fieldKey={fieldKey} kind="video" v={cur} />
         {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
       </div>
     </div>
@@ -4796,6 +4679,7 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
         <GateSections onEnter={() => scrollTo("g4-enter", true)} />
         <aside className="g4-enter" id="g4-enter" tabIndex={-1}>
           <div className="ticket">
+        <GateLangHelp />
         <div className="tab-switch" role="tablist">
           <button role="tab" aria-selected={mode === "student"} className={mode === "student" ? "on" : ""} disabled={busy} onClick={() => { setMode("student"); setErr(""); }}>학생</button>
           <button role="tab" aria-selected={mode === "teacher"} className={mode === "teacher" ? "on" : ""} disabled={busy} onClick={() => { setMode("teacher"); setErr(""); }}>교사</button>
@@ -4861,7 +4745,7 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
       <div className="card-head">
         {/* 발상 단계 카드는 「단계 3」처럼 tag만 찍는다. 교사 화면·CSV는 code(B3)를 쓴다 */}
         <span className="card-code">{sectionHead(sec)}</span>
-        <span className="card-title">{sec.title}{sec.hw && <span className="hw-chip">한 주 과제</span>}</span>
+        <span className="card-title" role="heading" aria-level="3">{sec.title}{sec.hw && <span className="hw-chip">한 주 과제</span>}</span>
         <span className="card-sess">{sec.session}</span>
       </div>
       {sec.note && sec.kind !== "inquiry" && <div className="card-note">{sec.note}</div>}
@@ -5258,7 +5142,7 @@ function StudentApp({ me, onExit, onGallery }) {
     const onHide = () => { if (document.visibilityState === "hidden") flush(); };
     // 저장이 끝나지 않은 채 창을 닫으면 경고 — 오프라인 큐 유실을 마지막에 한 번 더 막는다
     const onBefore = (e) => {
-      if (dirtyRef.current || savingRef.current || sketchDirty.current) { e.preventDefault(); e.returnValue = ""; }
+      if (dirtyRef.current || savingRef.current || sketchDirty.unsaved) { e.preventDefault(); e.returnValue = ""; }
     };
     const onOn = () => {
       setOnline(true);
@@ -5425,25 +5309,31 @@ function StudentApp({ me, onExit, onGallery }) {
   };
 
   return (
+    <AccessProvider sid={me.sid} ws={ws} setField={setField} cfgAll={cfgAll} session={tab} loaded={loaded}
+      where={quizOn ? "quiz" : assessOn ? "assess" : "lesson"}>
     <WsLockCtx.Provider value={wsLocked}>
     <NavCtx.Provider value={{ openMap, go: navGo }}>
     <div>
       <div className="topbar">
         <div className="topbar-in">
-          <div className="brand">허구의 아카이브 기록실<small>STUDENT · {me.sid}</small></div>
+          <div className="brand" role="heading" aria-level="1">허구의 아카이브 기록실<small lang="en">STUDENT · {me.sid}</small></div>
           <div className="top-right">
             <span>{me.nick}</span>
-            <span role={saveState === "err" ? "alert" : "status"} aria-live="polite"
+            <span translate="no"
               className={"save-pill " + (saveState === "dirty" || saveState === "saving" || saveState === "queued" ? "dirty" : saveState === "err" ? "err" : "")}>
               {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "queued" ? "연결 대기(기기에 담아 둠)" : saveState === "err" ? "저장 실패, 5초 뒤 재시도" : "저장됨 " + fmtTime(savedAt)}
             </span>
+            <span className="ax-sr" role={saveState === "err" ? "alert" : "status"}>
+              {saveState === "err" ? "저장하지 못했습니다. 5초 뒤 다시 저장합니다." : saveState === "queued" ? "인터넷 연결을 기다립니다. 쓴 내용은 이 기기에 담아 두었습니다." : ""}
+            </span>
             {saveState === "err" && <button className="btn small" onClick={doSave}>지금 저장</button>}
+            <AccessButton />
             <button className="btn small ghost" onClick={onGallery}>전시장</button>
             <button className="btn small ghost" onClick={async () => { await doSave(); await authApi.leave(); onExit(); }}>나가기</button>
           </div>
         </div>
       </div>
-      <div className="wrap">
+      <div className="wrap" role="main" id="main">
         {!online && (
           <div className="warn-note" role="alert" style={{ marginBottom: 10 }}>
             인터넷이 끊겼습니다. 지금 쓰는 내용은 이 기기에 임시로 담겨 있다가 연결이 돌아오면 자동으로 저장됩니다. 그전에 창을 닫지 마세요.
@@ -5603,6 +5493,7 @@ function StudentApp({ me, onExit, onGallery }) {
     </div>
     </NavCtx.Provider>
     </WsLockCtx.Provider>
+    </AccessProvider>
   );
 }
 
@@ -7960,6 +7851,13 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     TRANSLATE_STAGES.forEach((st) => L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, st.keys.join(" / "), st.ask, st.out])));
     L.push(mdRow(["돌아보기", "태도 · 가까운 방법", REFLECT_KEYS.join(" / "), "이 자국으로 보는 사람에게 무엇을 하려 하고, 내 작업은 여덟 방법 중 어디에 가까운가", "태도와 이유, 가까운 방법과 이유"]));
     L.push("");
+    L.push("## 학습 지원 사용 자료 (연구자료_학습지원)");
+    L.push("");
+    L.push("학생이 상단 「학습 지원」에서 켠 설정(pref_)과 지원별 사용 횟수(use_)입니다. 진단명이나 장애 여부는 수집하지 않습니다. 동의 항목 「학습 지원 사용」에 동의한 학생만 들어갑니다. 설계와 근거: 다양한_학습자_지원_설계.md");
+    L.push("");
+    L.push(mdHead(["열", "내용"]));
+    SUPPORT_CODEBOOK.forEach((r) => L.push(mdRow(r)));
+    L.push("");
     return L.join("\n");
   };
 
@@ -8299,6 +8197,9 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       p: "표 1 기술통계, 표 2 단계 도달, 표 3 안 보이는 이유 분포, 표 4 선택 분포, 표 5 사전·사후 비교, 표 6 상관. 마크다운 표라 논문 편집기에 그대로 붙습니다.", go: () => download("기술통계" + tag + "_" + stamp + ".md", descriptivesMD(), "text/markdown") },
     { k: "codebook", h: "변수 사전", fn: "변수사전" + tag + "_" + stamp + ".md",
       p: "모든 변수의 조작적 정의, 구체성 지수의 산출식, 단계와 기록 칸의 대응표. 연구 방법 절의 측정 도구 서술에 씁니다.", go: () => download("변수사전" + tag + "_" + stamp + ".md", codebookMD(), "text/markdown") },
+    { k: "support", h: "학습 지원 사용 자료", fn: "연구자료_학습지원" + tag + "_" + stamp + ".csv",
+      p: "참여자 1명이 1행. 학생이 켠 학습 지원(글자 크기·대비·읽어 주기·도움 언어·자막 등)과 지원별 사용 횟수를 담습니다. 장애나 출신을 짐작하게 할 수 있어 동의 항목 「학습 지원 사용」에 동의한 학생만 넣습니다.",
+      go: () => download("연구자료_학습지원" + tag + "_" + stamp + ".csv", "\uFEFF" + supportCsv(cases.filter((c) => consentAgreed(c.consent, "support")).map((c) => ({ pid: c.pid, ws: c.ws }))), "text/csv") },
     { k: "manuscript", h: "원고 초안", fn: "원고초안" + tag + "_" + stamp + ".md",
       p: "연구 방법과 결과의 사실 서술을 수치까지 채워 넣은 초안. 해석·논의는 「연구자 서술」 자리로 비워 둡니다.", go: () => download("원고초안" + tag + "_" + stamp + ".md", manuscriptMD(), "text/markdown") },
   ];
@@ -8608,7 +8509,8 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
 function TeacherApp({ onExit, onGallery }) {
   useContent();
   useEffect(() => watchContent(), []);
-  const [tab, setTab] = useState("현황");
+  const viewerOnly = authApi.isViewer();
+  const [tab, setTab] = useState(viewerOnly ? VIEWER_TABS[0] : "현황");
   const [roster, setRoster] = useState({});
   const [wsMap, setWsMap] = useState({});
   const [gradeMap, setGradeMap] = useState({});
@@ -8631,6 +8533,7 @@ function TeacherApp({ onExit, onGallery }) {
     !(tab === "수업 편집" && edDirty) ||
     window.confirm("저장하지 않은 수업 편집 원고가 있습니다. 이동하면 사라집니다. 이동할까요?");
   const switchTab = (t) => {
+    if (viewerOnly && !VIEWER_TABS.includes(t)) return;
     if (t !== tab && !confirmLoseEdit()) return;
     setTab(t);
   };
@@ -8806,8 +8709,9 @@ function TeacherApp({ onExit, onGallery }) {
         </div>
       </div>
       <div className="wrap wide">
-        {authApi.isViewer() && <div className="sample-banner">보기 전용 계정으로 들어왔습니다. 모든 기록을 볼 수 있지만 채점·설정·수업 편집 등 어떤 것도 저장되지 않습니다. 고치려면 나간 뒤 관리자 코드로 다시 입장하세요.</div>}
-        {sel ? (
+        <CaptionOnAir />
+        {authApi.isViewer() && <div className="sample-banner">보기 전용 계정으로 들어왔습니다. 수업 안내·수업 자료·학습 지원 설정만 볼 수 있고, 학생별 기록과 학번은 보이지 않으며 내려받기와 저장은 할 수 없습니다.</div>}
+        {sel && !viewerOnly ? (
           <div style={{ paddingTop: 18 }}>
             <TeacherStudentView key={sel} sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} surveyData={surveyMap[sel]} ids={ids} onSel={openStudent} initialTab={selTab}
               onBack={() => { setSel(null); loadAll(); }} />
@@ -8819,7 +8723,7 @@ function TeacherApp({ onExit, onGallery }) {
                 지금 보이는 학급은 <b>표본 자료</b>입니다. 화면 구조를 살펴보기 위한 가상 학생 8명이며, 실제 학생이 입장하면 자동으로 실데이터로 바뀝니다.
               </div>
             )}
-            <TeacherTabs tab={tab} onSwitch={switchTab} dirty={edDirty} />
+            <TeacherTabs tab={tab} onSwitch={switchTab} dirty={edDirty} viewer={viewerOnly} />
             {loading ? <div style={{ color: "var(--sub)" }}>학급 기록을 불러오는 중…</div> : tab === "현황" ? (
               <div>
                 <div className="kpis">
@@ -8988,6 +8892,11 @@ function TeacherApp({ onExit, onGallery }) {
                 </div>
                 <InquiryAidConfig cfgAll={cfgAll} setCfgAll={setCfgAll} setMsg={setMsg} />
                 <p className="hint" style={{ marginTop: 8 }}>앵커 판정 실험 설정은 「연구」 탭 맨 아래로 옮겼습니다. 이 탭은 수업 중 급한 공개 조작만 담습니다.</p>
+              </div>
+            ) : tab === "학습 지원" ? (
+              <div>
+                {msg && <div className="ok-note">{msg}</div>}
+                <AccessTeacherPanel ids={ids} roster={roster} wsMap={wsMap} cfgAll={cfgAll} setCfgAll={setCfgAll} setMsg={setMsg} sampleMode={sampleMode} onSel={openStudent} />
               </div>
             ) : tab === "수업 안내" ? (
               <TeacherGuide />
@@ -9534,6 +9443,7 @@ function Gallery({ onBack, backLabel }) {
             관람은 두 번 합니다. 처음에는 작품 캡션을 가린 채 이미지만 보고, 두 번째에는 작품 캡션을 펼쳐 같은 이미지가 어떻게 다르게 읽히는지 확인합니다.
             작품은 이름 대신 작품 번호로만 걸려 있습니다.
           </p>
+          <ArExpoEntry />
         </div>
         <div className="gal-controls">
           <div className="toggle-row" role="tablist">
@@ -9869,9 +9779,12 @@ function App() {
       <QuizTeacherStyle />
       <InquiryStyle />
       <WsLockStyle />
+      <AccessStyle /><AccessTeacherStyle /><A11yStyle /><A11yRuntime />
+      <SketchStyle />
       <LadderStyle />
       <ThemeStyle />
       <UxStyle />
+      <ArStyle />
       {restoring && <div style={{ padding: "60px 16px", textAlign: "center", color: "var(--sub)", fontSize: 13 }}>기록실을 여는 중…</div>}
       {view === "gate" && !restoring && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
@@ -9883,6 +9796,7 @@ function App() {
       {view === "gallery" && <Gallery onBack={() => setView(galFrom === "student" && !me ? "gate" : galFrom)}
         backLabel={galFrom === "student" && me ? "기록실로 돌아가기" : galFrom === "teacher" ? "교사 화면으로" : "입장 화면으로"} />}
       {view === "demo" && <DemoView onBack={() => setView("gate")} />}
+      <ArDeepLink />
     </div>
   );
 }
