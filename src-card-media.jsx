@@ -9,6 +9,7 @@
 
 import React from "react";
 import { LessonImages, WorkLinks } from "./src-content.jsx";
+import { ObsAlt } from "./src-access.jsx";
 
 export const CARD_MEDIA = {
   obs: {
@@ -82,7 +83,7 @@ export const CARD_MEDIA = {
     },
     institution: {
       images: [
-        { src: "/img/lessons/L2_w_broodthaers.jpg", cap: "마르셀 브로타에스, 「현대미술관, 독수리 부서」 중 〈형상 부문〉(1972), 뒤셀도르프 시립 쿤스트할레 전시 개막 장면. 1968년 브뤼셀 자택에서 문을 연 이 가상 미술관의 가장 큰 전시로, 시대와 지역이 서로 다른 독수리 도상 300여 점을 빌려 와 번호를 달고 ‘이것은 예술 작품이 아니다’라는 표찰을 붙였습니다. 사진 속 인물이 브로타에스입니다.", credit: "© Estate of Marcel Broodthaers · 사진 © Maria Gilissen · 파리 조폐국(Monnaie de Paris) 소장, 구글 아트 앤 컬처, 교육 목적 인용", link: "https://en.wikipedia.org/wiki/Marcel_Broodthaers", srcPage: "https://artsandculture.google.com/asset/UwEYeURkT1TdqQ" },
+        { src: "/img/lessons/L2_w_broodthaers.jpg", cap: "마르셀 브로타에스, 「현대미술관, 독수리 부서」 중 〈형상 부문〉(1972), 뒤셀도르프 시립 쿤스트할레 전시 개막 장면. 1968년 브뤼셀 자택에서 문을 연 이 가상 미술관의 가장 큰 전시로, 시대와 지역이 서로 다른 독수리 도상 수백 점을 빌려 와 번호를 달고 ‘이것은 미술 작품이 아니다’라는 팻말을 붙였습니다. 사진 속 인물이 브로타에스입니다.", credit: "© Estate of Marcel Broodthaers · 사진 © Maria Gilissen · 파리 조폐국(Monnaie de Paris) 소장, 구글 아트 앤 컬처, 교육 목적 인용", link: "https://en.wikipedia.org/wiki/Marcel_Broodthaers", srcPage: "https://artsandculture.google.com/asset/UwEYeURkT1TdqQ" },
         { src: "/img/lessons/L2_w_haacke.jpg", cap: "한스 하케, 「샤폴스키 외, 맨해튼 부동산 보유 현황」(1971)의 부분. 건물 정면 사진 아래에 소유·거래 내역을 타자기로 친 기록이 한 쌍을 이루어 조사 보고서의 형식으로 배열됩니다. 1971년 구겐하임 개인전에 나갈 예정이었으나 개막 6주 전 관장이 전시를 취소하고 담당 큐레이터 에드워드 프라이를 해고한 작품으로, 2007년부터 휘트니 미술관 소장품입니다.", credit: "© Hans Haacke / ARS, New York · 휘트니 미술관 소장품 페이지, 교육 목적 인용", link: "https://whitney.org/collection/works/29487" },
       ],
       links: [{ t: "마르셀 브로타에스", u: "https://en.wikipedia.org/wiki/Marcel_Broodthaers" }, { t: "하케 「샤폴스키 외」(휘트니 소장 기록)", u: "https://whitney.org/collection/works/29487" }, { t: "한스 하케", u: "https://en.wikipedia.org/wiki/Hans_Haacke" }, { t: "제도비평이란(테이트)", u: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" }],
@@ -113,6 +114,8 @@ export function CardMedia({ src, k }) {
     <div className="pc-media">
       <LessonImages images={m.images} />
       <WorkLinks links={m.links} />
+      {/* 관찰 방법을 다른 감각으로 하는 길 (학생이 「학습 지원」에서 켤 때만, src-access.jsx) */}
+      {src === "obs" && <ObsAlt k={k} />}
     </div>
   );
 }

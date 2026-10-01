@@ -27,7 +27,7 @@ const VIEWS = [
   { k: "locked", label: "제출 확정 뒤", stage: "submit",
     tip: "확정한 뒤에는 잠긴 제출만 보이고, 자기평가는 선생님이 「자기평가 ①」 단계를 열 때까지 나타나지 않습니다." },
   { k: "self1", label: "자기평가 ①", stage: "self1",
-    tip: "다섯 문항 평정 · 근거 한 문장 · 우리 반 등수 예측. 제출하면 고칠 수 없습니다. 제출한 작품이 없는 학생에게는 이 화면이 없습니다." },
+    tip: "왼쪽에 내 작품(대표 이미지·제목·작품 캡션)을 두고 여섯 문항마다 네 수준 가운데 하나를 고른 뒤, 근거 한 문장과 2학년 전체에서 앞에서 몇 % 안에 들지 예측합니다. 제출하면 고칠 수 없습니다. 제출한 작품이 없는 학생에게는 이 화면이 없습니다." },
   { k: "peer", label: "동료 비교", stage: "peer",
     tip: "배정된 쌍을 차례로 판정합니다. 작품 번호만 보이고 작품 캡션은 접힌 채 시작하며, 두 작품을 모두 본 뒤에야 고를 수 있습니다. 질문 · 이유 최소 글자 수 · 최소 판정 시간 · 확신도는 지금 설정값입니다." },
   { k: "peerDone", label: "비교 마침", stage: "peer",
@@ -37,7 +37,7 @@ const VIEWS = [
   { k: "self2cmp", label: "② 나란히 보기", stage: "self2",
     tip: "확정한 뒤에야 ①과 ②를 나란히 보고, 이번 판단이 처음과 견주어 어떻게 느껴졌는지 고릅니다." },
   { k: "result", label: "결과", stage: "result",
-    tip: "심사자들이 고른 결정적 축과 받은 이유 문장을 먼저 읽고, 「자리 보기」를 눌러야 자리가 보입니다. 자리의 표현(밴드·백분위·등수·보이지 않음)은 지금 「공개 범위」 설정값입니다." },
+    tip: "심사자들이 고른 결정적 축과 받은 이유 문장을 먼저 읽고, 「위치 보기」를 눌러야 위치가 보입니다. 위치의 표현(밴드·백분위·등수·보이지 않음)은 지금 「공개 범위」 설정값입니다." },
 ];
 
 /* 자리표시 그림 — 유물 기록 사진의 형식(중립 배경·그림자·눈금자)만 흉내 낸 SVG. 작품마다 모양과 기울기가 다르다 */
@@ -125,7 +125,7 @@ export function AssessPreviewPage({ cfg, onBack }) {
       break;
     case "self1":
       done = D("submit"); avail = D("submit", "self1"); cur = "self1";
-      screen = <SelfScreen key="self1" sid={ME} phase="s1" block={null} prev={null} n={n} subFail={false} reloadSubs={noop} sampleMode />;
+      screen = <SelfScreen key="self1" sid={ME} phase="s1" block={null} prev={null} n={n} sub={sub} subFail={false} reloadSubs={noop} sampleMode />;
       break;
     case "peer": {
       done = D("submit", "self1"); avail = D("submit", "self1", "peer"); cur = "peer";
@@ -141,12 +141,12 @@ export function AssessPreviewPage({ cfg, onBack }) {
       break;
     case "self2":
       done = D("submit", "self1", "peer"); avail = D("submit", "self1", "peer", "self2"); cur = "self2";
-      screen = <SelfScreen key="self2" sid={ME} phase="s2" block={null} prev={self.s1 || null} n={n} subFail={false} reloadSubs={noop} sampleMode />;
+      screen = <SelfScreen key="self2" sid={ME} phase="s2" block={null} prev={self.s1 || null} n={n} sub={sub} subFail={false} reloadSubs={noop} sampleMode />;
       break;
     case "self2cmp": {
       done = D("submit", "self1", "peer"); avail = D("submit", "self1", "peer", "self2"); cur = "self2";
       const locked = self.s2 ? { ...self.s2, submittedAt: null, changeCode: undefined, changeWhy: undefined } : { lockedAt: "2026-04-02T06:00:00.000Z", scores: {}, why: "" };
-      screen = <SelfScreen key="self2cmp" sid={ME} phase="s2" block={locked} prev={self.s1 || null} n={n} subFail={false} reloadSubs={noop} sampleMode />;
+      screen = <SelfScreen key="self2cmp" sid={ME} phase="s2" block={locked} prev={self.s1 || null} n={n} sub={sub} subFail={false} reloadSubs={noop} sampleMode />;
       break;
     }
     default: {
@@ -156,7 +156,7 @@ export function AssessPreviewPage({ cfg, onBack }) {
       cur = off ? null : "result";
       screen = off
         ? <WaitCard text={waitNote({ stage: "result", roster, pairs, s2Done: true, noWork: false })} />
-        : <ResultScreen key={"result-" + cfg.reveal} cfg={cfg} result={result} self={self} />;
+        : <ResultScreen key={"result-" + cfg.reveal} cfg={cfg} result={result} self={self} sub={sub} />;
     }
   }
 
@@ -167,7 +167,7 @@ export function AssessPreviewPage({ cfg, onBack }) {
         <div className="ap-bar-l">
           <div className="ap-t">학생 화면 미리 보기</div>
           <div className="hint">
-            표본 학급(학번 {PREVIEW_IDS[0]}~{PREVIEW_IDS[PREVIEW_IDS.length - 1]}, 작품 10점)의 학생 <span className="mono">{ME}</span>(작품 {sub ? sub.no : "-"}) 자리에서 봅니다.
+            표본(학번 {PREVIEW_IDS[0]}~{PREVIEW_IDS[PREVIEW_IDS.length - 1]}, 작품 10점)의 학생 <span className="mono">{ME}</span>(작품 {sub ? sub.no : "-"}) 자리에서 봅니다.
             질문 · 이유 최소 글자 수 · 최소 판정 시간 · 확신도 · 공개 범위는 지금 「상호평가 1」의 설정값(저장 전 편집 포함)을 따르고, 여기서는 아무것도 저장되지 않습니다.
             「닫힘」 단계에서는 학생 화면에 「최종 평가」 탭 자체가 나타나지 않습니다.
           </div>

@@ -8,12 +8,14 @@
      npm run backup -- --with-media       사진·녹음·스케치(media)까지 포함 (용량이 커서 기본은 뺀다)
 
    저장 내용: meta·students·worksheets·wsHistory·grades·surveys·submissions·assess·quiz·research·misc
-   (quizBank·quizKeys는 문항 은행이라 quiz-bank/ 로 따로 관리하므로 뺀다).
+   과 문항 은행 두 문서(quizBank 공개부·quizKeys 정답부). 은행 원본 quiz-bank/bank.json 은 공개 저장소에
+   올리지 않아 교사 PC에만 있으므로, 이 백업이 사본 구실을 한다. 잃어버리면
+   node scripts/quiz-bank-restore.mjs <백업 폴더> 로 두 문서를 합쳐 되살린다.
    한 학생을 되돌리려면 scripts/restore-worksheet.mjs 를 쓴다 (npm run restore).
    .backup/ 은 .gitignore에 있어 GitHub에 올라가지 않는다 (학생 개인 기록). */
 import fs from "node:fs";
 import path from "node:path";
-import { accessToken, listCollection, BACKUP_DIR, stamp, unwrap, summarize } from "./fs-admin.mjs";
+import { accessToken, listCollection, BACKUP_DIR, stamp, unwrap, summarize, backupDirsByTime } from "./fs-admin.mjs";
 
 const args = process.argv.slice(2);
 const flag = (name) => args.find((a) => a.startsWith(name + "="));
@@ -23,7 +25,7 @@ const label = args.filter((a) => !a.startsWith("--")).join("_").replace(/[\\/:*?
 
 if (at && isNaN(new Date(at).getTime())) { console.error("--at 값은 2026-09-17T01:30:00Z 같은 ISO 시각이어야 합니다."); process.exit(1); }
 
-const COLS = ["meta", "students", "worksheets", "wsHistory", "grades", "surveys", "submissions", "assess", "quiz", "research", "misc"];
+const COLS = ["meta", "students", "worksheets", "wsHistory", "grades", "surveys", "submissions", "assess", "quiz", "research", "misc", "quizBank", "quizKeys"];
 if (withMedia) COLS.push("media");
 
 const token = await accessToken();
@@ -41,8 +43,9 @@ fs.writeFileSync(path.join(dir, "INFO.json"), JSON.stringify({ savedAt: new Date
 console.log("저장 위치:", dir);
 console.log("문서 수:", Object.entries(counts).map(([k, n]) => k + " " + n).join(", "));
 
-/* 직전 백업과 견주어 기록지가 바뀐 학생을 알린다 */
-const prevDirs = fs.readdirSync(BACKUP_DIR).filter((d) => d !== path.basename(dir) && fs.existsSync(path.join(BACKUP_DIR, d, "worksheets.json"))).sort();
+/* 직전 백업과 견주어 기록지가 바뀐 학생을 알린다. 직전은 이름순이 아니라 담긴 시각순이다(이름이 날짜로 시작하지 않는 폴더가 늘 뒤에 오므로).
+   시점 백업(--at)이면 그 시점보다 앞선 것 가운데서 고른다 */
+const prevDirs = backupDirsByTime((d) => d !== path.basename(dir) && fs.existsSync(path.join(BACKUP_DIR, d, "worksheets.json")), { before: at ? Date.parse(at) : Date.now() });
 const prev = prevDirs.pop();
 if (prev) {
   const before = JSON.parse(fs.readFileSync(path.join(BACKUP_DIR, prev, "worksheets.json"), "utf8"));

@@ -8,7 +8,7 @@ import {
   parseSeatGrid, halfOf, routeNext, bankCells, cellOrder, drawBlock, usedOf, replayServed,
   correctCount, scoreOf, scoreAttempt, clientScoreOf, flagsOf, recompute, resultItems, wilson,
   itemStats, twinStats, levelMonotonic, reliabilityStats, recordSheet, csvAttempts, csvResponses, csvEvents, csvItems,
-  validateBank, splitBank, remainingSec, buildSampleQuiz, makeSyntheticBank, fmtMMSS,
+  validateBank, splitBank, mergeBank, cellNeed, cellShort, remainingSec, buildSampleQuiz, makeSyntheticBank, fmtMMSS,
 } from "./src-quiz-core.mjs";
 
 const sids = (n, from = 20301) => Array.from({ length: n }, (_, i) => String(from + i));
@@ -697,6 +697,66 @@ test("splitBank: 공개부에는 정답·해설·출처가 없고 keyHash가 맞
   assert.equal(keys.items[file.items[0].id].expl, file.items[0].expl);
   assert.deepEqual(keys.corrections, []);
   assert.equal(keys.ver, "2026-09-v1");
+});
+
+test("cellNeed·cellShort: 예비가 없는 칸은 한 문항만 비활성으로 돌려도 필요 수 아래로 내려간다", () => {
+  /* 필요 수는 급별 최대 방문 블록 수 × 블록당 영역 문항 수다. 1,296경로 열거로 얻은 MAX_VISIT 를 쓴다 */
+  assert.equal(cellNeed(3, 1), 8);   // 3급은 네 블록까지 머물고 블록마다 영역 ① 2문항
+  assert.equal(cellNeed(5, 1), 2);
+  assert.equal(cellNeed(5, 4), 0);   // 5급에는 영역 ④가 없다
+  LEVELS.forEach((l) => [1, 2, 3, 4].forEach((a) => assert.ok(cellNeed(l, a) <= CELL_MIN[l][a - 1], l + "급 " + a + " 필요 수가 CELL_MIN 을 넘음")));
+
+  const bank = makeSyntheticBank();   // 칸마다 CELL_MIN 만큼 있다(예비 포함)
+  assert.deepEqual(cellShort(bank, []), []);
+  assert.deepEqual(cellShort(bank, null), []);
+  assert.deepEqual(cellShort(null, ["Q31A01"]), []);
+  /* 3급 ①은 예비가 하나라 한 문항은 견디고 두 문항이면 모자란다 */
+  const l3a1 = bank.items.filter((it) => it.level === 3 && it.area === 1 && it.half === "A").map((it) => it.id);
+  assert.deepEqual(cellShort(bank, [l3a1[0]]), []);
+  const two = cellShort(bank, [l3a1[0], l3a1[1]]);
+  assert.equal(two.length, 1);
+  assert.deepEqual({ half: two[0].half, level: two[0].level, area: two[0].area, left: two[0].left, need: two[0].need }, { half: "A", level: 3, area: 1, left: 7, need: 8 });
+  /* 5급 ①은 예비가 없어 한 문항만 빼도 걸린다 */
+  const l5a1 = bank.items.filter((it) => it.level === 5 && it.area === 1 && it.half === "A").map((it) => it.id);
+  const one = cellShort(bank, [l5a1[0]]);
+  assert.equal(one.length, 1);
+  assert.equal(one[0].left, 1); assert.equal(one[0].need, 2); assert.deepEqual(one[0].ids, [l5a1[0]]);
+  /* 은행에 없는 id 는 무시한다 */
+  assert.deepEqual(cellShort(bank, ["ZZZZ"]), []);
+
+  /* 도판이 든 ① 칸은 하나가 더 있어야 한다(블록에 도판이 이미 있으면 그 문항을 건너뛴다).
+     ③ 칸은 가장 먼저 채우므로 도판을 건너뛸 일이 없어 더하지 않는다 */
+  const imgBank = makeSyntheticBank({ images: true });
+  const l3a1i = imgBank.items.filter((it) => it.level === 3 && it.area === 1 && it.half === "A");
+  const one3 = cellShort(imgBank, [l3a1i.find((it) => !it.image).id]);
+  assert.equal(one3.length, 1);
+  assert.equal(one3[0].need, 9); assert.equal(one3[0].left, 8);
+  /* 도판 문항 자체를 비활성으로 돌리면 남은 문항에 도판이 없으니 하나를 더할 까닭이 없다(drawBlock 은 비활성 문항을 먼저 뺀다) */
+  assert.deepEqual(cellShort(imgBank, [l3a1i.find((it) => it.image).id]), []);
+  const l3a3i = imgBank.items.filter((it) => it.level === 3 && it.area === 3 && it.half === "A");
+  const one3c = cellShort(imgBank, [l3a3i.find((it) => !it.image).id]);
+  assert.equal(one3c.length, 1);
+  assert.equal(one3c[0].need, 4); assert.equal(one3c[0].left, 3);
+});
+
+test("mergeBank: 공개부와 정답부만으로 은행 원본을 되살린다(5급 사례 필드 포함)", () => {
+  const file = makeSyntheticBank({ ver: "2026-09-v1", seedSalt: "salt-x" });
+  /* 5급 문항에는 사례 서술 필드가 붙는다. 이 필드가 정답부에 실려야 복구가 온전하다 */
+  file.items.filter((it) => it.level === 5).forEach((it, i) => {
+    it.case = "가상 사례 " + i;
+    it.question = "이 사례에서 알맞은 판단은?";
+    it.caseLen = it.case.length;
+  });
+  const { pub, keys } = splitBank(file);
+  assert.equal(JSON.stringify(pub).includes("가상 사례"), false);
+  const back = mergeBank(pub, keys);
+  assert.deepEqual(back, file);
+  assert.equal(JSON.stringify(back), JSON.stringify(file));
+  /* 정답부가 없으면 정답 자리가 비고 나머지 구조는 살아 있다 */
+  const noKeys = mergeBank(pub, null);
+  assert.equal(noKeys.items.length, file.items.length);
+  assert.equal(noKeys.items[0].answer, null);
+  assert.equal(validateBank(noKeys).ok, false);
 });
 
 /* ---------- 시간·표본 ---------- */
