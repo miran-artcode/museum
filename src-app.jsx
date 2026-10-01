@@ -6219,7 +6219,7 @@ function TimeScatter({ rows, hoverId, setHoverId, onSel }) {
 function CreativityPanel({ ids, roster, wsMap, onSel }) {
   const [hoverId, setHoverId] = useState(null);
   const [sortKey, setSortKey] = useState("id");
-  const wsOnly = useMemo(() => Object.fromEntries(ids.map((id) => [id, wsMap[id] || {}])), [ids, wsMap]);
+  const wsOnly = useMemo(() => Object.fromEntries(ids.map((id) => [id, wsMap[id] || {}])), [ids.join("|"), wsMap]);   // ids는 그릴 때마다 새 배열이라 내용으로 비교한다
   const axesAll = useMemo(() => creativityAxesAll(wsOnly), [wsOnly]);
   const aiAll = useMemo(() => aiTypesAll(wsOnly), [wsOnly]);
 
