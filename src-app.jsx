@@ -8663,7 +8663,7 @@ function TeacherApp({ onExit, onGallery }) {
   const [surveyMap, setSurveyMap] = useState({});
   const [sel, setSel] = useState(null);
   const [selTab, setSelTab] = useState(null); // 학생 상세를 열 때 곧장 보여 줄 서브탭 (예: 「변화 보기」→사고 변화)
-  const openStudent = (id, tab2) => { setSelTab(tab2 || null); setSel(id); };
+  const openStudent = (id, tab2) => { setSelTab(tab2 || null); setSel(id); if (id && visitedRef.current) visitedRef.current.add(id); };
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const [openMap, setOpenMap] = useState(DEFAULT_OPEN);
@@ -8684,34 +8684,78 @@ function TeacherApp({ onExit, onGallery }) {
     setTab(t);
   };
 
-  const loadAll = async () => {
-    setLoading(true);
-    const real = (await store.get("roster")) || {};
+  /* 학급 기록 읽기. 읽기 실패를 빈 기록({})으로 두면 그 학생이 「기록 없음」으로 보여
+     명부 정리의 「기록이 없는 학생만」에 골라져 지워질 수 있다. 실패한 학생은 loadFail에 표시한다.
+     quiet: 이미 보이는 자료를 그대로 둔 채 뒤에서 새로 읽는다 (탭을 비우면 패널 상태와 메시지가 사라진다). */
+  const [loadFail, setLoadFail] = useState({});
+  const [loadErr, setLoadErr] = useState("");
+  const newerWs = (a, b) => (a && b && (a._updatedAt || "") > (b._updatedAt || "") ? a : b);
+  const loadAll = async (opts) => {
+    const quiet = !!(opts && opts.quiet);
+    if (!quiet) setLoading(true);
+    const rRes = await store.getSafe("roster");
+    if (!rRes.ok) {
+      // 명부를 못 읽었는데 표본 학급을 띄우면 실제 학급이 사라진 것처럼 보인다. 지금 화면을 그대로 둔다
+      if (!viewerOnly) setLoadErr("학급 명부를 불러오지 못했습니다. 연결을 확인하고 「새로고침」을 누르세요.");
+      setLoading(false);
+      return;
+    }
+    const real = rRes.data || {};
     const realIds = Object.keys(real);
-    let r = {}, wsMapNew = {}, gMapNew = {}, svMapNew = {};
+    let r = {}, wsMapNew = {}, gMapNew = {}, svMapNew = null;
+    const fails = {};
+    let err = "";
     if (realIds.length) {
       r = { ...real };
-      const gs = await fbStore.allGrades();
-      svMapNew = await fbStore.allSurveys();
+      const [gs, svs] = await Promise.all([fbStore.allOfSafe("grades"), fbStore.allOfSafe("surveys")]);
+      if (!gs.ok || !svs.ok) err = "채점 또는 설문 기록을 불러오지 못해 앞서 읽은 값을 보여 줍니다.";
+      if (svs.ok) svMapNew = svs.data;
       await Promise.all(realIds.map(async (id) => {
-        wsMapNew[id] = (await store.get("ws:" + id)) || {};
-        gMapNew[id] = gs[id] || null;
+        const w = await store.getSafe("ws:" + id);
+        if (w.ok) wsMapNew[id] = w.data || {}; else fails[id] = true;
+        if (gs.ok) gMapNew[id] = gs.data[id] || null;
       }));
       setSampleMode(false);
+      if (gs.ok) setGradeMap(gMapNew);
     } else {
       const sample = buildSampleClass();
       r = { ...sample.roster }; wsMapNew = { ...sample.ws }; gMapNew = { ...sample.grade }; svMapNew = { ...sample.surveys };
       setSampleMode(true);
+      setGradeMap(gMapNew);
     }
-    const cfg = await store.get("config");
-    setOpenMap((cfg && cfg.open) || DEFAULT_OPEN);
-    setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
-    setAnCfg((cfg && cfg.anchor) || DEFAULT_ANCHOR);
+    const cfgRes = await store.getSafe("config");
+    if (cfgRes.ok) {
+      const cfg = cfgRes.data;
+      setOpenMap((cfg && cfg.open) || DEFAULT_OPEN);
+      setSvCfg((cfg && cfg.survey) || DEFAULT_SURVEY);
+      setAnCfg((cfg && cfg.anchor) || DEFAULT_ANCHOR);
+    }
     setRoster(r);
-    setWsMap(wsMapNew);
-    setGradeMap(gMapNew);
-    setSurveyMap(svMapNew);
+    // 실패한 학생은 앞서 읽은 값을 남긴다. 조용한 갱신에서는 구독이 먼저 가져온 더 새 기록을 덮지 않는다
+    setWsMap((p) => {
+      const n = { ...wsMapNew };
+      Object.keys(fails).forEach((id) => { if (p[id]) n[id] = p[id]; });
+      if (quiet) Object.keys(n).forEach((id) => { n[id] = newerWs(p[id], n[id]) || n[id]; });
+      return n;
+    });
+    if (svMapNew) setSurveyMap(svMapNew);
+    setLoadFail(fails);
+    const nf = Object.keys(fails).length;
+    setLoadErr(err + (nf ? (err ? " " : "") + "학생 " + nf + "명의 기록지를 불러오지 못했습니다(「불러오기 실패」로 표시). 「새로고침」을 누르세요." : ""));
     setLoading(false);
+  };
+
+  /* 학생 상세에서 돌아올 때: 학급 전체를 다시 읽고 탭을 비우는 대신, 열어 본 학생과 실패했던 학생만 뒤에서 다시 읽는다.
+     명부·기록지·설문은 목록 화면의 실시간 구독이 다시 붙으면서 새로 받는다 */
+  const visitedRef = useRef(new Set());
+  const refreshStudents = async (idList) => {
+    const list = [...idList].filter(Boolean);
+    if (!list.length || sampleMode) return;
+    const res = await Promise.all(list.map(async (id) => [id, ...(await Promise.all(["ws:", "grade:", "survey:"].map((k) => store.getSafe(k + id))))]));
+    setWsMap((p) => { const n = { ...p }; res.forEach(([id, w]) => { if (w.ok) n[id] = w.data || {}; }); return n; });
+    setGradeMap((p) => { const n = { ...p }; res.forEach(([id, , g]) => { if (g.ok) n[id] = g.data || null; }); return n; });
+    setSurveyMap((p) => { const n = { ...p }; res.forEach(([id, , , s]) => { if (s.ok) { if (s.data) n[id] = s.data; else delete n[id]; } }); return n; });
+    setLoadFail((p) => { const n = { ...p }; res.forEach(([id, w]) => { if (w.ok) delete n[id]; }); return n; });
   };
 
   /* config 문서는 차시 공개·설문·붙여넣기·앵커가 나눠 쓴다. 통째로 읽어 통째로 다시 쓰면
@@ -8785,7 +8829,7 @@ function TeacherApp({ onExit, onGallery }) {
       if (Object.keys(r).length) { setRoster(r); setSampleMode(false); setLoading(false); }
     });
     const un2 = fbStore.watchWorksheets((w) => {
-      if (Object.keys(w).length) setWsMap((p) => ({ ...p, ...w }));
+      if (Object.keys(w).length) { setWsMap((p) => ({ ...p, ...w })); setLoadFail((p) => { const n = { ...p }; Object.keys(w).forEach((id) => { delete n[id]; }); return n; }); }
     });
     const un3 = fbStore.watchDoc("config", (cfg) => { if (cfg && cfg.open) setOpenMap(cfg.open); if (cfg) setSvCfg(cfg.survey || DEFAULT_SURVEY); if (cfg) setCfgAll(cfg); if (cfg) setAnCfg(cfg.anchor || DEFAULT_ANCHOR); });
     const un4 = fbStore.watchSurveys((s) => {
@@ -8865,7 +8909,7 @@ function TeacherApp({ onExit, onGallery }) {
         {sel && !viewerOnly ? (
           <div style={{ paddingTop: 18 }}>
             <TeacherStudentView key={sel} sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} surveyData={surveyMap[sel]} ids={ids} onSel={openStudent} initialTab={selTab}
-              onBack={() => { setSel(null); loadAll(); }} />
+              onBack={() => { const v = new Set([...visitedRef.current, ...Object.keys(loadFail)]); visitedRef.current = new Set(); setSel(null); refreshStudents(v); }} />
           </div>
         ) : (
           <div>
@@ -8874,6 +8918,7 @@ function TeacherApp({ onExit, onGallery }) {
                 지금 보이는 학급은 <b>표본 자료</b>입니다. 화면 구조를 살펴보기 위한 가상 학생 8명이며, 실제 학생이 입장하면 자동으로 실데이터로 바뀝니다.
               </div>
             )}
+            {loadErr && <div role="status" className="warn-note" style={{ marginBottom: 10 }}>{loadErr}</div>}
             <TeacherTabs tab={tab} onSwitch={switchTab} dirty={edDirty} viewer={viewerOnly} />
             {loading ? <div style={{ color: "var(--sub)" }}>학급 기록을 불러오는 중…</div> : tab === "현황" ? (
               <div>
@@ -8906,7 +8951,7 @@ function TeacherApp({ onExit, onGallery }) {
                             <tr key={id}>
                               <td className="mono">{id}</td>
                               <td>{roster[id].nick}</td>
-                              <td><span className="mini-bar"><i style={{ width: p + "%" }} /></span> <span className="mono" style={{ fontSize: 11 }}>{p}%</span></td>
+                              <td>{loadFail[id] ? <span style={{ color: "var(--seal)", fontSize: 12 }}>불러오기 실패</span> : <><span className="mini-bar"><i style={{ width: p + "%" }} /></span> <span className="mono" style={{ fontSize: 11 }}>{p}%</span></>}</td>
                               <td><div className="sess-dots">{SESSIONS.map((s) => {
                                 const r = sessionProgress(s, w);
                                 const st = r >= 0.999 ? "완료" : r > 0 ? "진행 중" : "기록 없음";
@@ -9207,7 +9252,7 @@ function TeacherApp({ onExit, onGallery }) {
                   </div>
                 </div>
                 <RosterAdmin ids={ids} roster={roster} wsMap={wsMap} surveyMap={surveyMap}
-                  sampleMode={sampleMode} onDone={loadAll} />
+                  sampleMode={sampleMode} loadFail={loadFail} onDone={() => loadAll({ quiet: true })} />
               </div>
             )}
           </div>
