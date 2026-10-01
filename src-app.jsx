@@ -5504,6 +5504,24 @@ function StudentApp({ me, onExit, onGallery }) {
    늦게 성공해도 다시 눌렀을 때 같은 결과가 되는(멱등) 작업에만 쓴다. */
 const timed = (p, ms) => Promise.race([p, new Promise((res) => setTimeout(() => res(false), ms || 8000))]);
 
+/* 한 학생의 기록지·미디어·전시장 사본을 지운다 (기록 초기화·학생 완전 삭제·명부 일괄 삭제가 함께 쓴다).
+   지우기 직전에 서버의 기록지를 다시 읽어 미디어 참조를 모은다: 화면을 연 뒤 올린 사진이 빠지면 주인 없는 파일로 남는다.
+   미디어를 하나라도 못 지우면 기록지는 지우지 않는다. 기록지가 남아야 다시 눌렀을 때 참조를 다시 모을 수 있다.
+   돌려주는 값: { fatal: 기록지를 건드리지 못했는가, fails: 못 한 일 이름들 } */
+async function wipeWorksheet(sid, knownWs) {
+  const fresh = await store.getSafe("ws:" + sid);
+  if (!fresh.ok || fresh.fromCache) return { fatal: true, fails: ["기록지 읽기"] };
+  const refs = new Set([...collectMediaRefs(fresh.data || {}), ...collectMediaRefs(knownWs || {})]);
+  let mFail = 0;
+  for (const ref of refs) if (!(await timed(mediaStore.remove(sid, ref)))) mFail++;
+  if (mFail) return { fatal: true, fails: ["미디어 " + mFail + "개"] };
+  const fails = [];
+  // 기록지가 사라지면 전시장 사본만 남아 걸려 있게 된다
+  if (!(await timed(fbStore.remove("exhibit:" + sid)))) fails.push("전시장 사본");
+  if (fresh.data && !(await timed(fbStore.remove("ws:" + sid)))) fails.push("기록지");
+  return { fatal: false, fails };
+}
+
 function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack, ids, onSel, initialTab }) {
   const [ws, setWs] = useState(null);
   const [grade, setGrade] = useState({});
@@ -5581,7 +5599,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
   const [busyMgmt, setBusyMgmt] = useState(false);
   const [newNick, setNewNick] = useState("");
   const [newSid, setNewSid] = useState("");
-  const canManage = !isSample && !isPreview;
+  const canManage = !isSample && !isPreview && !authApi.isViewer(); // 보기 전용 계정은 쓰기가 모두 거부되므로 관리 버튼을 감춘다
 
   const changeNick = async () => {
     const nick = newNick.trim().slice(0, 12);
@@ -5693,24 +5711,28 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
     const token = window.prompt("이 학생의 기록지와 미디어를 모두 지웁니다. 별명(명부)과 채점은 남습니다.\n지우면 되돌릴 수 없습니다. 확인을 위해 학번(" + sid + ")을 입력하세요.");
     if (token == null) return;
     if (token.trim() !== sid) return setMgmtMsg("학번이 일치하지 않아 취소했습니다.");
+    if (authApi.isViewer()) return setMgmtMsg("보기 전용 계정은 지울 수 없습니다.");
     setBusyMgmt(true); setMgmtMsg("지우는 중…");
-    for (const ref of collectMediaRefs(ws)) await mediaStore.remove(sid, ref);
-    await fbStore.remove("ws:" + sid);
-    setWs({});
+    const w = await wipeWorksheet(sid, ws);
     setBusyMgmt(false);
+    if (w.fails.length) return setMgmtMsg("초기화를 끝내지 못했습니다(" + w.fails.join(", ") + " 실패). " + (w.fatal ? "기록지는 그대로 있습니다. " : "") + "연결을 확인하고 다시 누르세요.");
+    setWs({});
     setMgmtMsg("기록을 초기화했습니다. 학생이 다시 입장하면 빈 기록지로 시작합니다. (접속 중이던 학생은 화면을 새로 고침해야 합니다.)");
   };
 
   const deleteStudent = async () => {
-    const token = window.prompt("학생 " + sid + "의 명부·기록·미디어·채점을 모두 지웁니다. 되돌릴 수 없습니다.\n확인을 위해 학번을 입력하세요.");
+    const token = window.prompt("학생 " + sid + "의 명부·기록·미디어·채점·전시장 작품을 모두 지웁니다. 되돌릴 수 없습니다.\n(설문·상호평가·쪽지시험 기록·기록지 시점 사본·연구 동의 칸은 남습니다.)\n확인을 위해 학번을 입력하세요.");
     if (token == null) return;
     if (token.trim() !== sid) return setMgmtMsg("학번이 일치하지 않아 취소했습니다.");
+    if (authApi.isViewer()) return setMgmtMsg("보기 전용 계정은 지울 수 없습니다.");
     setBusyMgmt(true); setMgmtMsg("지우는 중…");
-    for (const ref of collectMediaRefs(ws)) await mediaStore.remove(sid, ref);
-    await fbStore.remove("ws:" + sid);
-    await fbStore.remove("grade:" + sid);
-    await fbStore.removeStudent(sid);
+    const w = await wipeWorksheet(sid, ws);
+    const fails = w.fails.slice();
+    if (!w.fatal && !(await timed(fbStore.remove("grade:" + sid)))) fails.push("채점");
+    // 명부는 나머지를 모두 지웠을 때만 지운다. 남은 것이 있으면 목록에 보여야 다시 정리할 수 있다
+    if (!fails.length && !(await timed(fbStore.removeStudent(sid)))) fails.push("명부");
     setBusyMgmt(false);
+    if (fails.length) return setMgmtMsg("삭제를 끝내지 못했습니다(" + fails.join(", ") + " 실패). 연결을 확인하고 다시 누르세요.");
     window.alert("학생 " + sid + "의 자료를 모두 지웠습니다.\n로그인 계정(" + sid + "@museum.class)은 Firebase 콘솔 Authentication에서 지울 수 있습니다. 같은 학번으로 다시 입장하면 새로 시작됩니다.");
     onBack();
   };
@@ -5819,7 +5841,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
         <div>
           {!canManage ? (
             <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
-              {isSample ? "표본 학급 자료는 관리할 수 없습니다. 실제 학생이 입장하면 여기서 별명·학번 변경, 기록 초기화, 작품 정리를 할 수 있습니다." : "미리보기 기록은 관리 대상이 아닙니다."}
+              {isSample ? "표본 학급 자료는 관리할 수 없습니다. 실제 학생이 입장하면 여기서 별명·학번 변경, 기록 초기화, 작품 정리를 할 수 있습니다." : isPreview ? "미리보기 기록은 관리 대상이 아닙니다." : "보기 전용 계정은 학생 관리를 할 수 없습니다."}
             </div></div>
           ) : (
             <div>
@@ -8539,30 +8561,35 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
     if (token == null) return;
     if (token.trim() !== String(chosen.length)) return say("warn", "인원 수가 일치하지 않아 취소했습니다.");
 
+    if (authApi.isViewer()) return say("warn", "보기 전용 계정은 지울 수 없습니다.");
     setBusy(true);
-    let done = 0;
-    try {
-      for (const id of chosen) {
-        say("ok", "지우는 중… " + (done + 1) + " / " + chosen.length + " (" + id + ")");
-        for (const ref of collectMediaRefs(wsMap[id] || {})) await mediaStore.remove(id, ref);
-        await fbStore.remove("ws:" + id);
-        await fbStore.remove("grade:" + id);
-        await fbStore.remove("survey:" + id);
-        await fbStore.removeStudent(id);
-        done++;
+    const doneIds = [], failed = [];
+    for (const id of chosen) {
+      say("ok", "지우는 중… " + (doneIds.length + failed.length + 1) + " / " + chosen.length + " (" + id + ")");
+      const w = await wipeWorksheet(id, wsMap[id]);
+      const fails = w.fails.slice();
+      if (!w.fatal) {
+        if (!(await timed(fbStore.remove("grade:" + id)))) fails.push("채점");
+        if (!(await timed(fbStore.remove("survey:" + id)))) fails.push("설문");
       }
-      const cm = await store.get("research:consent");
-      if (cm && typeof cm === "object") {
-        const next = { ...cm };
-        chosen.forEach((id) => { delete next[id]; });
-        await store.set("research:consent", next);
-      }
-      setSel({});
-      say("ok", done + "명을 지웠습니다. 로그인 계정은 Firebase 콘솔의 Authentication에서 따로 지워야 하며, 같은 학번으로 다시 입장하면 빈 기록지로 새로 시작합니다.");
-      if (onDone) onDone();
-    } catch (e) {
-      say("warn", "지우다 중단됐습니다 (" + done + "명 처리). 남은 학생은 다시 고르고 실행하세요.");
+      // 명부는 나머지를 모두 지웠을 때만 지운다. 남은 것이 있으면 목록에 남아야 다시 고를 수 있다
+      if (!fails.length && !(await timed(fbStore.removeStudent(id)))) fails.push("명부");
+      if (fails.length) failed.push(id + "(" + fails.join("·") + ")"); else doneIds.push(id);
     }
+    // 동의 대장은 그 학생 칸만 지운다. 읽어서 통째로 다시 쓰면 그 사이 다른 화면이 고친 칸이 사라진다
+    let consentOk = true;
+    if (doneIds.length) {
+      const patch = {};
+      doneIds.forEach((id) => { patch[id] = undefined; });
+      consentOk = (await store.updateFieldsT("research:consent", patch)) !== false; // "missing"이면 지울 칸도 없다
+    }
+    setSel(failed.length ? Object.fromEntries(chosen.filter((id) => !doneIds.includes(id)).map((id) => [id, true])) : {});
+    if (failed.length || !consentOk) {
+      say("warn", doneIds.length + "명을 지웠습니다. " + (failed.length ? failed.length + "명은 끝내지 못했습니다: " + failed.join(", ") + ". 연결을 확인하고 남은 학생(고른 상태로 둠)을 다시 지우세요. " : "") + (consentOk ? "" : "동의 대장의 칸을 지우지 못했습니다."));
+    } else {
+      say("ok", doneIds.length + "명을 지웠습니다. 로그인 계정은 Firebase 콘솔의 Authentication에서 따로 지워야 하며, 같은 학번으로 다시 입장하면 빈 기록지로 새로 시작합니다.");
+    }
+    if (doneIds.length && onDone) onDone();
     setBusy(false);
   };
 
@@ -8609,7 +8636,7 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
           </table>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
-          <button className="btn" disabled={busy || sampleMode || !chosen.length}
+          <button className="btn" disabled={busy || sampleMode || !chosen.length || authApi.isViewer()} hidden={authApi.isViewer()}
             style={chosen.length ? { background: "var(--seal)", borderColor: "var(--seal)" } : {}}
             onClick={del}>
             {busy ? "지우는 중…" : "고른 " + chosen.length + "명 지우기"}
