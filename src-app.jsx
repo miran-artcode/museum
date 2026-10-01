@@ -2307,7 +2307,7 @@ function prePostStats(pre, post) {
 /* ---------- 공용 UI ---------- */
 
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
 :root{
   --bg:#E8E6E0; --card:#F8F7F3; --card2:#F1EFE9; --ink:#24261F; --sub:#6E6C62;
   --line:#CCC9BE; --line2:#DEDBD2; --seal:#9A382F; --seal-bg:#F3E4E1;
