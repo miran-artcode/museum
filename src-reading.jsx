@@ -23,6 +23,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { fbStore } from "./src-fb.js";
 import { AccessReadingBar, AccessPara, figAlt, FigureDesc } from "./src-access.jsx";
+import { AskBox } from "./src-asks.jsx";
 
 const isArr = Array.isArray;
 const arr = (x) => (isArr(x) ? x : []);
@@ -557,12 +558,8 @@ export function ReadingBody({ rd, L, extra }) {
       ))}
       {renderSlot("end")}
       {extra}
-      {asks.length > 0 && (
-        <div className="rd-asks">
-          <div className="rd-asks-h">생각해 볼 질문</div>
-          <ol>{asks.map((a, i) => <li key={i}>{inline(a)}</li>)}</ol>
-        </div>
-      )}
+      {/* 학생 화면이면 질문마다 「내 생각 쓰기」로 답을 쓴다(골라서 쓰는 선택 활동). 교사·예시 화면은 질문만 (src-asks.jsx) */}
+      {asks.length > 0 && <AskBox L={L} rd={rd} asks={asks} fmt={inline} />}
       {works.length > 0 && (
         <section className="rd-works">
           <div className="rd-works-h">작품·문헌 더 알아보기 <span>{works.length}</span></div>

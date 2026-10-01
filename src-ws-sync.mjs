@@ -27,8 +27,10 @@
    이 파일은 순수 함수만 둔다 (React·Firebase 없음). 테스트: src-ws-sync.test.mjs
    ============================================================ */
 
-/* 안쪽 키 단위로 저장하는 보조 맵 */
-export const MAP_KEYS = new Set(["_inq", "_t", "_act"]);
+/* 안쪽 키 단위로 저장하는 보조 맵.
+   _askMeta·_askRev는 「생각해 볼 질문」 답의 질문 사본·입력 시각과 고친 흔적이다. 안쪽 키가 답 키(ask3.k1a2b3c)라
+   답 하나를 고치면 그 답의 항목만 보낸다 (src-asks-core.mjs) */
+export const MAP_KEYS = new Set(["_inq", "_t", "_act", "_askMeta", "_askRev"]);
 /* 토큰 구분자: 저장 키에 쓰지 않는 제어 문자(단위 구분자). 점은 저장 키 안에 있으므로 쓸 수 없다 */
 export const SEP = "\u001f";
 export const tok = (k, sub) => k + SEP + sub;

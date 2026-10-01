@@ -462,7 +462,7 @@ function useDetailsOpen(elRef) {
 
 /* 화면에 그려진 읽기 자료의 글 덩어리를 차례로. 학습 지원이 덧붙인 것(.ax-*)은 뺀다.
    도식(section.vz: 연표·흐름·비교·용어 등)은 통째로 innerText로 읽는다(글 순서가 맞다). 도식은 문장 강조를 하지 않는다 */
-const READ_SEL = ".rd-h, .rd-p, .rd-q p, .rd-q cite, .rd-key p, .rd-list li, section.vz, .rd-fig-t, .rd-asks-h, .rd-asks li";
+const READ_SEL = ".rd-h, .rd-p, .rd-q p, .rd-q cite, .rd-key p, .rd-list li, section.vz, .rd-fig-t, .rd-asks-h, .rd-asks li:not(.rd-ask), .rd-ask-q";
 function textBlocks(root) {
   if (!root) return [];
   return Array.from(root.querySelectorAll(READ_SEL))

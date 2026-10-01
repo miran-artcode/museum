@@ -28,6 +28,8 @@ import { InquirySource } from "./src-inquiry-aids.jsx";
 import { INQUIRY_SECTIONS, InquiryField, InquiryTrace, InquiryAidConfig, InquiryStyle, inquiryTraceRows } from "./src-inquiry.jsx";
 import { makeSnapshotter, WsHistoryCard } from "./src-ws-history.jsx";
 import { makeDirtyTracker, changedTokens, mergeRemote, buildEntries, mergeTraceForSave, reconcileTrace, tok as wsTok, mergeSurvey, surveyEntries, submittedBlocks } from "./src-ws-sync.mjs";
+import { isAskKey, askTrace } from "./src-asks-core.mjs";
+import { AskScope, AskReader, AskClassCard, AskStyle, askFieldMeta, askResearchFile, ASK_RESEARCH_VARS, ASK_VAR_NEED } from "./src-asks.jsx";
 import { LegacyEcho } from "./src-legacy-fields.jsx";
 import { WsLockCtx, LockSet, WsLockNote, WsLockCard, WsLockStyle, wsLockOn } from "./src-ws-lock.jsx";
 import { AccessProvider, AccessButton, AccessLessonTerms, AccessMemo, AccessStyle, MediaText, MediaTextRead, GateLangHelp } from "./src-access.jsx";
@@ -1930,6 +1932,9 @@ function fieldMeta(key) {
   const hash = s0.indexOf("#");
   const base = hash >= 0 ? s0.slice(0, hash) : s0;
   const sub = hash >= 0 ? s0.slice(hash + 1) : "";
+  // 생각해 볼 질문의 답 키(ask3.k1a2b3c)는 강의 노트의 질문 문장으로 읽는다 (src-asks.jsx)
+  const am = askFieldMeta(base, LESSONS);
+  if (am) return { ...am, sub, subName: subLabel(sub) };
   const [sid0, fk0] = base.split(".");
   // 저장 키가 재지정된 칸(s3a.problem → 단계 3 카드)은 표로 먼저 찾고, 없으면 키 앞부분으로 찾는다
   const hit = FIELD_OF_KEY[base];
@@ -5227,6 +5232,9 @@ function StudentApp({ me, onExit, onGallery }) {
           next._log = [...log, { k, at: now(), prev: prev.slice(0, 400) }];
         }
       }
+      // 생각해 볼 질문의 답(ask{차시}.{질문 지문})은 질문 사본·입력 시각·수정 이력을 따로 기록한다 (src-asks-core.mjs).
+      // _log에 섞지 않는다: 연구 변수 edit_n·rewrite_*의 뜻과 300건 상한을 본 과제 칸의 것으로 지키려고
+      if (isAskKey(k) && typeof val === "string") Object.assign(next, askTrace(p, k, val, now()));
       /* 붙여넣은 뒤 그 칸을 마지막으로 손댈 때까지의 초 — 붙이고 바로 넘어갔는지 붙잡고 고쳤는지.
          표·점검표는 setField가 배열이나 객체를 통째로 넘기므로 문자열 여부를 따지면 안 되고,
          붙여넣기 키가 "s5b.rounds#prompt2"처럼 줄까지 가리키므로 "#" 앞으로 맞춰야 한다. */
@@ -5719,7 +5727,7 @@ function StudentApp({ me, onExit, onGallery }) {
           const inquirySec = secs.find((s) => s.id === "q" + L.n);
           return (
             <React.Fragment key={L.n}>
-              <LessonPanel L={L} onReading={onReading} />
+              <AskScope ws={ws} setField={setField} locked={wsLocked} save={saveState}><LessonPanel L={L} onReading={onReading} /></AskScope>
               {confirmSec && <SectionCard sec={confirmSec} ws={ws} setField={setField} />}
               {inquirySec && <SectionCard sec={inquirySec} ws={ws} setField={setField} onGallery={onGallery} inq={{ sid: me.sid, cfg: cfgAll }} />}
             </React.Fragment>
@@ -6332,6 +6340,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
       )}
       {subTab === "기록 열람" && SESSIONS.filter((s) => sessFilter === "전체" || s === sessFilter).map((sess) => (
         <div key={sess}>
+          <AskReader ws={ws} session={sess} lessons={LESSONS} />
           {SCHEMA.filter((s) => s.session === sess).map((sec) => {
             const sp = sectionProgress(sec, ws);
             return (
@@ -7786,6 +7795,9 @@ const RESEARCH_VARS = [
   { k: "rewrite_deep_n", name: "깊은 개작 건수", unit: "건", def: "이전 문장과 절반 이상 달라진 개작의 수", get: (c) => c.rv.deepN },
   { k: "trace_pruned", name: "덜어 낸 흔적", unit: "건", def: "기록지가 저장 한계에 닿아 오래된 순으로 덜어 낸 흔적의 수. 0이 아니면 그 참여자의 고쳐 쓰기 이력은 완전하지 않다", get: (c) => (c.ws._pruned || 0) },
 
+  /* 생각해 볼 질문: 강의 노트 질문에 골라 쓴 답 (src-asks.jsx) */
+  ...ASK_RESEARCH_VARS,
+
   /* 프롬프트 궤적 */
   { k: "prompt_n", name: "프롬프트 기록 회차", unit: "회", def: "전문을 남긴 생성 회차의 수", get: (c) => c.pr.promptN },
   { k: "prompt_growth", name: "프롬프트 어휘 변화", unit: "개", def: "마지막 회차 − 첫 회차의 어휘 수", get: (c) => c.pr.growth },
@@ -7870,6 +7882,7 @@ const VAR_NEED = {
   rewrite_depth: "log", rewrite_deep_n: "log", trace_pruned: "log",
   survey_pre: "survey", survey_post: "survey",
   media_n: "media", cr_multimodal: "media",
+  ...ASK_VAR_NEED,
 };
 
 /* 동의하지 않은 항목의 값은 빈칸으로 나간다.
@@ -8697,6 +8710,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       p: "흔적 문장의 첫 문장과 마지막 문장, 저장한 문장 사이의 이동, 단원 안의 사고 변화 쌍 " + CHANGE_PAIRS.length + "종을 텍스트와 지표 차이로 나란히 담습니다.", go: exportPairs },
     { k: "inquiry", h: "탐구 되묻기 단위 자료", fn: "연구자료_탐구되묻기" + tag + "_" + stamp + ".csv",
       p: "참여자 × 탐구 질문(개념·설계)이 1행. 출발점, 첫 답과 고친 답, 겹침·구체성 차이, 받은 되묻기와 스스로 쓴 질문, 확정 뒤 고친 시간을 담습니다. 되묻기 뒤에 답이 움직였는지가 이 파일의 질문입니다.", go: exportInquiry },
+    askResearchFile({ cases, exportCases, tag, stamp, download, toCSV, agreed: consentAgreed, lessons: LESSONS }),
     { k: "desc", h: "기술통계 표", fn: "기술통계" + tag + "_" + stamp + ".md",
       p: "표 1 기술통계, 표 2 단계 도달, 표 3 안 보이는 이유 분포, 표 4 선택 분포, 표 5 사전·사후 비교, 표 6 상관. 마크다운 표라 논문 편집기에 그대로 붙습니다.", go: () => download("기술통계" + tag + "_" + stamp + ".md", descriptivesMD(), "text/markdown") },
     { k: "codebook", h: "변수 사전", fn: "변수사전" + tag + "_" + stamp + ".md",
@@ -9573,6 +9587,7 @@ function TeacherApp({ onExit, onGallery }) {
                     <p className="hint" style={{ marginTop: 8 }}>막대 순서는 왼쪽부터 상(초록)·중(갈색)·하(붉은색)이고, 인원수는 오른쪽 숫자로 읽습니다. 채점은 학생 열람 화면에서 합니다.</p>
                   </div>
                 </div>
+                <AskClassCard ids={ids} roster={roster} wsMap={wsMap} lessons={LESSONS} onSel={openStudent} code="기록 4" />
               </div>
             ) : tab === "사고 과정" ? (
               <TranslationPanel ids={ids} roster={roster} wsMap={wsMap} onSel={openStudent} />
@@ -10407,6 +10422,7 @@ function App() {
     <div className="app">
       <style>{CSS}</style>
       <ContentStyle />
+      <AskStyle />
       <CardMediaStyle />
       <SurveyStyle />
       <StanceStyle />

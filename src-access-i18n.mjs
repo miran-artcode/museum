@@ -144,6 +144,7 @@ export const UI_WORDS = [
   ["읽기 자료", { en: "Readings", zh: "阅读材料", vi: "Tài liệu đọc", ru: "Материалы для чтения", ja: "読み物" }],
   ["모두 펼치기", { en: "Open all", zh: "全部展开", vi: "Mở tất cả", ru: "Раскрыть всё", ja: "すべて開く" }],
   ["생각해 볼 질문", { en: "Questions to think about", zh: "思考题", vi: "Câu hỏi suy nghĩ", ru: "Вопросы для размышления", ja: "考えてみる質問" }],
+  ["내 생각 쓰기", { en: "Write my thoughts", zh: "写下我的想法", vi: "Viết suy nghĩ của tôi", ru: "Написать свои мысли", ja: "自分の考えを書く" }],
   ["배움 확인", { en: "Learning check", zh: "学习确认", vi: "Kiểm tra bài học", ru: "Проверка понимания", ja: "学びの確認" }],
   ["탐구 질문", { en: "Inquiry question", zh: "探究问题", vi: "Câu hỏi tìm hiểu", ru: "Исследовательский вопрос", ja: "探究の質問" }],
   ["답 저장", { en: "Save answer", zh: "保存答案", vi: "Lưu câu trả lời", ru: "Сохранить ответ", ja: "答えを保存" }],
