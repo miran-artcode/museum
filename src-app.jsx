@@ -5591,43 +5591,102 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
     else setMgmtMsg("별명 변경에 실패했습니다.");
   };
 
+  /* 학번 옮기기: 모든 것을 지금 서버에서 다시 읽어 옮긴다. 화면을 연 때의 사본을 옮기고 원본을 지우면
+     그 뒤 학생이 쓴 것이 사라진다. 복사가 모두 확인된 뒤에만 원본을 지우고, 중간에 끊긴 이관은
+     새 학번 기록지의 _moved 표시로 알아보고 다시 눌렀을 때 이어서 옮긴다. */
   const changeSid = async () => {
+    if (authApi.isViewer()) return setMgmtMsg("보기 전용 계정은 학번을 옮길 수 없습니다.");
     const target = newSid.trim();
     if (!/^\d{3,6}$/.test(target)) return setMgmtMsg("새 학번은 숫자 3~6자리입니다.");
     if (target === sid) return setMgmtMsg("현재 학번과 같습니다.");
     setBusyMgmt(true);
-    // 읽기 실패를 "비어 있음"으로 치면 사용 중인 학번을 빈 학번으로 오판해 그 학생의 기록을 덮어쓴다
-    const [tRes, rosterRes] = await Promise.all([store.getSafe("ws:" + target), store.getSafe("roster")]);
-    if (!tRes.ok || !rosterRes.ok) { setBusyMgmt(false); return setMgmtMsg("학번 확인 읽기에 실패했습니다. 연결을 확인하고 다시 시도하세요."); }
-    const tWs = tRes.data, allRoster = rosterRes.data;
-    if ((allRoster && allRoster[target]) || tWs) { setBusyMgmt(false); return setMgmtMsg("이미 사용 중인 학번입니다(" + target + "). 먼저 그 학번을 정리하세요."); }
-    if (!window.confirm(sid + " → " + target + " 학번을 바꿉니다.\n기록·미디어·채점이 새 학번으로 옮겨집니다. 학생이 지금 접속 중이 아닐 때 실행하세요.\n진행할까요?")) { setBusyMgmt(false); return; }
+    const stop = (m) => { setBusyMgmt(false); setMgmtMsg(m); };
+    const keys = ["ws:" + sid, "ws:" + target, "roster", "grade:" + sid, "survey:" + sid, "survey:" + target,
+      "exhibit:" + sid, "sub:" + sid, "assess:" + sid, "quiz:" + sid, "research:consent"];
+    const [res, histR] = await Promise.all([Promise.all(keys.map((k) => store.getSafe(k))), fbStore.listWsHistory(sid)]);
+    const [srcR, tWsR, rosterR, gR, svR, tSvR, exR, subR, asR, qzR, cmR] = res;
+    // 읽기 실패를 "없음"으로 치면 사용 중인 학번을 빈 학번으로 오판하거나 옮길 것을 빠뜨린 채 원본을 지운다
+    if ([srcR, tWsR, rosterR, gR, svR, tSvR, exR].some((r) => !r.ok || r.fromCache)) return stop("학번 확인 읽기에 실패했습니다. 연결을 확인하고 다시 시도하세요.");
+    const fresh = srcR.data;
+    if (!fresh && ws._updatedAt) return stop("화면을 연 뒤 이 학생의 기록지가 지워졌습니다. 목록으로 돌아가 다시 여세요.");
+    if ((fresh ? fresh._updatedAt || "" : "") !== (ws._updatedAt || "")) {
+      setWs(fresh);
+      return stop("화면을 연 뒤 학생이 기록지를 고쳤습니다(최근 저장 " + fmtTime(fresh._updatedAt) + "). 화면을 새 기록으로 바꿨습니다. 학생이 접속 중이 아닌지 확인한 뒤 다시 누르세요.");
+    }
+    const allRoster = rosterR.data || {};
+    const tWs = tWsR.data;
+    const mv = tWs && Array.isArray(tWs._moved) ? tWs._moved[tWs._moved.length - 1] : null;
+    // 앞선 이관이 끊겨 남은 복사본이고, 그 뒤 새 학번으로 쓴 기록이 없을 때만 이어서 옮긴다
+    const resumed = !!(mv && mv.from === sid && !((tWs._updatedAt || "") > (mv.at || "")));
+    if ((allRoster[target] || tWs) && !resumed) return stop("이미 사용 중인 학번입니다(" + target + "). 먼저 그 학번을 정리하세요.");
+    const svSrc = svR.data, svT = tSvR.data;
+    const svSame = !!(svSrc && svT) && JSON.stringify(svSrc) === JSON.stringify(svT); // 끊긴 이관이 이미 복사해 둔 설문
+    const svMove = !!svSrc && (!svT || svSame);
+    const refs = collectMediaRefs(fresh || {});
+    const nick = (allRoster[sid] || rec).nick || "";
+    const has = (r, name) => (!r.ok ? name + "(확인하지 못함)" : r.data ? name : null);
+    const moveList = [
+      fresh ? "기록지 (진행 " + overallProgress(fresh) + "%, 최근 저장 " + fmtTime(fresh._updatedAt) + ")" : null,
+      refs.length ? "사진·음성·스케치·영상 " + refs.length + "개" : null,
+      gR.data ? "채점" : null,
+      svMove ? "설문" : null,
+      exR.data ? "전시장 작품" : null,
+      "명부의 별명" + (nick ? " 「" + nick + "」" : ""),
+    ].filter(Boolean);
+    const stayList = [
+      svSrc && !svMove ? "설문 (새 학번에 이미 다른 설문이 있어 옮기지 않음)" : null,
+      has(subR, "상호평가 제출작"), has(asR, "상호평가 기록"), has(qzR, "쪽지시험 응시 기록"),
+      !histR.ok ? "기록지 시점 사본(확인하지 못함)" : histR.data.length ? "기록지 시점 사본 " + histR.data.length + "개 (되돌리기 목록)" : null,
+      !cmR.ok ? "연구 동의 대장의 칸(확인하지 못함)" : cmR.data && cmR.data[sid] ? "연구 동의 대장의 칸" : null,
+      "로그인 계정 (" + sid + "@museum.class)",
+    ].filter(Boolean);
+    if (!window.confirm(sid + " → " + target + " 학번을 바꿉니다." + (resumed ? "\n(앞서 끊긴 이관을 이어서 합니다.)" : "") +
+      "\n\n새 학번으로 옮기는 것\n· " + moveList.join("\n· ") +
+      "\n\n옛 학번에 그대로 남는 것 (옮기지 않음)\n· " + stayList.join("\n· ") +
+      "\n\n학생이 지금 접속 중이 아닐 때 실행하세요. 진행할까요?")) return stop("");
     setMgmtMsg("옮기는 중… 창을 닫지 마세요.");
+    const copiedRefs = [];
     try {
-      if (!(await store.set("ws:" + target, ws))) throw new Error("기록지 복사 실패");
-      const refs = collectMediaRefs(ws);
+      if (fresh) {
+        const moved = [...(Array.isArray(fresh._moved) ? fresh._moved : []), { from: sid, to: target, at: now() }].slice(-10);
+        if (!(await store.setT("ws:" + target, { ...fresh, _moved: moved }))) throw new Error("기록지 복사 실패");
+      }
       for (const ref of refs) {
         // 읽기 실패를 "미디어 없음"으로 치면 복사를 건너뛴 채 아래에서 원본을 지운다 — 사진·녹음이 영영 사라진다
         const r = await mediaStore.getSafe(sid, ref);
         if (!r.ok) throw new Error("미디어 읽기 실패");
-        if (r.data && !(await mediaStore.put(target, ref, r.data))) throw new Error("미디어 복사 실패");
+        if (!r.data) continue; // 기록지가 가리키지만 파일은 이미 없는 경우
+        if (!(await timed(mediaStore.put(target, ref, r.data), 30000))) throw new Error("미디어 복사 실패");
+        copiedRefs.push(ref);
       }
-      const gRes = await store.getSafe("grade:" + sid);
-      if (!gRes.ok) throw new Error("채점 읽기 실패");
-      if (gRes.data && !(await store.set("grade:" + target, gRes.data))) throw new Error("채점 복사 실패");
-      await fbStore.setStudent(target, { nick: rec.nick || "" });
-      // 복사가 모두 성공한 뒤에만 원본을 지운다
-      for (const ref of refs) await mediaStore.remove(sid, ref);
-      await fbStore.remove("ws:" + sid);
-      await fbStore.remove("grade:" + sid);
-      await fbStore.removeStudent(sid);
-      setBusyMgmt(false); setMgmtMsg("");
-      window.alert("학번을 옮겼습니다 → " + target + ".\n학생에게: 다음 입장부터 새 학번과 새 비밀번호 4자리로 들어오라고 안내하세요.\n예전 로그인 계정(" + sid + "@museum.class)은 Firebase 콘솔 Authentication에서 지우면 됩니다.");
-      if (onSel) onSel(target); else onBack();
+      if (gR.data && !(await store.setT("grade:" + target, gR.data))) throw new Error("채점 복사 실패");
+      if (svMove && !svSame && !(await store.setT("survey:" + target, svSrc))) throw new Error("설문 복사 실패");
+      if (exR.data && !(await store.setT("exhibit:" + target, { ...exR.data, owner: target }))) throw new Error("전시장 작품 복사 실패");
+      if (!(await timed(fbStore.setStudent(target, { nick })))) throw new Error("명부 등록 실패");
     } catch (e) {
-      setBusyMgmt(false);
-      setMgmtMsg("옮기다 중단됐습니다 (" + e.message + "). 원본 기록은 그대로 남아 있으니 다시 시도하세요.");
+      return stop("옮기다 중단됐습니다 (" + e.message + "). 옛 학번의 기록은 그대로 있으니 다시 누르면 이어서 옮깁니다.");
     }
+    // 지우기 직전에 원본을 한 번 더 본다. 옮기는 사이 학생이 저장했다면 원본을 지우지 않는다
+    const again = await store.getSafe("ws:" + sid);
+    if (!again.ok || again.fromCache || (again.data ? again.data._updatedAt || "" : "") !== (fresh ? fresh._updatedAt || "" : "")) {
+      if (again.ok && again.data) setWs(again.data);
+      return stop("새 학번에 복사는 끝났지만 그 사이 옛 학번 기록지가 바뀌었거나 확인하지 못해 옛 학번 자료를 지우지 않았습니다. 학생이 접속을 마친 뒤 「학번 옮기기」를 다시 누르면 새 기록으로 이어서 옮깁니다.");
+    }
+    const left = [];
+    if (exR.data && !(await timed(fbStore.remove("exhibit:" + sid)))) left.push("전시장 작품");
+    let mFail = 0;
+    for (const ref of copiedRefs) if (!(await timed(mediaStore.remove(sid, ref)))) mFail++;
+    if (mFail) left.push("미디어 " + mFail + "개");
+    if (svMove && !(await timed(fbStore.remove("survey:" + sid)))) left.push("설문");
+    if (fresh && !(await timed(fbStore.remove("ws:" + sid)))) left.push("기록지");
+    if (gR.data && !(await timed(fbStore.remove("grade:" + sid)))) left.push("채점");
+    // 명부는 마지막에, 나머지를 모두 지웠을 때만 지운다. 남은 것이 있으면 옛 학번이 목록에 보여야 정리할 수 있다
+    if (!left.length && !(await timed(fbStore.removeStudent(sid)))) left.push("명부");
+    setBusyMgmt(false); setMgmtMsg("");
+    window.alert("학번을 옮겼습니다 → " + target + ".\n" +
+      (left.length ? "옛 학번(" + sid + ")에서 다음을 지우지 못했습니다: " + left.join(", ") + ". 목록에서 옛 학번을 열어 정리하세요.\n" : "") +
+      "학생에게: 다음 입장부터 새 학번과 새 비밀번호 4자리로 들어오라고 안내하세요.\n예전 로그인 계정(" + sid + "@museum.class)은 Firebase 콘솔 Authentication에서 지우면 됩니다.");
+    if (onSel) onSel(target); else onBack();
   };
 
   const resetRecords = async () => {
