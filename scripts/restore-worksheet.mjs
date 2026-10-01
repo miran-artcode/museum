@@ -1,7 +1,7 @@
 /* 한 학생의 기록지를 백업 폴더의 상태로 되돌린다.
 
-     npm run restore -- <백업 폴더> <학번>            예) npm run restore -- 2026-09-17_1830 20420
-     npm run restore -- --at=<ISO 시각> <학번>        예) npm run restore -- --at=2026-09-17T01:30:00Z 20420
+     npm run restore -- <백업 폴더> <학번>            예) npm run restore -- 2026-09-17_1830 29901
+     npm run restore -- --at=<ISO 시각> <학번>        예) npm run restore -- --at=2026-09-17T01:30:00Z 29901
                                                        (백업 폴더 없이 Firestore 시점 복구에서 그 시점을 직접 읽는다. 최근 7일)
      npm run restore -- <백업 폴더> <학번> --to=<다른 학번>
                                                        백업의 학번 기록을 다른 학번에 넣는다 (학번을 잘못 쳐서 만든 계정의 기록을 옮길 때)
