@@ -9046,7 +9046,7 @@ function TeacherApp({ onExit, onGallery }) {
                 <div className="card">
                   <div className="card-head"><span className="card-code">설정 2</span><span className="card-title">학생 비밀번호 안내</span></div>
                   <div className="card-body">
-                    <p style={{ fontSize: 13 }}>학생 비밀번호는 학급 서버가 암호화해 보관하므로 교사도 볼 수 없고 이 화면에서 바꿀 수 없습니다. 잊어버린 학생이 있으면 Firebase 콘솔의 Authentication 목록에서 해당 학번 계정을 지우세요. 학생이 같은 학번으로 다시 입장하면 새 비밀번호로 등록되고, 기록은 학번에 남아 있으므로 그대로 이어집니다. 교사 계정(teacher)은 지우지 않습니다. 지운 뒤에는 다음에 입장하는 사람이 관리자 코드를 정하게 되므로, 코드를 잊었으면 콘솔에서 비밀번호를 바꿉니다.</p>
+                    <p style={{ fontSize: 13 }}>학생 비밀번호는 학급 서버가 암호화해 보관하므로 교사도 볼 수 없고 이 화면에서 바꿀 수 없습니다. 잊어버린 학생이 있으면 계정을 지우지 말고 교사 PC에서 <code>node scripts/reset-pin.mjs 학번 새4자리</code>로 비밀번호만 바꿉니다. 기록은 학번에 남아 있으므로 그대로 이어집니다. 교사·보기 전용 계정도 지우지 않습니다. 지운 사이에는 누구든 같은 이메일로 가입해 그 권한을 가져갈 수 있습니다. 코드를 잊었으면 같은 스크립트의 --teacher·--viewer나 콘솔에서 비밀번호만 바꿉니다.</p>
                   </div>
                 </div>
                                 <div className="card">
