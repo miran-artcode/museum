@@ -1359,7 +1359,8 @@ const median = (arr) => {
   const a = arr.filter((x) => x != null).sort((x, y) => x - y);
   if (!a.length) return null;
   const mid = Math.floor(a.length / 2);
-  return a.length % 2 ? a[mid] : Math.round((a[mid - 1] + a[mid]) / 2);
+  // 짝수 개면 가운데 두 값의 평균을 그대로 돌려준다. 정수로 반올림하면 3.42·3.58의 중앙값이 4가 된다 (화면 표시의 반올림은 화면에서)
+  return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
 };
 
 /* ---------- 가져온 글과 전유 ----------
@@ -6047,6 +6048,8 @@ function ApproprScatter({ rows, apMed, srMed, hoverId, setHoverId, onSel }) {
   );
 }
 
+/* 화면 표시용 반올림 — 계산값(중앙값 등)은 정확히 두고 보일 때만 소수 한 자리로 */
+const fmt1 = (x) => (x == null ? x : Math.round(x * 10) / 10);
 function AxisStripRow({ axis, rows, first, hoverId, setHoverId, onSel }) {
   const W = 560, H = first ? 42 : 30, Y = 15;
   const pts = rows.filter((r) => r.v != null);
@@ -6057,7 +6060,7 @@ function AxisStripRow({ axis, rows, first, hoverId, setHoverId, onSel }) {
     <div className="hbar" style={{ alignItems: "center" }}>
       <span className="lb" title={axis.desc}>{axis.name}</span>
       <svg viewBox={"0 0 " + W + " " + H} style={{ flex: "1 1 280px", height: H }} role="img" aria-label={axis.name + " 학급 분포"}>
-        <title>{axis.name + ": 기록 " + pts.length + "명" + (med != null ? " · 중앙값 " + med + "점" : "") + ". " + axis.desc}</title>
+        <title>{axis.name + ": 기록 " + pts.length + "명" + (med != null ? " · 중앙값 " + fmt1(med) + "점" : "") + ". " + axis.desc}</title>
         <line x1={0} y1={Y} x2={W} y2={Y} stroke="var(--line)" strokeWidth={1} />
         {[0, W / 2, W].map((x, i) => <line key={i} x1={x} y1={Y - 3} x2={x} y2={Y + 3} stroke="var(--line2)" strokeWidth={1} />)}
         {first && [["0", 0, "start"], ["50", W / 2, "middle"], ["100", W, "end"]].map(([t, x, an]) => (
@@ -6079,7 +6082,7 @@ function AxisStripRow({ axis, rows, first, hoverId, setHoverId, onSel }) {
       <span className="v" style={{ minWidth: 96, textAlign: "right" }}>
         {axis.key === "originality" && rows.length < 2 ? "비교는 2명부터" : (
           <>
-            {med != null ? "중앙값 " + med : "기록 없음"}
+            {med != null ? "중앙값 " + fmt1(med) : "기록 없음"}
             {missing > 0 && <span style={{ color: "var(--seal)" }}> · 미기록 {missing}</span>}
           </>
         )}
@@ -6220,7 +6223,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
     <div>
       <div className="kpis">
         <div className="kpi"><div className="n">{rows.filter((r) => overallProgress(wsMap[r.id]) > 0).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {ids.length}</span></div><div className="l">기록을 시작한 학생</div></div>
-        <div className="kpi"><div className="n">{meanMed != null ? meanMed : "—"}</div><div className="l">축 평균의 학급 중앙값</div></div>
+        <div className="kpi"><div className="n">{meanMed != null ? fmt1(meanMed) : "—"}</div><div className="l">축 평균의 학급 중앙값</div></div>
         <div className="kpi"><div className="n" style={zeroMedia.length ? { color: "var(--seal)" } : {}}>{zeroMedia.length}</div><div className="l">미디어 0건 학생</div></div>
         <div className="kpi"><div className="n">{editSum}</div><div className="l">고쳐 쓴 흔적 합계</div></div>
       </div>
@@ -6373,8 +6376,8 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
         <div className="card-head"><span className="card-code">AI 2</span><span className="card-title">학급이 서로 비슷해지고 있는가</span></div>
         <div className="card-body">
           <div className="kpis" style={{ marginBottom: 12 }}>
-            <div className="kpi"><div className="n">{simAll.cls.peerSimMed != null ? simAll.cls.peerSimMed + "%" : "—"}</div><div className="l">서술 유사도 중앙값</div></div>
-            <div className="kpi"><div className="n">{simAll.cls.structSimMed != null ? simAll.cls.structSimMed + "%" : "—"}</div><div className="l">구조 유사도 중앙값</div></div>
+            <div className="kpi"><div className="n">{simAll.cls.peerSimMed != null ? Math.round(simAll.cls.peerSimMed) + "%" : "—"}</div><div className="l">서술 유사도 중앙값</div></div>
+            <div className="kpi"><div className="n">{simAll.cls.structSimMed != null ? Math.round(simAll.cls.structSimMed) + "%" : "—"}</div><div className="l">구조 유사도 중앙값</div></div>
             <div className="kpi"><div className="n">{simAll.cls.lexPool || "—"}</div><div className="l">학급 어휘 풀</div></div>
             <div className="kpi"><div className="n">{simAll.cls.attitudeEnt != null ? simAll.cls.attitudeEnt + "%" : "—"}</div><div className="l">태도 선택의 고름</div></div>
           </div>
