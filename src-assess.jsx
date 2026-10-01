@@ -385,7 +385,7 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
               {img ? <img src={img} alt={"내 작품 「" + (d.title || "무제") + "」"} /> : <span className="ph">{img === undefined ? "불러오는 중…" : "이미지 없음"}</span>}
             </div>
             {img === null && (
-              <div className="warn-note" style={{ marginTop: 8 }}>대표 이미지가 없거나 불러오지 못했습니다. 7차시 「전시 출품」에서 대표 이미지를 먼저 올려 주세요.</div>
+              <div className="warn-note" style={{ marginTop: 8 }}>대표 이미지를 아직 올리지 않았거나 불러오지 못했습니다. 7차시 「전시 출품」에서 대표 이미지를 먼저 올려 주세요.</div>
             )}
           </div>
           <div className="as-grid2">
@@ -919,8 +919,8 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
             </div>
           ) : <div className="as-plate-hidden">작품 캡션 없음</div>
         ) : <div className="as-plate-hidden">작품 캡션 접힘</div>}
-        <button type="button" role="radio" aria-checked={on} aria-label={"작품 " + no + (on ? " 고름" : " 고르기")} className={"btn small " + (on ? "" : "ghost")} disabled={!canPick}
-          onClick={() => { setWin(side); setWarn(""); }}>{on ? "고름" : "이쪽"}</button>
+        <button type="button" role="radio" aria-checked={on} aria-label={"작품 " + no + (on ? ", 고른 쪽" : " 고르기")} className={"btn small " + (on ? "" : "ghost")} disabled={!canPick}
+          onClick={() => { setWin(side); setWarn(""); }}>{on ? "고른 쪽" : "이쪽 고르기"}</button>
       </div>
     );
   };
@@ -982,7 +982,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
               </div>
             )}
             <div className="field">
-              <label>고른 이유를 한 문장으로 ({cfg.minWhy}자 이상). 고르는 데 가장 중요했던 이미지나 작품 캡션의 근거를 적습니다</label>
+              <label>고른 이유를 한 문장으로 ({cfg.minWhy}자 이상). 고르는 데 가장 중요했던 이미지나 작품 캡션의 근거를 적어 주세요</label>
               <textarea rows={2} maxLength={REASON_MAX} value={why} onChange={(e) => { setWhy(e.target.value); setWarn(""); }}
                 placeholder="예: 손잡이 안쪽만 닳아 있어서 실제로 쥐고 쓴 물건처럼 보였다" />
               <span className={"as-count" + (whyLen < cfg.minWhy ? " low" : "")}>{whyLen} / {REASON_MAX}</span>

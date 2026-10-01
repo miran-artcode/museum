@@ -39,7 +39,7 @@ export const ANCHOR_TAGS = [
 ];
 
 export const ANCHOR_QUESTION =
-  "두 작품 가운데, 실재한 적 없는 유물을 더 그럴듯하게 만들어 낸 쪽은 어느 쪽인가요?";
+  "두 작품 가운데 실재한 적 없는 유물을 더 그럴듯하게 만들어 낸 것은 어느 쪽인가요?";
 
 export const ANCHOR_MIN_SEC = 5;   // 이보다 빨리 고르면 한 번 더 보게 한다
 export const ANCHOR_MIN_WHY = 15;  // 이유 문장의 최소 길이
@@ -189,7 +189,7 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
           </dl>
         ) : <div className="an-plate-hidden">작품 캡션 접힘</div>}
         <button type="button" className={"btn small " + (win === side ? "" : "ghost")} onClick={() => { setWin(side); setWarn(""); }}>
-          {win === side ? "고름" : "이쪽"}
+          {win === side ? "고른 쪽" : "이쪽 고르기"}
         </button>
       </div>
     );
@@ -199,11 +199,11 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
     <div className="card an-card">
       <div className="card-head">
         <span className="card-code">예시 판정</span>
-        <span className="card-title">두 유물 가운데 어느 쪽이 더 성립하는가</span>
+        <span className="card-title">두 유물 가운데 어느 쪽이 더 그럴듯한가</span>
         <span className="card-sess">{doneN} / {pairs.length}</span>
       </div>
       <div className="card-note">
-        우리 반 작품이 아니라 <b>선생님이 준비한 예시 유물</b>입니다. 성적과 관계없습니다.
+        2학년 학생 작품이 아니라 <b>선생님이 준비한 예시 유물</b>입니다. 성적과 관계없습니다.
         네 쌍을 차례로 보고, 매번 한쪽을 고르고 그 이유를 한 문장으로 써 주세요.
       </div>
       <div className="card-body">

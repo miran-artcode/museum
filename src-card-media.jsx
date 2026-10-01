@@ -36,7 +36,7 @@ export const CARD_MEDIA = {
       images: [
         { src: "/img/lessons/L2_w_t1_inventory_1.jpg", cap: "조르주 페렉, 「파리의 어느 장소에 대한 완전한 묘사 시도」(1975). 페렉은 1974년 10월 18일부터 사흘 동안 파리 생쉴피스 광장 8번지의 이 카페 드 라 메리(Café de la Mairie)를 비롯한 광장의 몇 곳에 앉아, 눈앞을 지나는 버스·비둘기·행인을 모두 적으려 했습니다(사진은 2022년 촬영).", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 CVB", link: "https://fr.wikipedia.org/wiki/Tentative_d%27%C3%A9puisement_d%27un_lieu_parisien", srcPage: "https://commons.wikimedia.org/wiki/File:8_place_Saint-Sulpice_Paris.jpg" },
         { src: "/img/lessons/L2_w_t1_inventory_2.jpg", cap: "조르주 페렉, 「파리의 어느 장소에 대한 완전한 묘사 시도」(1975). 페렉이 사흘 동안 관찰한 생쉴피스 광장의 일상으로, 분수 가장자리와 성당 모퉁이, 오가는 행인과 비둘기가 보입니다. 페렉은 이런 '아무 일도 일어나지 않을 때 일어나는 일'을 목록처럼 적었습니다(사진은 2012년 촬영).", credit: "위키미디어 공용 · CC BY 2.0 · 사진 Alexander Baranov", link: "https://fr.wikipedia.org/wiki/Tentative_d%27%C3%A9puisement_d%27un_lieu_parisien", srcPage: "https://commons.wikimedia.org/wiki/File:Paris_Place_Saint-Sulpice_20120512.jpg" },
-        { src: "/img/lessons/L2_w_dion_thames.jpg", cap: "마크 디온, 「테이트 템스 발굴」(1999). 템스강 하안에서 수습한 도자기 파편·병·뼈 등을 17세기 ‘호기심의 방’ 형식의 양문형 목제 캐비닛에 분류해 넣었습니다. 테이트 소장(T07669).", credit: "© Mark Dion · 테이트 소장품 페이지, 교육 목적 인용", link: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" },
+        { src: "/img/lessons/L2_w_dion_thames.jpg", cap: "마크 디온, 「테이트 템스 발굴」(1999). 템스강 강가에서 수습한 도자기 파편·병·뼈 등을 17세기 ‘호기심의 방’ 형식의 양문형 목제 캐비닛에 분류해 넣었습니다. 테이트 소장(T07669).", credit: "© Mark Dion · 테이트 소장품 페이지, 교육 목적 인용", link: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" },
       ],
       links: [{ t: "위키백과(프랑스어) 작품 항목", u: "https://fr.wikipedia.org/wiki/Tentative_d%27%C3%A9puisement_d%27un_lieu_parisien" }, { t: "위키백과(영어): An Attempt at Exhausting a Place in Paris", u: "https://en.wikipedia.org/wiki/An_Attempt_at_Exhausting_a_Place_in_Paris" }, { t: "위키백과(한국어): 조르주 페렉", u: "https://ko.wikipedia.org/wiki/%EC%A1%B0%EB%A5%B4%EC%A3%BC_%ED%8E%98%EB%A0%89" }, { t: "마크 디온 「테이트 템스 발굴」(테이트)", u: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" }],
     },
@@ -64,14 +64,14 @@ export const CARD_MEDIA = {
     },
     archive: {
       images: [
-        { src: "/img/lessons/L2_w_dion_thames.jpg", cap: "마크 디온, 「테이트 템스 발굴」(1999). 템스강 하안에서 수습한 도자기 파편·병·뼈 등을 17세기 ‘호기심의 방’ 형식의 양문형 목제 캐비닛에 분류해 넣었습니다. 테이트 소장(T07669).", credit: "© Mark Dion · 테이트 소장품 페이지, 교육 목적 인용", link: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" },
+        { src: "/img/lessons/L2_w_dion_thames.jpg", cap: "마크 디온, 「테이트 템스 발굴」(1999). 템스강 강가에서 수습한 도자기 파편·병·뼈 등을 17세기 ‘호기심의 방’ 형식의 양문형 목제 캐비닛에 분류해 넣었습니다. 테이트 소장(T07669).", credit: "© Mark Dion · 테이트 소장품 페이지, 교육 목적 인용", link: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" },
       ],
       links: [{ t: "테이트 소장 「템스 발굴」", u: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" }, { t: "마크 디온", u: "https://en.wikipedia.org/wiki/Mark_Dion" }],
     },
     parafiction: {
       images: [
         { src: "/img/lessons/L2_w_fauna.jpg", cap: "호안 폰트쿠베르타·페레 포르미게라, 「파우나」(1987), 바르셀로나 현대미술관(MACBA) 전시 전경. 가상의 동물학자 ‘아마이젠하우펜 박사’의 아카이브라는 설정으로, 박제 표본이 든 유리 진열장과 벽면의 사진·문서·노트를 자연사 박물관 전시처럼 설치했습니다.", credit: "© Joan Fontcuberta, Pere Formiguera / VEGAP · MACBA 소장품 페이지, 교육 목적 인용", link: "https://www.macba.cat/en/art-artists/artists/fontcuberta-joan-formiguera-pere/fauna" },
-        { src: "/img/lessons/L2_w_atlas.jpg", cap: "아틀라스 그룹 / 왈리드 라아드, 「아틀라스 그룹 아카이브」 중 〈노트북 72권: 사라진 레바논 전쟁〉(1989/1998)의 한 면. 레바논 내전기의 역사학자들이 경마장에서 결승선 사진에 내기를 걸었다는 설정으로, 경마 사진 둘레에 날짜·거리·기록과 역사학자들의 내기 내역이 주석처럼 달려 있습니다.", credit: "© Walid Raad · 아틀라스 그룹 공식 아카이브 사이트, 교육 목적 인용", link: "https://www.theatlasgroup1989.org/n72" },
+        { src: "/img/lessons/L2_w_atlas.jpg", cap: "아틀라스 그룹 / 왈리드 라아드, 「아틀라스 그룹 아카이브」 중 〈노트북 제72권: 사라진 레바논 전쟁〉(1989/1998)의 한 면. 레바논 내전기의 역사학자들이 경마장에서 결승선 사진에 내기를 걸었다는 설정으로, 경마 사진 둘레에 날짜·거리·기록과 역사학자들의 내기 내역이 주석처럼 달려 있습니다.", credit: "© Walid Raad · 아틀라스 그룹 공식 아카이브 사이트, 교육 목적 인용", link: "https://www.theatlasgroup1989.org/n72" },
       ],
       links: [{ t: "호안 폰트쿠베르타", u: "https://en.wikipedia.org/wiki/Joan_Fontcuberta" }, { t: "아틀라스 그룹 아카이브(공식)", u: "https://www.theatlasgroup1989.org/" }, { t: "파라픽션이란", u: "https://en.wikipedia.org/wiki/Parafiction" }],
     },

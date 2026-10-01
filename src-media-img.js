@@ -137,7 +137,7 @@ export function imgErrText(e) {
   if (code === "decode") {
     const heic = /heic|heif/i.test(String((e && e.type) || "") + String((e && e.name) || ""));
     return heic
-      ? "아이폰 HEIC 사진은 이 브라우저에서 열 수 없습니다. 아이폰 설정 → 카메라 → 포맷을 「호환성 우선」으로 바꾸거나 JPG로 변환해 올려 주세요."
+      ? "아이폰 HEIC 사진은 이 브라우저에서 열 수 없습니다. 아이폰 설정 → 카메라 → 포맷에서 「높은 호환성」을 고른 뒤 다시 찍거나 JPG로 변환해 올려 주세요."
       : "이 파일을 열 수 없습니다. JPG나 PNG로 저장한 사진을 올려 주세요.";
   }
   if (code === "small") {

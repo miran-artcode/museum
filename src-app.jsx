@@ -109,7 +109,7 @@ const INSPECT_ITEMS = [
   { k: "exhibit", label: "전시했을 때의 화면", hint: "전시 벽에 걸어 놓아도 무리 없는 화면인가" },
 ];
 const PEER_VIEWS = [
-  { k: "blind", label: "작품 캡션을 가리고 봤을 때", hint: "이미지만 보고 무엇에 쓰는 물건인지, 어느 시대 물건인지 말할 수 있는가. 그렇게 보이게 한 곳 두 군데를 짚어 주세요" },
+  { k: "blind", label: "작품 캡션을 가리고 봤을 때", hint: "이미지만 보고 무엇에 쓰는 물건인지, 어느 시대 물건인지 말할 수 있는가. 그렇게 보이게 한 부분 두 군데를 짚어 주세요" },
   { k: "cause", label: "흔적과 쓰임이 맞는가", hint: "닳고 부서지고 고친 부분이 쓰던 방식과 이어지는가. 진짜 같은 부분과 의심스러운 부분을 하나씩 적어 주세요" },
   { k: "labelwork", label: "작품 캡션을 읽은 뒤", hint: "작품 캡션을 읽고 나니 이미지가 다르게 보이는가. 달라진 부분을 짚어 주세요" },
   { k: "problem", label: "어떤 문제로 읽히는가", hint: "어떤 사회 문제로 보이는가. 고발·경고·공감·기록·질문 가운데 어떤 태도로 말하고 있는지" },
@@ -259,7 +259,7 @@ const ENGAGE_MODES = [
   },
   {
     k: "parafiction", label: "허구와 파라픽션", sub: "실재한 적 없는 것을 기록의 형식에 담는다",
-    works: "호안 폰트쿠베르타 「Fauna」(1987) · 아틀라스 그룹: 가짜 표본과 가짜 문서를 진짜 형식으로",
+    works: "호안 폰트쿠베르타 「파우나」(1987) · 아틀라스 그룹: 가짜 표본과 가짜 문서를 진짜 형식으로",
     does: "관람자는 자기가 무엇을 근거로 믿었는지 되짚는다. 믿음의 조건이 드러난다.",
     risk: "고지 없이 유통되면 위조가 된다. 이 단원이 작품 캡션에 허구 고지를 붙이는 이유다.",
     fit: "아직 오지 않은 일이나 이미 사라진 일이라 찍을 대상 자체가 없을 때",
@@ -280,14 +280,14 @@ const ENGAGE_MODES = [
   },
   {
     k: "intervene", label: "개입과 전술", sub: "공공장소와 일상의 절차에 끼어든다",
-    works: "크지슈토프 보디치코의 건물 프로젝션: 기념비에 사람의 손과 목소리를 겹쳐 비춤",
+    works: "크지슈토프 보디치코의 건물 프로젝션: 기념비에 사람의 손이나 얼굴을 비추고 목소리를 들려줌",
     does: "평소 안 보이던 규칙이 어긋남으로 드러난다. 지나가던 사람이 관람자가 된다.",
     risk: "놀라게 하는 데서 끝나면 문제는 전달되지 않는다. 허락 없는 개입은 다른 사람의 영역을 침범할 수 있다.",
     fit: "문제가 특정한 장소·절차에 붙어 있어 그곳에서만 드러날 때",
   },
   {
     k: "relational", label: "관계와 대화", sub: "사람들 사이에 일어나는 일 자체를 작품으로 삼는다",
-    works: "요제프 보이스의 사회적 조각 · 니콜라 부리요 「관계미학」(1998) · 그랜트 케스터 「대화적 미술」(2004)",
+    works: "요제프 보이스의 사회적 조각 · 니콜라 부리요 『관계미학』(1998) · 그랜트 케스터 『대화 조각들』(2004)",
     does: "물건 대신 만남과 대화가 작품이 된다. 관람자가 참여자가 된다.",
     risk: "클레어 비숍이 「적대와 관계미학」(2004)에서 지적했듯, 화합만 남고 갈등이 지워지면 문제도 함께 지워진다.",
     fit: "문제의 핵심이 사람들 사이의 관계가 끊긴 데 있을 때",
@@ -685,7 +685,7 @@ const SCHEMA_DEF = [
         k: "ownQ", t: "area", label: "다음 질문 만들기: 이 단원을 지나며 내 안에 새로 생긴, 더 파고들고 싶은 질문 하나를 만들어 쓰기",
         steps: [
           "돌아보기: 여덟 차시 동안 아직 답을 찾지 못한 궁금함 떠올리기",
-          "다듬기: 그 궁금함을 ‘예·아니오로 끝나지 않는’ 질문 한 문장으로 다듬기",
+          "다듬기: 그 궁금함을 ‘예·아니요로 끝나지 않는’ 질문 한 문장으로 다듬기",
           "덧붙이기: 이 질문에 답해 보려면 무엇을 보거나 만들어 봐야 할지 한 줄 쓰기",
         ],
       },
@@ -740,7 +740,7 @@ const SURVEY_ITEMS = [
   { k: "a3", s: "cse", text: "나는 남들이 생각하지 못한 방식으로 문제를 풀 수 있다." },
   { k: "a4", s: "cse", text: "나는 상상력이 풍부한 편이라고 생각한다." },
   // 창의적 정체성 (cpi)
-  { k: "a5", s: "cpi", text: "‘창의적인 사람’이라는 말은 나를 설명하는 중요한 특징이다." },
+  { k: "a5", s: "cpi", text: "창의적이라는 점은 나를 설명하는 중요한 특징이다." },
   { k: "a6", s: "cpi", text: "나는 나의 창의성을 소중하게 여긴다." },
   { k: "a7", s: "cpi", text: "새로운 것을 만들어 내는 일은 내 삶에서 중요한 부분이다." },
   // 아이디어 행동 (rib)
@@ -760,7 +760,7 @@ const SURVEY_ITEMS = [
   { k: "a19", s: "evb", text: "내 생각과 다른 의견을 들으면 내 아이디어를 다시 살펴본다." },
   // AI 협업 창의성 인식 (aic)
   { k: "a20", s: "aic", text: "인공지능 도구를 쓰면 내 아이디어를 더 여러 방향으로 펼쳐 볼 수 있다." },
-  { k: "a21", s: "aic", text: "인공지능이 만든 결과물 중에서 무엇이 좋은지 고르고 버리는 것도 창의적인 일이다." },
+  { k: "a21", s: "aic", text: "인공지능이 만든 결과물 중에서 좋은 것을 고르고 나머지를 버리는 것도 창의적인 일이다." },
   { k: "a22", s: "aic", text: "인공지능 도구를 쓸 때에도 작품의 방향을 정하는 것은 나여야 한다." },
   { k: "a23", s: "aic", rev: true, text: "인공지능이 다 만들어 주기 때문에 내 창의성은 별로 중요하지 않다." },
   { k: "a24", s: "aic", text: "인공지능이 내 예상과 다른 결과를 내놓아도, 그것을 내 의도에 맞게 살려 쓸 수 있다." },
@@ -3091,7 +3091,7 @@ function Carry({ ws, items, strong, title, toLadder }) {
 function ConcChip({ text, label }) {
   const c = concreteness(text);
   if (c == null) return null;
-  return <span className={"conc-chip " + (c >= 55 ? "hi" : c <= 30 ? "lo" : "")} title="위치·재질·변형·수량을 가리키는 말이 얼마나 들어 있는지 기계적으로 센 값입니다. 점수가 아니라 다시 볼 부분을 가리키는 표지입니다.">{label || "구체성"} {c}</span>;
+  return <span className={"conc-chip " + (c >= 55 ? "hi" : c <= 30 ? "lo" : "")} title="위치·재질·변형·수량을 가리키는 말이 얼마나 들어 있는지 기계적으로 센 값입니다. 점수가 아니라 다시 볼 부분을 가리키는 표시입니다.">{label || "구체성"} {c}</span>;
 }
 
 /* 여러 줄 표의 행 개수를 늘 일정하게 유지 */
@@ -4013,11 +4013,11 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
                 </table>
               </div>
               <div className="field" style={{ marginTop: 10 }}>
-                <label>작품 캡션 바꿔 달기: 자기 작품 캡션을 이 작품 옆에 붙였을 때 읽기가 어떻게 달라지는지, 이름이 바꾼 것이 무엇인지 한 문장</label>
+                <label>작품 캡션 바꿔 달기: 내 작품 캡션을 이 작품 옆에 붙였을 때 이 작품이 어떻게 다르게 읽히는지, 이름 때문에 무엇이 바뀌었는지 한 문장</label>
                 <input value={b.swap || ""} onChange={(e) => upB(i, { swap: e.target.value })} />
               </div>
               <div className="field">
-                <label>종합 비평 (한 문단): 허구를 밝힌 가짜 유물이 현재의 문제를 더 선명하게 말했는지, 허구 고지가 의미와 윤리성에 준 효과. ‘이것은 왜 미술인가’와 ‘이 가짜는 우리 시대의 무엇을 진실하게 말하는가’에 각각 한 문장 이상 답하기</label>
+                <label>종합 비평 (한 문단): 허구를 밝힌 가짜 유물이 현재의 문제를 더 선명하게 말했는지, 허구 고지가 의미와 윤리성에 어떤 효과를 주었는지. ‘이것은 왜 미술인가’와 ‘이 가짜는 우리 시대의 무엇을 진실하게 말하는가’에 각각 한 문장 이상 답하기</label>
                 <textarea rows={4} value={b.overall || ""} onChange={(e) => upB(i, { overall: e.target.value })} />
               </div>
             </div>
@@ -4202,10 +4202,10 @@ function FieldReader({ sec, f, ws, owner }) {
       <div className="read-block">
         <div className="rl">{f.label}</div>
         <table className="tbl">
-          <thead><tr><th style={{ width: 26 }}></th><th style={{ width: 140 }}>물건</th><th style={{ width: 130 }}>어디에 있나</th>{rows.some((r) => filled(r.whose)) && <th style={{ width: 110 }}>누구의 몸 (옛 기록)</th>}<th>누가 어떻게 만지나</th><th style={{ width: 56 }}>고름 / 뺌</th></tr></thead>
+          <thead><tr><th style={{ width: 26 }}></th><th style={{ width: 140 }}>물건</th><th style={{ width: 130 }}>어디에 있나</th>{rows.some((r) => filled(r.whose)) && <th style={{ width: 110 }}>누구의 몸 (옛 기록)</th>}<th>누가 어떻게 만지나</th><th style={{ width: 80 }}>선택 / 제외</th></tr></thead>
           <tbody>{rows.map((r, i) => (
             <tr key={i}><td className="rn">{i + 1}</td><td>{r.obj}</td><td>{r.where || "-"}</td>{rows.some((x) => filled(x.whose)) && <td>{r.whose || "-"}</td>}<td>{r.act || "-"}</td>
-              <td style={{ color: r.verdict === "고름" ? "var(--patina)" : r.verdict === "접음" ? "var(--seal)" : "var(--sub)" }}>{r.verdict === "접음" ? "뺌" : r.verdict || "-"}</td></tr>
+              <td style={{ color: r.verdict === "고름" ? "var(--patina)" : r.verdict === "접음" ? "var(--seal)" : "var(--sub)" }}>{r.verdict === "고름" ? "선택" : r.verdict === "접음" ? "제외" : r.verdict || "-"}</td></tr>
           ))}</tbody>
         </table>
       </div>
@@ -4407,7 +4407,7 @@ function AudioField({ f, fieldKey, v, setField }) {
         ) : (
           <button className="btn small ghost" onClick={start}>{cur ? "다시 녹음하기" : "녹음 시작"}</button>
         )}
-        <span className="hint">최대 {MAX}초 · 약 0.5MB까지 저장됩니다.</span>
+        <span className="hint">최대 {MAX}초까지 녹음할 수 있습니다(약 0.5MB).</span>
         <MediaText fieldKey={fieldKey} kind="audio" v={cur} />
         {err && <span className="hint" style={{ color: "var(--seal)" }}>{err}</span>}
       </div>
@@ -4604,7 +4604,7 @@ function SurveyCard({ phase, block, onChange, onSubmit, busy, saveInfo }) {
         )}
         <div className="sv-foot">
           <ConfirmButton className="btn" disabled={done < total || !extraDone || busy} onConfirm={onSubmit}
-            ask="제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?" yes="제출" no="더 보기"
+            ask="제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?" yes="제출" no="돌아가기"
             label={busy ? "제출 중…" : done < total ? "남은 문항 " + (total - done) + "개" : !extraDone ? "돌아보기 문항이 남았습니다" : "제출하기"} />
           <span className="hint">모든 문항에 답하면 제출 버튼이 활성화됩니다. 제출한 뒤에는 고칠 수 없습니다.</span>
         </div>
@@ -5433,7 +5433,7 @@ function StudentApp({ me, onExit, onGallery }) {
     const cur = surveyRef.current || {};
     const done = blockDone(cur[phase] || {});
     await svSubmitWrite(phase, { ...cur, ver: SURVEY_VER, [phase]: done }, [[["ver"], SURVEY_VER], [[phase], done]],
-      "제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.", true);
+      "제출하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.", true);
   };
 
   /* 평가자 성향 설문(s1) — 같은 surveys/{학번} 문서의 stance 블록. v1 응답은 건드리지 않는다 */
@@ -5447,7 +5447,7 @@ function StudentApp({ me, onExit, onGallery }) {
     const done = blockDone(st[phase] || {});
     await svSubmitWrite("stance." + phase, { ...cur, stance: { ...st, ver: STANCE_VER, [phase]: done } },
       [[["stance", "ver"], STANCE_VER], [["stance", phase], done]],
-      "제출을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.", true);
+      "제출하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.", true);
   };
 
   /* 앵커 판정 — 같은 surveys/{학번} 문서의 anchor 블록.
@@ -8433,7 +8433,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("돌아보기에서 학생은 사회참여 미술이 사회를 드러내 온 여덟 가지 방법 가운데 자기 작업과 가장 가까운 것 하나를 짚고 그 이유를 한 줄 적는다. 여덟 방법은 3차시 감상에서 작품으로 익힌다. 이 단원의 결과물 자체는 가림과 우회 · 허구와 파라픽션 · 증거와 포렌식 세 방법을 겹쳐 놓은 형식이며, 이 사실을 학생에게 미리 밝힌다. 같은 입장에서 말하는 태도(고발·경고·공감·기록·질문)와 그 이유도 정하며, 이것이 4차시 캡션의 말투와 7차시 진열의 기준이 된다.");
     L.push("");
-    L.push(mdHead(["방법", "대표 작업", "관람자가 하게 되는 일", "이 방법의 위험"]));
+    L.push(mdHead(["방법", "대표 작업", "관람자가 하는 일", "이 방법의 위험"]));
     ENGAGE_MODES.forEach((m) => L.push(mdRow([m.label + (UNIT_MODES.includes(m.k) ? " (단원 형식)" : ""), m.works, m.does, m.risk])));
     L.push("");
     L.push("단계 4에서 학생은 안 보이는 이유를 다섯 가지(" + INVIS_TYPES.map((t) => t.label).join(" · ") + ")로 나눈다. 이유마다 다음 단계에서 찾을 물건과 자국의 종류가 달라지도록 안내문을 연결해 두었다.");
@@ -10263,7 +10263,7 @@ const DEMO_WS = {
   "s5d.fileName": "10203_5_도구A_4",
   "s5d.selWhy": "왼쪽의 온전한 그립과 오른쪽의 벗겨진 그립이 형태·질감·광택의 세 층위에서 대비되고, 광택이 손바닥 너비 안에 머물러 흔적의 인과가 성립함.",
   "s5d.excWhy": "3회차는 표면이 매끈해 새 물건처럼 보였다. '오래 쓴 도구의 기록'이라는 표현 의도와 어긋나 제외함.",
-  "s5d.serendip": "4회차에서 시키지 않았는데 그립 아래쪽에 가는 균열이 생겼다. 처음에는 지우려 했지만, 균열의 방향이 손이 눌리는 방향과 맞아 '반복된 힘의 기록'으로 읽혀서 살리기로 함. 논쟁 질문에서 나는 '의도와 이어 붙일 수 있으면 발견'이라고 썼는데, 이 균열은 그 기준을 통과한다.",
+  "s5d.serendip": "4회차에서 시키지 않았는데 그립 아래쪽에 가는 균열이 생겼다. 처음에는 지우려 했지만, 균열의 방향이 손이 눌리는 방향과 맞아 '반복된 힘의 기록'으로 읽혀서 살리기로 함. 논쟁 질문에서 나는 '우연을 받아들인 이유를 설계표의 언어로 설명할 수 있을 때만 발견'이라고 썼는데, 이 균열은 그 기준을 통과한다.",
   "s5e.pairSaw": "설명 없이 본 짝은 '공사장에서 쓰던 물건 같다'고 읽음",
   "s5e.pairDiff": "배송 노동으로는 읽히지 않았다. 작품 캡션의 출토 맥락에서 하역장을 밝히기로 하고, 이미지는 그대로 두기로 함.",
   "s6a.partial": "광택이 그립 전체에 퍼진 부분을 인페인팅으로 손바닥 너비까지 줄임",

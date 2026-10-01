@@ -36,10 +36,10 @@ const NONE_OPT = "쓴 적 없다";
 /* 학생에게 보이는 묶음 이름 — 재는 구성개념이 아니라 묻는 내용으로 적는다 */
 export const STANCE_BLOCKS = [
   { k: "use", t: "AI를 얼마나, 어떻게 쓰는가", d: "잘 쓰는지 묻는 것이 아닙니다. 요즘 실제로 쓰는 모습 그대로 고르세요." },
-  { k: "att", t: "AI에 대한 생각", d: "좋다·싫다 하나를 고르는 것이 아니라, 문장마다 얼마나 동의하는지 답합니다." },
+  { k: "att", t: "AI에 대한 생각", d: "좋다·싫다 가운데 하나를 고르지 않고 문장마다 얼마나 동의하는지 답합니다." },
   { k: "emo", t: "AI에 대한 느낌", d: "생각과 느낌은 다를 수 있습니다. 지금 드는 느낌 그대로 고르세요." },
   { k: "blf", t: "무엇이 작품을 좋게 만드는가", d: "정답이 없는 질문입니다. 내 기준에 가까운 쪽을 고르세요." },
-  { k: "art", t: "예술에 대한 나의 태도", d: "미술을 잘하는지 묻는 것이 아니라, 미술을 어떻게 대하는지 묻습니다." },
+  { k: "art", t: "예술에 대한 나의 태도", d: "미술 실력과 관계없이 미술을 어떻게 대하는지 묻습니다." },
 ];
 
 /* 채점 척도 — 학생 화면에는 나오지 않고 교사 화면과 CSV에만 쓴다 */
@@ -267,7 +267,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy, saveInfo })
       </div>
       <div className="card-note">
         정답이 없고 성적과도 관계없는 설문입니다. 여러분이 작품을 어떤 눈으로 보는지 알아보려는 것이고, 개인의 답을 따로 확인하지 않습니다.
-        {isPost ? " 단원을 모두 마친 지금의 생각으로 답합니다. 사전에 무엇이라 답했는지 기억해 맞출 필요는 없습니다." : " 잘 보이려는 답 말고 지금의 나에게 가장 가까운 답을 고르세요."}
+        {isPost ? " 단원을 모두 마친 지금의 생각으로 답합니다. 사전 설문에서 어떻게 답했는지 떠올려 맞출 필요는 없습니다." : " 잘 보이려는 답 말고 지금의 나에게 가장 가까운 답을 고르세요."}
         {" 고른 답은 자동으로 저장되니 도중에 나갔다가 이어서 해도 됩니다."}
       </div>
 
@@ -373,7 +373,7 @@ export function StanceCard({ phase, block, onChange, onSubmit, busy, saveInfo })
 
         <div className="sv-foot">
           <ConfirmButton className="btn" disabled={remain > 0 || busy} onConfirm={onSubmit}
-            ask="제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?" yes="제출" no="더 보기"
+            ask="제출하면 답을 다시 고칠 수 없습니다. 지금 제출할까요?" yes="제출" no="돌아가기"
             label={busy ? "제출 중…" : remain > 0 ? "아직 " + remain + "문항 남았습니다" : "제출하기"} />
           {remain > 0 && <button type="button" className="st-jump" onClick={jump}>남은 문항으로 가기 →</button>}
           <span className="hint">답은 고르는 즉시 저장됩니다. 모두 답하면 제출 버튼이 활성화되고, 제출한 뒤에는 고칠 수 없습니다.</span>

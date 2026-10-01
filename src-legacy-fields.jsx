@@ -12,11 +12,11 @@ import React from "react";
 
 const LEGACY = [
   { k: "s3o.second", label: "함께 쓴 관찰 방법 (옛 단계 1)", names: "obs" },
-  { k: "s3e.sub", label: "함께 쓸 드러내는 방법 (옛 T4)", names: "engage" },
-  { k: "s3e.dropMode", label: "비교했다가 제외한 방법 (옛 T4)", names: "engage" },
-  { k: "s3e.dropWhy", label: "그 방법을 제외한 이유 (옛 T4)" },
-  { k: "s3e.risk", label: "고른 방법의 위험을 내 작업에서 어떻게 다룰 것인가 (옛 T4)" },
-  { k: "s3e.form", label: "이 단원의 형식으로 어떻게 실현할 것인가 (옛 T4)" },
+  { k: "s3e.sub", label: "함께 쓸 드러내는 방법 (옛 「드러내는 방법」 단계)", names: "engage" },
+  { k: "s3e.dropMode", label: "비교했다가 제외한 방법 (옛 「드러내는 방법」 단계)", names: "engage" },
+  { k: "s3e.dropWhy", label: "그 방법을 제외한 이유 (옛 「드러내는 방법」 단계)" },
+  { k: "s3e.risk", label: "고른 방법의 위험을 내 작업에서 어떻게 다룰 것인가 (옛 「드러내는 방법」 단계)" },
+  { k: "s3e.form", label: "이 단원의 형식으로 어떻게 실현할 것인가 (옛 「드러내는 방법」 단계)" },
 ];
 
 /* obs·engage: 코드 → 이름 표 ({ k, label }[]) */
