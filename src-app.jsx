@@ -70,7 +70,8 @@ const mediaStore = {
   get: (owner, ref) => fbStore.get("media:" + owner + "_" + ref),
   getSafe: (owner, ref) => fbStore.getSafe("media:" + owner + "_" + ref), // 실패와 없음을 구분 — 학번 이전처럼 원본 삭제가 뒤따르는 곳용
   put: (owner, ref, data) => fbStore.set("media:" + owner + "_" + ref, data),
-  putT: (owner, ref, data) => fbStore.setT("media:" + owner + "_" + ref, data), // 오프라인이면 8초 뒤 false
+  // 1MB에 가까운 사진·녹음은 느린 학교 와이파이에서 8초를 넘길 수 있어 30초를 기다린다. 오프라인이면 30초 뒤 false (실패가 보인다)
+  putT: (owner, ref, data) => fbStore.setT("media:" + owner + "_" + ref, data, { timeout: 30000 }),
   remove: (owner, ref) => fbStore.remove("media:" + owner + "_" + ref),
 };
 
@@ -3107,7 +3108,10 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
   const ph = (m && m.ph) || { when: "밤 11시", where: "아파트 분리수거장", what: "상자 더미 옆 손수레, 오른쪽 손잡이에만 테이프" };
   const legacy = typeof v === "string" && v.trim() ? v : "";
   const blank = { when: "", where: "", what: "" };
-  const rows = padRows(legacy ? [] : v, 3, blank);
+  /* 옛 기록이 줄글이면 줄마다 한 장면으로 표에 옮겨 보여 준다. 예전에는 빈 표가 떠서 첫 글자를 치는 순간
+     줄글이 통째로 사라졌다. 이제 표를 고치면 옮긴 줄이 함께 저장되므로 줄글의 내용이 빠지지 않는다 (줄 수 제한 없음) */
+  const legacyRows = legacy ? legacy.split(/\n+/).map((x) => x.trim()).filter(Boolean).map((x) => ({ ...blank, what: x })) : [];
+  const rows = padRows(legacy ? legacyRows : v, 3, blank);
   const up = (i, k, val) => setField(fieldKey, rows.map((r, j) => (j === i ? { ...r, [k]: val } : r)));
   return (
     <div className="field span2">
@@ -3126,10 +3130,8 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
           <b>이전에 줄글로 쓴 내용</b>
           <div style={{ whiteSpace: "pre-wrap" }}>{legacy}</div>
           <div className="carry-row">
-            <button type="button" className="btn small ghost" onClick={() => {
-              const parts = legacy.split(/\n+/).map((x) => x.replace(/^\s*\d+[.)]\s*/, "").trim()).filter(Boolean).slice(0, 3);
-              setField(fieldKey, padRows(parts.map((p) => ({ when: "", where: "", what: p })), 3, blank));
-            }}>줄글을 표로 옮기기</button>
+            <button type="button" className="btn small ghost" onClick={() => setField(fieldKey, rows)}>표로 옮겨 저장하기</button>
+            <span className="hint" style={{ margin: 0 }}>아래 표에 줄마다 옮겨 두었습니다. 표를 고치면 표로 저장됩니다.</span>
           </div>
         </div>
       )}
@@ -3140,9 +3142,9 @@ function ScenesField({ f, fieldKey, v, setField, ws }) {
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="rn">{i + 1}</td>
-                <td data-th={col.when}><input value={r.when || ""} maxLength={60} placeholder={i === 0 ? ph.when : ""} onChange={(e) => up(i, "when", e.target.value)} /></td>
-                <td data-th={col.where}><input value={r.where || ""} maxLength={60} placeholder={i === 0 ? ph.where : ""} onChange={(e) => up(i, "where", e.target.value)} /></td>
-                <td data-th={col.what}><input value={r.what || ""} maxLength={200} placeholder={i === 0 ? ph.what : ""} onChange={(e) => up(i, "what", e.target.value)} /></td>
+                <td data-th={col.when}><input aria-label={(i + 1) + "번째 장면: " + col.when} value={r.when || ""} maxLength={60} placeholder={i === 0 ? ph.when : ""} onChange={(e) => up(i, "when", e.target.value)} /></td>
+                <td data-th={col.where}><input aria-label={(i + 1) + "번째 장면: " + col.where} value={r.where || ""} maxLength={60} placeholder={i === 0 ? ph.where : ""} onChange={(e) => up(i, "where", e.target.value)} /></td>
+                <td data-th={col.what}><input aria-label={(i + 1) + "번째 장면: " + col.what} value={r.what || ""} maxLength={200} placeholder={i === 0 ? ph.what : ""} onChange={(e) => up(i, "what", e.target.value)} /></td>
               </tr>
             ))}
           </tbody>
@@ -3181,7 +3183,7 @@ function InvisField({ f, fieldKey, v, setField, ws }) {
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="rn">{i + 1}</td>
-                <td data-th="안 보이는 것"><textarea rows={2} value={r.text || ""} maxLength={150} placeholder={INVIS_PH[i] || ""} onChange={(e) => up(i, "text", e.target.value)} /></td>
+                <td data-th="안 보이는 것"><textarea aria-label={(i + 1) + "번째 줄: 안 보이는 것"} rows={2} value={r.text || ""} maxLength={150} placeholder={INVIS_PH[i] || ""} onChange={(e) => up(i, "text", e.target.value)} /></td>
                 <td data-th="안 보이는 이유">
                   <div className="ivt">
                     {INVIS_TYPES.map((t) => (
@@ -3266,9 +3268,9 @@ function CandsField({ f, fieldKey, v, setField, ws }) {
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="rn">{i + 1}</td>
-                <td data-th="물건"><textarea rows={2} value={r.obj || ""} maxLength={60} placeholder={CAND_PH[i][0]} onChange={(e) => up(i, "obj", e.target.value)} /></td>
-                <td data-th="어디에 있는지"><textarea rows={2} value={r.where || ""} maxLength={60} placeholder={CAND_PH[i][1]} onChange={(e) => up(i, "where", e.target.value)} /></td>
-                <td data-th="누가 어떻게 만지는지"><textarea rows={2} value={r.act || ""} maxLength={120} placeholder={CAND_PH[i][2]} onChange={(e) => up(i, "act", e.target.value)} /></td>
+                <td data-th="물건"><textarea aria-label={(i + 1) + "번째 후보: 물건"} rows={2} value={r.obj || ""} maxLength={60} placeholder={CAND_PH[i][0]} onChange={(e) => up(i, "obj", e.target.value)} /></td>
+                <td data-th="어디에 있는지"><textarea aria-label={(i + 1) + "번째 후보: 어디에 있는지"} rows={2} value={r.where || ""} maxLength={60} placeholder={CAND_PH[i][1]} onChange={(e) => up(i, "where", e.target.value)} /></td>
+                <td data-th="누가 어떻게 만지는지"><textarea aria-label={(i + 1) + "번째 후보: 누가 어떻게 만지는지"} rows={2} value={r.act || ""} maxLength={120} placeholder={CAND_PH[i][2]} onChange={(e) => up(i, "act", e.target.value)} /></td>
                 <td data-th="선택 / 제외">
                   <div className="seg" style={{ flexDirection: "column" }}>
                     <button type="button" className={r.verdict === "고름" ? "on-ok" : ""} onClick={() => setVerdict(i, "고름")}>선택</button>
@@ -3312,8 +3314,8 @@ function TracesField({ f, fieldKey, v, setField, ws }) {
       <div className="tf">
         <span className="tf-l">{label}</span>
         {multi
-          ? <textarea rows={2} value={r[k] || ""} maxLength={max} placeholder={i === 0 ? ph : ""} onChange={(e) => (k === "shape" ? onShape(i, e.target.value) : up(i, k, e.target.value))} />
-          : <input value={r[k] || ""} maxLength={max} placeholder={i === 0 ? ph : ""} onChange={(e) => up(i, k, e.target.value)} />}
+          ? <textarea aria-label={label} rows={2} value={r[k] || ""} maxLength={max} placeholder={i === 0 ? ph : ""} onChange={(e) => (k === "shape" ? onShape(i, e.target.value) : up(i, k, e.target.value))} />
+          : <input aria-label={label} value={r[k] || ""} maxLength={max} placeholder={i === 0 ? ph : ""} onChange={(e) => up(i, k, e.target.value)} />}
         {sym && <span className="sym-warn">‘{sym}’은(는) 사진에 찍히지 않습니다. 위치·모양·횟수로 바꿔 보세요.</span>}
         {k === "freq" && filled(r.span) && !String(r.freq || "").includes(r.span) && <span className="hint">옛 기록의 기간: {r.span}</span>}
       </div>
@@ -3586,6 +3588,10 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
   const v = ws[key];
   // 사진 처리 오류를 alert 대신 그 칸 안에 보여 준다 — 모바일에서 alert은 맥락을 가린다
   const [imgErr, setImgErr] = useState("");
+  // 칸 이름표와 입력칸을 잇는다 (스크린리더가 칸 이름을 읽는다)
+  const fid = React.useId();
+  // 아직 올리는 중인 사진 수. 겹쳐 고른 사진까지 세어 3장 상한을 넘기지 않는다
+  const upRef = useRef(0);
   // 상한의 80%를 넘으면 카운터를 보여 준다 — 조용히 잘리는 maxLength의 예고
   const lenHint = (val, max) => {
     const n = String(val || "").length;
@@ -3611,20 +3617,20 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
     return (
       <div className={"field " + (f.t === "area" || wide ? "span2" : "")}>
         {f.qtype ? (
-          <div className="q-head"><span className={"q-type " + (f.qtype === "설계" ? "design" : "concept")}>{f.qtype}</span><label style={{ margin: 0 }}>{f.label}</label></div>
+          <div className="q-head"><span className={"q-type " + (f.qtype === "설계" ? "design" : "concept")}>{f.qtype}</span><label htmlFor={fid} style={{ margin: 0 }}>{f.label}</label></div>
         ) : (
-          <label>{f.label}</label>
+          <label htmlFor={fid}>{f.label}</label>
         )}
         <ThinkSteps steps={f.steps} />
         <StageEcho sec={sec} f={f} ws={ws} />
         {f.t === "text" && !wide ? (
           /* phTrace: 4차시 마모·수리 칸은 3차시 흔적 글의 앞머리를 예시로 보여 준다 (칸마다 다른 머리말) */
-          <input value={v ?? ""} placeholder={f.phTrace && filled(ladderSummary(ws).trace) ? f.phTrace : (f.def || "")}
+          <input id={fid} value={v ?? ""} placeholder={f.phTrace && filled(ladderSummary(ws).trace) ? f.phTrace : (f.def || "")}
             maxLength={f.max || 300} onChange={(e) => setField(key, e.target.value)} />
         ) : f.t === "text" ? (
-          <textarea rows={legacyLong ? 3 : 2} value={v ?? ""} maxLength={legacyLong ? 4000 : f.max} placeholder={f.def || ""} onChange={(e) => setField(key, e.target.value)} />
+          <textarea id={fid} rows={legacyLong ? 3 : 2} value={v ?? ""} maxLength={legacyLong ? 4000 : f.max} placeholder={f.def || ""} onChange={(e) => setField(key, e.target.value)} />
         ) : (
-          <textarea rows={f.rows || 3} value={v ?? ""} maxLength={4000} placeholder={f.ph || ""} onChange={(e) => setField(key, e.target.value)} />
+          <textarea id={fid} rows={f.rows || 3} value={v ?? ""} maxLength={4000} placeholder={f.ph || ""} onChange={(e) => setField(key, e.target.value)} />
         )}
         {legacyLong && <span className="hint">이전에 여러 줄로 쓴 답입니다. 한 줄로 줄여 써도 됩니다.</span>}
         {lenHint(v, legacyLong ? 4000 : (f.max || (f.t === "text" ? 300 : 4000)))}
@@ -3641,15 +3647,15 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
         <div className="debate-grid">
           <div className="debate-cell">
             <div className="debate-l">① 내 입장</div>
-            <textarea rows={3} maxLength={1500} value={m.pos || ""} onChange={(e) => up("pos", e.target.value)} />
+            <textarea aria-label="내 입장" rows={3} maxLength={1500} value={m.pos || ""} onChange={(e) => up("pos", e.target.value)} />
           </div>
           <div className="debate-cell">
             <div className="debate-l">② 반대 입장의 가장 강한 근거</div>
-            <textarea rows={3} maxLength={1500} value={m.counter || ""} onChange={(e) => up("counter", e.target.value)} placeholder="내 입장을 반박하는 쪽이 내놓을 가장 설득력 있는 근거를 그 사람의 입장에서 쓰기" />
+            <textarea aria-label="반대 입장의 가장 강한 근거" rows={3} maxLength={1500} value={m.counter || ""} onChange={(e) => up("counter", e.target.value)} placeholder="내 입장을 반박하는 쪽이 내놓을 가장 설득력 있는 근거를 그 사람의 입장에서 쓰기" />
           </div>
           <div className="debate-cell">
             <div className="debate-l">③ 그 근거를 알고도 내 입장을 유지하는 이유 (입장을 바꿨다면 무엇이 바꿨는지)</div>
-            <textarea rows={3} maxLength={1500} value={m.hold || ""} onChange={(e) => up("hold", e.target.value)} />
+            <textarea aria-label="그 근거를 알고도 내 입장을 유지하는 이유" rows={3} maxLength={1500} value={m.hold || ""} onChange={(e) => up("hold", e.target.value)} />
           </div>
         </div>
         <span className="hint">채점은 ③이 채워졌는지만 봅니다. 어느 입장인지는 보지 않습니다.</span>
@@ -3697,21 +3703,23 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
     const list = v || [];
     const preset = imgPresetOf(key);
     const pick = async (e) => {
-      const files = Array.from(e.target.files || []).slice(0, 3 - list.length);
+      const files = Array.from(e.target.files || []).slice(0, Math.max(0, 3 - list.length - upRef.current));
       e.target.value = "";
       setImgErr("");
-      // 여러 장을 한 번에 고르면 렌더 때의 list가 낡아 앞 장을 덮어쓰므로 여기서 누적한다
-      let cur = list.slice();
+      upRef.current += files.length;
+      // 올리기가 끝날 때마다 그 칸의 최신 값에 덧붙인다. 렌더 때의 list로 쓰면 겹쳐 고른 앞 묶음이나
+      // 그 사이 지운 사진이 되돌아간다 (setField에 함수를 준다)
       for (const file of files) {
         try {
           const r = await prepareImage(file, preset);
           if (r.blurry && !window.confirm(BLUR_CONFIRM)) continue;
           const ref = key + "." + Date.now() + Math.floor(Math.random() * 100);
-          const ok = await mediaStore.put(OWNER, ref, r.data);
+          const ok = await mediaStore.putT(OWNER, ref, r.data);
           if (!ok) { setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요."); continue; }
-          cur = [...cur, { ref, at: now(), w: r.w, h: r.h }].slice(0, 3);
-          setField(key, cur);
+          const item = { ref, at: now(), w: r.w, h: r.h };
+          setField(key, (cur) => [...(Array.isArray(cur) ? cur : []), item].slice(0, 3), { upload: true });
         } catch (err) { setImgErr(imgErrText(err)); }
+        finally { upRef.current = Math.max(0, upRef.current - 1); }
       }
     };
     return (
@@ -3722,7 +3730,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
             {list.map((it, i) => (
               <div className="mm-item" key={it.ref}>
                 <MediaThumb owner={OWNER} refId={it.ref} alt={f.label + " " + (i + 1)} />
-                <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, it.ref); setField(key, list.filter((x) => x.ref !== it.ref)); }}>지우기</button>
+                <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, it.ref); setField(key, (cur) => (Array.isArray(cur) ? cur : []).filter((x) => x.ref !== it.ref)); }}>지우기</button>
               </div>
             ))}
           </div>
@@ -3777,11 +3785,11 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
         const r = await prepareImage(file, preset);
         if (r.blurry && !window.confirm(BLUR_CONFIRM)) return;
         const ref = key + "." + Date.now();
-        const ok = await mediaStore.put(OWNER, ref, r.data);
+        const ok = await mediaStore.putT(OWNER, ref, r.data);
         if (!ok) return setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요.");
+        setField(key, { ref, at: now(), w: r.w, h: r.h }, { upload: true });
         // 바꿔 올리면 옛 문서는 아무도 가리키지 않으므로 지운다 (녹음·영상 칸과 같은 처리). 실패해도 새 사진에는 지장 없음
         if (cur && cur.ref) mediaStore.remove(OWNER, cur.ref);
-        setField(key, { ref, at: now(), w: r.w, h: r.h });
       } catch (err) { setImgErr(imgErrText(err)); }
     };
     return (
@@ -3815,6 +3823,11 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
       const next = rows.map((r, j) => (j === i ? { ...r, [k2]: val } : r));
       setField(key, next);
     };
+    // 올리기·지우기처럼 await 뒤에 쓰는 곳: 렌더 때의 rows로 쓰면 그 사이 친 프롬프트가 지워진다. 최신 표에 그 칸만 바꾼다
+    const upLate = (i, k2, val, opts) => setField(key, (cur) => {
+      const base = Array.isArray(cur) ? cur : [{}, {}, {}, {}, {}];
+      return base.map((r, j) => (j === i ? { ...r, [k2]: val } : r));
+    }, opts);
     return (
       <div className="tbl-scroll">
         {/* 프롬프트 전문 칸이 들어와 열이 일곱이 되었다. .tbl-scroll의 기본 최소 너비(640px)로는
@@ -3838,7 +3851,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
                   {r.img ? (
                     <div className="mm-item">
                       <MediaThumb owner={OWNER} refId={r.img} alt={i + 1 + "회차 결과"} size={64} />
-                      <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, r.img); up(i, "img", ""); }}>지우기</button>
+                      <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, r.img); upLate(i, "img", ""); }}>지우기</button>
                     </div>
                   ) : (
                     <input type="file" accept="image/*" style={{ fontSize: 11 }} onChange={async (e) => {
@@ -3850,7 +3863,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
                         const r = await prepareImage(file, imgPresetOf(key));
                         if (r.blurry && !window.confirm(BLUR_CONFIRM)) return;
                         const ref = key + ".r" + i + "." + Date.now();
-                        if (await mediaStore.put(OWNER, ref, r.data)) up(i, "img", ref);
+                        if (await mediaStore.putT(OWNER, ref, r.data)) upLate(i, "img", ref, { upload: true });
                         else setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요.");
                       } catch (err) { setImgErr(imgErrText(err)); }
                     }} />
@@ -4282,7 +4295,8 @@ function AudioField({ f, fieldKey, v, setField }) {
         stream.getTracks().forEach((t) => t.stop());
         clearInterval(timerRef.current);
         const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
-        if (blob.size > 900000) { setErr("녹음 파일이 저장 한도(약 0.9MB)를 넘어 담지 못했습니다. 조금 더 짧게 나눠 녹음해 주세요."); setRec(null); setSec(0); return; }
+        // 규칙이 받는 문서는 base64 100만 자 미만(원본 약 0.75MB)이다. 넘으면 저장이 거부되어 「연결 확인」으로 잘못 안내되므로 여기서 크기로 알린다
+        if (blob.size > 740000) { setErr("녹음 파일이 저장 한도(약 0.7MB)를 넘어 담지 못했습니다. 조금 더 짧게 나눠 녹음해 주세요."); setRec(null); setSec(0); return; }
         const fr = new FileReader();
         fr.onload = async () => {
           // 새 녹음을 먼저 저장하고, 성공한 뒤에만 이전 녹음을 지운다 —
@@ -4290,7 +4304,7 @@ function AudioField({ f, fieldKey, v, setField }) {
           const ref = fieldKey + "." + Date.now();
           const ok = await mediaStore.putT(OWNER, ref, fr.result);
           if (ok) {
-            setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) });
+            setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) }, { upload: true });
             if (cur) mediaStore.remove(OWNER, cur.ref); // 잔존물 정리 — 실패해도 새 녹음에는 지장 없음
           } else setErr("녹음 저장에 실패했습니다. 연결을 확인하고 다시 녹음해 주세요. 이전 녹음은 그대로 있습니다.");
           setRec(null); setSec(0);
@@ -4384,11 +4398,14 @@ function VideoField({ f, fieldKey, v, setField }) {
         }
         const fr = new FileReader();
         fr.onload = async () => {
-          if (cur) await mediaStore.remove(OWNER, cur.ref);
+          // 새 영상을 먼저 저장하고 성공한 뒤에만 이전 영상을 지운다 (녹음 칸과 같은 순서).
+          // 지우기부터 하면 저장이 실패했을 때 이전 영상까지 사라진다
           const ref = fieldKey + "." + Date.now();
-          const ok = await mediaStore.put(OWNER, ref, fr.result);
-          if (ok) setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) });
-          else setErr("영상 저장에 실패했습니다.");
+          const ok = await mediaStore.putT(OWNER, ref, fr.result);
+          if (ok) {
+            setField(fieldKey, { ref, at: now(), sec: Math.round(secRef.current) }, { upload: true });
+            if (cur) mediaStore.remove(OWNER, cur.ref);
+          } else setErr("영상 저장에 실패했습니다. 연결을 확인하고 다시 찍어 주세요. 이전 영상은 그대로 있습니다.");
           setRec(null); setSec(0); setBusy(false);
         };
         fr.readAsDataURL(blob);
@@ -4451,7 +4468,7 @@ function ReflectField({ f, fieldKey, m, ws, setField }) {
           <div className="prev-t">{prev || "5차시 성찰 질문에 아직 답하지 않았습니다. 5차시 탭에서 먼저 쓰고 오면 비교할 수 있습니다."}</div>
         </div>
       )}
-      <textarea rows={4} maxLength={2000} value={m.pos || ""} onChange={(e) => setField(fieldKey, { ...m, pos: e.target.value, at: now() })} />
+      <textarea aria-label={f.label} rows={4} maxLength={2000} value={m.pos || ""} onChange={(e) => setField(fieldKey, { ...m, pos: e.target.value, at: now() })} />
     </div>
   );
 }
@@ -5128,8 +5145,11 @@ function StudentApp({ me, onExit, onGallery }) {
 
   /* v 자리에 함수를 주면 그 칸의 지금 값(다른 기기에서 받은 값·방금 고친 값까지 반영된 최신 값)을 받아 새 값을 돌려준다.
      사진 올리기처럼 await 뒤에 쓰는 곳과 _inq처럼 여러 항목이 든 맵은 이렇게 써야, 렌더 때의 낡은 값으로 다른 항목을 되돌리지 않는다. */
-  const setField = (k, v) => {
-    if (!loaded || wsLockRef.current || removedRef.current) return; // 입력 잠금 중에는 어떤 칸도 쓰지 않는다
+  /* opts.upload: 사진·녹음·영상 올리기가 끝나 참조를 적는 쓰기. 잠금 전에 시작한 올리기는 잠긴 뒤에 끝나도 적는다
+     (안 적으면 올라간 파일이 아무도 가리키지 않는 채 남는다). 잠긴 동안에는 올리기 입력칸이 비활성이라 새로 시작할 수 없다 */
+  const setField = (k, v, opts) => {
+    if (!loaded || removedRef.current) return;
+    if (wsLockRef.current && !(opts && opts.upload)) return; // 입력 잠금 중에는 어떤 칸도 쓰지 않는다
     const fn = typeof v === "function";
     const upd = (p) => {
       const val = fn ? v(p[k]) : v;
