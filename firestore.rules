@@ -17,20 +17,26 @@ service cloud.firestore {
           && emailParts().size() == 2
           && emailParts()[1] == 'museum.class';
     }
-    // 로그인한 계정의 아이디 (학번 또는 teacher)
+    // 로그인한 계정의 아이디 (학번 또는 teacher·viewer)
     function uid() {
       return emailParts()[0];
     }
     function isTeacher() {
       return signedIn() && uid() == 'teacher';
     }
+    // 학생 계정: 아이디가 숫자 3~6자리(입장 화면이 받는 학번 형식)인 계정만.
+    // 본인 판별과, 문서 이름 앞부분으로 소유자를 가리는 media·wsHistory가 이것을 요구한다:
+    // 가입은 누구에게나 열려 있어 숫자가 아닌 아이디(teacher2@, x_y@ 등)로 남의 이름 공간을 차지하지 못하게 한다.
+    function student() {
+      return signedIn() && uid().matches('^[0-9]{3,6}$');
+    }
     function isOwner(id) {
-      return signedIn() && uid() == id;
+      return student() && uid() == id;
     }
     // 보기 전용 교사 계정(viewer@museum.class): 관리자 코드 칸에 참관용 코드를 넣어 들어온다. 수업 참관자·공동 연구자에게
     // 따로 알려 주는 코드이며 저장소 어디에도 적지 않는다(공개 저장소). 계정은 콘솔에서 만들고 앱은 만들지 않는다.
     // 수업 기록(기록지·채점·설문·상호평가·응시 기록·은행)은 읽되 아무것도 쓰지 못하고, 여러 사람이 아는 코드이므로
-    // 정답 키(quizKeys)·연구 동의 대장(research)·기록지 시점 사본(wsHistory)·media 전체 목록은 교사(teacher)만 읽는다.
+    // 정답 키(quizKeys)·연구 문서(research, 가명 대응표 pidMap만 예외)·기록지 시점 사본(wsHistory)·media 전체 목록은 교사(teacher)만 읽는다.
     function isViewer() {
       return signedIn() && uid() == 'viewer';
     }
@@ -41,6 +47,11 @@ service cloud.firestore {
     // 값이 문자열인 media만 길이로 잰다.
     function mediaSizeOk() {
       return request.resource.data.v is string && request.resource.data.v.size() < 1000000;
+    }
+    // 학생이 쓰는 media 값은 data: 주소(사진·스케치는 canvas.toDataURL, 녹음·영상은 FileReader.readAsDataURL)뿐이다.
+    // media는 학급 구성원이 이름으로 읽으므로 다른 형식(외부 주소·스크립트 문자열)을 끼워 넣지 못하게 한다. mediaSizeOk 뒤에 쓴다(문자열 확인)
+    function mediaFmtOk() {
+      return request.resource.data.v.matches('data:(image|audio|video)/[^,]*,.*');
     }
     // 학급 설정 문서의 v (없으면 빈 맵)
     function cfgV() {
@@ -59,16 +70,25 @@ service cloud.firestore {
     function studentNickOk() {
       return request.resource.data.get('nick', '') is string && request.resource.data.get('nick', '').size() <= 12;
     }
+    // 학급 구성원: 교사·보기 전용, 그리고 명부(students)에 오른 학생.
+    // 이메일·비밀번호 가입은 누구에게나 열려 있어 로그인만으로는 이 학급 사람인지 알 수 없다.
+    // 학급이 함께 보는 문서(설정·명부·제출·전시·수업 자료·media)는 로그인(signedIn)이 아니라 이것으로 연다.
+    // 입장 화면은 로그인 직후 명부 문서부터 만들고(별명) 그 뒤에 이 문서들을 읽는다.
+    function member() {
+      return canView() || (student() && enrolled(uid()));
+    }
 
-    // 차시 공개 설정: 로그인한 사람은 읽고, 교사만 쓴다
+    // 차시 공개 설정·상호평가 비교 명단(peerRoster, 반별 peerRoster_{반}): 학급 구성원이 읽고, 교사만 쓴다
     match /meta/{docId} {
-      allow read: if signedIn();
+      allow read: if member();
       allow write: if isTeacher();
     }
 
-    // 학생 명부(학번과 별명만): 로그인한 사람은 읽고, 본인과 교사만 쓴다
+    // 학생 명부(학번과 별명만): 학급 구성원이 읽고, 본인과 교사만 쓴다
+    // 처음 입장하는 학생은 아직 명부에 없어 구성원이 아니다. 입장 화면이 별명을 확인하도록 자기 문서 한 건은 늘 읽게 한다(없어도)
     match /students/{sid} {
-      allow read: if signedIn();
+      allow read: if member();
+      allow get: if isOwner(sid);
       allow create: if isTeacher()
                     || (isOwner(sid) && !rosterLocked() && studentNickOk()
                         && request.resource.data.keys().hasOnly(['nick', 'updatedAt']));
@@ -79,23 +99,34 @@ service cloud.firestore {
     }
 
     // 창작 기록지: 본인과 교사만 읽는다. 쓰기는 본인, 그리고 학생 관리(학번 이관·전시 내리기)를 위한 교사
+    // 판 표시 cv: 2026-09-17 전의 옛 화면은 기록지를 통째로 덮어써 다른 기기에서 쓴 칸을 지웠다. 새 화면(src-fb.js)은
+    // 기록지를 쓸 때마다 맨 위에 cv: 2를 함께 쓴다. 학생이 새로 만드는 문서에는 cv가 있어야 하고, cv가 한 번 들어간 문서는
+    // cv 없이 고칠 수 없다(열린 채 남은 옛 화면의 통째 쓰기 거부). 칸 단위 갱신(updateDoc)은 기존 cv가 결과에 남으므로 통과한다.
+    function wsCvOk() {
+      return !('cv' in resource.data) || request.resource.data.get('cv', 0) >= 2;
+    }
     match /worksheets/{sid} {
       allow read: if isOwner(sid) || canView();
-      allow create: if isTeacher() || (isOwner(sid) && enrolled(sid));
-      allow update: if isOwner(sid) || isTeacher();
+      allow create: if isTeacher() || (isOwner(sid) && enrolled(sid) && request.resource.data.get('cv', 0) >= 2);
+      allow update: if isTeacher() || (isOwner(sid) && wsCvOk());
       allow delete: if isTeacher();
     }
 
-    // 기록지 시점 사본: 문서 이름이 {학번}_{시간대}라 앞부분으로 소유자를 판별한다.
+    // 기록지 시점 사본: 문서 이름이 {학번}_{시간대 YYYYMMDDHH}라 앞부분으로 소유자를 판별한다.
     // 학생 화면의 자동 저장이 만들고, 교사가 「관리」 탭에서 읽어 그 시점으로 되돌린다 (src-ws-history.jsx)
+    // 학생은 {자기 학번}_{숫자 10자리} 이름만 쓴다. 교사가 되돌리기 직전에 남기는 {학번}_r{시각} 사본은 교사만 다룬다
+    // (학생이 그 이름으로 가짜 「되돌리기 전」 사본을 만들거나 덮지 못하게).
     // 교사 화면은 v.sid로 조회하므로 학생 쓰기는 v.sid가 자기 학번이어야 한다 (다른 학생의 목록에 가짜 사본을 끼워 넣지 못하게)
     function wshSidOk() {
       return request.resource.data.get('v', {}).get('sid', '') == uid();
     }
+    function wshMine(id) {
+      return student() && id.matches('^' + uid() + '_[0-9]{10}$');
+    }
     match /wsHistory/{docId} {
-      allow read: if isTeacher() || (signedIn() && docId.split('_')[0] == uid());
-      allow create: if isTeacher() || (signedIn() && docId.split('_')[0] == uid() && enrolled(uid()) && wshSidOk());
-      allow update: if isTeacher() || (signedIn() && docId.split('_')[0] == uid() && wshSidOk());
+      allow read: if isTeacher() || wshMine(docId);
+      allow create: if isTeacher() || (wshMine(docId) && enrolled(uid()) && wshSidOk());
+      allow update: if isTeacher() || (wshMine(docId) && wshSidOk());
       allow delete: if isTeacher();
     }
 
@@ -106,35 +137,76 @@ service cloud.firestore {
     }
 
     // 사전·사후 창의성 설문: 본인과 교사만 읽고, 본인만 쓴다 (연구용 수집 데이터)
+    // 같은 문서의 다섯 블록(사전 pre·사후 post·앵커 판정 anchor·성향 stance.pre·stance.post)은 제출(submittedAt)한 뒤에는
+    // 그대로여야 한다. 사전·사후 비교의 전제이고, 옛 사본을 가진 다른 탭이 문서를 통째로 덮어 제출한 응답을 지우는 일도 여기서 막힌다.
+    // 교사는 학번 이관 때 새 학번의 문서를 만들 수만 있고, 이미 있는 응답은 고치지 못한다(지우기는 된다).
+    function svV(res) {
+      return res.data.get('v', {});
+    }
+    function svBlockKept(before, after) {
+      return before.get('submittedAt', null) == null || after == before;
+    }
+    function surveyKept() {
+      let b = svV(resource);
+      let a = svV(request.resource);
+      let bSt = b.get('stance', {});
+      let aSt = a.get('stance', {});
+      return svBlockKept(b.get('pre', {}), a.get('pre', {}))
+          && svBlockKept(b.get('post', {}), a.get('post', {}))
+          && svBlockKept(b.get('anchor', {}), a.get('anchor', {}))
+          && svBlockKept(bSt.get('pre', {}), aSt.get('pre', {}))
+          && svBlockKept(bSt.get('post', {}), aSt.get('post', {}));
+    }
     match /surveys/{sid} {
       allow read: if isOwner(sid) || canView();
-      allow create: if isOwner(sid) && enrolled(sid);
-      allow update: if isOwner(sid);
+      allow create: if isTeacher() || (isOwner(sid) && enrolled(sid));
+      allow update: if isOwner(sid) && surveyKept();
       allow delete: if isTeacher();
     }
 
     // 사진·음성: 문서 이름이 {소유자}_{필드}_{시각} 형식이므로 앞부분으로 소유자를 판별한다
     // 교사 쓰기는 학번 이관 때 미디어를 새 소유자 이름으로 복사하기 위한 것
     // 교사가 「수업 편집」에서 올린 수업 자료 그림도 teacher_ 로 시작하는 이름으로 여기 들어간다
-    // 기록지는 본인·교사만 읽지만 그 안의 사진·음성·영상은 전시를 위해 문서 이름을 아는 사람이 읽는다.
+    // 기록지는 본인·교사만 읽지만 그 안의 사진·음성·영상은 전시와 상호평가를 위해 문서 이름을 아는 학급 구성원이 읽는다.
     // 컬렉션 전체 목록(list)은 교사만: 학생 화면은 문서 이름으로만 읽으므로 목록이 열리면 학급 전체 미디어를 내려받을 수 있다.
     match /media/{mediaId} {
-      allow get: if signedIn();
+      allow get: if member();
       allow list: if isTeacher();
-      allow create: if isTeacher() || (signedIn() && mediaId.split('_')[0] == uid() && enrolled(uid()) && mediaSizeOk());
-      allow update: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher()) && mediaSizeOk();
-      allow delete: if signedIn() && (mediaId.split('_')[0] == uid() || isTeacher());
+      allow create: if isTeacher()
+                    || (student() && mediaId.split('_')[0] == uid() && enrolled(uid()) && mediaSizeOk() && mediaFmtOk());
+      allow update: if (isTeacher() && mediaSizeOk())
+                    || (student() && mediaId.split('_')[0] == uid() && mediaSizeOk() && mediaFmtOk());
+      allow delete: if isTeacher() || (student() && mediaId.split('_')[0] == uid());
     }
 
-    // 상호평가(쌍대비교) — 최종 작품 스냅샷. 비교와 결과 화면을 위해 학급 전체가 읽는다.
+    // 상호평가(쌍대비교) — 최종 작품 스냅샷. 비교와 결과 화면을 위해 학급 구성원이 읽는다.
     // 문서 id가 학번이라 표시상 익명·저장상 준익명이다 (설계서 §4.6).
     // 확정(locked)된 제출은 학생이 고칠 수 없다 — 비교 도중 작품이 바뀌면 판정자마다 다른 작품을 본 것이 된다.
     // 해제는 교사만 한다 (locked:false를 써 넣으면 학생이 다시 고쳐 제출할 수 있다).
+    // 학생 화면은 제출을 늘 확정 상태로 쓴다(src-assess.jsx submit: locked true). 잠기지 않은 제출을 만들어 두고 비교 도중에
+    // 바꾸는 길을 막고, 대표 이미지(img.owner)는 자기 media만 가리키게 한다(남의 사진을 자기 작품으로 걸지 못하게).
+    function subV(res) {
+      return res.data.get('v', {});
+    }
+    function subOwnOk(sid) {
+      return subV(request.resource).get('locked', false) == true
+          && subV(request.resource).get('img', {}).get('owner', '') == sid;
+    }
     match /submissions/{sid} {
-      allow read: if signedIn();
-      allow create: if isTeacher() || (isOwner(sid) && enrolled(sid));
-      allow update: if isTeacher() || (isOwner(sid) && resource.data.get('v', {}).get('locked', false) != true);
+      allow read: if member();
+      allow create: if isTeacher() || (isOwner(sid) && enrolled(sid) && subOwnOk(sid));
+      allow update: if isTeacher() || (isOwner(sid) && subV(resource).get('locked', false) != true && subOwnOk(sid));
       allow delete: if isTeacher();
+    }
+
+    // 전시장 출품: 기록지에서 「공개」를 고른 작품의 작품 캡션 사본(번호·이미지 참조·제목·캡션 칸·작가 노트).
+    // 기록지는 본인·교사만 읽으므로 전시장은 이 컬렉션을 읽는다. 공개를 거두면 학생 화면이나 교사가 지운다.
+    // 학생은 자기 학번 문서만 쓰고 v.owner도 자기 학번이어야 한다(전시장이 이미지를 {owner}_{img} media에서 읽으므로 남의 사진을 걸지 못하게)
+    match /exhibit/{sid} {
+      allow read: if member();
+      allow create, update: if isTeacher()
+                            || (isOwner(sid) && enrolled(sid) && request.resource.data.get('v', {}).get('owner', '') == sid);
+      allow delete: if isTeacher() || isOwner(sid);
     }
 
     // 상호평가 — 자기평가·판정·집계 결과. 본인과 교사만 읽는다.
@@ -263,17 +335,19 @@ service cloud.firestore {
     }
 
     // 연구 참여 동의 대장: 교사만 읽고 쓴다.
-    // 명부(students)에 두지 않는 이유 — 명부는 로그인한 학생 모두가 읽으므로
+    // 명부(students)에 두지 않는 이유 — 명부는 학급 학생 모두가 읽으므로
     // 누가 연구에서 빠졌는지가 학생끼리 보이게 된다. 동의 여부는 학생 사이에 드러나서는 안 된다.
+    // 가명 대응표 pidMap(학번 → P번호, 반 → C번호)만은 보기 전용 계정(공동 연구자)도 읽는다: 익명 연구 자료를 같은 가명으로 맞춰 보기 위함.
+    // 동의 대장처럼 누가 빠졌는지 드러나는 나머지 문서는 교사만 읽는다.
     match /research/{docId} {
-      allow read: if isTeacher();
+      allow read: if isTeacher() || (docId == 'pidMap' && isViewer());
       allow write: if isTeacher();
     }
 
     // 그 밖의 학급 공용 문서. 「수업 편집」 탭이 고친 차시별 발문·이론·그림·링크가
-    // lessonEdits 문서에 쌓인다. 학생은 읽기만 하고 교사만 고친다.
+    // lessonEdits 문서에 쌓인다. 학급 구성원이 읽고 교사만 고친다.
     match /misc/{docId} {
-      allow read: if signedIn();
+      allow read: if member();
       allow write: if isTeacher();
     }
 
