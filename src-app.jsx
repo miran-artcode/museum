@@ -38,6 +38,7 @@ import { AccessTeacherPanel, AccessTeacherStyle, CaptionOnAir } from "./src-acce
 import { A11yStyle, A11yRuntime } from "./src-access-a11y.jsx";
 import { supportCsv, SUPPORT_CODEBOOK } from "./src-access-core.mjs";
 import { SketchPad, SketchRead, SketchStyle, sketchDirty } from "./src-sketch.jsx";
+import { FolioPad, FolioRead, PortfolioStyle, folioDirty, folioGate, folioProgress, folioUnits } from "./src-portfolio.jsx";
 import {
   ATTITUDES, ATTITUDE_HINTS, LADDER_INTRO, TRANSLATE_STAGES, REFLECT_KEYS, DERIVE_KEYS,
   LEGACY_BACK, normBack, backLabel, SYMBOL_WORDS, findSymbol, SCHEMA_REV, REV_SECTIONS,
@@ -561,6 +562,16 @@ const SCHEMA_DEF = [
   },
   INQUIRY_SECTIONS.q6,
   {
+    id: "s6f", session: "6차시", code: "S", title: "생성과 다듬기 포트폴리오",
+    note: "세 번의 생성과 다듬기를 이미지와 함께 기록합니다.",
+    fields: [
+      { k: "steps", t: "folio", part: "steps", label: "세 번의 생성" },
+      { k: "edit",  t: "folio", part: "edit",  opt: true, label: "이미지 다듬기" },
+      { k: "notes", t: "folio", part: "notes", opt: true, label: "다듬기 과정 기록" },
+      { k: "trash", t: "folio", part: "trash", opt: true, label: "정리할 이미지 목록" },
+    ],
+  },
+  {
     id: "s6a", session: "6차시", code: "M", title: "다듬기 기록",
     fields: [
       { k: "regen", t: "text", label: "재생성 (고친 프롬프트)" },
@@ -867,6 +878,7 @@ function fieldProgress(f, v) {
       return { total: 3, done: ["pos", "counter", "hold"].filter((k) => filled(m[k])).length };
     }
     case "reflect": return { total: 1, done: filled((v || {}).pos) ? 1 : 0 };
+    case "folio": return folioProgress(f, v);
     case "rounds": return { total: 1, done: rows.some((r) => r && (filled(r.tool) || filled(r.judge) || filled(r.change) || filled(r.prompt))) ? 1 : 0 };
     case "inspect": {
       const m = v || {};
@@ -1911,6 +1923,17 @@ const SUB_LABELS = {
   spot: "흔적의 위치", shape: "자국의 모양", freq: "반복", span: "기간", read: "짝이 읽은 것", gap: "맞은 정도", fixed: "고친 것", text: "안 보이는 것", what: "본 것",
   memo: "메모", sent: "보낸 말", overall: "종합 비평", swap: "작품 캡션 바꿔 달기",
   counter: "반론", hold: "그럼에도 남는 것", stand: "내 입장", url: "링크",
+  ra: "1회차", rb: "2회차", rc: "3회차", rv: "세 회차 돌아보기", aim: "이번에 노린 것", exp: "예상",
+  pa: "프롬프트 ①", pb: "프롬프트 ②", pc: "프롬프트 ③", pd: "프롬프트 ④", pe: "프롬프트 ⑤", pf: "프롬프트 ⑥", po: "프롬프트 그 밖에",
+  seen: "보이는 것", un: "시키지 않았는데 나온 것", jd: "판단과 근거", nx: "다음에 고칠 한 가지", nw: "방향을 바꾸는 이유", sk: "생성하지 않은 이유",
+  look: "판단한 곳", dPr: "프롬프트로 정한 것", dAi: "AI가 정한 것", dHand: "다듬기에서 고칠 것", big: "가장 크게 바꾼 수정",
+  use: "다음 작업에서 쓸 방법", drift: "바뀐 것", stuck: "벗어나지 못한 부분", baseWhy: "다듬기 이미지를 고른 이유",
+  stCheck: "점검 기록", stPatch: "부분 수정 기록", stCrop: "자르기 기록", stTone: "빛과 톤 기록", stFix: "손으로 고치기 기록",
+  stMark: "스케일 바와 표식 기록", stFinal: "수정 전후의 차이와 이유", aiTool: "부분 수정 도구", aiRegion: "다시 그리게 한 부위",
+  aiPrompt: "부위에 넣은 프롬프트", rf: "반영한 부분", phScope: "AI 활용 범위 문장", phMaking: "제작 과정 문장", calWhat: "길이 맞추기 기준",
+  kpStructure: "그대로 두는 이유(구조)", kpCause: "그대로 두는 이유(흔적과 쓰임)", kpLight: "그대로 두는 이유(빛과 그림자)",
+  kpScale: "그대로 두는 이유(크기)", kpText: "그대로 두는 이유(글자)", kpLabel: "그대로 두는 이유(작품 캡션)",
+  kpMisread: "그대로 두는 이유(엉뚱하게 읽힐 여지)", kpExhibit: "그대로 두는 이유(전시 화면)",
 };
 function subLabel(sub) {
   if (!sub) return "";
@@ -2130,6 +2153,7 @@ function fieldUnits(f, v) {
         r.backTo && "돌아간 단계: " + backLabel(r.backTo), r.fixed && "고친 것: " + r.fixed].filter(Boolean).join(" / "));
     }); break;
     case "cards": push("고른 것", cardLabel(f.src, v)); break;
+    case "folio": folioUnits(f, v).forEach((u) => push(u.sub, u.text)); break;
     case "image": case "images": case "audio": case "video": case "sketch": case "links": break;
     default: push("", typeof v === "string" ? v : ""); break;
   }
@@ -3802,6 +3826,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
       </div>
     );
   }
+  if (f.t === "folio") return <FolioField f={f} fieldKey={key} v={v} setField={setField} ws={ws} />;
   if (f.t === "audio") {
     return <AudioField f={f} fieldKey={key} v={v} setField={setField} />;
   }
@@ -4033,7 +4058,8 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
 
 /* ---------- 읽기 전용 렌더러 (교사 열람용) ---------- */
 
-function FieldReader({ sec, f, ws, owner }) {
+function FieldReader({ sec, f, ws, owner, grade, onGrade, onGradeSave }) {
+  if (f.t === "folio") return <FolioRead f={f} ws={ws || {}} owner={owner || OWNER} store={mediaStore} MediaThumb={MediaThumb} fmtTime={fmtTime} inspectItems={INSPECT_ITEMS} grade={grade || null} onGrade={onGrade || null} onGradeSave={onGradeSave || null} />;
   const key = fkey(sec, f);
   const v = ws[key];
   const Empty = <div className="rv empty">미기록</div>;
@@ -4416,6 +4442,12 @@ function AudioField({ f, fieldKey, v, setField }) {
    읽기 화면(SketchRead)은 저장 버전과 과정 기록도 보여 준다. 붓 설정·내 팔레트는 기록지의 _skp에 둔다 */
 function SketchField(props) {
   return <SketchPad {...props} owner={OWNER} store={mediaStore} MediaThumb={MediaThumb} confirmDel={confirmDel} fmtTime={fmtTime} />;
+}
+
+/* 생성과 다듬기 포트폴리오(6차시 s6f): 저장소·미디어 도구와 점검 항목을 넘긴다 (src-portfolio.jsx) */
+function FolioField(props) {
+  return <FolioPad {...props} owner={OWNER} store={mediaStore} MediaThumb={MediaThumb} confirmDel={confirmDel}
+    fmtTime={fmtTime} inspectItems={INSPECT_ITEMS} />;
 }
 
 /* 짧은 영상 (카메라 녹화, 저해상도) — 문서 크기 한도 안에서 10초 안팎을 담는다 */
@@ -5319,7 +5351,7 @@ function StudentApp({ me, onExit, onGallery }) {
     const onHide = () => { if (document.visibilityState === "hidden") flush(); };
     // 저장이 끝나지 않은 채 창을 닫으면 경고 — 오프라인 큐 유실을 마지막에 한 번 더 막는다
     const onBefore = (e) => {
-      if (dirtyRef.current || savingRef.current || sketchDirty.unsaved) { e.preventDefault(); e.returnValue = ""; }
+      if (dirtyRef.current || savingRef.current || sketchDirty.unsaved || folioDirty.unsaved || folioDirty.draft || folioDirty.uploading > 0) { e.preventDefault(); e.returnValue = ""; }
     };
     const onOn = () => {
       setOnline(true);
@@ -5491,6 +5523,7 @@ function StudentApp({ me, onExit, onGallery }) {
   /* 스케치를 그리던 화면을 떠나기 전: 그림 문서를 올려야 하므로 저장을 한 번 해 보고(최대 8초), 못 했으면 묻는다.
      저장하지 못한 그림은 이 기기의 초안에만 있다(초안도 쓸 수 없는 브라우저에서는 사라진다) */
   const sketchGate = async () => {
+    if (!(await folioGate())) return false;
     if (sketchDirty.flush && sketchDirty.unsaved) await Promise.race([sketchDirty.flush(), new Promise((res) => setTimeout(res, 8000))]);
     if (!sketchDirty.unsaved) return true;
     return window.confirm(sketchDirty.current
@@ -5516,6 +5549,7 @@ function StudentApp({ me, onExit, onGallery }) {
       setLeaving(false);
       return;
     }
+    if (!(await folioGate({ leaving: true }))) { setLeaving(false); return; }
     const ok = await Promise.race([saveAllNow(), new Promise((res) => setTimeout(() => res(false), 6000))]);
     if (!ok && !removedRef.current && !window.confirm("마지막으로 쓴 내용의 저장을 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.\n지금 나가면 그 내용이 저장되지 않을 수 있습니다. 그래도 나갈까요?")) {
       setLeaving(false);
@@ -5523,6 +5557,7 @@ function StudentApp({ me, onExit, onGallery }) {
     }
     exitedRef.current = true;
     sketchDirty.unsaved = false; // 다음에 들어오는 학생에게 이어지지 않게
+    folioDirty.unsaved = false; folioDirty.current = false; folioDirty.draft = false; folioDirty.uploading = 0;
     await authApi.leave();
     onExit();
   };
@@ -6371,7 +6406,7 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
                   <span className="card-sess">{sec.session} · {sp.done}/{sp.total}</span>
                 </div>
                 <div className="card-body">
-                  {sec.fields.map((f) => <FieldReader key={f.k} sec={sec} f={f} ws={ws} owner={isPreview ? "preview" : sid} />)}
+                  {sec.fields.map((f) => <FieldReader key={f.k} sec={sec} f={f} ws={ws} owner={isPreview ? "preview" : sid} grade={grade} onGrade={isSample ? null : upGrade} onGradeSave={isSample ? null : saveGrade} />)}
                   {sec.id === "s3c" && <LegacyEcho ws={ws} obs={OBS_METHODS} engage={ENGAGE_MODES} />}
                 </div>
               </div>
@@ -10457,6 +10492,7 @@ function App() {
       <GuardStyle />
       <AccessStyle /><AccessTeacherStyle /><A11yStyle /><A11yRuntime />
       <SketchStyle />
+      <PortfolioStyle />
       <LadderStyle />
       <ThemeStyle />
       <UxStyle />
