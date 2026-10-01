@@ -17,6 +17,7 @@ export const GATE_SECTIONS = [
     body: "레디메이드·개념미술·극사실주의 감상, 나의 미술 정의문 쓰기",
     img: "/img/lessons/L1_w_stieglitz.jpg",
     alt: "마르셀 뒤샹의 「샘」(1917), 앨프리드 스티글리츠가 찍은 기록 사진",
+    credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz",
   },
   {
     no: "02",
@@ -26,6 +27,7 @@ export const GATE_SECTIONS = [
     body: "사회참여 미술 감상과 문제 관찰, 허구 유물의 세계관·화면 설계",
     img: "/img/lessons/L2_w_maebyeong_nmk421.jpg",
     alt: "청자 상감 구름 학 무늬 매병(고려, 뚜껑이 있는 매병, 국립중앙박물관 소장)",
+    credit: "국립중앙박물관 · 공공누리 제1유형(출처 표시)",
   },
   {
     no: "03",
@@ -33,8 +35,9 @@ export const GATE_SECTIONS = [
     en: "GENERATE",
     title: "생성과 다듬기",
     body: "프롬프트 작성과 AI 이미지 생성·선별, 다듬기와 작품 캡션 문구",
-    img: "/img/lessons/L6_s30_3.jpg",
-    alt: "금으로 이어 붙인 킨츠기 찻사발",
+    img: "/img/lessons/L6_w_kintsugi.jpg",
+    alt: "깨진 곳을 옻으로 붙이고 이음선에 금분을 얹은 킨츠기 다완",
+    credit: "위키미디어 공용 · CC0 · 사진 Daderot",
   },
   {
     no: "04",
@@ -44,6 +47,7 @@ export const GATE_SECTIONS = [
     body: "작품화와 전시 구성, 두 번의 관람과 상호 비평, 단원 성찰",
     img: "/img/lessons/L3_w_realpictures.jpg",
     alt: "어두운 전시장 바닥에서 빛을 받은 검은 인쇄물 더미",
+    credit: "© Alfredo Jaar · 작가 공식 사이트, 교육 목적 인용",
   },
 ];
 
@@ -92,6 +96,7 @@ export function GateSections({ onEnter }) {
             <div className="g4-col-img">
               <img src={s.img} alt={s.alt} loading="lazy" />
             </div>
+            {s.credit && <div className="g4-cr">{s.credit}</div>}
             <div className="g4-col-txt">
               <div className="g4-no">{s.no}</div>
               <div className="g4-col-meta">
@@ -159,6 +164,7 @@ export const GATE_CSS = `
 .g4-col-img img{width:100%;height:100%;object-fit:cover;display:block;
   transition:transform .6s ease}
 .g4-col:hover .g4-col-img img{transform:scale(1.04)}
+.g4-cr{font-size:11px;line-height:1.5;color:#767676;margin-top:6px;min-height:3em}
 .g4-col-txt{padding:16px 2px 26px;border-top:1px solid #111;margin-top:14px;position:relative}
 .g4-no{font-family:'Archivo',sans-serif;font-size:clamp(40px,4.5vw,56px);font-weight:900;line-height:1;letter-spacing:-.02em}
 .g4-col-meta{display:flex;gap:10px;align-items:baseline;margin:10px 0 6px}
