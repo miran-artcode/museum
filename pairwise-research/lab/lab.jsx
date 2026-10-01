@@ -1,9 +1,9 @@
 /* ============================================================
-   쌍대비교 체험실 — 8차시 상호평가를 예시 학급 12점으로 미리 해 보는 교사용 페이지
+   쌍대비교 체험실 — 8차시 상호평가를 예시 작품 12점으로 미리 해 보는 교사용 페이지
 
    · 「직접 해 보기」의 학생 화면은 앱의 src-assess.jsx(AssessTab)를 그대로 돌린다. 저장소만 mock-fb.js로 바꿔 끼워
      모든 기록이 이 페이지의 메모리에만 남는다. 선생님 단계 스위치·명단 확정·집계는 교사 화면과 같은 core 함수를 부른다.
-   · 반 친구 11명의 판정은 sim.js가 예시 작품의 숨은 품질로 만든다.
+   · 다른 학생 11명의 판정은 sim.js가 예시 작품의 숨은 품질로 만든다.
    · 빌드: node pairwise-research/lab/build.mjs → pairwise-research/lab/dist/쌍대비교_체험실.html
    ============================================================ */
 import React, { useState, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
@@ -178,7 +178,7 @@ function TryTab({ meSid, setMe, peer, setPeer, epoch, reset, agg, setAgg, simSee
           {stage === "submit" && !roster && (
             <div className="stage-box">
               <h3>1. 제출과 명단 확정</h3>
-              <p>왼쪽 학생 화면에서 「제출 확정」을 눌러 보세요. 반 친구 11명은 이미 제출했다고 가정합니다.</p>
+              <p>왼쪽 학생 화면에서 「제출 확정」을 눌러 보세요. 다른 학생 11명은 이미 제출했다고 가정합니다.</p>
               <p className="why"><b>왜 사본으로 고정하나.</b> 비교가 도는 동안 작가가 원본을 고치면 먼저 판정한 학생과 나중에 판정한 학생이 서로 다른 작품을 본 셈이 됩니다. 그래서 확정하는 순간 이미지(긴 변 1000px)와 작품 캡션을 <Key>submissions/학번</Key>에 사본으로 둡니다.</p>
               <div className="field-row">
                 <label htmlFor="k-sel">1인당 비교 쌍 수</label>
@@ -186,7 +186,8 @@ function TryTab({ meSid, setMe, peer, setPeer, epoch, reset, agg, setAgg, simSee
                   {K_OPTIONS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
                 </select>
               </div>
-              <p className="hint">실제 학급(27~30명)은 12쌍이라 작품마다 24번 비교됩니다. 예시 학급은 12점이라 최대 11쌍입니다.</p>
+              <p className="hint">실제로는 2학년 다섯 반 145명이 한 명단에 들어가고, 1인당 12쌍이면 작품마다 24번 비교됩니다. 예시는 12점이라 최대 11쌍입니다.</p>
+              <p className="hint">명단은 다섯 반이 모두 제출한 뒤 한 번만 확정합니다. 다시 확정하면 새 배정표가 생겨, 그 전에 판정한 반의 기록이 새 명단의 집계에 들어가지 않습니다.</p>
               <div className="field-row">
                 <span className="lbl">확신도 묻기</span>
                 <span className="seg">
@@ -212,8 +213,9 @@ function TryTab({ meSid, setMe, peer, setPeer, epoch, reset, agg, setAgg, simSee
           {stage === "self1" && (
             <div className="stage-box">
               <h3>2. 자기평가 ①</h3>
-              <p>다섯 문항(종합 설득력과 네 축)에 1~5점, 근거 한 문장, 「우리 반에서 몇 번째쯤일까」 등수 예측을 합니다.</p>
-              <p className="why"><b>왜 비교 전에 하나.</b> 동료 작품을 보기 전의 기준을 기록해 두어야 비교 뒤에 달라진 정도를 잴 수 있습니다. 등수 예측은 백분위로 바꿔 저장합니다: (n − 예측 등수) ÷ (n − 1).</p>
+              <p>학생은 왼쪽에 자기 작품을 두고 여섯 문항(기록 사진의 형식·흔적과 쓰임·작품 캡션과 이미지·사회 문제와 태도·AI 결과물을 고르고 고친 판단·유물로서의 설득력)마다 네 수준 가운데 하나를 고릅니다. 이어서 근거 한 문장을 쓰고, 2학년 전체에서 앞에서 몇 % 안에 들지 예측합니다.</p>
+              <p className="why"><b>왜 비교 전에 하나.</b> 동료 작품을 보기 전의 기준을 기록해 두어야 비교 뒤에 달라진 정도를 잴 수 있습니다. 위치 예측(앞에서 몇 %)은 2학년 전체 등수와 백분위로 바꿔 함께 저장합니다.</p>
+              <p className="why"><b>왜 수준 문장인가.</b> 「그렇다·아니다」보다 작품의 모습을 적은 네 문장 가운데 고르게 하면 학생이 자기 작품에서 확인할 곳이 분명해집니다. 문항은 성취기준 [12미02-01]·[12미02-03]·[12미02-04]와 3~6차시 학습 목표에 대응합니다.</p>
               {!s1Done && <p className="hint">학생 화면에서 자기평가 ①을 제출한 뒤 다음 단계를 여는 것이 자연스럽습니다.</p>}
               <button type="button" className="btn-p" onClick={() => open("peer")}>동료 비교 열기</button>
             </div>
@@ -226,7 +228,7 @@ function TryTab({ meSid, setMe, peer, setPeer, epoch, reset, agg, setAgg, simSee
               <ul className="why-list">
                 <li>작품 번호만 보이고, 작품 캡션은 접힌 채 시작합니다. 펼쳤는지는 기록됩니다.</li>
                 <li>두 이미지가 모두 화면에 60% 이상 보여야 고를 수 있고, 5초 안에 고르면 한 번 더 보라는 안내가 뜹니다(실제 경과 시간은 그대로 기록).</li>
-                <li>AI 활용 범위는 숨기고 학급 공통 안내 한 줄만 보입니다. 작품마다 다른 고지가 보이면 그 차이가 점수에 그대로 실리기 때문입니다.</li>
+                <li>AI 활용 범위는 숨기고 2학년 공통 안내 한 줄만 보입니다. 작품마다 다른 고지가 보이면 그 차이가 점수에 그대로 실리기 때문입니다.</li>
                 <li>마지막 화면은 앞에서 본 쌍을 좌우만 바꿔 다시 보여 주는 반복 쌍입니다. 학생에게는 알리지 않고, 점수 계산에서는 뺍니다.</li>
               </ul>
               <details className="mini">
@@ -250,7 +252,7 @@ function TryTab({ meSid, setMe, peer, setPeer, epoch, reset, agg, setAgg, simSee
               <p className="why"><b>왜 ①을 가리나.</b> ①이 보이면 그 값에 끌려가 비교가 기준을 얼마나 움직였는지 알 수 없습니다. 실제 수업에서는 ② 전에 선생님이 기준 예시 한 쌍을 함께 짚습니다(하위권의 과대평가는 동료 작품을 보는 것만으로 저절로 고쳐지지 않습니다).</p>
               {!s2Locked && <p className="hint">학생 화면에서 「현재 점수 확정」까지 해 두면 결과 화면에서 예측과 실제의 차이를 볼 수 있습니다.</p>}
               <button type="button" className="btn-p" onClick={runAgg}>집계 실행</button>
-              <p className="hint">반 친구 11명의 판정을 예시 작품의 숨은 품질로 만든 뒤, 내 판정과 합쳐 계산합니다.</p>
+              <p className="hint">다른 학생 11명의 판정을 예시 작품의 숨은 품질로 만든 뒤, 내 판정과 합쳐 계산합니다.</p>
             </div>
           )}
 
@@ -272,7 +274,7 @@ function TryTab({ meSid, setMe, peer, setPeer, epoch, reset, agg, setAgg, simSee
           {stage === "result" && (
             <div className="stage-box">
               <h3>6. 결과 공개</h3>
-              <p>학생 화면에는 받은 이유 문장과 결정적 축이 먼저 나오고, 위치는 학생이 「자리 보기」를 눌러야 보입니다.</p>
+              <p>학생 화면에는 받은 이유 문장과 결정적 축이 먼저 나오고, 위치는 학생이 「위치 보기」를 눌러야 보입니다.</p>
               <div className="field-row">
                 <label htmlFor="rv-sel">공개 범위</label>
                 <select id="rv-sel" value={peer.reveal} onChange={(e) => setPeer({ ...peer, reveal: e.target.value })}>
@@ -327,7 +329,7 @@ function MyCalib({ meSid }) {
 }
 
 /* ============================================================
-   탭 2 · 예시 학급
+   탭 2 · 예시 작품
    ============================================================ */
 function GalleryTab({ meSid }) {
   const [showQ, setShowQ] = useState(false);
@@ -335,8 +337,8 @@ function GalleryTab({ meSid }) {
   return (
     <div>
       <div className="intro">
-        <p>2학년 한 반을 12명으로 줄인 예시 학급입니다. 예시 A·B·C(「오른손」·「수위선 1.2m」·「37번 열쇠」)는 앱의 자료집 예시 작품과 같은 글과 도판이고, 나머지 9점은 이 체험을 위해 쓴 가상의 작품이며 도판은 기록 사진 형식만 흉내 낸 도식입니다. 강한 작품부터 약한 작품까지 고르게 섞었습니다.</p>
-        <label className="check"><input id="show-q" type="checkbox" checked={showQ} onChange={(e) => setShowQ(e.target.checked)} /> 반 친구 판정을 흉내 낼 때 쓴 숨은 품질 보기 (체험 전에는 가려 두는 편이 좋습니다)</label>
+        <p>2학년 전체 145명을 12명으로 줄인 예시입니다. 예시 A·B·C(「오른손」·「수위선 1.2m」·「37번 열쇠」)는 앱의 자료집 예시 작품과 같은 글과 도판이고, 나머지 9점은 이 체험을 위해 쓴 가상의 작품이며 도판은 기록 사진 형식만 흉내 낸 도식입니다. 강한 작품부터 약한 작품까지 고르게 섞었습니다.</p>
+        <label className="check"><input id="show-q" type="checkbox" checked={showQ} onChange={(e) => setShowQ(e.target.checked)} /> 다른 학생 판정을 흉내 낼 때 쓴 숨은 품질 보기 (체험 전에는 가려 두는 편이 좋습니다)</label>
       </div>
       <div className="gallery">
         {sorted.map((w) => (
@@ -375,16 +377,19 @@ function RosterTab({ peer }) {
   const [view, setView] = useState("round");
   const [sel, setSel] = useState(null);
   const n = roster.works.length, k = roster.k;
-  const nos = roster.works.map((w) => w.no);
+  const byNoList = roster.works.map((w) => w.no).sort();                 // 작품 번호순(표·버튼용)
+  const order = (roster.stats && roster.stats.order) || byNoList;       // 순환 규칙이 쓰는 순서(seed로 섞음)
+  const workOf = Object.fromEntries(roster.works.map((w) => [w.no, w]));
   const ds = (roster.stats && roster.stats.ds) || [];
   const errors = validatePlan({ plan: roster.plan, works: roster.works, judges: roster.judges, k, repeat: 1 });
   const st = roster.stats || {};
 
-  const rows = roster.works.map((w, j) => {
+  const rows = order.map((no, j) => {
+    const w = workOf[no];
     const items = roster.plan[w.sid] || [];
     const byRound = [];
     for (let r = 1; r <= k; r += 1) {
-      const a = nos[(j + r) % n], b = nos[(j + r + ds[r - 1]) % n];
+      const a = order[(j + r) % n], b = order[(j + r + ds[r - 1]) % n];
       const it = items.find((x) => x.rep == null && ((x.a === a && x.b === b) || (x.a === b && x.b === a)));
       byRound.push(it || null);
     }
@@ -396,7 +401,7 @@ function RosterTab({ peer }) {
   };
   const has = (it) => sel && it && (it.a === sel || it.b === sel);
   const expo = {};
-  nos.forEach((no) => { expo[no] = { n: 0, L: 0, R: 0, opp: new Set() }; });
+  byNoList.forEach((no) => { expo[no] = { n: 0, L: 0, R: 0, opp: new Set() }; });
   roster.works.forEach((w) => (roster.plan[w.sid] || []).forEach((it) => {
     if (it.rep != null) return;
     const { L, R } = cellOf(it);
@@ -417,7 +422,7 @@ function RosterTab({ peer }) {
       </div>
       <div className="rule-box">
         <h3>순환 규칙</h3>
-        <p>작품을 번호순으로 0~{n - 1}에 놓고, 작품 j를 낸 학생의 r회차 쌍을 <b className="num">{"{ j + r, j + r + d_r } (mod " + n + ")"}</b>로 정합니다. 한 회차 안에서 학생들이 한 바퀴 돌면 앞자리 j + r이 모든 작품을 정확히 한 번 덮고, d_r이 회차 안에서 같으므로 뒷자리도 그렇습니다. 그래서 k회차를 마치면 작품마다 정확히 2k번 비교됩니다. r ≥ 1이라 자기 작품은 앞자리에 오지 않고, d_r은 뒷자리가 자기 작품이 되지 않도록 고릅니다.</p>
+        <p>작품을 seed로 섞은 순서대로 0~{n - 1}에 놓고(작품 번호순으로 두면 번호가 이어진 같은 반 작품끼리 짝지어지기 쉽습니다), 작품 j를 낸 학생의 r회차 쌍을 <b className="num">{"{ j + r, j + r + d_r } (mod " + n + ")"}</b>로 정합니다. 한 회차 안에서 학생들이 한 바퀴 돌면 앞자리 j + r이 모든 작품을 정확히 한 번 덮고, d_r이 회차 안에서 같으므로 뒷자리도 그렇습니다. 그래서 k회차를 마치면 작품마다 정확히 2k번 비교됩니다. r ≥ 1이라 자기 작품은 앞자리에 오지 않고, d_r은 뒷자리가 자기 작품이 되지 않도록 고릅니다.</p>
         <p className="num ds">d_r = {ds.join(", ")}</p>
         <ul className="checks">
           <li><Status kind={errors.length ? "hold" : "ok"}>{errors.length ? "검사 오류 " + errors.length + "건" : "자기 작품 없음 · 한 학생 안에서 같은 쌍 없음 · 반복 쌍 좌우 뒤집힘"}</Status></li>
@@ -436,7 +441,7 @@ function RosterTab({ peer }) {
         <span className="hint">작품 번호를 누르면 그 작품이 나오는 칸이 모두 표시됩니다. 칸은 「왼쪽 · 오른쪽」입니다.</span>
       </div>
       <div className="chips">
-        {nos.map((no) => (
+        {byNoList.map((no) => (
           <button type="button" key={no} className={"chip" + (sel === no ? " on" : "")} aria-pressed={sel === no} onClick={() => setSel(sel === no ? null : no)}>{no}</button>
         ))}
       </div>
@@ -467,14 +472,14 @@ function RosterTab({ peer }) {
           </tbody>
         </table>
       </div>
-      <p className="hint">회차 구조에서는 줄이 한 칸 내려갈 때마다 앞자리가 한 번호씩 밀리는 대각선이 보입니다. 학생이 보는 순서는 회차를 섞은 것이고, 반복 쌍은 앞 {k - 2}화면 가운데 하나를 골라 맨 뒤에 좌우를 바꿔 둡니다(원본과 반복 사이에 다른 화면이 둘 이상 들어갑니다).</p>
+      <p className="hint">회차 구조의 줄은 섞은 명단 순서입니다. 줄이 한 칸 내려갈 때마다 앞자리가 명단에서 한 칸씩 밀립니다. 학생이 보는 순서는 회차를 섞은 것이고, 반복 쌍은 앞 {k - 2}화면 가운데 하나를 골라 맨 뒤에 좌우를 바꿔 둡니다(원본과 반복 사이에 다른 화면이 둘 이상 들어갑니다).</p>
 
       <h3 className="h3">작품별 노출</h3>
       <div className="scroll-x">
         <table className="tbl">
           <thead><tr><th scope="col">작품</th><th scope="col">비교 횟수</th><th scope="col" className="bar-col">왼쪽 · 오른쪽</th><th scope="col">서로 다른 상대</th></tr></thead>
           <tbody>
-            {nos.map((no) => {
+            {byNoList.map((no) => {
               const e = expo[no];
               return (
                 <tr key={no}>
@@ -572,19 +577,19 @@ function AggTab({ meSid, peer, agg: tryAgg }) {
   return (
     <div>
       <div className="intro">
-        <p>교사 화면의 「집계 실행」과 같은 함수(<Key>aggregate</Key>)의 결과입니다. 반 친구 판정은 예시 작품의 숨은 품질로 만든 것이므로, 숨은 품질과 추정 θ를 나란히 놓고 동료 판정이 기준을 얼마나 되찾는지 볼 수 있습니다.</p>
+        <p>교사 화면의 「집계 실행」과 같은 함수(<Key>aggregate</Key>)의 결과입니다. 다른 학생 판정은 예시 작품의 숨은 품질로 만든 것이므로, 숨은 품질과 추정 θ를 나란히 놓고 동료 판정이 기준을 얼마나 되찾는지 볼 수 있습니다.</p>
       </div>
       <div className="controls">
         <div className="field-row">
           <span className="lbl">판정 자료</span>
           <span className="seg">
-            <button type="button" aria-pressed={source === "try"} disabled={!liveRoster} onClick={() => setSource("try")}>내 체험 판정 + 반 친구 11명</button>
+            <button type="button" aria-pressed={source === "try"} disabled={!liveRoster} onClick={() => setSource("try")}>내 체험 판정 + 다른 학생 11명</button>
             <button type="button" aria-pressed={source === "sim"} onClick={() => setSource("sim")}>12명 모두 예시 판정자</button>
           </span>
         </div>
         {!liveRoster && <p className="hint">「직접 해 보기」에서 명단을 확정하면 내 판정을 넣어 계산할 수 있습니다.</p>}
         <div className="field-row">
-          <span className="lbl">학급 작품의 다양성</span>
+          <span className="lbl">작품의 다양성</span>
           <span className="seg">
             {[[0.5, "비슷함(×0.5)"], [1, "기본"], [1.5, "뚜렷함(×1.5)"]].map(([v, t]) => <button key={v} type="button" aria-pressed={mult === v} onClick={() => setMult(v)}>{t}</button>)}
           </span>
@@ -595,8 +600,8 @@ function AggTab({ meSid, peer, agg: tryAgg }) {
             <select id="ks" value={kSim} onChange={(e) => setKSim(Number(e.target.value))}>{K_OPTIONS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select>
           </div>
         )}
-        <button type="button" className="btn-s" onClick={() => setSeed((seed == null ? 3 : seed) + 1)}>반 친구 판정 다시 뽑기</button>
-        <span className="hint">{data.same ? "지금 숫자는 「직접 해 보기」에서 집계한 결과와 같습니다. " : ""}같은 학급이라도 판정을 다시 받으면 SSR이 달라집니다. 몇 번 눌러 흔들림의 폭을 보세요.</span>
+        <button type="button" className="btn-s" onClick={() => setSeed((seed == null ? 3 : seed) + 1)}>다른 학생 판정 다시 뽑기</button>
+        <span className="hint">{data.same ? "지금 숫자는 「직접 해 보기」에서 집계한 결과와 같습니다. " : ""}같은 작품이라도 판정을 다시 받으면 SSR이 달라집니다. 몇 번 눌러 흔들림의 폭을 보세요.</span>
       </div>
 
       <div className="tiles">
@@ -619,7 +624,7 @@ function AggTab({ meSid, peer, agg: tryAgg }) {
         <div>
           <h3 className="h3">읽는 법</h3>
           <dl className="gloss">
-            <dt>θ(세타)</dt><dd>브래들리–테리 모형의 작품 위치. 두 작품의 θ 차가 1이면 판정자 약 73%가 앞선 쪽을 고른다고 봅니다. 학급 평균이 0입니다.</dd>
+            <dt>θ(세타)</dt><dd>브래들리–테리 모형의 작품 위치. 두 작품의 θ 차가 1이면 판정자 약 73%가 앞선 쪽을 고른다고 봅니다. 전체 평균이 0입니다.</dd>
             <dt>SSR</dt><dd>(θ의 분산 − 평균 오차 분산) ÷ θ의 분산. 판정자들이 얼마나 같은 순서를 가리키는가입니다. .80 이상 채택, .70~.80 주의, .70 미만 보류.</dd>
             <dt>반분 신뢰도</dt><dd>판정자를 반으로 갈라 두 번 계산한 θ의 상관. 반쪽은 비교 횟수가 절반이라 낮게 나오는 것이 정상이어서 보고 지표로만 씁니다.</dd>
             <dt>반복 쌍 일치율</dt><dd>같은 쌍을 좌우만 바꿔 다시 보여 줬을 때 같은 작품을 고른 비율. 성실한 판정자도 비슷한 두 작품에서는 갈리므로 모형 기대치와 견줘 읽습니다.</dd>
@@ -670,7 +675,7 @@ function AggTab({ meSid, peer, agg: tryAgg }) {
 
       {mineJ.length > 0 && (
         <>
-          <h3 className="h3">내 판정과 학급 합의</h3>
+          <h3 className="h3">내 판정과 전체 합의</h3>
           <div className="scroll-x">
             <table className="tbl">
               <thead><tr><th scope="col">쌍(왼쪽 · 오른쪽)</th><th scope="col">내가 고른 쪽</th><th scope="col">θ가 높은 쪽</th><th scope="col">내 이유 · 결정적 축</th></tr></thead>
@@ -705,10 +710,10 @@ const DECISIONS = [
   ["점수 대신 둘 중 하나를 고른다", "고2 판정자가 「5점 만점에 3점」을 일관되게 매기기는 어렵고 친분이 점수에 실립니다. 두 작품의 우열 판단은 훨씬 일관되고, 거친 판정을 여럿 모아도 확률 모형으로 순위 척도를 되찾을 수 있습니다. 훈련받지 않은 동료 판정이 전문가 순위와 높은 상관을 보인다는 보고가 대학과 중등에서 이어졌습니다.", "Thurstone 1927; Bradley & Terry 1952; Jones & Alcock 2014; Jones & Wheadon 2015"],
   ["1인당 12쌍, 작품마다 정확히 24회", "신뢰도는 판정자 수가 아니라 작품당 비교 횟수가 정합니다. 학생 한 명이 작품 하나를 내므로 판정자 수가 곧 작품 수이고, 순환 규칙을 쓰면 작품마다 정확히 2k번 비교됩니다.", "Kinnear 외 2025; Verhavert 외 2019"],
   ["명단 확정 순간 배정표를 한 문서에 고정한다", "점수가 비슷한 작품끼리 붙이는 적응 배정은 신뢰도 수치를 부풀리고 순위 정확도는 더 얻지 못하며, 학생 화면이 남의 판정을 실시간으로 읽어야 합니다. 비적응 균형 배정을 명단 확정 때 한 번 만듭니다.", "Bramley 2015; Bramley & Vitello 2019; Crompvoets 외 2020"],
-  ["좌우를 맞추고 숨은 반복 쌍을 하나 둔다", "먼저 놓인 쪽으로 끌리는 경향은 방향이 상황마다 달라 균형 배치로 상쇄합니다. 반복 쌍은 학급의 일관성을 보는 기술 통계일 뿐 개인을 빼는 기준이 아닙니다.", "Bar-Hillel 2015; Kendall & Babington Smith 1940"],
+  ["좌우를 맞추고 숨은 반복 쌍을 하나 둔다", "먼저 놓인 쪽으로 끌리는 경향은 방향이 상황마다 달라 균형 배치로 상쇄합니다. 반복 쌍은 판정자 전체의 일관성을 보는 기술 통계일 뿐 개인을 빼는 기준이 아닙니다.", "Bar-Hillel 2015; Kendall & Babington Smith 1940"],
   ["이유 한 문장은 모든 쌍에서, 결정적 축은 고른 뒤에", "비교를 글로 옮기는 것 자체가 학습이고, 받은 문장이 8차시 성찰의 재료가 됩니다. 판정 중에 기준을 나열하면 전체를 보는 판단이 항목별 판단으로 바뀌므로 축은 고른 뒤에 하나만 고릅니다. 「노력」 항목은 두지 않습니다.", "Nicol 2021; Leech & Chambers 2022; Bellaiche 외 2023"],
   ["확신도 대신 「판단이 어려웠다」 표시", "강제선택에 확신도를 더하면 시간만 늘고 정확도는 오르지 않습니다. 판단의 어려움은 의미 있는 변수라 선택 표시로 남깁니다. 배포된 설정은 현재 확신도 묻기가 켜져 있으니 8차시 전에 의도를 확인하세요.", "Mantiuk 외 2012; van Daal 외 2017"],
-  ["AI 활용 범위는 비교 화면에서 숨긴다", "AI 라벨 하나로 같은 작품의 평가가 내려가므로 작품마다 다른 고지가 보이면 그 차이가 θ에 그대로 실립니다. 대신 학급 공통 안내 한 줄을 두고, 고지의 효과는 별도의 앵커 쌍으로 잽니다.", "Bellaiche 외 2023; Horton 외 2023; Raj 외 2026"],
+  ["AI 활용 범위는 비교 화면에서 숨긴다", "AI 라벨 하나로 같은 작품의 평가가 내려가므로 작품마다 다른 고지가 보이면 그 차이가 θ에 그대로 실립니다. 대신 2학년 공통 안내 한 줄을 두고, 고지의 효과는 별도의 앵커 쌍으로 잽니다.", "Bellaiche 외 2023; Horton 외 2023; Raj 외 2026"],
   ["자기평가 ②는 ①을 보지 않고 먼저 확정한다", "①이 보이면 그 값에 끌려가 보정량이 진짜 재평가가 아니게 됩니다. 확정한 뒤에 나란히 보고 변화 사유를 고릅니다. 주 결과는 보정량 |편향①| − |편향②|입니다.", "Schraw 2009; Nederhand 외 2019"],
   ["결과는 이유 먼저, 위치는 밴드로, 눌러야 보이게", "정확한 등수는 하위권에 해롭고 점수는 함께 준 논평의 효과를 지웁니다. 받은 이유와 결정적 축을 먼저 보여 주고 위치는 상·중·하로만 알립니다.", "Hattie & Timperley 2007; Butler 1988; Goulas & Megalokonomou 2021"],
   ["품질 표시는 하되 아무도 자동으로 빼지 않는다", "판정 12건의 적합도 지수는 흔들림이 커서 개인 판단에 쓸 수 없습니다. 주 분석은 전원을 넣고, 표시된 판정자를 뺀 계산은 민감도 분석으로만 보고합니다.", "Wu, Niezink & Junker 2022; Linacre 2002"],
@@ -716,8 +721,10 @@ const DECISIONS = [
 
 function DesignTab() {
   const rows = [0.5, 0.75, 1, 1.5];
-  const ks = [10, 12, 15, 21];
-  const cell = (sigma, k) => (SIM.A || []).find((r) => r.n === 28 && r.k === k && r.sigma === sigma);
+  const ks = [10, 12, 15];
+  const cell = (sigma, k) => (SIM.H || []).find((r) => r.n === 145 && r.k === k && r.sigma === sigma && !r.absent);
+  const absent = (SIM.H || []).filter((r) => r.absent > 0).sort((x, y) => x.absent - y.absent);
+  const base = cell(1, 12);
   const shade = (v) => { const t = Math.max(0, Math.min(1, (v - 0.45) / 0.5)); const a = [234, 241, 237], b = [49, 104, 79]; return "rgb(" + a.map((x, i) => Math.round(x + (b[i] - x) * t)).join(",") + ")"; };
   return (
     <div>
@@ -725,8 +732,8 @@ function DesignTab() {
       <ol className="decisions">
         {DECISIONS.map(([h, b, ref]) => <li key={h}><h3>{h}</h3><p>{b}</p><p className="ref">{ref}</p></li>)}
       </ol>
-      <h3 className="h3">몇 번 비교해야 믿을 만한가: 시뮬레이션 결과(학급 28명, 반복 200회)</h3>
-      <p className="hint">배포된 계산 코드를 그대로 돌린 몬테카를로 결과입니다(<Key>scripts/assess-sim.mjs</Key>). 칸마다 SSR 평균, 아래는 SSR .80 이상이 나온 비율입니다. σ는 학급 안 작품 품질의 흩어짐(logit)입니다.</p>
+      <h3 className="h3">몇 번 비교해야 믿을 만한가: 2학년 전체 145점 시뮬레이션</h3>
+      <p className="hint">배포된 계산 코드를 그대로 돌린 몬테카를로 결과입니다(<Key>scripts/assess-sim.mjs</Key> 시나리오 H, 칸마다 40회). 칸마다 SSR 평균, 아래는 SSR .80 이상이 나온 비율입니다. σ는 작품 품질의 흩어짐(logit)입니다.</p>
       <div className="scroll-x">
         <table className="tbl heat">
           <thead><tr><th scope="col">작품 다양성 σ</th>{ks.map((k) => <th key={k} scope="col" className="num">1인당 {k}쌍<br /><small>작품당 {2 * k}회</small></th>)}</tr></thead>
@@ -735,7 +742,7 @@ function DesignTab() {
               <tr key={s}>
                 <th scope="row" className="num">{s}</th>
                 {ks.map((k) => { const c = cell(s, k); if (!c) return <td key={k}>-</td>; const dark = c.ssrMean > 0.8; return (
-                  <td key={k} className="num" style={{ background: shade(c.ssrMean), color: dark ? "#fff" : "#111" }} title={"σ " + s + " · " + k + "쌍: SSR 평균 " + c.ssrMean + ", 10~90 백분위 " + c.ssrP10 + "~" + c.ssrP90 + ", 채택률 " + Math.round(c.pAdopt * 100) + "%"}>
+                  <td key={k} className="num" style={{ background: shade(c.ssrMean), color: dark ? "#fff" : "#111" }} title={"σ " + s + " · " + k + "쌍: SSR 평균 " + c.ssrMean + ", 10~90 백분위 " + c.ssrP10 + "~" + c.ssrP90 + ", 채택률 " + Math.round(c.pAdopt * 100) + "%, 백분위 오차 평균 " + Math.round(c.pctAbsErrMean * 100) + "%p"}>
                     <b>{fmtNum(c.ssrMean)}</b><br /><small>채택 {Math.round(c.pAdopt * 100)}%</small>
                   </td>
                 ); })}
@@ -744,7 +751,29 @@ function DesignTab() {
           </tbody>
         </table>
       </div>
-      <p className="hint">작품당 24회(12쌍)에서 SSR .80은 작품 다양성이 1 logit 안팎일 때 절반쯤만 나옵니다. 작품들이 서로 비슷한 학급에서는 판정을 두 배로 받아도 .80에 이르기 어렵습니다. 그래서 첫 학급의 θ 표준편차를 먼저 보고 남은 학급의 쌍 수를 정합니다.</p>
+      <p className="hint">작품당 24회(12쌍)에서 SSR .80은 작품 다양성이 1 logit 안팎일 때 절반쯤 나옵니다. 작품들이 서로 비슷하면 판정을 늘려도 .80에 이르기 어렵습니다.</p>
+      {base && (
+        <>
+          <h3 className="h3">145점 가운데 몇 번째인지는 얼마나 정확한가</h3>
+          <p>σ = 1, 1인당 12쌍일 때 추정한 백분위는 실제 백분위와 평균 <b className="num">{Math.round(base.pctAbsErrMean * 100)}%p</b> 어긋나고, 열 명 가운데 한 명은 <b className="num">{Math.round(base.pctAbsErrP90 * 100)}%p</b> 이상 어긋납니다. 등수로는 평균 <b className="num">{Math.round(base.rankAbsErrMean)}칸</b>입니다. 앞·가운데·뒤 세 묶음이 실제와 같은 비율은 <b className="num">{Math.round(base.bandAgree * 100)}%</b>입니다. 그래서 학생에게는 등수 대신 세 묶음(밴드)으로 알리는 것을 기본으로 둡니다.</p>
+        </>
+      )}
+      {absent.length > 0 && (
+        <>
+          <h3 className="h3">한 반이 판정하지 못하면</h3>
+          <div className="scroll-x">
+            <table className="tbl">
+              <thead><tr><th scope="col">판정하지 못한 학생</th><th scope="col">SSR 평균</th><th scope="col">작품당 비교 최솟값(평균)</th><th scope="col">백분위 오차 평균</th></tr></thead>
+              <tbody>
+                {[base].concat(absent).filter(Boolean).map((r) => (
+                  <tr key={r.absent}><td className="num">{r.absent ? r.absent + "명" : "없음"}</td><td className="num">{fmtNum(r.ssrMean)}</td><td className="num">{fmtNum(r.exposureMinMean, 1)}회</td><td className="num">{Math.round(r.pctAbsErrMean * 100)}%p</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="hint">판정은 반마다 다른 8차시 수업 시간에 쌓입니다. 한 반(29명)이 통째로 빠져도 SSR은 조금만 내려가지만, 그 반이 판정할 쌍에 들어 있던 작품은 비교 횟수가 줄어듭니다. 결과는 마지막 반의 판정이 끝난 뒤 한 번에 집계합니다.</p>
+        </>
+      )}
     </div>
   );
 }
@@ -752,7 +781,7 @@ function DesignTab() {
 /* ============================================================
    껍데기
    ============================================================ */
-const TABS = [["try", "직접 해 보기"], ["gallery", "예시 학급 12점"], ["roster", "배정표"], ["agg", "집계와 품질"], ["design", "설계 요점"]];
+const TABS = [["try", "직접 해 보기"], ["gallery", "예시 작품 12점"], ["roster", "배정표"], ["agg", "집계와 품질"], ["design", "설계 요점"]];
 const FLOW = [
   ["제출", "대표 이미지·제목·작품 캡션을 사본으로 고정", "submissions/학번"],
   ["자기평가 ①", "5문항 1~5점 · 근거 · 등수 예측", "assess/학번.self.s1"],
@@ -778,7 +807,7 @@ function App() {
       <header className="mast">
         <p className="eyebrow">허구의 아카이브 · 8차시 상호평가 · 교사용</p>
         <h1>쌍대비교 체험실</h1>
-        <p className="lead">예시 학급 12점으로 학생 화면을 직접 해 보고, 선생님 단계 스위치를 넘기며 배정·집계·품질 판정이 어떻게 돌아가는지 확인합니다. 학생 화면은 앱의 실제 코드를 그대로 돌리고, 기록은 이 페이지 안에만 남습니다.</p>
+        <p className="lead">예시 작품 12점으로 학생 화면을 직접 해 보고, 선생님 단계 스위치를 넘기며 배정·집계·품질 판정이 어떻게 돌아가는지 확인합니다. 실제 수업에서는 2학년 전체 145점이 한 명단이고 순위도 2학년 전체 기준입니다. 학생 화면은 앱의 실제 코드를 그대로 돌리고, 기록은 이 페이지 안에만 저장됩니다.</p>
       </header>
       <ol className="flow" aria-label="상호평가 흐름">
         {FLOW.map(([h, d, key], i) => (
@@ -798,7 +827,7 @@ function App() {
         {tab === "design" && <DesignTab />}
       </main>
       <footer className="foot">
-        <p>학생 화면: <Key>src-assess.jsx</Key> · 계산: <Key>src-assess-core.mjs</Key> · 예시 학급과 판정 흉내: <Key>pairwise-research/lab/</Key>. 예시 A·B·C 외 도판 9점은 체험용 도식이며 실제 학생 작품이 아닙니다.</p>
+        <p>학생 화면: <Key>src-assess.jsx</Key> · 계산: <Key>src-assess-core.mjs</Key> · 예시 작품과 판정 흉내: <Key>pairwise-research/lab/</Key>. 예시 A·B·C 외 도판 9점은 체험용 도식이며 실제 학생 작품이 아닙니다.</p>
       </footer>
     </div>
   );

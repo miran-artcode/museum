@@ -24,7 +24,9 @@ export const DWELL_ANY_WINDOW_MS = 30000; // 어떤 움직임이든 이 안에 �
 export const DWELL_STRONG_WINDOW_MS = 120000; // 분명한 조작이 이 안에 있어야 함
 export const DWELL_MOVE_PX = 3;           // 마우스 이동으로 인정하는 최소 거리
 
-const STRONG_EVENTS = ["pointerdown", "keydown", "wheel", "scroll", "touchstart", "input"];
+/* museum:listening: 학습 지원의 읽어 주기가 문장을 읽을 때마다 보낸다(src-access.jsx). 귀로 읽는 동안에도
+   살펴본 시간으로 센다: 손을 움직이지 않고 듣는 학생(시각장애·읽기 어려움)이 「켜 둔 채 비활동」으로 잡히지 않게 */
+const STRONG_EVENTS = ["pointerdown", "keydown", "wheel", "scroll", "touchstart", "input", "museum:listening"];
 
 /* onTick(active, sec): active가 true면 살펴본 시간, false면 켜 둔 채 비활동 시간에 sec를 더하라는 뜻.
    반환값은 정리 함수. */

@@ -116,16 +116,19 @@ export const session = {
 
 /* 교사 화면 탭. 이름은 TeacherApp의 분기 문자열과 같아야 한다. */
 export const TEACHER_TAB_GROUPS = [
-  { name: "수업 운영", tabs: ["현황", "차시 공개", "수업 안내", "수업 편집"] },
+  { name: "수업 운영", tabs: ["현황", "차시 공개", "수업 안내", "수업 편집", "학습 지원"] },
   { name: "학생 기록", tabs: ["기록 현황", "사고 과정", "창의성", "설문"] },
   { name: "평가", tabs: ["상호평가", "쪽지시험"] },
   { name: "연구·설정", tabs: ["연구", "설정"] },
 ];
 
-export function TeacherTabs({ tab, onSwitch, dirty }) {
+// 보기 전용 계정에는 학생 기록·학번이 없는 탭만 보인다 (규칙도 학생 문서 읽기를 막는다)
+export const VIEWER_TABS = ["수업 안내", "수업 편집", "학습 지원"];
+
+export function TeacherTabs({ tab, onSwitch, dirty, viewer }) {
   return (
     <div className="t-tabs t-groups">
-      {TEACHER_TAB_GROUPS.map((g) => (
+      {TEACHER_TAB_GROUPS.map((g) => ({ ...g, tabs: viewer ? g.tabs.filter((t) => VIEWER_TABS.includes(t)) : g.tabs })).filter((g) => g.tabs.length).map((g) => (
         <div className="t-group" key={g.name}>
           <span className="t-group-l">{g.name}</span>
           {g.tabs.map((t) => (

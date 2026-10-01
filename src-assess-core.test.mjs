@@ -6,6 +6,7 @@ import {
   bradleyTerry, scaleSeparation, splitHalf, judgeFit, positionBias, connectivity, repeatAgreement, ranksAndBands,
   collectJudgements, aggregate, csvJudgements, csvScores, csvSelf, csvSubmissions, csvJudges, buildSampleAssess, judgeBlockOf,
   wilson, predPctOf, simText, submissionFromWs, subReady, stableHash, peerCfg, DEFAULT_PEER, TAG_OPTIONS, QUALITY_MIN,
+  SELF_ITEMS, SELF_SCALE, SELF_LABELS, SELF_TEXT, CHANGE_CODES, CRITERIA, rankFromTop, topFromRank,
 } from "./src-assess-core.mjs";
 
 const sids = (n, from = 20301) => Array.from({ length: n }, (_, i) => String(from + i));
@@ -118,7 +119,8 @@ test("validatePlan은 변조를 잡는다 — 자기 작품·중복 쌍·반복 
   p2[ids[1]][1] = { ...p2[ids[1]][0], i: 1 };
   assert.ok(validatePlan({ plan: p2, works, judges: ids, k: 5 }).some((e) => e.includes("두 번")));
   const p3 = structuredClone(made.plan);
-  p3[ids[2]][5].left = p3[ids[2]][0].left;
+  const rp3 = p3[ids[2]].find((it) => it.rep != null);
+  rp3.left = p3[ids[2]][rp3.rep].left;
   assert.ok(validatePlan({ plan: p3, works, judges: ids, k: 5 }).some((e) => e.includes("뒤집히지")));
   const p4 = structuredClone(made.plan);
   p4[ids[3]][2].i = 9;
@@ -475,4 +477,58 @@ test("비교 0회 작품은 순위 분모에서 빠지고 표 맨 뒤로, SSR은
   const firstNull = ranks.indexOf(null);
   assert.ok(firstNull === -1 || ranks.slice(firstNull).every((r) => r == null));
   assert.equal(buildSampleAssess(sids(3)).roster, null);
+});
+
+test("자기평가 v2 — 문항마다 네 수준 문장, 네 축과 종합·과정 문항, 변화 사유 키 유지", () => {
+  assert.equal(SELF_SCALE, 4);
+  assert.equal(SELF_LABELS.length, SELF_SCALE);
+  const keys = SELF_ITEMS.map((it) => it.k);
+  assert.equal(new Set(keys).size, keys.length);
+  ["overall", "process"].concat(CRITERIA.map((c) => c.k)).forEach((k) => assert.ok(keys.includes(k), k));
+  SELF_ITEMS.forEach((it) => {
+    assert.equal(it.levels.length, SELF_SCALE, it.k);
+    assert.ok(it.label && it.text && it.look && /^\[12미0\d-0\d\]$/.test(it.std), it.k);
+    it.levels.concat([it.text, it.look, it.label]).forEach((t) => assert.ok(!/—/.test(t), "줄표 금지: " + t));
+  });
+  assert.deepEqual(CHANGE_CODES.map((c) => c.k), ["shifted", "same", "unclear", "other"]);
+  assert.ok(SELF_TEXT.rankQ.includes("{n}") && SELF_TEXT.rankQ.includes("2학년 전체"));
+});
+
+test("명단 순서 섞기 — 반별로 번호가 이어져 있어도 같은 반 작품이 한 판정자에게 몰리지 않는다", () => {
+  const works = [];
+  for (let c = 1; c <= 5; c += 1) for (let i = 1; i <= 29; i += 1) works.push({ no: c + "-" + String(i).padStart(2, "0"), sid: "2" + String(c).padStart(2, "0") + String(i).padStart(2, "0") });
+  const made = makePlan({ works, judges: works.map((w) => w.sid), k: 12, repeat: 1, seed: "2026-11-01T00:00:00Z" });
+  assert.deepEqual(made.errors, []);
+  assert.equal(made.stats.exposureMin, 24); assert.equal(made.stats.exposureMax, 24);
+  assert.equal(made.stats.order.length, 145);
+  const cls = (no) => no.split("-")[0];
+  const own = {}; works.forEach((w) => { own[w.sid] = cls(w.no); });
+  let same = 0, tot = 0;
+  Object.entries(made.plan).forEach(([sid, items]) => items.filter((x) => x.rep == null).forEach((x) => { same += (cls(x.a) === own[sid]) + (cls(x.b) === own[sid]); tot += 2; }));
+  assert.ok(same / tot < 0.3, "같은 반 비율 " + (same / tot).toFixed(3));   // 우연 수준은 28/144 ≈ 0.19
+  const again = makePlan({ works: works.slice().reverse(), judges: works.map((w) => w.sid), k: 12, repeat: 1, seed: "2026-11-01T00:00:00Z" });
+  assert.equal(again.hash, made.hash);
+});
+
+test("위치 예측 — 앞에서 몇 % 안을 2학년 전체 등수·백분위로 바꾸고 되돌린다", () => {
+  assert.equal(rankFromTop(1, 145), 1);
+  assert.equal(rankFromTop(100, 145), 145);
+  assert.equal(rankFromTop(30, 145), 44);
+  assert.equal(topFromRank(44, 145), 30);
+  assert.equal(rankFromTop(50, 12), 6);
+  assert.equal(rankFromTop(null, 145), null);
+  const r = rankFromTop(10, 145);
+  assert.ok(predPctOf(r, 145) > 0.9 && predPctOf(r, 145) < 0.92);
+});
+
+test("자기평가 CSV — 열이 문항 키를 따르고 위치 예측(pred_top)이 함께 나간다", () => {
+  const assessMap = { 20901: { self: { s1: { scores: { veri: 3, overall: 4, process: 2 }, predTop: 30, predRank: 44, n: 145, predPct: predPctOf(44, 145), submittedAt: "t" } } } };
+  const { head, rows } = csvSelf({ roster: null, assessMap, pidOf: () => "P01" });
+  SELF_ITEMS.forEach((it) => assert.ok(head.includes(it.k), it.k));
+  assert.ok(head.includes("pred_top"));
+  const row = rows[0];
+  assert.equal(row[head.indexOf("overall")], 4);
+  assert.equal(row[head.indexOf("process")], 2);
+  assert.equal(row[head.indexOf("pred_top")], 30);
+  assert.equal(row[head.indexOf("pred_rank")], 44);
 });
