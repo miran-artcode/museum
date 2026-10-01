@@ -18,7 +18,7 @@ import { LESSONS_DEF } from "./src-lessons.jsx";
 import { CardMedia, CardMediaStyle } from "./src-card-media.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
-import { UxStyle, ConfirmButton, session, TeacherTabs } from "./src-ux.jsx";
+import { UxStyle, ConfirmButton, session, TeacherTabs, VIEWER_TABS } from "./src-ux.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { ArExpoEntry, ArDeepLink, ArStyle } from "./src-ar.jsx";
 import { LabelCompare } from "./src-label-compare.jsx";
@@ -8522,7 +8522,8 @@ function RosterAdmin({ ids, roster, wsMap, surveyMap, sampleMode, onDone }) {
 function TeacherApp({ onExit, onGallery }) {
   useContent();
   useEffect(() => watchContent(), []);
-  const [tab, setTab] = useState("현황");
+  const viewerOnly = authApi.isViewer();
+  const [tab, setTab] = useState(viewerOnly ? VIEWER_TABS[0] : "현황");
   const [roster, setRoster] = useState({});
   const [wsMap, setWsMap] = useState({});
   const [gradeMap, setGradeMap] = useState({});
@@ -8545,6 +8546,7 @@ function TeacherApp({ onExit, onGallery }) {
     !(tab === "수업 편집" && edDirty) ||
     window.confirm("저장하지 않은 수업 편집 원고가 있습니다. 이동하면 사라집니다. 이동할까요?");
   const switchTab = (t) => {
+    if (viewerOnly && !VIEWER_TABS.includes(t)) return;
     if (t !== tab && !confirmLoseEdit()) return;
     setTab(t);
   };
@@ -8726,8 +8728,8 @@ function TeacherApp({ onExit, onGallery }) {
       </div>
       <div className="wrap wide">
         <CaptionOnAir />
-        {authApi.isViewer() && <div className="sample-banner">보기 전용 계정으로 들어왔습니다. 모든 기록을 볼 수 있지만 채점·설정·수업 편집 등 어떤 것도 저장되지 않습니다. 고치려면 나간 뒤 관리자 코드로 다시 입장하세요.</div>}
-        {sel ? (
+        {authApi.isViewer() && <div className="sample-banner">보기 전용 계정으로 들어왔습니다. 수업 안내·수업 자료·학습 지원 설정만 볼 수 있고, 학생별 기록과 학번은 보이지 않으며 내려받기와 저장은 할 수 없습니다.</div>}
+        {sel && !viewerOnly ? (
           <div style={{ paddingTop: 18 }}>
             <TeacherStudentView key={sel} sid={sel} roster={roster} wsData={wsMap[sel]} gradeData={gradeMap[sel]} surveyData={surveyMap[sel]} ids={ids} onSel={openStudent} initialTab={selTab}
               onBack={() => { setSel(null); loadAll(); }} />
@@ -8739,7 +8741,7 @@ function TeacherApp({ onExit, onGallery }) {
                 지금 보이는 학급은 <b>표본 자료</b>입니다. 화면 구조를 살펴보기 위한 가상 학생 8명이며, 실제 학생이 입장하면 자동으로 실데이터로 바뀝니다.
               </div>
             )}
-            <TeacherTabs tab={tab} onSwitch={switchTab} dirty={edDirty} />
+            <TeacherTabs tab={tab} onSwitch={switchTab} dirty={edDirty} viewer={viewerOnly} />
             {loading ? <div style={{ color: "var(--sub)" }}>학급 기록을 불러오는 중…</div> : tab === "현황" ? (
               <div>
                 <div className="kpis">
