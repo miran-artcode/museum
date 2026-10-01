@@ -12,6 +12,7 @@
    ============================================================ */
 import React, { useEffect, useState, useSyncExternalStore } from "react";
 import { fbStore, authApi } from "./src-fb.js";
+import { useQuizAccAll, withAcc } from "./src-quiz-acc.jsx";
 import {
   accessCfg, PRESETS, normPrefs, prefsDiff, useTotals, USE_KINDS, langOf, ACCESS_LANGS,
   capInit, capPush, capInterim, capShouldFlush, capDoc, applyPreset, DEFAULT_PREFS,
@@ -283,7 +284,9 @@ function SupportTableCard({ ids, roster, wsMap, cfgAll, setMsg, sampleMode, onSe
   const [recFor, setRecFor] = useState(null);
   const sample = sampleMode ? sampleSupport(ids || []) : null;
   const wsOf = (id) => (sample ? { ...(wsMap[id] || {}), ...(sample[id] || {}) } : wsMap[id] || {});
-  const q = (cfgAll && cfgAll.quiz) || {};
+  /* 쪽지시험 학생별 조정은 quizAcc/{학번}에 있다(학급 설정의 옛 맵 위에 덮어 읽는다, src-quiz-acc.mjs) */
+  const accAll = useQuizAccAll(!sampleMode && !viewer);
+  const q = withAcc((cfgAll && cfgAll.quiz) || {}, accAll.map);
   const tm = q.timeMult || {};
   const noImg = q.noImage || {};
   const rows = (ids || []).map((id) => {

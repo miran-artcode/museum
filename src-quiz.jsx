@@ -18,6 +18,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
+import { useQuizAccMine, readQuizAcc, withAcc } from "./src-quiz-acc.jsx";
 import {
   QUIZ_VER, BLOCKS, BLOCK_SIZE, START_LEVEL, BLOCK_END_MIN, MAX_EVENTS, SCORE_ROWS, MIN_ANSWERED, quizCfg, ruleSentences, eventLabel,
   deriveSeed, halfOf, drawBlock, usedOf, routeNext, isCorrect, optionOrder, clientScoreOf, scoreRowIndex, remainingSec, fmtMMSS, buildSampleQuiz,
@@ -1034,7 +1035,9 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
   const sid = me && me.sid ? String(me.sid) : "";
   const sample = useMemo(() => (sampleMode && sid ? buildSampleQuiz([sid]) : null), [sampleMode, sid]);
   /* 표본(미리 보기)은 표본 설정을 쓰고 단계가 닫혀 있어도 그린다. 실제 화면은 닫힘이면 아무것도 그리지 않는다 */
-  const cfg = sampleMode && sample ? quizCfg({ quiz: sample.cfg }) : quizCfg(cfgAll);
+  /* 학생별 배수·이미지 제외는 학급 설정이 아니라 내 문서 quizAcc/{학번}에 있다 (src-quiz-acc.mjs) */
+  const accMine = useQuizAccMine(sid, !sampleMode);
+  const cfg = sampleMode && sample ? quizCfg({ quiz: sample.cfg }) : withAcc(quizCfg(cfgAll), accMine);
   const stage = cfg.stage;
   const closed = !sampleMode && stage === "closed";
 
@@ -1093,8 +1096,11 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
         if (!canStart) throw new Error("시작 마감이 지나 새로 시작할 수 없습니다. 선생님께 알려 주세요.");
         const half = halfOf(sid, cfg).half;
         const seed = deriveSeed(sid, bank.seedSalt);
-        const noImage = !!(cfg.noImage && cfg.noImage[sid]);
-        const tm = cfg.timeMult && Number(cfg.timeMult[sid]) > 0 ? Number(cfg.timeMult[sid]) : 1;
+        /* 시작 순간에는 내 조정 값을 서버에서 다시 읽는다(구독 응답이 늦어도 이미지 제외가 빠지지 않게). 읽지 못하면 구독 값 */
+        const accNow = sampleMode ? null : await readQuizAcc(sid);
+        const cfgS = accNow ? withAcc(quizCfg(cfgAll), accNow) : cfg;
+        const noImage = !!(cfgS.noImage && cfgS.noImage[sid]);
+        const tm = cfgS.timeMult && Number(cfgS.timeMult[sid]) > 0 ? Number(cfgS.timeMult[sid]) : 1;
         const d = drawBlock({ bank, half, seed, level: START_LEVEL, used: [], disabled: cfg.disabled || [], noImage, k: 1 });
         const at = new Date().toISOString();
         v = {

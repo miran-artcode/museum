@@ -262,12 +262,21 @@ service cloud.firestore {
       return cfg.get('stage', 'closed') == 'open'
           && request.time.toMillis() < cfg.get('openedAtMs', 0) + cfg.get('startDeadlineSec', 900) * 1000;
     }
+    // 학생별 조정(시간 배수·이미지 제외)은 quizAcc/{학번}의 v에 있다 (아래 match /quizAcc, src-quiz-acc.mjs)
+    function quizAccV(sid) {
+      return exists(/databases/$(database)/documents/quizAcc/$(sid))
+          ? get(/databases/$(database)/documents/quizAcc/$(sid)).data.get('v', {}) : {};
+    }
+    // 학생별 시간 배수: quizAcc 값이 먼저, 없으면 학급 설정의 옛 맵(2026-10-01 이전 값, 교사 탭이 열리면 옮겨지고 비워짐), 둘 다 없으면 1
+    function quizMult(sid) {
+      return quizAccV(sid).get('timeMult', quizCfg().get('timeMult', {}).get(sid, 1));
+    }
     // 서버 시각이 시작 시각 + (제한 시간 × 배수 + 보전 + 추가 + 전체 정지 + 60초 유예) 안인가
     function quizWithinTime(sid) {
       let cfg = quizCfg();
       let b = quizV(resource);
       return request.time.toMillis() < resource.data.startedAt.toMillis()
-          + (cfg.get('durationSec', 2400) * cfg.get('timeMult', {}).get(sid, 1)
+          + (cfg.get('durationSec', 2400) * quizMult(sid)
              + b.get('pausedTotalSec', 0) + b.get('extraSec', 0) + cfg.get('pausedAccumSec', 0) + 60) * 1000;
     }
     // 이미 있던 블록 키는 바뀌지 않는다 (새 블록을 더하는 것만 허용)
@@ -305,6 +314,12 @@ service cloud.firestore {
     }
     match /quizKeys/{docId} {
       allow read: if isTeacher();
+      allow write: if isTeacher();
+    }
+    // 쪽지시험 학생별 조정: 본인과 교사만 읽고 교사만 쓴다. 보기 전용 계정도 읽지 못한다.
+    // 학급 설정(meta/config)에 두면 학급 구성원 모두가 읽어, 누가 조정을 받는지(장애·학습 지원 여부를 짐작하게 하는 정보)가 학생끼리 보인다.
+    match /quizAcc/{sid} {
+      allow read: if isOwner(sid) || isTeacher();
       allow write: if isTeacher();
     }
     match /quiz/{sid} {

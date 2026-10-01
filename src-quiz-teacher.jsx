@@ -12,6 +12,8 @@
    저장 규약
    - 단계·설정은 onSaveCfg(patch) 한 길로만 나간다. 메인 세션이 { quiz: {...} } 만 merge 로 쓴다.
      merge 는 맵을 필드 단위로 합치므로 timeMult·noImage 의 키를 지우는 대신 1·false 를 명시해 보낸다.
+   - 학생별 시간 배수·이미지 제외는 2026-10-01부터 설정이 아니라 quizAcc/{학번}에 쓴다(학급 설정은 학생 모두가 읽는다).
+     화면은 설정의 옛 맵 위에 quizAcc 를 덮어 읽고, 탭이 열리면 옛 맵을 옮긴 뒤 비운다 (src-quiz-acc.mjs·src-quiz-acc.jsx).
    - 은행은 quizBank/v1(공개부)·quizKeys/v1(정답부) 두 문서로 나눠 올린다(splitBank).
    - 응시 문서의 교사 필드(result·pausedTotalSec·extraSec·falsePos·note·resumeOk)는 fbStore.quizPatch 로 merge 한다.
      학생이 쓰는 필드(blocks·served·events)는 여기서 건드리지 않는다.
@@ -19,6 +21,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { fbStore } from "./src-fb.js";
+import { useQuizAccAll, useQuizAccMigrate, saveQuizAcc, withAcc, legacyHas } from "./src-quiz-acc.jsx";
 import {
   LEVELS, BLOCKS, BLOCK_SIZE, LEVEL_NAMES, LEVEL_WORDS, AREAS, AREA_MIX, CELL_MIN, cellShort, LEVEL_SEC, BLOCK_END_MIN,
   LEVEL_TARGET_P, LEVEL_P_RANGE, ITEM_STAT_MIN_N, ITEM_FLAG_MIN_N, TWIN_DIFF, SHORT_BLUR_N, MIN_ANSWERED, MAX_EVENTS,
@@ -287,7 +290,10 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     return () => { clearInterval(tick); offs.forEach((f) => { try { if (typeof f === "function") f(); } catch (e) {} }); };
   }, [sampleMode]);
 
-  const cfg = sampleMode ? quizCfg({ quiz: (sample && sample.cfg) || {} }) : quizCfg(cfgAll);
+  const cfgRaw = sampleMode ? quizCfg({ quiz: (sample && sample.cfg) || {} }) : quizCfg(cfgAll);
+  /* 학생별 배수·이미지 제외는 quizAcc/{학번}에 있다. 옛 설정 맵 위에 덮어 읽는다 (src-quiz-acc.mjs) */
+  const acc = useQuizAccAll(!sampleMode);
+  const cfg = sampleMode ? cfgRaw : withAcc(cfgRaw, acc.map);
   /* 파일을 고르면 올리기 전에도 그 파일로 문항을 열람·검토할 수 있다(은행은 배포본에 넣지 않는다: 문두가 공개되면 시험 전에 읽힌다).
      올린 은행이 있으면 그것이 우선이다 */
   const [bankFile, setBankFile] = useState(null);    // { name, data, report }
@@ -303,7 +309,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
     Object.keys(liveAll || {}).forEach((sid) => { const e = liveAll[sid]; if (!e || !e.v) return; a[sid] = e.v; m[sid] = { startedAtMs: e.startedAtMs, hbMs: e.hbMs, lockedAtMs: e.lockedAtMs }; });
     return { attempts: a, meta: m };
   }, [sampleMode, sample, liveAll]);
-  /* 실제로 적용된 시간 배수는 설정(cfg.timeMult)이 우선이다(규칙도 설정을 읽는다): 기록표·CSV 에는 그 값을 쓴다 */
+  /* 실제로 적용된 시간 배수는 설정(cfg.timeMult: quizAcc 를 덮어 읽은 값)이 응시 문서보다 우선이다(규칙도 quizAcc·설정을 읽는다): 기록표·CSV 에는 그 값을 쓴다 */
   const attempts = useMemo(() => {
     const out = {};
     Object.keys(attemptsRaw || {}).forEach((sid) => {
@@ -373,6 +379,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
 
   const [note, setNote] = useState(null);       // { kind: "ok" | "warn", text }
   const [stageBusy, setStageBusy] = useState(false);
+  useQuizAccMigrate({ enabled: !sampleMode, cfgRaw, acc, onNote: setNote });
 
   /* ---- 은행 상태 ---- */
   const bankOk = !!(bank && bank.ver);
@@ -420,9 +427,15 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
   const seatForeign = Object.keys(seat.pos).filter((id) => !(ids || []).includes(id));
   const halfLabel = (id) => { const h = halfOf(id, live); return h.half + (h.known ? "" : "?"); };
 
-  /* ---- 학생별 배수·이미지 제외 ---- */
-  const setMult = (id, v) => edit("timeMult", { ...(live.timeMult || {}), [id]: Number(v) });
-  const setNoImg = (id, on) => edit("noImage", { ...(live.noImage || {}), [id]: !!on });
+  /* ---- 학생별 배수·이미지 제외: 학급 설정이 아니라 quizAcc/{학번}에 쓴다(학생끼리 보이지 않게, src-quiz-acc.mjs) ---- */
+  const setAcc = async (id, patch) => {
+    if (sampleMode) return;
+    const cur = { timeMult: (cfg.timeMult || {})[id], noImage: (cfg.noImage || {})[id] };
+    const ok = await saveQuizAcc(id, cur, patch, legacyHas(cfgRaw, id));
+    if (!ok) setNote({ kind: "warn", text: id + " 학생의 시험 조정을 저장하지 못했습니다. 연결을 확인하고 다시 고르세요." });
+  };
+  const setMult = (id, v) => setAcc(id, { timeMult: Number(v) });
+  const setNoImg = (id, on) => setAcc(id, { noImage: !!on });
   /* ---- 비활성 문항 ---- */
   const [disInput, setDisInput] = useState("");
   const disabledList = Array.isArray(live.disabled) ? live.disabled : [];
@@ -892,7 +905,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
             </div>
           </div>
 
-          <div className="sv-block-t">학생별 조정 <span className="hint" style={{ fontWeight: 400 }}>(시간 배수는 학습지원·특수교육 대상. 이미지 제외 학생은 이미지 문항을 늘 건너뜁니다. 줄을 누르면 학생 기록이 열립니다)</span></div>
+          <div className="sv-block-t">학생별 조정 <span className="hint" style={{ fontWeight: 400 }}>(시간 배수는 읽기나 처리 속도(한국어 읽기 포함) 때문에 아는 것을 시간 안에 다 보이기 어려운 학생에게 줍니다. 이미지 제외 학생은 이미지 문항을 늘 건너뜁니다. 이 값은 그 학생 본인과 교사만 볼 수 있습니다. 줄을 누르면 학생 기록이 열립니다)</span></div>
           <div className="tbl-scroll">
             <table className="roster at-click qt-tbl">
               <thead><tr><th>학번</th><th>별명</th><th>반</th><th>좌석</th><th>시간 배수</th><th>이미지 제외</th></tr></thead>

@@ -160,6 +160,8 @@ function route(key) {
   if (key === "quizBank") return { kind: "doc", path: ["quizBank", "v1"] };
   if (key === "quizKeys") return { kind: "doc", path: ["quizKeys", "v1"] };
   if (key.startsWith("quiz:")) return { kind: "doc", path: ["quiz", safe(key.slice(5))] };
+  // 쪽지시험 학생별 조정(시간 배수·이미지 제외): 본인·교사만 읽는다. 학급 설정에 두면 학생끼리 보인다 (src-quiz-acc.mjs)
+  if (key.startsWith("quizAcc:")) return { kind: "doc", path: ["quizAcc", safe(key.slice(8))] };
   return { kind: "doc", path: ["misc", safe(key)] };
 }
 

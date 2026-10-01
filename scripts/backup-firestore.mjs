@@ -7,7 +7,7 @@
                                           최근 7일 안이면 1분 단위로 과거 상태를 읽을 수 있다
      npm run backup -- --with-media       사진·녹음·스케치(media)까지 포함 (용량이 커서 기본은 뺀다)
 
-   저장 내용: meta·students·worksheets·wsHistory·grades·surveys·submissions·assess·quiz·research·misc
+   저장 내용: meta·students·worksheets·wsHistory·grades·surveys·submissions·assess·quiz·quizAcc(쪽지시험 학생별 조정)·research·misc
    과 문항 은행 두 문서(quizBank 공개부·quizKeys 정답부). 은행 원본 quiz-bank/bank.json 은 공개 저장소에
    올리지 않아 교사 PC에만 있으므로, 이 백업이 사본 구실을 한다. 잃어버리면
    node scripts/quiz-bank-restore.mjs <백업 폴더> 로 두 문서를 합쳐 되살린다.
@@ -25,7 +25,7 @@ const label = args.filter((a) => !a.startsWith("--")).join("_").replace(/[\\/:*?
 
 if (at && isNaN(new Date(at).getTime())) { console.error("--at 값은 2026-09-17T01:30:00Z 같은 ISO 시각이어야 합니다."); process.exit(1); }
 
-const COLS = ["meta", "students", "worksheets", "wsHistory", "grades", "surveys", "submissions", "assess", "quiz", "research", "misc", "quizBank", "quizKeys"];
+const COLS = ["meta", "students", "worksheets", "wsHistory", "grades", "surveys", "submissions", "assess", "quiz", "quizAcc", "research", "misc", "quizBank", "quizKeys"];
 if (withMedia) COLS.push("media");
 
 const token = await accessToken();
