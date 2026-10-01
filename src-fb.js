@@ -306,15 +306,32 @@ export const fbStore = {
   /* watchDoc과 같으나 문서 유무와 출처(캐시 사본인지, 이 기기의 미전송 쓰기가 섞였는지)를 함께 준다.
      학생 화면이 자기 기록지를 구독해 다른 기기가 쓴 값을 받을 때 쓴다 (src-ws-sync.mjs):
      fromCache 사본은 로드 때 이미 반영됐고 서버보다 오래됐을 수 있어 부른 쪽이 건너뛴다. */
-  watchDocMeta(key, cb) {
+  /* 오류가 나면 onSnapshot 구독은 그대로 죽는다 (네트워크 끊김은 SDK가 알아서 잇지만 권한·토큰 오류는 아니다).
+     그러면 탭이 아무 표시 없이 옛 사본에 머물므로 2초부터 두 배씩 최대 60초 간격으로 다시 구독한다.
+     onErr(e)는 끊겼을 때, onOk()는 다시 받기 시작했을 때 부른다 (학생 화면의 「실시간 연결 끊김」 안내) */
+  watchDocMeta(key, cb, onErr, onOk) {
     const r = route(key);
     if (r.kind !== "doc") return () => {};
-    return onSnapshot(doc(db, r.path[0], r.path[1]), (s) => {
-      const m = s.metadata || {};
-      if (!s.exists()) return cb({ exists: false, data: null, fromCache: !!m.fromCache, hasPendingWrites: !!m.hasPendingWrites });
-      const data = s.data();
-      cb({ exists: true, data: data && data.v !== undefined ? data.v : data, fromCache: !!m.fromCache, hasPendingWrites: !!m.hasPendingWrites });
-    }, (e) => { console.error("watch fail", key, e); });
+    let un = null, timer = null, stopped = false, wait = 2000, broken = false;
+    const start = () => {
+      un = onSnapshot(doc(db, r.path[0], r.path[1]), (s) => {
+        wait = 2000;
+        if (broken) { broken = false; if (onOk) onOk(); }
+        const m = s.metadata || {};
+        if (!s.exists()) return cb({ exists: false, data: null, fromCache: !!m.fromCache, hasPendingWrites: !!m.hasPendingWrites });
+        const data = s.data();
+        cb({ exists: true, data: data && data.v !== undefined ? data.v : data, fromCache: !!m.fromCache, hasPendingWrites: !!m.hasPendingWrites });
+      }, (e) => {
+        console.error("watch fail", key, e);
+        if (stopped) return;
+        broken = true;
+        if (onErr) onErr(e);
+        timer = setTimeout(() => { timer = null; if (!stopped) start(); }, wait);
+        wait = Math.min(wait * 2, 60000);
+      });
+    };
+    start();
+    return () => { stopped = true; if (timer) clearTimeout(timer); if (un) un(); };
   },
 
   /* 한 학생의 기록지 시점 사본 목록. 실패와 없음을 구분한다 (되돌리기 화면이 빈 목록을 "없음"으로 보이면 안 되므로) */
