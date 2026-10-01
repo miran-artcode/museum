@@ -151,7 +151,7 @@ export function imgErrText(e) {
 /* 입력칸 아래 안내 문장 */
 export function imgHintText(preset) {
   const p = preset || IMG_PRESETS.photo;
-  return `JPG·PNG·WebP, 긴 변 ${p.minLong}px 이상 원본 · 긴 변 ${p.maxPx}px까지 선명하게 줄여 저장합니다.`;
+  return `JPG·PNG·WebP 원본(긴 변 ${p.minLong}px 이상)을 올리면 긴 변 ${p.maxPx}px까지 선명하게 줄여 저장합니다.`;
 }
 
 /* 흐림 경고 — 확인을 누르면 그대로 올린다 */

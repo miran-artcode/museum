@@ -33,7 +33,7 @@ export const LABEL_LO = "직접 촬영·합성, AI는 배경 보정에만 사용
 /* 판정 뒤에 고르는 결정적 축 — 상호평가 설계서의 4축과 같은 말을 쓴다 */
 export const ANCHOR_TAGS = [
   { k: "veri", label: "기록 사진의 형식", desc: "진짜 기록 사진처럼 보이는가" },
-  { k: "cause", label: "흔적과 쓰임", desc: "닳고 부서진 자리가 쓰던 방식과 이어지는가" },
+  { k: "cause", label: "흔적과 쓰임", desc: "닳고 부서진 부분이 쓰던 방식과 이어지는가" },
   { k: "plate", label: "작품 캡션", desc: "읽고 나서 이미지가 달라 보이는가" },
   { k: "voice", label: "사회 문제와 태도", desc: "어떤 문제가 어떤 태도로 읽히는가" },
 ];
@@ -204,7 +204,7 @@ export function AnchorCard({ me, cfg, block, onChange, onSubmit, busy }) {
       </div>
       <div className="card-note">
         우리 반 작품이 아니라 <b>선생님이 준비한 예시 유물</b>입니다. 성적과 관계없습니다.
-        네 쌍을 차례로 보고, 매번 한 쪽을 고르고 그 이유를 한 문장으로 써 주세요.
+        네 쌍을 차례로 보고, 매번 한쪽을 고르고 그 이유를 한 문장으로 써 주세요.
       </div>
       <div className="card-body">
         <div className="an-q">{ANCHOR_QUESTION}</div>

@@ -124,7 +124,7 @@ export function waitNote({ stage, roster, pairs, s2Done, noWork }) {
     return noWork ? "동료 비교를 마쳤습니다. 제출한 작품이 없어 자기평가와 내 작품 결과는 없습니다." : "동료 비교를 마쳤습니다. 자기평가 ②는 선생님이 열면 여기에 나타납니다.";
   }
   if (stage === "self2") return noWork ? "동료 비교를 마쳤습니다. 제출한 작품이 없어 자기평가와 내 작품 결과는 없습니다." : s2Done ? "자기평가 ②를 제출했습니다. 결과는 선생님이 공개하면 여기에 나타납니다." : "지금 할 일이 없습니다.";
-  if (stage === "result") return noWork ? "제출한 작품이 없어 내 작품 결과는 없습니다. 판정에 참여해 주어 고맙습니다." : "공개된 결과가 아직 없습니다. 선생님이 집계를 마치고 공개하면 이 자리에 나타납니다.";
+  if (stage === "result") return noWork ? "제출한 작품이 없어 내 작품 결과는 없습니다. 판정에 참여해 주어 고맙습니다." : "공개된 결과가 아직 없습니다. 선생님이 집계를 마치고 공개하면 여기에 나타납니다.";
   return "지금 할 일이 없습니다. 다음 단계는 선생님이 열면 나타납니다.";
 }
 
@@ -341,7 +341,7 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
     if (sampleMode) { setWarn("예시 화면에서는 저장되지 않습니다."); return false; }
     if (!d.no.trim()) { setWarn("작품 번호가 비어 있습니다. 7차시 「전시 출품」에서 받은 번호를 적어 주세요."); return false; }
     if (!d.title.trim()) { setWarn("작품 제목을 적어 주세요."); return false; }
-    if (img === undefined) { setWarn("대표 이미지를 아직 읽는 중입니다. 잠시 뒤 다시 눌러 주세요."); return false; }
+    if (img === undefined) { setWarn("대표 이미지를 아직 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요."); return false; }
     if (!img) { setWarn("대표 이미지가 없어 제출할 수 없습니다. 7차시 「전시 출품」에서 대표 이미지를 먼저 올린 뒤 이 화면으로 돌아오세요."); return false; }
     return true;
   };
@@ -350,7 +350,7 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
     setBusy(true); setWarn("");
     let enc;
     try { enc = await reencode(img); }
-    catch (e) { setWarn("이미지를 줄이는 데 실패했습니다. 7차시 「전시 출품」에서 대표 이미지를 다시 올린 뒤 시도해 주세요."); setBusy(false); return; }
+    catch (e) { setWarn("이미지 크기를 줄이지 못했습니다. 7차시 「전시 출품」에서 대표 이미지를 다시 올린 뒤 시도해 주세요."); setBusy(false); return; }
     const refId = "asm." + Date.now();
     const ok1 = await fbStore.setT("media:" + sid + "_" + refId, enc.data, { timeout: 15000 });
     if (!ok1) { setWarn("이미지를 저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요."); setBusy(false); return; }
@@ -365,19 +365,19 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
     };
     const ok2 = await fbStore.setT("sub:" + sid, doc);
     setBusy(false);
-    if (!ok2) setWarn("제출을 저장하지 못했습니다. 연결을 확인하고 「제출 확정」을 다시 눌러 주세요. 적은 내용은 이 화면에 그대로 남아 있습니다.");
+    if (!ok2) setWarn("제출을 저장하지 못했습니다. 연결을 확인하고 「제출 확정」을 다시 눌러 주세요. 적은 내용은 이 화면에 그대로 있습니다.");
   };
 
   return (
     <div className="card as-card">
       <div className="card-head"><span className="card-code">제출</span><span className="card-title">최종 작품 제출</span></div>
       <div className="card-note">
-        7차시까지 쓴 제목·작품 캡션·대표 이미지를 그대로 가져왔습니다. 여기서 고친 뒤 「제출 확정」을 누르면
+        7차시까지 저장한 제목·작품 캡션·대표 이미지를 그대로 가져왔습니다. 여기서 고친 뒤 「제출 확정」을 누르면
         이 내용이 그대로 고정되어 2학년 전체 비교 대상이 됩니다. 비교 화면에는 작품 번호와 이미지, 펼쳤을 때의 작품 캡션만 보입니다.
       </div>
       <div className="card-body">
         {notInRoster && (
-          <div className="warn-note">비교 명단이 이미 확정되어 이번 회차에서는 내 작품이 비교되지 않습니다. 제출은 기록으로 남고, 판정에는 그대로 참여합니다.</div>
+          <div className="warn-note">비교 명단이 이미 확정되어 이번 회차에서는 내 작품이 비교되지 않습니다. 제출한 내용은 기록되고, 판정에는 그대로 참여합니다.</div>
         )}
         <div className="as-sub-grid">
           <div>
@@ -414,7 +414,7 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
             ask="제출을 확정하면 이 내용이 그대로 고정되어 2학년 전체 비교 대상이 됩니다. 고치려면 선생님께 해제를 요청해야 합니다. 지금 확정할까요?"
             label={busy ? "저장 중…" : "제출 확정"} />
           {canSkip && <button type="button" className="btn ghost" disabled={busy || sampleMode} onClick={onSkip}>제출하지 않고 다음 단계로</button>}
-          <span className="hint">확정하면 고칠 수 없습니다. 이미지는 긴 변 {SUB_MAX_PX}px로 줄인 사본을 따로 저장합니다.{canSkip ? " 제출하지 않아도 판정에는 참여합니다." : ""}</span>
+          <span className="hint">확정하면 고칠 수 없습니다. 이미지는 긴 변을 {SUB_MAX_PX}px로 줄인 사본을 따로 저장합니다.{canSkip ? " 제출하지 않아도 판정에는 참여합니다." : ""}</span>
         </div>
       </div>
     </div>
@@ -936,7 +936,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
       </div>
       <div className="card-note">
         2학년 전체 작품을 두 점씩 견줍니다. 다른 반 작품도 함께 나옵니다. 작품 번호만 보이고 누구의 작품인지는 나오지 않습니다.
-        매번 한 쪽을 고르고 그 이유를 한 문장으로 써 주세요. 고른 것은 되돌릴 수 없습니다.
+        매번 한쪽을 고르고 그 이유를 한 문장으로 써 주세요. 고른 것은 되돌릴 수 없습니다.
         <div className="as-banner">이번 비교에 나오는 작품은 모두 2학년 학생이 AI 이미지 도구를 써서 만들었고, 작품 캡션은 학생이 직접 썼습니다. 각 작품의 AI 활용 범위는 모든 반의 비교가 끝난 뒤 전시장에서 공개합니다.</div>
       </div>
       <div className="card-body">
@@ -954,7 +954,7 @@ export function PeerScreen({ sid, cfg, roster, jkey, pairs, block, subMap, subFa
         )}
         {finished ? (
           saveErr
-            ? <div className="warn-note" role="alert">판정은 모두 골랐지만 마지막 판정이 아직 저장되지 않았습니다. 위의 「다시 저장」을 눌러 주세요.</div>
+            ? <div className="warn-note" role="alert">모든 쌍을 판정했지만 마지막 판정이 아직 저장되지 않았습니다. 위의 「다시 저장」을 눌러 주세요.</div>
             : <div className="ok-note" role="status">동료 비교를 마쳤습니다. {N}쌍 모두 기록되었습니다. 고맙습니다.</div>
         ) : (
           <>
@@ -1077,7 +1077,7 @@ export function ResultScreen({ cfg, result, self, sub }) {
           <button type="button" className="btn small ghost" onClick={() => setShowPos(true)}>위치 보기</button>
         ) : (
           <div>
-            {pos ? <div className="as-pos">{pos}</div> : <div className="hint" style={{ marginBottom: 8 }}>이 작품은 아직 비교된 적이 없어 위치를 말할 수 없습니다.</div>}
+            {pos ? <div className="as-pos">{pos}</div> : <div className="hint" style={{ marginBottom: 8 }}>이 작품은 아직 비교된 적이 없어 위치를 알 수 없습니다.</div>}
             {pos && reveal !== "band" && (
               <p className="as-plays">
                 이 작품은 {typeof r.plays === "number" ? r.plays + "번" : "여러 번"} 비교되었고,
@@ -1086,7 +1086,7 @@ export function ResultScreen({ cfg, result, self, sub }) {
             )}
             {(w1 || w2) && (
               <p className="as-plays">
-                내 예측과 견주면 {w1 ? "자기평가 ①의 " + w1 : ""}{w1 && w2 ? ", " : ""}{w2 ? "자기평가 ②의 " + w2 : ""}입니다.
+                이 위치는 {w1 ? "자기평가 ①의 " + w1 : ""}{w1 && w2 ? ", " : ""}{w2 ? "자기평가 ②의 " + w2 : ""}입니다.
               </p>
             )}
             {r.caution && <p className="hint">이번 비교는 판정 수가 넉넉하지 않아 위치에 오차가 있을 수 있습니다.</p>}

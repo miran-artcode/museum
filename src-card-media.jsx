@@ -15,9 +15,9 @@ export const CARD_MEDIA = {
   obs: {
     drift: {
       images: [
-        { src: "/img/lessons/L2_w_t1_drift.jpg", cap: "기 드보르, 「파리 심리지리 가이드: 사랑의 정념에 관한 담론」(1957). 파리 조감도를 잘라 낸 조각들을 흩어 놓고 붉은 화살표로 ‘표류(dérive)’의 경로와 ‘분위기 단위’의 위치를 이어 놓은 석판화 지도로, ‘상상주의 바우하우스’(MIBI) 명의로 펴냈으며 바르셀로나 현대미술관(MACBA) 소장품입니다.", credit: "© Guy Debord · MACBA(바르셀로나 현대미술관) 소장품 페이지, 교육 목적 인용", link: "https://www.macba.cat/en/obra/r3779-guide-psychogeographique-de-paris-discours-sur-les-passions-de-lamour-pentes-psychogeographiques-de-la-derive-et-localisation-dunites-dambiance/" },
+        { src: "/img/lessons/L2_w_t1_drift.jpg", cap: "기 드보르, 「파리 심리지리 가이드: 사랑의 정념에 관한 담론」(1957). 파리 조감도를 잘라 낸 조각들을 흩어 놓고 붉은 화살표로 ‘표류(dérive)’의 경로와 ‘분위기 단위’의 위치를 이어 놓은 석판화 지도입니다. ‘상상주의 바우하우스’(MIBI) 명의로 펴냈고 바르셀로나 현대미술관(MACBA)이 소장하고 있습니다.", credit: "© Guy Debord · MACBA(바르셀로나 현대미술관) 소장품 페이지, 교육 목적 인용", link: "https://www.macba.cat/en/obra/r3779-guide-psychogeographique-de-paris-discours-sur-les-passions-de-lamour-pentes-psychogeographiques-de-la-derive-et-localisation-dunites-dambiance/" },
       ],
-      links: [{ t: "MACBA 소장품 페이지", u: "https://www.macba.cat/en/obra/r3779-guide-psychogeographique-de-paris-discours-sur-les-passions-de-lamour-pentes-psychogeographiques-de-la-derive-et-localisation-dunites-dambiance/" }, { t: "Bureau of Public Secrets 「표류의 이론」 영역", u: "https://www.bopsecrets.org/SI/2.derive.htm" }, { t: "위키백과(영어) Dérive", u: "https://en.wikipedia.org/wiki/D%C3%A9rive" }],
+      links: [{ t: "MACBA 소장품 페이지", u: "https://www.macba.cat/en/obra/r3779-guide-psychogeographique-de-paris-discours-sur-les-passions-de-lamour-pentes-psychogeographiques-de-la-derive-et-localisation-dunites-dambiance/" }, { t: "Bureau of Public Secrets 「표류의 이론」 영어 번역", u: "https://www.bopsecrets.org/SI/2.derive.htm" }, { t: "위키백과(영어) Dérive", u: "https://en.wikipedia.org/wiki/D%C3%A9rive" }],
     },
     fixed: {
       images: [
@@ -34,7 +34,7 @@ export const CARD_MEDIA = {
     },
     inventory: {
       images: [
-        { src: "/img/lessons/L2_w_t1_inventory_1.jpg", cap: "조르주 페렉, 「파리의 어느 장소에 대한 완전한 묘사 시도」(1975). 페렉은 1974년 10월 18일부터 사흘 동안 파리 생쉴피스 광장 8번지의 이 카페 드 라 메리(Café de la Mairie)를 비롯한 광장의 몇 자리에 앉아, 눈앞을 지나는 버스·비둘기·행인을 모두 적으려 했습니다(사진은 2022년 촬영).", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 CVB", link: "https://fr.wikipedia.org/wiki/Tentative_d%27%C3%A9puisement_d%27un_lieu_parisien", srcPage: "https://commons.wikimedia.org/wiki/File:8_place_Saint-Sulpice_Paris.jpg" },
+        { src: "/img/lessons/L2_w_t1_inventory_1.jpg", cap: "조르주 페렉, 「파리의 어느 장소에 대한 완전한 묘사 시도」(1975). 페렉은 1974년 10월 18일부터 사흘 동안 파리 생쉴피스 광장 8번지의 이 카페 드 라 메리(Café de la Mairie)를 비롯한 광장의 몇 곳에 앉아, 눈앞을 지나는 버스·비둘기·행인을 모두 적으려 했습니다(사진은 2022년 촬영).", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 CVB", link: "https://fr.wikipedia.org/wiki/Tentative_d%27%C3%A9puisement_d%27un_lieu_parisien", srcPage: "https://commons.wikimedia.org/wiki/File:8_place_Saint-Sulpice_Paris.jpg" },
         { src: "/img/lessons/L2_w_t1_inventory_2.jpg", cap: "조르주 페렉, 「파리의 어느 장소에 대한 완전한 묘사 시도」(1975). 페렉이 사흘 동안 관찰한 생쉴피스 광장의 일상으로, 분수 가장자리와 성당 모퉁이, 오가는 행인과 비둘기가 보입니다. 페렉은 이런 '아무 일도 일어나지 않을 때 일어나는 일'을 목록처럼 적었습니다(사진은 2012년 촬영).", credit: "위키미디어 공용 · CC BY 2.0 · 사진 Alexander Baranov", link: "https://fr.wikipedia.org/wiki/Tentative_d%27%C3%A9puisement_d%27un_lieu_parisien", srcPage: "https://commons.wikimedia.org/wiki/File:Paris_Place_Saint-Sulpice_20120512.jpg" },
         { src: "/img/lessons/L2_w_dion_thames.jpg", cap: "마크 디온, 「테이트 템스 발굴」(1999). 템스강 하안에서 수습한 도자기 파편·병·뼈 등을 17세기 ‘호기심의 방’ 형식의 양문형 목제 캐비닛에 분류해 넣었습니다. 테이트 소장(T07669).", credit: "© Mark Dion · 테이트 소장품 페이지, 교육 목적 인용", link: "https://www.tate.org.uk/art/artworks/dion-tate-thames-dig-t07669" },
       ],
@@ -57,7 +57,7 @@ export const CARD_MEDIA = {
     },
     indirect: {
       images: [
-        { src: "/img/lessons/L3_w_gutete.jpg", cap: "알프레도 자, 「구테테 에메리타의 눈」(1996)의 발광 텍스트 패널. 구테테 에메리타가 교회에서 가족이 살해되는 것을 목격한 상황을 서술한 글로, 관람자는 이 글을 읽은 뒤에야 그의 눈을 찍은 슬라이드와 만납니다.", credit: "© Alfredo Jaar · 작가 공식 사이트 alfredojaar.net, 교육 목적 인용", link: "https://alfredojaar.net/projects/1996/the-eyes-of-gutete-emerita/" },
+        { src: "/img/lessons/L3_w_gutete.jpg", cap: "알프레도 자, 「구테테 에메리타의 눈」(1996)의 발광 텍스트 패널. 구테테 에메리타가 교회에서 가족이 살해되는 것을 목격한 상황을 서술한 글입니다. 관람자는 이 글을 읽은 뒤에야 그의 눈을 찍은 슬라이드를 봅니다.", credit: "© Alfredo Jaar · 작가 공식 사이트 alfredojaar.net, 교육 목적 인용", link: "https://alfredojaar.net/projects/1996/the-eyes-of-gutete-emerita/" },
         { src: "/img/lessons/L3_w_realpictures.jpg", cap: "알프레도 자, 「리얼 픽처스」(1995), 설치 전경. 르완다에서 찍은 사진을 봉인한 검은 상자들을 쌓아 올린 설치로, 상자 표면에는 그 사진에 무엇이 담겼는지가 글로만 적혀 있어 관람자는 문장만 읽을 수 있습니다.", credit: "© Alfredo Jaar · 작가 공식 사이트 alfredojaar.net, 교육 목적 인용", link: "https://alfredojaar.net/projects/1995/real-pictures/" },
       ],
       links: [{ t: "작가 공식 사이트", u: "https://alfredojaar.net/" }],
@@ -70,7 +70,7 @@ export const CARD_MEDIA = {
     },
     parafiction: {
       images: [
-        { src: "/img/lessons/L2_w_fauna.jpg", cap: "호안 폰트쿠베르타·페레 포르미게라, 「파우나」(1987), 바르셀로나 현대미술관(MACBA) 전시 전경. 가상의 동물학자 ‘아마이젠하우펜 박사’의 아카이브라는 설정으로, 박제 표본이 든 유리 진열장과 벽면의 사진·문서·노트를 자연사 박물관의 형식으로 설치했습니다.", credit: "© Joan Fontcuberta, Pere Formiguera / VEGAP · MACBA 소장품 페이지, 교육 목적 인용", link: "https://www.macba.cat/en/art-artists/artists/fontcuberta-joan-formiguera-pere/fauna" },
+        { src: "/img/lessons/L2_w_fauna.jpg", cap: "호안 폰트쿠베르타·페레 포르미게라, 「파우나」(1987), 바르셀로나 현대미술관(MACBA) 전시 전경. 가상의 동물학자 ‘아마이젠하우펜 박사’의 아카이브라는 설정으로, 박제 표본이 든 유리 진열장과 벽면의 사진·문서·노트를 자연사 박물관 전시처럼 설치했습니다.", credit: "© Joan Fontcuberta, Pere Formiguera / VEGAP · MACBA 소장품 페이지, 교육 목적 인용", link: "https://www.macba.cat/en/art-artists/artists/fontcuberta-joan-formiguera-pere/fauna" },
         { src: "/img/lessons/L2_w_atlas.jpg", cap: "아틀라스 그룹 / 왈리드 라아드, 「아틀라스 그룹 아카이브」 중 〈노트북 72권: 사라진 레바논 전쟁〉(1989/1998)의 한 면. 레바논 내전기의 역사학자들이 경마장에서 결승선 사진에 내기를 걸었다는 설정으로, 경마 사진 둘레에 날짜·거리·기록과 역사학자들의 내기 내역이 주석처럼 달려 있습니다.", credit: "© Walid Raad · 아틀라스 그룹 공식 아카이브 사이트, 교육 목적 인용", link: "https://www.theatlasgroup1989.org/n72" },
       ],
       links: [{ t: "호안 폰트쿠베르타", u: "https://en.wikipedia.org/wiki/Joan_Fontcuberta" }, { t: "아틀라스 그룹 아카이브(공식)", u: "https://www.theatlasgroup1989.org/" }, { t: "파라픽션이란", u: "https://en.wikipedia.org/wiki/Parafiction" }],
@@ -84,7 +84,7 @@ export const CARD_MEDIA = {
     institution: {
       images: [
         { src: "/img/lessons/L2_w_broodthaers.jpg", cap: "마르셀 브로타에스, 「현대미술관, 독수리 부서」 중 〈형상 부문〉(1972), 뒤셀도르프 시립 쿤스트할레 전시 개막 장면. 1968년 브뤼셀 자택에서 문을 연 이 가상 미술관의 가장 큰 전시로, 시대와 지역이 서로 다른 독수리 도상 수백 점을 빌려 와 번호를 달고 ‘이것은 미술 작품이 아니다’라는 팻말을 붙였습니다. 사진 속 인물이 브로타에스입니다.", credit: "© Estate of Marcel Broodthaers · 사진 © Maria Gilissen · 파리 조폐국(Monnaie de Paris) 소장, 구글 아트 앤 컬처, 교육 목적 인용", link: "https://en.wikipedia.org/wiki/Marcel_Broodthaers", srcPage: "https://artsandculture.google.com/asset/UwEYeURkT1TdqQ" },
-        { src: "/img/lessons/L2_w_haacke.jpg", cap: "한스 하케, 「샤폴스키 외, 맨해튼 부동산 보유 현황」(1971)의 부분. 건물 정면 사진 아래에 소유·거래 내역을 타자기로 친 기록이 한 쌍을 이루어 조사 보고서의 형식으로 배열됩니다. 1971년 구겐하임 개인전에 나갈 예정이었으나 개막 6주 전 관장이 전시를 취소하고 담당 큐레이터 에드워드 프라이를 해고한 작품으로, 2007년부터 휘트니 미술관 소장품입니다.", credit: "© Hans Haacke / ARS, New York · 휘트니 미술관 소장품 페이지, 교육 목적 인용", link: "https://whitney.org/collection/works/29487" },
+        { src: "/img/lessons/L2_w_haacke.jpg", cap: "한스 하케, 「샤폴스키 외, 맨해튼 부동산 보유 현황」(1971)의 부분. 건물 정면 사진과 그 아래 소유·거래 내역을 타자기로 친 기록이 한 쌍을 이루어 조사 보고서처럼 배열됩니다. 1971년 구겐하임 개인전에 나갈 예정이던 작품입니다. 개막 6주 전 관장이 전시를 취소하고 담당 큐레이터 에드워드 프라이를 해고했습니다. 2007년부터 휘트니 미술관 소장품입니다.", credit: "© Hans Haacke / ARS, New York · 휘트니 미술관 소장품 페이지, 교육 목적 인용", link: "https://whitney.org/collection/works/29487" },
       ],
       links: [{ t: "마르셀 브로타에스", u: "https://en.wikipedia.org/wiki/Marcel_Broodthaers" }, { t: "하케 「샤폴스키 외」(휘트니 소장 기록)", u: "https://whitney.org/collection/works/29487" }, { t: "한스 하케", u: "https://en.wikipedia.org/wiki/Hans_Haacke" }, { t: "제도비평이란(테이트)", u: "https://www.tate.org.uk/art/art-terms/i/institutional-critique" }],
     },
@@ -97,8 +97,8 @@ export const CARD_MEDIA = {
     },
     relational: {
       images: [
-        { src: "/img/lessons/L3_w_beuys_1.jpg", cap: "요제프 보이스, 「7000그루의 참나무」(1982~87, 부제 ‘도시 행정 대신 도시 숲 가꾸기’). 카셀 프리데리치아눔 정면 잔디밭의 참나무 두 그루와 밑동의 현무암 기둥으로, 오른쪽은 1982년 보이스가 도쿠멘타 7을 위해 처음 심은 나무, 왼쪽은 1987년 아들 벤첼이 심은 마지막 나무이며, 나무마다 현무암 기둥 하나를 짝지어 세운 이 사업은 시민이 함께 만드는 ‘사회적 조각’의 대표 사례입니다.", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 Codc", link: "https://www.7000eichen.de/", srcPage: "https://commons.wikimedia.org/wiki/File:7000_Eichen_vor_Fridericianum.jpg" },
-        { src: "/img/lessons/L3_w_beuys_2.jpg", cap: "요제프 보이스, 「7000그루의 참나무」(1982–87) 기록 사진, 1982년 6월. 도쿠멘타 7 개막 무렵 프리데리치아눔 앞에 현무암 기둥 7,000개를 쌓아 시작한 더미로, 나무 한 그루가 심길 때마다 돌 하나를 옮겨 세워 더미가 조금씩 줄어들도록 했으며, 건물 프리즈의 글귀는 로렌스 위너의 작품입니다.", credit: "위키미디어 공용 · CC BY-SA 2.5 · 사진 J. Bunse", link: "https://www.7000eichen.de/", srcPage: "https://commons.wikimedia.org/wiki/File:Documenta_7_Beuys_Weiner_Fridericianum_1982.jpg" },
+        { src: "/img/lessons/L3_w_beuys_1.jpg", cap: "요제프 보이스, 「7000그루의 참나무」(1982~87, 부제 ‘도시 행정 대신 도시 숲 가꾸기’). 카셀 프리데리치아눔 정면 잔디밭의 참나무 두 그루와 밑동의 현무암 기둥입니다. 오른쪽은 1982년 보이스가 도쿠멘타 7을 위해 처음 심은 나무, 왼쪽은 1987년 아들 벤첼이 심은 마지막 나무입니다. 나무마다 현무암 기둥 하나를 짝지어 세운 이 사업은 시민이 함께 만드는 ‘사회적 조각’의 대표 사례입니다.", credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 Codc", link: "https://www.7000eichen.de/", srcPage: "https://commons.wikimedia.org/wiki/File:7000_Eichen_vor_Fridericianum.jpg" },
+        { src: "/img/lessons/L3_w_beuys_2.jpg", cap: "요제프 보이스, 「7000그루의 참나무」(1982–87) 기록 사진, 1982년 6월. 도쿠멘타 7 개막 무렵 프리데리치아눔 앞에 현무암 기둥 7,000개를 쌓아 시작한 더미입니다. 나무 한 그루가 심길 때마다 돌 하나를 옮겨 세워 더미가 조금씩 줄어들도록 했습니다. 건물 프리즈의 글귀는 로렌스 위너의 작품입니다.", credit: "위키미디어 공용 · CC BY-SA 2.5 · 사진 J. Bunse", link: "https://www.7000eichen.de/", srcPage: "https://commons.wikimedia.org/wiki/File:Documenta_7_Beuys_Weiner_Fridericianum_1982.jpg" },
       ],
       links: [{ t: "7000 Eichen 공식 사이트(독일어)", u: "https://www.7000eichen.de/" }, { t: "테이트 미술 용어 ‘사회적 조각’", u: "https://www.tate.org.uk/art/art-terms/s/social-sculpture" }, { t: "위키백과(한국어) 사회적 조각", u: "https://ko.wikipedia.org/wiki/%EC%82%AC%ED%9A%8C%EC%A0%81_%EC%A1%B0%EA%B0%81" }, { t: "관계미학(위키백과 영어)", u: "https://en.wikipedia.org/wiki/Relational_art" }],
     },

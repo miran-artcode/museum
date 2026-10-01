@@ -92,7 +92,7 @@ function LessonStrip({ L }) {
       <div className="iaid-t">
         <span className="iaid-acc">SOURCE</span>
         {L.n}차시에 본 작품·자료 {items.length}점
-        <span className="iaid-sub"> (눌러서 크게 보고, 이 가운데 실제로 근거가 된 것을 답에 짚어 씁니다{items.length > 5 ? ". 옆으로 밀면 더 있습니다" : ""})</span>
+        <span className="iaid-sub"> (눌러서 크게 보고, 이 가운데 실제로 근거가 된 것을 답에 밝혀 씁니다{items.length > 5 ? ". 옆으로 넘기면 더 볼 수 있습니다" : ""})</span>
       </div>
       <div className="iaid-row">
         {items.map((it, i) => (
@@ -132,7 +132,7 @@ function RoundStrip({ ws, Thumb, owner }) {
           내가 생성한 화면
           <span className="iaid-sub"> (「생성 회차 기록」 카드에 결과 화면을 올리면 여기에 나란히 놓입니다)</span>
         </div>
-        <div className="iaid-empty">아직 올린 화면이 없습니다. 위의 「생성 회차 기록」에서 회차마다 결과 화면을 올린 뒤 이 질문에 답하면, 고른 한 점과 버린 넉 점을 여기에서 나란히 보며 쓸 수 있습니다.</div>
+        <div className="iaid-empty">아직 올린 화면이 없습니다. 위의 「생성 회차 기록」에서 회차마다 결과 화면을 올리면 고른 한 점과 버린 네 점을 여기에서 나란히 보며 답을 쓸 수 있습니다.</div>
       </div>
     );
   }
@@ -202,7 +202,7 @@ function GalleryLink({ n, onGallery }) {
         <span className="iaid-sub"> ({n === 7 ? "내 작품 옆에 놓을 한 점을 전시장에서 고릅니다" : "관람에서 본 작품 두 점을 전시장에서 다시 확인합니다"})</span>
       </div>
       <button type="button" className="iaid-go" onClick={onGallery}>전시장 열기 →</button>
-      <div className="iaid-empty" style={{ marginTop: 6 }}>전시장을 보고 돌아오면 쓰던 답은 그대로 남아 있습니다.</div>
+      <div className="iaid-empty" style={{ marginTop: 6 }}>전시장을 보고 돌아와도 쓰던 답은 그대로 있습니다.</div>
     </div>
   );
 }
