@@ -11,7 +11,7 @@ import {
 } from "./src-stance.jsx";
 import {
   AnchorCard, AnchorPanel, AnchorStyle, DEFAULT_ANCHOR, ANCHOR_VER, AI_LEVELS,
-  anchorOpen, anchorDone, anchorScore, anchorPlateRate,
+  anchorOpen, anchorDone, anchorScore, anchorPlateRate, anchorCounts,
 } from "./src-anchor.jsx";
 import { SurveyStyle, SurveyScaleBar, LikertRow, useTopbarHeight, prefersReducedMotion } from "./src-survey-ui.jsx";
 import { LESSONS_DEF } from "./src-lessons.jsx";
@@ -6575,7 +6575,7 @@ function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
       ...cols.map((c) => "사후:" + c),
       ...STANCE_DERIVED.map((k) => "사전점수:" + k),
       ...STANCE_DERIVED.map((k) => "사후점수:" + k),
-      "앵커:조건", "앵커:제출시각", "앵커:AI전면선택(0~4)", "앵커:작품 캡션 펼침 비율"];
+      "앵커:조건", "앵커:제출시각", "앵커:AI전면선택(0~4, 제출한 학생만)", "앵커:anchor_n(답한 쌍)", "앵커:anchor_prop(AI전면 ÷ 답한 쌍)", "앵커:작품 캡션 펼침 비율"];
     const rws = rows.map((r) => {
       const st = (r.sv || {}).stance || {};
       const pre = st.pre || {}, post = st.post || {};
@@ -6592,7 +6592,9 @@ function SurveyPanel({ ids, roster, surveyMap, sampleMode, onSel }) {
         ...STANCE_DERIVED.map((k) => num(so[k])),
         an && an.cond != null ? an.cond : "",
         an && an.submittedAt ? an.submittedAt : "",
-        an && anchorScore(an) != null ? anchorScore(an) : "",
+        an && anchorCounts(an).score != null ? anchorCounts(an).score : "",   // 중간에 멈춘 학생은 0~4 합계로 내보내지 않는다
+        an ? anchorCounts(an).n : "",
+        an && anchorCounts(an).prop != null ? Math.round(anchorCounts(an).prop * 1000) / 1000 : "",
         an && anchorPlateRate(an) != null ? num(anchorPlateRate(an)) : ""];
     });
     const csv = toCSV(head, rws);   // afn(b28 − b29)처럼 음수가 되는 점수가 있다. 숫자로 내보낸다

@@ -110,6 +110,13 @@ export function anchorScore(block) {
   if (!items.length) return null;
   return items.filter((x) => x && x.win && x.win === x.hi).length;
 }
+/* CSV용: 답한 쌍 수(n), 「AI 전면」 쪽 비율(prop), 제출을 마친 경우의 0~4 점수(score).
+   중간에 멈춘 학생을 0~4 합계로 내보내면 「고지를 크게 깎은 학생」으로 오인되므로 score는 제출한 학생만 */
+export function anchorCounts(block) {
+  const items = ((block && block.items) || []).filter((x) => x && (x.win === "a" || x.win === "b"));
+  const hi = items.filter((x) => x.win === x.hi).length;
+  return { n: items.length, prop: items.length ? hi / items.length : null, score: anchorDone(block) ? anchorScore(block) : null };
+}
 /* 작품 캡션을 펼쳐 본 비율 — 무엇을 보고 판단했는가 */
 export function anchorPlateRate(block) {
   const items = (block && block.items) || [];
@@ -307,13 +314,15 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
   };
 
   const exportCSV = () => {
-    const head = ["학번", "별명", "조건", "제출시각", "anchorScore(0~4)", "작품 캡션 펼침 비율"];
+    const head = ["학번", "별명", "조건", "제출시각", "anchorScore(0~4, 제출한 학생만)", "anchor_n(답한 쌍)", "anchor_prop(AI전면 ÷ 답한 쌍)", "작품 캡션 펼침 비율"];
     pairs.forEach((p, i) => head.push(p.id + ":고지높은쪽", p.id + ":선택", p.id + ":AI전면고름", p.id + ":축", p.id + ":초", p.id + ":이유"));
     const rows = ids.map((id) => {
       const an = (surveyMap[id] || {}).anchor;
       const its = (an && an.items) || [];
       const r = [id, (roster[id] || {}).nick || "", an ? an.cond : "", an && an.submittedAt ? an.submittedAt : "",
-        an ? (anchorScore(an) != null ? anchorScore(an) : "") : "",
+        an && anchorCounts(an).score != null ? anchorCounts(an).score : "",
+        an ? anchorCounts(an).n : "",
+        an && anchorCounts(an).prop != null ? Math.round(anchorCounts(an).prop * 1000) / 1000 : "",
         an && anchorPlateRate(an) != null ? Math.round(anchorPlateRate(an) * 100) / 100 : ""];
       pairs.forEach((p, i) => {
         const x = its.find((y) => y.i === i);
@@ -337,8 +346,8 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
     <div className="card">
       <div className="card-head"><span className="card-code">앵커</span><span className="card-title">고지 라벨을 바꿔 붙인 네 쌍</span></div>
       <div className="card-note">
-        같은 이미지에 <b>「AI 활용 범위」 문구만 다르게</b> 붙여 학생마다 무작위로 보여 줍니다.
-        라벨이 무작위 배정되므로 두 조건의 선택률 차이가 곧 <b>고지가 깎는 양</b>입니다.
+        같은 이미지에 <b>「AI 활용 범위」 문구만 다르게</b> 붙여 학번 끝자리 홀짝으로 번갈아 보여 줍니다(무작위 배정이 아니라 교대 배정).
+        끝자리가 학생 특성과 무관하다고 보면 두 조건의 선택률 차이가 <b>고지가 깎는 양</b>의 추정치입니다.
         학급 밖 예시 유물이라 어떤 학생도 이 조작 때문에 손해 보지 않습니다.
       </div>
       <div className="card-body">
