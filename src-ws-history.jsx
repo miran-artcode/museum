@@ -27,6 +27,36 @@ import { fbStore } from "./src-fb.js";
    ============================================================ */
 
 const GAP_MS = 120000;
+
+/* 값 안의 media 참조(문자열 ref)를 모은다. 사진·녹음·스케치·영상 칸과 생성 회차의 그림이 여기에 해당한다 */
+function refsIn(v, out = []) {
+  if (!v) return out;
+  if (Array.isArray(v)) { v.forEach((x) => refsIn(x, out)); return out; }
+  if (typeof v === "object") { if (typeof v.ref === "string" && v.ref) out.push(v.ref); Object.values(v).forEach((x) => refsIn(x, out)); }
+  return out;
+}
+/* 되돌릴 기록 만들기: 사본(snap)을 쓰되, 사본이 가리키는 media 문서가 지금 없는 칸은 현재 값(cur)을 둔다.
+   사진·녹음·스케치는 새로 올릴 때 옛 문서를 지우므로(스케치는 자동 저장으로 몇 분마다 바뀐다), 옛 사본의 참조를 그대로 쓰면
+   없는 문서를 가리켜 학생 화면에서 열리지 않고 지금의 문서는 가리키는 곳 없이 남는다. exists(ref) → 문서가 있으면 true */
+export async function mergeRestore(snap, cur, exists) {
+  const next = { ...(snap || {}) };
+  const kept = [];
+  for (const k of Object.keys(next)) {
+    if (k.charAt(0) === "_") continue;
+    const refs = refsIn(next[k]);
+    if (!refs.length) continue;
+    const oks = await Promise.all(refs.map((r) => exists(r)));
+    if (oks.every(Boolean)) continue;
+    kept.push(k);
+    if (cur && cur[k] !== undefined) next[k] = cur[k]; else delete next[k];
+  }
+  // 사본에는 없고 지금만 있는 media 칸(사본 뒤에 올린 사진·스케치)은 그대로 둔다
+  for (const k of Object.keys(cur || {})) {
+    if (k.charAt(0) === "_" || k in next || kept.includes(k)) continue;
+    if (refsIn(cur[k]).length) { next[k] = cur[k]; kept.push(k); }
+  }
+  return { next, kept };
+}
 const pad = (n) => String(n).padStart(2, "0");
 
 /* 시간대 이름: 기기의 현지 시각으로 YYYYMMDDHH */
@@ -110,8 +140,11 @@ export function WsHistoryCard({ sid, ws, busy, onRestored, setMsg }) {
     // ① 현재 상태를 먼저 사본으로 남긴다 (실패하면 되돌리지 않는다). 기록지가 없으면 남길 것이 없다
     const backupOk = !cur0 || await fbStore.setT("wsh:" + sid + "_r" + Date.now(), { sid, bucket: "되돌리기 전", at: nowIso, ws: cur0 });
     if (!backupOk) { setWorking(false); setMsg && setMsg("되돌리기 전 사본 저장에 실패해 중단했습니다. 연결을 확인하고 다시 시도하세요."); return; }
-    // ② 사본을 본 문서에 쓴다. 되돌린 사실은 _restored에 남긴다
-    const next = { ...row.ws, _updatedAt: nowIso, _restored: [...(Array.isArray(cur0 && cur0._restored) ? cur0._restored : []), { from: row.at, at: nowIso }].slice(-20) };
+    // ② 사본을 본 문서에 쓴다. 되돌린 사실은 _restored에 남긴다.
+    //    사진·녹음·스케치 칸은 사본이 가리키는 파일이 아직 있을 때만 되돌리고, 없으면 지금 값을 둔다(mergeRestore)
+    const exists = async (ref) => { const r = await fbStore.getSafe("media:" + sid + "_" + ref); return !!(r && r.ok && r.data != null); };
+    const merged = await mergeRestore(row.ws, cur0, exists);
+    const next = { ...merged.next, _updatedAt: nowIso, _restored: [...(Array.isArray(cur0 && cur0._restored) ? cur0._restored : []), { from: row.at, at: nowIso }].slice(-20) };
     const ok = await fbStore.setT("ws:" + sid, next);
     setWorking(false);
     if (!ok) { setMsg && setMsg("되돌리기에 실패했습니다. 다시 시도하세요."); return; }
@@ -150,7 +183,7 @@ export function WsHistoryCard({ sid, ws, busy, onRestored, setMsg }) {
               </tbody>
             </table></div>
           )}
-        <p className="hint" style={{ marginTop: 8 }}>되돌리기 직전 상태는 「되돌리기 전」 사본으로 남아 다시 되돌릴 수 있습니다. 사진·음성·스케치 파일은 별도 저장이라 되돌리기와 무관하게 남습니다.</p>
+        <p className="hint" style={{ marginTop: 8 }}>되돌리기 직전 상태는 「되돌리기 전」 사본으로 저장되어 다시 되돌릴 수 있습니다. 사진·음성·스케치는 그 시점의 파일이 아직 있을 때만 되돌리고, 없으면 지금 것을 그대로 둡니다.</p>
       </div>
     </div>
   );

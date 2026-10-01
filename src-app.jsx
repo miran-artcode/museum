@@ -36,7 +36,7 @@ import { AccessProvider, AccessButton, AccessLessonTerms, AccessMemo, AccessStyl
 import { AccessTeacherPanel, AccessTeacherStyle, CaptionOnAir } from "./src-access-teacher.jsx";
 import { A11yStyle, A11yRuntime } from "./src-access-a11y.jsx";
 import { supportCsv, SUPPORT_CODEBOOK } from "./src-access-core.mjs";
-import { SketchPad, SketchStyle, sketchDirty } from "./src-sketch.jsx";
+import { SketchPad, SketchRead, SketchStyle, sketchDirty } from "./src-sketch.jsx";
 import {
   ATTITUDES, ATTITUDE_HINTS, LADDER_INTRO, TRANSLATE_STAGES, REFLECT_KEYS, DERIVE_KEYS,
   LEGACY_BACK, normBack, backLabel, SYMBOL_WORDS, findSymbol, SCHEMA_REV, REV_SECTIONS,
@@ -3804,7 +3804,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
     return <AudioField f={f} fieldKey={key} v={v} setField={setField} />;
   }
   if (f.t === "sketch") {
-    return <SketchField f={f} fieldKey={key} v={v} setField={setField} />;
+    return <SketchField f={f} fieldKey={key} v={v} setField={setField} prefsV={ws && ws._skp} />;
   }
   if (f.t === "video") {
     return <VideoField f={f} fieldKey={key} v={v} setField={setField} />;
@@ -4107,13 +4107,7 @@ function FieldReader({ sec, f, ws, owner }) {
     );
   }
   if (f.t === "sketch") {
-    const cur = typeof v === "string" ? null : v;
-    return (
-      <div className="read-block">
-        <div className="rl">{f.label}</div>
-        {cur ? <MediaThumb owner={owner || OWNER} refId={cur.ref} alt={f.label} size={200} /> : <div className="rv empty">스케치 없음</div>}
-      </div>
-    );
+    return <SketchRead f={f} v={v} owner={owner || OWNER} store={mediaStore} MediaThumb={MediaThumb} fmtTime={fmtTime} />;
   }
   if (f.t === "video") {
     const cur = typeof v === "string" ? null : v;
@@ -4415,8 +4409,9 @@ function AudioField({ f, fieldKey, v, setField }) {
   );
 }
 
-/* 스케치 캔버스 (디지털 에스키스) — 도구·레이어·확대·저장은 src-sketch.jsx.
-   값 { ref, at, w, h, paper, layers } 중 ref(합친 그림)만 교사 화면·집계가 읽는다 */
+/* 스케치 캔버스 (디지털 에스키스) — 도구·레이어·확대·저장은 src-sketch.jsx와 src-sketch-*.
+   값 { ref, at, w, h, paper, layers, log, versions, stats } 중 ref(합친 그림)만 집계가 읽고,
+   읽기 화면(SketchRead)은 저장 버전과 과정 기록도 보여 준다. 붓 설정·내 팔레트는 기록지의 _skp에 둔다 */
 function SketchField(props) {
   return <SketchPad {...props} owner={OWNER} store={mediaStore} MediaThumb={MediaThumb} confirmDel={confirmDel} fmtTime={fmtTime} />;
 }
@@ -5491,6 +5486,7 @@ function StudentApp({ me, onExit, onGallery }) {
   /* 전시장으로: 기다리던 입력을 먼저 저장에 태운다 (화면이 닫힌 뒤에도 그 저장은 끝까지 간다).
      돌아왔을 때 같은 차시의 방문 횟수를 다시 세지 않도록 표시해 둔다 */
   const toGallery = () => {
+    if (sketchDirty.current && !window.confirm("스케치에 저장하지 않은 획이 있습니다. 지금 이동하면 사라집니다. 이동할까요?")) return;
     flush();
     svFlush();
     galleryTripSid = me.sid;
@@ -5501,6 +5497,13 @@ function StudentApp({ me, onExit, onGallery }) {
   const leave = async () => {
     if (leaving) return;
     setLeaving(true);
+    // 스케치는 그림 문서를 먼저 올린 뒤 기록지에 적으므로, 진행 중인 저장을 기다리고 남은 변경을 한 번 저장해 본다(최대 12초).
+    // 끝나면 그 값이 아래 saveAllNow에 함께 실린다. 저장하지 못하면 묻는다(그림은 이 기기의 초안에만 남는다)
+    if (sketchDirty.flush) await Promise.race([sketchDirty.flush(), new Promise((res) => setTimeout(res, 12000))]);
+    if (sketchDirty.unsaved && !window.confirm("스케치를 저장하지 못했습니다. 인터넷 연결을 확인해 주세요.\n지금 나가면 마지막으로 그린 내용이 저장되지 않을 수 있습니다. 그래도 나갈까요?")) {
+      setLeaving(false);
+      return;
+    }
     const ok = await Promise.race([saveAllNow(), new Promise((res) => setTimeout(() => res(false), 6000))]);
     if (!ok && !removedRef.current && !window.confirm("마지막으로 쓴 내용의 저장을 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.\n지금 나가면 그 내용이 저장되지 않을 수 있습니다. 그래도 나갈까요?")) {
       setLeaving(false);

@@ -1,54 +1,58 @@
 /* ============================================================
    디지털 에스키스 (4차시 「에스키스와 화면 설계」 s4c.sketchpad)
    ------------------------------------------------------------
-   미술 전공 학생이 종이 대신 쓸 수 있게 만든 그리기 도구.
-   · 도구: 연필·펜·붓펜·마커·목탄·에어브러시·지우개, 도형(직선·화살표·사각형·타원), 글자, 스포이트, 화면 이동
-   · 필압(애플 펜슬·S펜·와콤)을 굵기·농도에 반영하고, 마우스·손가락은 붓펜만 속도로 굵기를 흉내 낸다.
-     손떨림 보정, Shift 직선, Alt 스포이트, 펜 뒤쪽 지우개(와콤·서피스)
-   · 색: 팔레트 20색 + 색 고르기 + 최근 색, 도구별 굵기·불투명도 기억
-   · 화면: 확대·축소(버튼·Ctrl+휠·두 손가락), 이동(스페이스·휠 버튼·두 손가락), 회전, 좌우 반전 보기,
-     안내선(격자·삼분할·세 칸), 종이 색, 크게 그리기(화면 가득)
-   · 레이어 4장, 되돌리기 40단계, 사진을 레이어로 불러와 따라 그리기
-   · 저장: 합친 그림 한 장(ref, 교사 화면·집계가 읽는 값) + 레이어별 PNG(layers[].ref). 다시 열면 레이어째 이어 그린다.
-     media 규칙이 dataURL 1,000,000자 미만이라 합친 그림은 PNG → JPEG 품질 단계 → 축소 순으로 맞춘다.
-   · 저장하지 않은 그림은 sessionStorage 초안으로 둔다. 차시 탭을 옮기거나 새로 고쳐도 이어진다.
-     (탭을 닫으면 사라지므로 beforeunload 경고는 sketchDirty.unsaved로 그대로 띄운다.)
-   값 모양: { ref, at, w, h, paper, layers: [{ ref, name, op, vis }] }. ref만 있는 옛 값(720×480 JPEG)도 읽는다.
-   collectMediaRefs(src-app.jsx)가 layers[].ref까지 모으므로 학번 변경·기록 초기화 때 레이어 문서도 함께 옮겨지고 지워진다.
-
-   그리기 엔진: 레이어마다 캔버스 하나 + 되돌리기 한도 밖으로 밀려난 작업을 굳힌 base.
-   작업(획·도형·글자·사진·지우기)은 벡터로 기록하고, 되돌리기는 base 위에 남은 작업을 다시 그린다.
-   획은 늘 scratch 캔버스에 불투명하게 그린 뒤 획 불투명도로 레이어에 합성한다. 실시간 미리보기와
-   다시 그리기가 같은 경로를 타므로 되돌린 뒤 다시 실행해도 픽셀이 같다. 연필·목탄의 결은 캔버스 좌표에
-   고정된 종이 결 무늬(같은 씨앗)로 가리므로 난수 없이도 다시 그릴 때 똑같다.
+   미술 전공 학생이 종이나 태블릿 그림 앱 대신 쓸 수 있게 만든 그리기 도구.
+   파일 구성
+     src-sketch.jsx            이 파일: 화면, 포인터·제스처, 선택·변형·조정, 저장·자동 저장·버전·초안
+     src-sketch-engine.mjs     그리기 엔진: 붓, 레이어, 되돌리기, 과정 기록
+     src-sketch-core.mjs       순수 계산: 색, 도형 바로잡기, 채우기 영역, 조정, 안내선, 기록 꾸리기
+     src-sketch-ui.jsx         아이콘과 공용 부품
+     src-sketch-color.jsx      색 창            src-sketch-brushpanel.jsx  브러시 보관함·설정
+     src-sketch-layers.jsx     레이어 창        src-sketch-history.jsx     기록 창·과정 다시 보기
+     src-sketch-read.jsx       교사 읽기 화면
+   기능
+     · 붓 10종(연필·펜·붓펜·마커·평붓·수채·목탄·파스텔·에어브러시·스프레이) + 번짐 + 지우개, 붓마다 설정 저장
+     · 필압·기울기(펜), 손떨림 보정, 그리다 멈추면 도형으로 바로잡기, Shift 직선, 대칭 그리기, 안내선에 맞춰 그리기
+     · 채우기, 도형, 글자, 스포이트, 선택(사각형·타원·올가미·자동)과 변형(이동·크기·회전·뒤집기), 조정(색조·밝기·흐림 등)
+     · 레이어 8장: 혼합 모드, 불투명도, 알파 잠금, 잠금, 복제, 합치기. 모든 작업을 60단계까지 되돌린다
+     · 화면: 확대·이동·회전(두 손가락)·좌우 반전 보기, 안내선(격자·삼분할·세 칸·등각·투시 1점·2점·대칭), 크게 그리기
+     · 저장: 합친 그림(ref) + 레이어별 그림 + 과정 기록. 2분마다 자동 저장, 저장 버전 15개, 과정 다시 보기
+       앞 저장본의 문서는 기록지 값이 새 값으로 바뀐 것을 본 뒤에 지운다. 한 장이라도 못 올리면 저장하지 않는다
+     · 저장하지 않은 그림은 이 브라우저(IndexedDB)에 초안으로 두어 탭을 옮기거나 닫아도 이어진다
+     · 읽기 실패와 「없음」을 구분한다: 읽지 못했으면 빈 캔버스에 그려 덮어쓰지 못하게 막고 다시 불러오게 한다
+   값 모양
+     { ref, at, w, h, paper, keep, stats, guide?,
+       layers: [{ id, name, op, vis, blend, alock, lock, parts: [{ ref }] }],   (옛 값: { ref, name, op, vis })
+       log: { parts: [{ ref }], n },  versions: [{ ref, at, w, h, n }] }
+     교사 화면·집계는 ref(합친 그림)만 읽는다. ref만 있는 옛 값(720×480 JPEG)도 읽는다.
+     collectMediaRefs(src-app.jsx)가 안쪽의 ref를 모두 모으므로 학번 변경·기록 초기화 때 함께 옮겨지고 지워진다.
    ============================================================ */
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { WsLockCtx } from "./src-ws-lock.jsx";
+import { clamp, fitShape, guideLines, assistSnap, matTRS, matApply } from "./src-sketch-core.mjs";
+import {
+  Engine, BRUSHES, BRUSH, RATIOS, PAPERS, paperColor, MAX_LAYERS, ADJUSTS, TEXT_FONTS, textFont, PART_MAX, LOG_PREFIX,
+  encodeOpaque, encodeLayer, blobOf, loadImg, packLog, unpackLog, putParts, fetchLog, fetchLayer, readDoc, FAILED, refsOf, logStats, opLabel, freeCanvas,
+} from "./src-sketch-engine.mjs";
+import { Icon, IconBtn, Seg, Range, PanelHead } from "./src-sketch-ui.jsx";
+import { ColorPanel, SKETCH_COLOR_CSS } from "./src-sketch-color.jsx";
+import { LayersPanel, SKETCH_LAYERS_CSS } from "./src-sketch-layers.jsx";
+import { HistoryPanel, ReplayPlayer, SKETCH_HISTORY_CSS } from "./src-sketch-history.jsx";
+import { BrushPanel, SKETCH_BRUSH_CSS } from "./src-sketch-brushpanel.jsx";
+import { SketchRead, SKETCH_READ_CSS } from "./src-sketch-read.jsx";
+
+export { SketchRead };
 
 /* 저장하지 않은 스케치 상태 — src-app.jsx의 차시 이동 확인(current)과 창 닫기 경고(unsaved)가 읽는다.
-   current: 지금 화면을 떠나면 획이 사라지는가(초안 보관에 실패했을 때만 true)
+   current: 지금 화면을 떠나면 획이 사라지는가(초안 보관이 아직 안 됐거나 실패했을 때 true)
    unsaved: 서버에 저장하지 않은 변경이 있는가 */
-export const sketchDirty = { current: false, unsaved: false };
+export const sketchDirty = { current: false, unsaved: false, flush: null };
+/* flush: 나가기 전에 src-app.jsx가 부르는 저장 함수(진행 중인 저장을 기다리고, 남은 변경을 한 번 저장해 본다). 스케치가 화면에 없으면 null */
 
-const LIMIT = 950000;          // media 규칙: dataURL 글자 수 < 1,000,000
-const MAX_LAYERS = 4;
-const HISTORY_MAX = 40;
-const DRAFT_PREFIX = "museum:sketch:";
-const PREFS_KEY = "museum:sketchPrefs";
-
-const RATIOS = [
-  { k: "wide", name: "가로", W: 1500, H: 1000 },
-  { k: "tall", name: "세로", W: 1000, H: 1500 },
-  { k: "square", name: "정사각", W: 1250, H: 1250 },
-];
-const PAPERS = [
-  { k: "white", name: "흰색", c: "#FFFFFF" },
-  { k: "cream", name: "미색", c: "#F4EEDF" },
-  { k: "gray", name: "회색", c: "#BDBAB3" },
-  { k: "kraft", name: "크라프트", c: "#C4A37A" },
-  { k: "black", name: "검정", c: "#232323" },
-];
-const paperColor = (k) => (PAPERS.find((p) => p.k === k) || PAPERS[0]).c;
+const PREFS_KEY = "museum:sketchPrefs2";
+const PREFS_FIELD = "_skp";            // 기록지에 함께 두는 붓 설정·내 팔레트(밑줄 키: 수정 이력·집계에서 빠진다)
+const DRAFT_DB = "museum-sketch", DRAFT_STORE = "drafts";
+const VERSIONS_MAX = 15, VERSION_GAP = 10 * 60000, AUTOSAVE_GAP = 120000;
 
 const PALETTE = [
   ["#111111", "검정"], ["#444444", "진회색"], ["#777777", "회색"], ["#AAAAAA", "밝은 회색"], ["#DDDDDD", "연회색"], ["#FFFFFF", "흰색"],
@@ -57,572 +61,105 @@ const PALETTE = [
   ["#6F4AA0", "보라"], ["#E2789A", "분홍"],
 ];
 
-/* 도구 표. eng: 그리는 방식(path 선, grain 결 있는 선, soft 부드러운 분사), minW: 필압 0일 때 굵기 비율 */
-const TOOLS = [
-  { k: "pencil", name: "연필", key: "1", eng: "grain", tex: "fine", min: 1, max: 40, size: 4, op: 0.9, minW: 0.6, dens: [0.2, 0.8], press: true },
-  { k: "pen", name: "펜", key: "2", eng: "path", min: 1, max: 40, size: 3, op: 1, minW: 0.35, dash: true, press: true },
-  { k: "brush", name: "붓펜", key: "3", eng: "path", min: 2, max: 80, size: 14, op: 1, minW: 0.12, taper: true, speed: true, press: true },
-  { k: "marker", name: "마커", key: "4", eng: "path", min: 4, max: 120, size: 26, op: 0.45, minW: 1 },
-  { k: "charcoal", name: "목탄", key: "5", eng: "grain", tex: "coarse", min: 4, max: 160, size: 24, op: 0.9, minW: 0.55, dens: [0.15, 0.7], press: true },
-  { k: "air", name: "에어브러시", key: "6", eng: "soft", min: 10, max: 400, size: 90, op: 0.4, flow: 0.08, press: true },
-  { k: "eraser", name: "지우개", key: "e", eng: "path", min: 2, max: 400, size: 36, op: 1, minW: 0.6, erase: true, press: true },
-  { k: "shape", name: "도형", key: "u", min: 1, max: 40, size: 4, op: 1, dash: true },
-  { k: "text", name: "글자", key: "t", min: 16, max: 200, size: 44, op: 1 },
+/* 붓 말고의 도구 */
+const EXTRA = [
+  { k: "fill", name: "채우기", key: "g" },
+  { k: "shape", name: "도형", key: "u", min: 1, max: 40, dash: true },
+  { k: "text", name: "글자", key: "t", min: 16, max: 200 },
+  { k: "select", name: "선택", key: "m" },
+  { k: "xform", name: "변형", key: "v" },
   { k: "picker", name: "스포이트", key: "i" },
   { k: "hand", name: "이동", key: "h" },
 ];
-const TOOL = Object.fromEntries(TOOLS.map((t) => [t.k, t]));
+const TOOL = { ...BRUSH, ...Object.fromEntries(EXTRA.map((t) => [t.k, t])) };
+const isDrawBrush = (k) => !!BRUSH[k] && !BRUSH[k].erase && BRUSH[k].eng !== "smudge";
 const SHAPES = [["line", "직선"], ["arrow", "화살표"], ["rect", "사각형"], ["ellipse", "타원"]];
 const DASHES = [["solid", "실선"], ["dash", "파선"], ["dot", "점선"]];
-const GUIDES = [["none", "없음"], ["grid", "격자"], ["thirds", "삼분할"], ["three", "세 칸"]];
+const GUIDES = [["none", "없음"], ["grid", "격자"], ["thirds", "삼분할"], ["three", "세 칸"], ["iso", "등각"], ["persp1", "투시 1점"], ["persp2", "투시 2점"], ["sym", "대칭"]];
+const SYMS = [["v", "좌우"], ["h", "상하"], ["quad", "네 방향"], ["radial", "방사"]];
+const SEL_KINDS = [["rect", "사각형"], ["ellipse", "타원"], ["lasso", "올가미"], ["wand", "자동"]];
+const SEL_OPS = [["new", "새로"], ["add", "더하기"], ["sub", "빼기"]];
+const ASSIST_KINDS = ["grid", "iso", "persp1", "persp2"];
+const QUICK_NAMES = { line: "직선", ellipse: "타원", circle: "원", rect: "사각형", poly: "다각형" };
 
-const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-const pcurve = (p) => Math.pow(clamp(p, 0.02, 1), 0.75);
-const smooth01 = (t) => t * t * (3 - 2 * t);
-const mkCanvas = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
-const hexRgb = (h) => { const n = parseInt(String(h).slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
-const rgbHex = (r, g, b) => "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase();
-const TEXT_FONT = (size) => `500 ${size}px 'Noto Sans KR','IBM Plex Sans KR',sans-serif`;
-
-function dashArr(dash, w) {
-  if (dash === "dash") return [w * 4 + 8, w * 2.5 + 7];
-  if (dash === "dot") return [0.1, w * 2 + 6];
-  return [];
-}
-
-function loadImg(src) {
-  return new Promise((res, rej) => {
-    const im = new Image();
-    im.onload = () => res(im);
-    im.onerror = () => rej(new Error("image"));
-    im.src = src;
-  });
-}
-
-/* ---------- 종이 결 (연필·목탄) ---------- */
-
-const GN = 256;
-const grainCache = {};
-/* 흐린 잡음의 순위(0~1). 문턱값이 곧 칠해지는 픽셀 비율이라 필압이 농도가 된다 */
-function grainRank(tex) {
-  if (grainCache[tex]) return grainCache[tex];
-  let s = tex === "fine" ? 0x2545f491 : 0x9e3779b9;
-  const rnd = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
-  const raw = new Float32Array(GN * GN);
-  for (let i = 0; i < raw.length; i++) raw[i] = rnd();
-  const blur = (src, r, horiz) => {
-    const out = new Float32Array(GN * GN);
-    for (let y = 0; y < GN; y++) for (let x = 0; x < GN; x++) {
-      let sum = 0;
-      for (let k = -r; k <= r; k++) sum += horiz ? src[y * GN + ((x + k + GN) % GN)] : src[((y + k + GN) % GN) * GN + x];
-      out[y * GN + x] = sum / (2 * r + 1);
-    }
-    return out;
-  };
-  const r = tex === "fine" ? 1 : 2;
-  let b = blur(blur(raw, r, true), r, false);
-  if (tex !== "fine") b = blur(blur(b, 1, true), 1, false);
-  const mix = tex === "fine" ? 0.35 : 0.15;
-  const val = new Float32Array(GN * GN);
-  for (let i = 0; i < val.length; i++) val[i] = b[i] * (1 - mix) + raw[i] * mix;
-  const idx = Array.from({ length: GN * GN }, (_, i) => i).sort((a, c) => val[a] - val[c]);
-  const rank = new Float32Array(GN * GN);
-  idx.forEach((k, i) => { rank[k] = i / idx.length; });
-  return (grainCache[tex] = rank);
-}
-
-/* ---------- 획 그리기 ---------- */
-
-/* pts: [x, y, 필압, x, y, 필압, ...]. final이면 끝까지 다 그리고(꼬리·끝 가늘어짐 포함) 다시 그리기와 같은 결과 */
-function makeRenderer(eng, op, final) {
-  const T = TOOL[op.tool];
-  const ctx = eng.sctx;
-  const pts = op.pts;
-  const X = (k) => pts[3 * k], Y = (k) => pts[3 * k + 1], P = (k) => pts[3 * k + 2];
-  const dist = [0];
-  const Ls = op.size * 2.5;
-  const spacing = Math.max(1, op.size * 0.06);
-  let done = 0, dashOff = 0, next = 0, total = 0;
-  const dashed = T.dash && op.dash && op.dash !== "solid";
-
-  const wAt = (k) => {
-    let w = op.size * (T.minW + (1 - T.minW) * pcurve(P(k)));
-    if (T.taper) {
-      w *= 0.2 + 0.8 * smooth01(Math.min(1, dist[k] / Ls));
-      if (final) w *= 0.2 + 0.8 * smooth01(Math.min(1, (total - dist[k]) / Ls));
-    }
-    return Math.max(0.4, w);
-  };
-  const dens = (p) => T.dens[0] + (T.dens[1] - T.dens[0]) * pcurve(p);
-  const dab = (x, y, p) => {
-    const r = (op.size / 2) * (0.35 + 0.65 * pcurve(p));
-    ctx.globalAlpha = Math.min(1, T.flow * (0.3 + 0.7 * pcurve(p)));
-    ctx.drawImage(eng.sprite(op.color), x - r, y - r, r * 2, r * 2);
-  };
-  const dot = (k) => {
-    const w = wAt(k);
-    if (T.eng === "soft") return dab(X(k), Y(k), P(k));
-    const path = (c) => { c.beginPath(); c.arc(X(k), Y(k), w / 2, 0, Math.PI * 2); c.fill(); };
-    if (T.eng === "grain") eng.grainPaint(path, X(k), Y(k), X(k), Y(k), w, dens(P(k)), T.tex, op.color);
-    else path(ctx);
-  };
-  const quad = (ax, ay, cx, cy, bx, by, w, p) => {
-    if (T.eng === "grain") {
-      const path = (c) => { c.beginPath(); c.moveTo(ax, ay); c.quadraticCurveTo(cx, cy, bx, by); c.stroke(); };
-      eng.grainPaint(path, Math.min(ax, cx, bx), Math.min(ay, cy, by), Math.max(ax, cx, bx), Math.max(ay, cy, by), w, dens(p), T.tex, op.color);
-      return;
-    }
-    ctx.lineWidth = w;
-    if (dashed) {
-      ctx.lineDashOffset = dashOff;
-      dashOff += (Math.hypot(cx - ax, cy - ay) + Math.hypot(bx - cx, by - cy) + Math.hypot(bx - ax, by - ay)) / 2;
-    }
-    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(cx, cy, bx, by); ctx.stroke();
-  };
-  const softSeg = (i) => {
-    const ax = X(i - 1), ay = Y(i - 1), len = dist[i] - dist[i - 1];
-    if (len <= 0) return;
-    while (next <= len) {
-      const t = next / len;
-      dab(ax + (X(i) - ax) * t, ay + (Y(i) - ay) * t, P(i - 1) + (P(i) - P(i - 1)) * t);
-      next += spacing;
-    }
-    next -= len;
-  };
-
-  function add() {
-    const n = pts.length / 3;
-    for (let k = dist.length; k < n; k++) dist.push(dist[k - 1] + Math.hypot(X(k) - X(k - 1), Y(k) - Y(k - 1)));
-    total = dist[n - 1] || 0;
-    ctx.save();
-    ctx.strokeStyle = op.color; ctx.fillStyle = op.color;
-    ctx.lineCap = "round"; ctx.lineJoin = "round";
-    if (dashed) ctx.setLineDash(dashArr(op.dash, op.size));
-    if (done === 0 && n >= 1) {
-      // 실시간에는 누르자마자 점을 보이고, 최종 그리기에서는 점 하나짜리 획만 점으로 그린다
-      if (!final || n === 1) { dot(0); if (T.eng === "soft") next = spacing; }
-      done = 1;
-    }
-    for (let i = done; i < n; i++) {
-      if (T.eng === "soft") { softSeg(i); continue; }
-      const ax = i === 1 ? X(0) : (X(i - 2) + X(i - 1)) / 2, ay = i === 1 ? Y(0) : (Y(i - 2) + Y(i - 1)) / 2;
-      quad(ax, ay, X(i - 1), Y(i - 1), (X(i - 1) + X(i)) / 2, (Y(i - 1) + Y(i)) / 2, (wAt(i - 1) + wAt(i)) / 2, (P(i - 1) + P(i)) / 2);
-    }
-    if (final && n >= 2 && T.eng !== "soft") {
-      const k = n - 1, mx = (X(k - 1) + X(k)) / 2, my = (Y(k - 1) + Y(k)) / 2;
-      quad(mx, my, (mx + X(k)) / 2, (my + Y(k)) / 2, X(k), Y(k), wAt(k), P(k));
-    }
-    ctx.restore();
-    done = Math.max(done, n);
-  }
-  return { add };
-}
-
-function drawShape(ctx, op) {
-  const { x0, y0, x1, y1 } = op;
-  ctx.save();
-  ctx.strokeStyle = op.color; ctx.fillStyle = op.color;
-  ctx.lineWidth = op.size; ctx.lineCap = "round";
-  ctx.lineJoin = op.shape === "rect" ? "miter" : "round";
-  if (op.dash && op.dash !== "solid") ctx.setLineDash(dashArr(op.dash, op.size));
-  if (op.shape === "line" || op.shape === "arrow") {
-    let ex = x1, ey = y1;
-    const L = Math.hypot(x1 - x0, y1 - y0) || 1, ux = (x1 - x0) / L, uy = (y1 - y0) / L;
-    const hl = Math.min(L * 0.6, Math.max(16, op.size * 4)), hw = hl * 0.5;
-    if (op.shape === "arrow") { ex = x1 - ux * hl * 0.8; ey = y1 - uy * hl * 0.8; }
-    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(ex, ey); ctx.stroke();
-    if (op.shape === "arrow") {
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x1 - ux * hl - uy * hw, y1 - uy * hl + ux * hw);
-      ctx.lineTo(x1 - ux * hl + uy * hw, y1 - uy * hl - ux * hw);
-      ctx.closePath(); ctx.fill();
-    }
-  } else if (op.shape === "rect") {
-    const x = Math.min(x0, x1), y = Math.min(y0, y1), w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
-    if (op.fill) ctx.fillRect(x, y, w, h);
-    ctx.strokeRect(x, y, w, h);
-  } else {
-    ctx.beginPath();
-    ctx.ellipse((x0 + x1) / 2, (y0 + y1) / 2, Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2, 0, 0, Math.PI * 2);
-    if (op.fill) ctx.fill();
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawText(ctx, op) {
-  ctx.save();
-  ctx.font = TEXT_FONT(op.size);
-  ctx.fillStyle = op.color;
-  ctx.textBaseline = "top";
-  String(op.text).split("\n").forEach((line, i) => ctx.fillText(line, op.x, op.y + i * op.size * 1.3));
-  ctx.restore();
-}
-
-/* ---------- 엔진: 레이어·되돌리기·합성 ---------- */
-
-class Engine {
-  constructor() {
-    this.W = 1500; this.H = 1000;
-    this.layers = []; this.activeId = 0; this.hist = []; this.redo = [];
-    this.seq = 1; this.nameSeq = 0;
-    this.host = null; this.live = null;
-    this.scratch = mkCanvas(this.W, this.H);
-    this.scratch.className = "skx-scratch";
-    this.sctx = this.scratch.getContext("2d");
-    this.tmp = null; this.tctx = null; this.pat = {}; this.snap = null;
-    this.spr = null; this.sprC = "";
-    this.pickCv = null;
-  }
-  attach(host) { this.host = host; this.mount(); }
-  /* host 안의 캔버스 순서를 레이어 순서(아래 → 위)에 맞추고, 활성 레이어 바로 위에 scratch를 둔다 */
-  mount() {
-    const h = this.host;
-    if (!h) return;
-    const want = [];
-    for (const L of this.layers) { want.push(L.cv); if (L.id === this.activeId) want.push(this.scratch); }
-    [...h.children].forEach((c) => { if (!want.includes(c)) h.removeChild(c); });
-    want.forEach((c, i) => { if (h.children[i] !== c) h.insertBefore(c, h.children[i] || null); });
-    for (const L of this.layers) { L.cv.style.opacity = String(L.op); L.cv.style.display = L.vis ? "" : "none"; }
-    const A = this.active();
-    this.scratch.style.display = A && A.vis ? "" : "none";
-  }
-  active() { return this.layers.find((L) => L.id === this.activeId) || this.layers[this.layers.length - 1]; }
-  layer(id) { return this.layers.find((L) => L.id === id); }
-  makeLayer(name) {
-    const cv = mkCanvas(this.W, this.H);
-    if (!name) name = "레이어 " + ++this.nameSeq;
-    else { const m = /^레이어 (\d+)$/.exec(name); if (m) this.nameSeq = Math.max(this.nameSeq, +m[1]); }
-    return { id: this.seq++, name, op: 1, vis: true, cv, ctx: cv.getContext("2d"), base: null, ver: 0 };
-  }
-  setSize(W, H) {
-    this.W = W; this.H = H;
-    this.scratch.width = W; this.scratch.height = H;
-    this.tmp = null; this.tctx = null; this.pat = {}; this.snap = null;
-  }
-  /* list: [{ name, op, vis, img }] (없으면 빈 레이어 하나) */
-  reset(W, H, list, activeIdx) {
-    this.live = null;
-    this.setSize(W, H);
-    this.layers = []; this.hist = []; this.redo = []; this.nameSeq = 0;
-    (list && list.length ? list : [{}]).slice(0, MAX_LAYERS).forEach((src) => {
-      const L = this.makeLayer(src.name);
-      L.op = typeof src.op === "number" ? clamp(src.op, 0, 1) : 1;
-      L.vis = src.vis !== false;
-      if (src.img) {
-        L.base = mkCanvas(W, H);
-        L.base.getContext("2d").drawImage(src.img, 0, 0, W, H);
-        L.ctx.drawImage(L.base, 0, 0);
-      }
-      this.layers.push(L);
-    });
-    const i = activeIdx != null && activeIdx >= 0 && activeIdx < this.layers.length ? activeIdx : this.layers.length - 1;
-    this.activeId = this.layers[i].id;
-    this.mount();
-  }
-  /* 비율 바꾸기: 지금 그림을 새 캔버스에 맞춰 줄이고 가운데에 둔다. 되돌리기 기록은 비운다 */
-  resizeKeep(W2, H2) {
-    const olds = this.layers.map((L) => { const c = mkCanvas(this.W, this.H); c.getContext("2d").drawImage(L.cv, 0, 0); return c; });
-    const s = Math.min(W2 / this.W, H2 / this.H), dw = this.W * s, dh = this.H * s, dx = (W2 - dw) / 2, dy = (H2 - dh) / 2;
-    this.live = null;
-    this.setSize(W2, H2);
-    this.hist = []; this.redo = [];
-    this.layers.forEach((L, i) => {
-      L.cv.width = W2; L.cv.height = H2;
-      L.base = mkCanvas(W2, H2);
-      L.base.getContext("2d").drawImage(olds[i], dx, dy, dw, dh);
-      this.replay(L);
-    });
-    this.mount();
-  }
-  addLayer(name, index) {
-    const L = this.makeLayer(name);
-    let i = index != null ? index : this.layers.indexOf(this.active()) + 1;
-    if (i < 0 || i > this.layers.length) i = this.layers.length;
-    this.layers.splice(i, 0, L);
-    return L;
-  }
-  removeLayer(id) {
-    if (this.layers.length <= 1) return false;
-    const i = this.layers.findIndex((L) => L.id === id);
-    if (i < 0) return false;
-    this.layers.splice(i, 1);
-    const strip = (arr) => arr.map((op) => (op.layers.includes(id) ? { ...op, layers: op.layers.filter((x) => x !== id) } : op)).filter((op) => op.layers.length);
-    this.hist = strip(this.hist); this.redo = strip(this.redo);
-    if (this.activeId === id) this.activeId = this.layers[Math.max(0, i - 1)].id;
-    this.mount();
-    return true;
-  }
-  moveLayer(id, dir) {
-    const i = this.layers.findIndex((L) => L.id === id), j = i + dir;
-    if (i < 0 || j < 0 || j >= this.layers.length) return false;
-    [this.layers[i], this.layers[j]] = [this.layers[j], this.layers[i]];
-    this.mount();
-    return true;
-  }
-  hasContent() {
-    return this.layers.some((L) => {
-      let has = !!L.base;
-      for (const op of this.hist) if (op.layers.includes(L.id)) has = op.kind !== "clear";
-      return has;
-    });
-  }
-  clearScratch() {
-    const c = this.sctx;
-    c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
-    c.clearRect(0, 0, this.W, this.H);
-  }
-  ensureTmp() {
-    if (this.tmp) return;
-    this.tmp = mkCanvas(this.W, this.H);
-    this.tctx = this.tmp.getContext("2d");
-    this.pat = {};
-  }
-  grainPattern(tex, dens) {
-    const q = clamp(Math.round(dens * 40), 1, 40), key = tex + q;
-    if (this.pat[key]) return this.pat[key];
-    const rank = grainRank(tex), th = q / 40;
-    const c = mkCanvas(GN, GN), x = c.getContext("2d"), im = x.createImageData(GN, GN);
-    for (let i = 0; i < rank.length; i++) im.data[i * 4 + 3] = rank[i] < th ? 255 : 0;
-    x.putImageData(im, 0, 0);
-    return (this.pat[key] = this.tctx.createPattern(c, "repeat"));
-  }
-  /* 선을 tmp에 그린 뒤 종이 결 무늬로 가려 scratch에 옮긴다. 무늬가 캔버스 좌표에 고정돼 있어 결이 이어진다 */
-  grainPaint(path, minx, miny, maxx, maxy, w, dens, tex, color) {
-    this.ensureTmp();
-    const pad = w / 2 + 2;
-    const x0 = Math.max(0, Math.floor(minx - pad)), y0 = Math.max(0, Math.floor(miny - pad));
-    const x1 = Math.min(this.W, Math.ceil(maxx + pad)), y1 = Math.min(this.H, Math.ceil(maxy + pad));
-    if (x1 <= x0 || y1 <= y0) return;
-    const t = this.tctx, bw = x1 - x0, bh = y1 - y0;
-    t.save();
-    t.beginPath(); t.rect(x0, y0, bw, bh); t.clip();
-    t.clearRect(x0, y0, bw, bh);
-    t.strokeStyle = color; t.fillStyle = color; t.lineWidth = w; t.lineCap = "round"; t.lineJoin = "round";
-    path(t);
-    t.globalCompositeOperation = "destination-in";
-    t.fillStyle = this.grainPattern(tex, dens);
-    t.fillRect(x0, y0, bw, bh);
-    t.restore();
-    this.sctx.drawImage(this.tmp, x0, y0, bw, bh, x0, y0, bw, bh);
-  }
-  sprite(color) {
-    if (this.spr && this.sprC === color) return this.spr;
-    const S = 128, c = mkCanvas(S, S), x = c.getContext("2d");
-    const [r, g, b] = hexRgb(color);
-    const gr = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-    gr.addColorStop(0, `rgba(${r},${g},${b},1)`);
-    gr.addColorStop(0.35, `rgba(${r},${g},${b},0.7)`);
-    gr.addColorStop(0.7, `rgba(${r},${g},${b},0.22)`);
-    gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
-    x.fillStyle = gr; x.fillRect(0, 0, S, S);
-    this.spr = c; this.sprC = color;
-    return c;
-  }
-  paint(op, final) {
-    if (op.kind === "stroke") makeRenderer(this, op, final).add();
-    else if (op.kind === "shape") drawShape(this.sctx, op);
-    else if (op.kind === "text") drawText(this.sctx, op);
-  }
-  compose(op, c) {
-    c.save();
-    c.globalAlpha = clamp(op.opacity, 0, 1);
-    c.globalCompositeOperation = TOOL[op.tool] && TOOL[op.tool].erase ? "destination-out" : "source-over";
-    c.drawImage(this.scratch, 0, 0);
-    c.restore();
-  }
-  apply(op, L) {
-    const c = L.ctx;
-    if (op.kind === "clear") { c.clearRect(0, 0, this.W, this.H); return; }
-    if (op.kind === "image") { c.save(); c.globalAlpha = 1; c.drawImage(op.img, op.x, op.y, op.w, op.h); c.restore(); return; }
-    this.clearScratch();
-    this.paint(op, true);
-    this.compose(op, c);
-    this.clearScratch();
-  }
-  replay(L) {
-    const c = L.ctx;
-    c.save();
-    c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
-    c.clearRect(0, 0, this.W, this.H);
-    if (L.base) c.drawImage(L.base, 0, 0);
-    c.restore();
-    for (const op of this.hist) if (op.layers.includes(L.id)) this.apply(op, L);
-    L.ver++;
-  }
-  /* 되돌리기 한도를 넘은 가장 오래된 작업은 레이어의 base에 굳힌다 */
-  bake(op) {
-    for (const id of op.layers) {
-      const L = this.layer(id);
-      if (!L) continue;
-      if (!L.base) L.base = mkCanvas(this.W, this.H);
-      this.apply(op, { ctx: L.base.getContext("2d") });
-    }
-  }
-  push(op) {
-    this.hist.push(op);
-    this.redo = [];
-    while (this.hist.length > HISTORY_MAX) this.bake(this.hist.shift());
-  }
-  commit(op) {
-    for (const id of op.layers) { const L = this.layer(id); if (L) { this.apply(op, L); L.ver++; } }
-    this.push(op);
-  }
-  undo() {
-    const op = this.hist.pop();
-    if (!op) return false;
-    this.redo.push(op);
-    for (const id of op.layers) { const L = this.layer(id); if (L) this.replay(L); }
-    return true;
-  }
-  redoOne() {
-    const op = this.redo.pop();
-    if (!op) return false;
-    this.hist.push(op);
-    for (const id of op.layers) { const L = this.layer(id); if (L) { this.apply(op, L); L.ver++; } }
-    return true;
-  }
-  /* 실시간 획. 지우개는 획 시작 때 레이어를 떠 두고(snap) 프레임마다 snap에서 지운 결과를 보인다 */
-  beginLive(op) {
-    const L = this.layer(op.layers[0]);
-    if (!L) return;
-    this.clearScratch();
-    const erase = TOOL[op.tool] && TOOL[op.tool].erase;
-    this.live = { op, L, erase, r: op.kind === "stroke" ? makeRenderer(this, op, false) : null, raf: 0 };
-    if (erase) {
-      if (!this.snap || this.snap.width !== this.W || this.snap.height !== this.H) this.snap = mkCanvas(this.W, this.H);
-      const s = this.snap.getContext("2d");
-      s.clearRect(0, 0, this.W, this.H); s.drawImage(L.cv, 0, 0);
-      this.scratch.style.opacity = "0";
-    } else this.scratch.style.opacity = String(clamp(op.opacity, 0, 1));
-    this.drawLive();
-  }
-  drawLive() {
-    const lv = this.live;
-    if (!lv) return;
-    if (lv.r) lv.r.add(); else { this.clearScratch(); this.paint(lv.op, false); }
-    if (lv.erase && !lv.raf) {
-      lv.raf = requestAnimationFrame(() => {
-        lv.raf = 0;
-        if (this.live !== lv) return;
-        this.restoreSnap(lv.L);
-        this.compose(lv.op, lv.L.ctx);
-      });
-    }
-  }
-  /* Shift 직선처럼 점 목록이 통째로 바뀌었을 때 */
-  restartLive() {
-    const lv = this.live;
-    if (!lv) return;
-    this.clearScratch();
-    if (lv.op.kind === "stroke") lv.r = makeRenderer(this, lv.op, false);
-    this.drawLive();
-  }
-  restoreSnap(L) {
-    const c = L.ctx;
-    c.save(); c.globalAlpha = 1; c.globalCompositeOperation = "copy"; c.drawImage(this.snap, 0, 0); c.restore();
-  }
-  endLive() {
-    const lv = this.live;
-    if (!lv) return null;
-    this.live = null;
-    if (lv.raf) cancelAnimationFrame(lv.raf);
-    this.clearScratch();
-    this.scratch.style.opacity = "1";
-    if (lv.erase) this.restoreSnap(lv.L);
-    this.apply(lv.op, lv.L);
-    lv.L.ver++;
-    this.push(lv.op);
-    return lv.op;
-  }
-  cancelLive() {
-    const lv = this.live;
-    if (!lv) return;
-    this.live = null;
-    if (lv.raf) cancelAnimationFrame(lv.raf);
-    this.clearScratch();
-    this.scratch.style.opacity = "1";
-    if (lv.erase) this.restoreSnap(lv.L);
-  }
-  composite(paper) {
-    const c = mkCanvas(this.W, this.H), x = c.getContext("2d");
-    x.fillStyle = paper; x.fillRect(0, 0, this.W, this.H);
-    for (const L of this.layers) if (L.vis) { x.globalAlpha = L.op; x.drawImage(L.cv, 0, 0); }
-    return c;
-  }
-  pick(px, py, paper) {
-    const x = Math.floor(px), y = Math.floor(py);
-    if (x < 0 || y < 0 || x >= this.W || y >= this.H) return null;
-    if (!this.pickCv) this.pickCv = mkCanvas(1, 1);
-    const c = this.pickCv.getContext("2d", { willReadFrequently: true });
-    c.globalAlpha = 1; c.fillStyle = paper; c.fillRect(0, 0, 1, 1);
-    for (const L of this.layers) if (L.vis) { c.globalAlpha = L.op; c.drawImage(L.cv, x, y, 1, 1, 0, 0, 1, 1); }
-    const d = c.getImageData(0, 0, 1, 1).data;
-    return rgbHex(d[0], d[1], d[2]);
-  }
-}
-
-/* ---------- 인코딩 ---------- */
-
-/* 합친 그림: PNG가 한도 안이면 그대로, 아니면 JPEG 품질을 낮추고, 그래도 크면 줄인다 */
-function encodeOpaque(cv) {
-  let d = cv.toDataURL("image/png");
-  if (d.length <= LIMIT) return d;
-  for (const q of [0.92, 0.85, 0.75, 0.62]) { d = cv.toDataURL("image/jpeg", q); if (d.length <= LIMIT) return d; }
-  for (const s of [0.8, 0.64, 0.5]) {
-    const c = mkCanvas(Math.round(cv.width * s), Math.round(cv.height * s));
-    c.getContext("2d").drawImage(cv, 0, 0, c.width, c.height);
-    d = c.toDataURL("image/jpeg", 0.8);
-    if (d.length <= LIMIT) return d;
-  }
-  return null;
-}
-/* 레이어: 투명도를 지켜야 하므로 PNG, 크면 WebP(지원 브라우저만) */
-function encodeAlpha(cv) {
-  let d = cv.toDataURL("image/png");
-  if (d.length <= LIMIT) return d;
-  for (const q of [0.92, 0.8]) {
-    d = cv.toDataURL("image/webp", q);
-    if (d.startsWith("data:image/webp") && d.length <= LIMIT) return d;
-  }
-  return null;
-}
-function blobData(cv) {
-  return new Promise((res, rej) => {
-    if (!cv.toBlob) { try { res(cv.toDataURL("image/png")); } catch (e) { rej(e); } return; }
-    cv.toBlob((b) => {
-      if (!b) return rej(new Error("blob"));
-      const fr = new FileReader();
-      fr.onload = () => res(fr.result);
-      fr.onerror = rej;
-      fr.readAsDataURL(b);
-    }, "image/png");
-  });
-}
+/* 한글 자판 상태(맥·아이패드 외장 키보드)에서는 e.key가 자모로 오므로 그때만 물리 키 위치로 읽는다 */
+const keyOf = (e) => {
+  const k = e.key || "";
+  if (k.length > 1 || /^[\x20-\x7e]$/.test(k)) return k;
+  const m = /^Key([A-Z])$/.exec(e.code || "");
+  return m ? m[1].toLowerCase() : k;
+};
+let zoomCache = { at: 0, z: 1 };
+/* 학습 지원의 글자 크기(body zoom) */
+const bodyZoom = () => {
+  const now = Date.now();
+  if (now - zoomCache.at > 500) { zoomCache = { at: now, z: parseFloat(getComputedStyle(document.body).zoom) || 1 }; }
+  return zoomCache.z;
+};
+const isHex = (c) => typeof c === "string" && /^#[0-9A-F]{6}$/i.test(c);
+const pad2 = (n) => String(n).padStart(2, "0");
 
 const ss = {
   get(k) { try { const s = sessionStorage.getItem(k); return s ? JSON.parse(s) : null; } catch (e) { return null; } },
-  set(k, v) { sessionStorage.setItem(k, JSON.stringify(v)); },
-  del(k) { try { sessionStorage.removeItem(k); } catch (e) {} },
+  set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
 };
 
-function loadPrefs() {
-  const o = { press: true, smooth: 3, dash: "solid", shapeKind: "line", fill: false, finger: true, recent: [] };
-  TOOLS.forEach((t) => { if (t.size) o[t.k] = { size: t.size, op: t.op }; });
-  const saved = ss.get(PREFS_KEY);
-  if (saved && typeof saved === "object") {
-    for (const k of Object.keys(o)) {
-      if (!(k in saved)) continue;
-      if (o[k] && typeof o[k] === "object" && !Array.isArray(o[k])) {
-        const t = TOOL[k];
-        const s = saved[k] || {};
-        o[k] = { size: clamp(+s.size || t.size, t.min, t.max), op: clamp(+s.op || t.op, 0.05, 1) };
-      } else if (Array.isArray(o[k])) {
-        if (Array.isArray(saved[k])) o[k] = saved[k].filter((c) => /^#[0-9A-F]{6}$/i.test(c)).slice(0, 8);
-      } else if (typeof saved[k] === typeof o[k]) o[k] = saved[k];
-    }
+/* 초안 보관(IndexedDB). 쓸 수 없는 환경(사생활 보호 창 등)에서는 모든 호출이 조용히 실패한다 */
+const idb = (() => {
+  let dbp = null, ok = null;   // ok: 초안 저장소를 쓸 수 있는가(null이면 아직 모름)
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    try {
+      const rq = indexedDB.open(DRAFT_DB, 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore(DRAFT_STORE);
+      rq.onsuccess = () => { const db = rq.result; db.onversionchange = () => { db.close(); dbp = null; }; ok = true; res(db); };
+      rq.onerror = () => { dbp = null; ok = false; rej(rq.error); };
+      rq.onblocked = () => rej(new Error("blocked"));
+    } catch (e) { ok = false; rej(e); }
+  }));
+  const tx = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction(DRAFT_STORE, mode);
+      const rq = fn(t.objectStore(DRAFT_STORE));
+      t.oncomplete = () => res(rq && rq.result);
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    });
+  };
+  return {
+    get: (k) => tx("readonly", (s) => s.get(k)).catch(() => null),
+    put: (k, v) => tx("readwrite", (s) => s.put(v, k)).then(() => true, () => false),
+    del: (k) => tx("readwrite", (s) => s.delete(k)).catch(() => {}),
+    keys: () => tx("readonly", (s) => s.getAllKeys()).catch(() => []),
+    usable: () => ok !== false,
+  };
+})();
+
+function defaultPrefs() {
+  const o = {
+    press: true, gamma: 1, smooth: 3, dash: "solid", shapeKind: "line", fill: false, finger: true, rotGesture: true, quick: true, autosave: true,
+    fillTol: 32, fillRef: "all", selKind: "rect", selOp: "new", wandTol: 32, font: "sans", uniform: true, penAuto: false, recent: [], palettes: [],
+  };
+  BRUSHES.forEach((b) => { o[b.k] = { ...b.d }; });
+  o.shape = { size: 4, op: 1 }; o.text = { size: 44, op: 1 }; o.fillT = { op: 1 };
+  return o;
+}
+function mergePrefs(saved) {
+  const o = defaultPrefs();
+  if (!saved || typeof saved !== "object") return o;
+  for (const k of Object.keys(o)) {
+    if (!(k in saved)) continue;
+    const d = o[k], s = saved[k];
+    if (k === "recent") { if (Array.isArray(s)) o[k] = s.filter(isHex).slice(0, 10); }
+    else if (k === "palettes") {
+      if (Array.isArray(s)) o[k] = s.filter((p) => p && typeof p.name === "string" && Array.isArray(p.colors)).slice(0, 8)
+        .map((p) => ({ name: p.name.slice(0, 20), colors: p.colors.filter(isHex).slice(0, 30) }));
+    } else if (d && typeof d === "object") {
+      if (s && typeof s === "object") for (const kk of Object.keys(d)) if (typeof s[kk] === "number" && isFinite(s[kk])) d[kk] = s[kk];
+      const T = TOOL[k];
+      if (T && T.min) d.size = clamp(d.size, T.min, T.max);
+      if ("op" in d) d.op = clamp(d.op, 0.05, 1);
+    } else if (typeof s === typeof d) o[k] = s;
   }
   return o;
 }
@@ -631,103 +168,67 @@ function loadPrefs() {
 const sizeToSlider = (t, s) => Math.round((1000 * Math.log(s / t.min)) / Math.log(t.max / t.min));
 const sliderToSize = (t, v) => { const s = t.min * Math.pow(t.max / t.min, v / 1000); return s < 10 ? Math.round(s * 2) / 2 : Math.round(s); };
 
-/* ---------- 아이콘 ---------- */
-
-const ICONS = {
-  pencil: <><path d="M4 16l.7-3.2L14.2 3.3a1.6 1.6 0 0 1 2.3 0l.2.2a1.6 1.6 0 0 1 0 2.3L7.2 15.3z" /><path d="M12.6 4.9l2.5 2.5" /></>,
-  pen: <><path d="M10 2.5l4.5 6.5L10 17.5 5.5 9z" /><circle cx="10" cy="9.5" r="1.2" /><path d="M10 10.7v6.8" /></>,
-  brush: <><path d="M16.8 3.2c-2.2 1.2-5.6 4.4-7.3 6.6l1.7 1.7c2.2-1.7 5.4-5.1 6.6-7.3z" /><path d="M9.3 10.1c-1.8-.2-3.3 1-3.5 2.7-.2 1.5-1 2.6-2.3 3.4 3.2.7 6.8-.4 7.4-3.7" /></>,
-  marker: <><path d="M12.5 3.5l4 4-7.5 7.5H5v-4z" /><path d="M10.5 5.5l4 4" /><path d="M3 17.5h7" /></>,
-  charcoal: <><path d="M6.2 16.8L3.2 13.8 12 5l3 3z" /><path d="M12 5l1.6-1.6a1.4 1.4 0 0 1 2 0l1 1a1.4 1.4 0 0 1 0 2L15 8" /><path d="M3 18.2h1.2M5.5 18.2h1" /></>,
-  air: <><circle cx="6" cy="10" r="3.5" /><path d="M9.5 10h4" /><circle cx="15.5" cy="7" r=".7" /><circle cx="17" cy="10" r=".7" /><circle cx="15.5" cy="13" r=".7" /><circle cx="17.8" cy="5.5" r=".5" /><circle cx="17.8" cy="14.5" r=".5" /></>,
-  eraser: <><path d="M3.5 12.5l7.2-7.2a1.5 1.5 0 0 1 2.1 0l3.9 3.9a1.5 1.5 0 0 1 0 2.1L11 17H7.5z" /><path d="M7.8 8.2l6 6" /><path d="M11 17h6" /></>,
-  shape: <><rect x="2.8" y="2.8" width="8.4" height="8.4" /><circle cx="13" cy="13" r="4.3" /></>,
-  text: <><path d="M4 5V3.5h12V5" /><path d="M10 3.5v13" /><path d="M7.5 16.5h5" /></>,
-  picker: <><path d="M12.6 3.9a2.1 2.1 0 0 1 3 3l-1.8 1.8-3-3z" /><path d="M10.8 5.7l-6.5 6.5-.6 3.6 3.6-.6 6.5-6.5" /></>,
-  hand: <><path d="M7 10.5V5.2a1.1 1.1 0 0 1 2.2 0v4.3M9.2 9.5V3.9a1.1 1.1 0 0 1 2.2 0v5.6M11.4 9.5V5.1a1.1 1.1 0 0 1 2.2 0v5.4M13.6 10.3V7.6a1.1 1.1 0 0 1 2.2 0v4.9c0 3-2.3 5.3-5.3 5.3-2.1 0-3.4-.9-4.6-2.6L3.6 12a1.1 1.1 0 0 1 1.8-1.3L7 12.4" /></>,
-  undo: <><path d="M7.5 4.5L3.5 8.5l4 4" /><path d="M3.5 8.5h8.5a4.5 4.5 0 0 1 0 9H9" /></>,
-  redo: <><path d="M12.5 4.5l4 4-4 4" /><path d="M16.5 8.5H8a4.5 4.5 0 0 0 0 9h3" /></>,
-  zoomOut: <><circle cx="8.5" cy="8.5" r="5.5" /><path d="M12.5 12.5l5 5M6 8.5h5" /></>,
-  zoomIn: <><circle cx="8.5" cy="8.5" r="5.5" /><path d="M12.5 12.5l5 5M6 8.5h5M8.5 6v5" /></>,
-  flip: <><path d="M10 2.5v15" strokeDasharray="2 2" /><path d="M7.5 5.5L2.5 14h5z" /><path d="M12.5 5.5l5 8.5h-5z" /></>,
-  layers: <><path d="M10 3l7.5 4-7.5 4-7.5-4z" /><path d="M2.5 11l7.5 4 7.5-4" /></>,
-  full: <><path d="M3 7.5V3h4.5M12.5 3H17v4.5M17 12.5V17h-4.5M7.5 17H3v-4.5" /></>,
-  unfull: <><path d="M7.5 3v4.5H3M17 7.5h-4.5V3M12.5 17v-4.5H17M3 12.5h4.5V17" /></>,
-  rotL: <><path d="M4.5 9a6 6 0 1 1 1.6 5" /><path d="M4 4.5V9h4.5" /></>,
-  rotR: <><path d="M15.5 9a6 6 0 1 0-1.6 5" /><path d="M16 4.5V9h-4.5" /></>,
-  eye: <><path d="M1.8 10S5 4.5 10 4.5 18.2 10 18.2 10 15 15.5 10 15.5 1.8 10 1.8 10z" /><circle cx="10" cy="10" r="2.6" /></>,
-  eyeOff: <><path d="M3 3l14 14" /><path d="M8 5a8.6 8.6 0 0 1 2-.5c5 0 8.2 5.5 8.2 5.5a14 14 0 0 1-2.4 3M5.4 6.6A13.5 13.5 0 0 0 1.8 10S5 15.5 10 15.5a8 8 0 0 0 3.5-.8" /></>,
-  up: <path d="M5 12.5l5-5 5 5" />,
-  down: <path d="M5 7.5l5 5 5-5" />,
-  trash: <><path d="M3.5 5.5h13M8 5.5V3.5h4v2M5.5 5.5l.8 11h7.4l.8-11" /></>,
-  plus: <path d="M10 4v12M4 10h12" />,
-  close: <path d="M5 5l10 10M15 5L5 15" />,
-};
-const Icon = ({ k }) => (
-  <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICONS[k]}</svg>
-);
-
-function Guides({ kind, W, H }) {
-  if (kind === "none") return null;
-  const L = [];
-  if (kind === "grid") {
-    const step = Math.round(Math.min(W, H) / 10);
-    for (let x = step; x < W; x += step) L.push([x, 0, x, H, 1]);
-    for (let y = step; y < H; y += step) L.push([0, y, W, y, 1]);
-  } else if (kind === "thirds") {
-    [1, 2].forEach((i) => { L.push([(W * i) / 3, 0, (W * i) / 3, H, 1.2]); L.push([0, (H * i) / 3, W, (H * i) / 3, 1.2]); });
-  } else if (kind === "three") {
-    // 세 시점 에스키스용 세 칸: 가로 캔버스는 좌우로, 세로 캔버스는 위아래로 나눈다
-    [1, 2].forEach((i) => L.push(W >= H ? [(W * i) / 3, 0, (W * i) / 3, H, 2] : [0, (H * i) / 3, W, (H * i) / 3, 2]));
-  }
-  return (
-    <svg className="skx-guide" viewBox={`0 0 ${W} ${H}`} width={W} height={H} aria-hidden="true">
-      {L.map(([a, b, c, d, w], i) => <line key={i} x1={a} y1={b} x2={c} y2={d} stroke="rgba(0,105,190,.5)" strokeWidth={w} vectorEffect="non-scaling-stroke" />)}
-    </svg>
-  );
+function ratioFor(w, h) {
+  const a = w / h;
+  return RATIOS.reduce((best, r) => (Math.abs(r.W / r.H - a) < Math.abs(best.W / best.H - a) ? r : best), RATIOS[0]);
 }
-
+/* 저장된 크기를 그대로 쓸 수 있는가(회전한 캔버스 포함). 아니면 가까운 비율의 기본 크기로 */
+function sizeFor(w, h) {
+  if (w >= 200 && h >= 200 && w <= 2400 && h <= 2400 && w * h <= 2400000) return { W: Math.round(w), H: Math.round(h) };
+  const R = ratioFor(w || 3, h || 2);
+  return { W: R.W, H: R.H };
+}
+function blobImg(blob) {
+  const url = URL.createObjectURL(blob);
+  return loadImg(url).finally(() => setTimeout(() => URL.revokeObjectURL(url), 2000));
+}
+function download(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 /* 글자 입력칸: 화면 배율에 맞춘 크기로 보이되, 16px 미만이면 iOS가 페이지를 확대하므로 16px로 두고 줄여 보인다 */
-function textStyle(pos, fs, color) {
-  const o = { left: pos.x, top: pos.y, color, fontSize: Math.max(16, fs) };
+function textStyle(pos, fs, color, font) {
+  const o = { left: pos.x, top: pos.y, color, font: textFont(Math.max(16, fs), font), lineHeight: 1 };
   if (fs < 16) { o.transform = `scale(${Math.max(0.2, fs / 16)})`; o.transformOrigin = "0 0"; }
   return o;
 }
 
-function LayerThumb({ L, paper }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    const x = c.getContext("2d");
-    x.globalAlpha = 1; x.fillStyle = paper; x.fillRect(0, 0, c.width, c.height);
-    x.drawImage(L.cv, 0, 0, c.width, c.height);
-  });
-  const k = 40 / Math.max(L.cv.width, L.cv.height);
-  return <canvas ref={ref} width={Math.round(L.cv.width * k)} height={Math.round(L.cv.height * k)} className="skx-lthumb" aria-hidden="true" />;
+function Guides({ g, W, H }) {
+  if (!g || g.kind === "none") return null;
+  const cfg = g.kind === "sym" ? { sym: g.sym, cx: W / 2, cy: H / 2, n: g.n } : { step: g.step, vp: g.vp, rays: 28 };
+  let L = [];
+  try { L = guideLines(g.kind, cfg, W, H) || []; } catch (e) {}
+  return (
+    <svg className="skx-guide" viewBox={`0 0 ${W} ${H}`} width={W} height={H} aria-hidden="true">
+      {L.map(([a, b, c, d, w], i) => <line key={i} x1={a} y1={b} x2={c} y2={d} stroke="rgba(0,105,190,.5)" strokeWidth={w || 1} vectorEffect="non-scaling-stroke" />)}
+    </svg>
+  );
 }
 
 /* ============================================================
    화면
    ============================================================ */
 
-export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, confirmDel, fmtTime }) {
+export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, confirmDel, fmtTime, prefsV }) {
   const locked = useContext(WsLockCtx);
   const cur = v && typeof v === "object" && v.ref ? v : null;
   const rootRef = useRef(null), viewRef = useRef(null), stageRef = useRef(null), hostRef = useRef(null);
-  const cursorRef = useRef(null), fileRef = useRef(null);
+  const cursorRef = useRef(null), fileRef = useRef(null), selPathRef = useRef(null);
   const engRef = useRef(null);
   if (!engRef.current) engRef.current = new Engine();
   const eng = engRef.current;
 
-  const [prefs, setPrefs] = useState(loadPrefs);
+  const [prefs, setPrefs] = useState(() => mergePrefs(prefsV && typeof prefsV === "object" ? prefsV : ss.get(PREFS_KEY)));
   const [tool, setTool] = useState("pencil");
+  const [lastBrush, setLastBrush] = useState("pencil");
   const [color, setColor] = useState("#111111");
-  const [paper, setPaper] = useState("white");
-  const [guide, setGuide] = useState("none");
+  const [guide, setGuide] = useState({ kind: "none", step: 100, vp: null, sym: "v", n: 6, assist: false });
   const [full, setFull] = useState(false);
-  const [showLayers, setShowLayers] = useState(false);
-  const [, setTick] = useState(0);
+  const [panel, setPanel] = useState(null);       // brush | layers | color | history | actions | adjust | guide
+  const [tick, setTick] = useState(0);
   const [zoomPct, setZoomPct] = useState(100);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
@@ -738,6 +239,13 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   const [textVal, setTextVal] = useState("");
   const [touchDev, setTouchDev] = useState(() => typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
   const [dims, setDims] = useState({ W: eng.W, H: eng.H });
+  const [adj, setAdj] = useState(null);           // 조정 중: { type, params }
+  const [replay, setReplay] = useState(null);     // 과정 다시 보기: 작업 배열
+  const [savedAt, setSavedAt] = useState(0);
+  const [loadFail, setLoadFail] = useState(false);  // 저장된 그림을 읽지 못함(없음과 다르다): 다시 불러오기 전에는 그리거나 저장하지 못한다
+  const [autoFail, setAutoFail] = useState(0);      // 자동 저장이 연달아 실패한 횟수
+  const [remote, setRemote] = useState(false);      // 그리는 동안 다른 기기에서 저장된 그림이 들어옴
+  const [refImg, setRefImg] = useState(null);       // 참고 그림(이 기기에서만 보인다)
 
   const view = useRef({ s: 0.5, r: 0, fx: 1, tx: 0, ty: 0, fit: true });
   const drag = useRef(null);
@@ -745,18 +253,37 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   const spaceRef = useRef(false);
   const prevTool = useRef("pencil");
   const loadedRef = useRef(undefined);
+  const initDone = useRef(false);
   const loadSeq = useRef(0);
   const vRef = useRef(v); vRef.current = v;
   const dirtyRef = useRef(false); dirtyRef.current = dirty;
-  const draft = useRef({ fresh: true, timer: 0, ver: 0 });
+  const draft = useRef({ fresh: true, timer: 0, ver: 0, writing: false, again: false, failed: false });
+  const changeSeq = useRef(0);
+  const lastChangeAt = useRef(0);
+  const lastSaveAt = useRef(Date.now());
+  const savingRef = useRef(false);
+  const cleanup = useRef(null);                   // 저장 뒤 지울 옛 문서: 값이 실제로 바뀐 것을 확인한 다음 지운다
   const noteTimer = useRef(0);
   const textValRef = useRef(""); textValRef.current = textVal;
   const textRef = useRef(null);
-  const penSeen = useRef(false);
+  const lastPen = useRef(-1e9);                   // 펜이 마지막으로 닿거나 떠 있던 시각: 손바닥 접촉을 거르는 데 쓴다
+  const ignored = useRef(new Set());              // 무시하기로 한 터치(손바닥)의 pointerId
+  const lastTry = useRef(0);
+  const savePromise = useRef(null);
+  const remoteRef = useRef(false);
+  const loadFailRef = useRef(false);
+  const refCv = useRef(null), refFile = useRef(null);
+  const xfRef = useRef(null);                     // 변형 중: { x, cx, cy, w, h, tx, ty, rot, sx, sy }
+  const xfDrag = useRef(null);
+  const adjRef = useRef(null);                    // 조정 중: { a, type, params, seed }
+  const rafRef = useRef(0);
+  const prefsSent = useRef("");
+  const prefsTimer = useRef(0);
+  const aliveRef = useRef(true);
   const st = useRef({});
-  st.current = { tool, prefs, color, paper, locked, loading, full, textAt, busy };
+  st.current = { tool, prefs, color, locked, loading, full, textAt, busy, guide, panel, adj, loadFail };
   const fn = useRef({});
-  const dkey = DRAFT_PREFIX + owner + ":" + fieldKey;
+  const dkey = owner + ":" + fieldKey;
   const bump = () => setTick((t) => t + 1);
 
   const flash = (msg) => {
@@ -764,16 +291,30 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     clearTimeout(noteTimer.current);
     noteTimer.current = setTimeout(() => setNote(""), 3200);
   };
-  const setPref = (patch) => setPrefs((p) => {
-    const n = { ...p, ...patch };
-    try { ss.set(PREFS_KEY, n); } catch (e) {}
-    return n;
-  });
-  const setToolPref = (k, patch) => setPrefs((p) => {
-    const n = { ...p, [k]: { ...p[k], ...patch } };
-    try { ss.set(PREFS_KEY, n); } catch (e) {}
-    return n;
-  });
+
+  /* ---------- 설정 (붓·팔레트): 이 탭(sessionStorage)과 기록지(_skp)에 둔다 ---------- */
+
+  const storePrefs = (n) => {
+    ss.set(PREFS_KEY, n);
+    clearTimeout(prefsTimer.current);
+    prefsTimer.current = setTimeout(() => {
+      const s = JSON.stringify(n);
+      if (s === prefsSent.current || st.current.locked || !aliveRef.current) return;
+      prefsSent.current = s;
+      try { setField(PREFS_FIELD, n); } catch (e) {}
+    }, 4000);
+  };
+  const setPref = (patch) => setPrefs((p) => { const n = { ...p, ...patch }; storePrefs(n); return n; });
+  const setToolPref = (k, patch) => setPrefs((p) => { const n = { ...p, [k]: { ...p[k], ...patch } }; storePrefs(n); return n; });
+  const pushRecent = (c) => {
+    if (!isHex(c)) return;
+    setPrefs((p) => {
+      if (p.recent[0] === c) return p;
+      const n = { ...p, recent: [c, ...p.recent.filter((x) => x !== c)].slice(0, 10) };
+      storePrefs(n);
+      return n;
+    });
+  };
 
   /* ---------- 화면 변환 (캔버스 좌표 ↔ 화면 좌표) ---------- */
 
@@ -795,10 +336,25 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     const u = (c * px + s * py) / V.s, y = (-s * px + c * py) / V.s;
     return { x: V.fx < 0 ? eng.W - u : u, y };
   };
+  /* 학습 지원의 글자 크기(body zoom 125~200%)가 켜져 있으면 포인터 좌표(뷰포트 px)와 배치 좌표(확대 전 px)가 다르다.
+     k = 화면에 보이는 폭 ÷ 배치 폭. rect까지 확대 전 좌표로 주는 브라우저에서는 body의 zoom 값을 쓴다 */
+  const viewK = () => {
+    const el = viewRef.current;
+    if (!el || !el.offsetWidth) return 1;
+    const k = el.getBoundingClientRect().width / el.offsetWidth;
+    return Math.abs(k - 1) < 0.01 ? 1 : k;
+  };
   const localOf = (clientX, clientY) => {
     const el = viewRef.current, r = el.getBoundingClientRect();
-    return { x: clientX - r.left - el.clientLeft, y: clientY - r.top - el.clientTop };
+    const k = el.offsetWidth ? r.width / el.offsetWidth : 1;
+    if (Math.abs(k - 1) < 0.01) {
+      const z = bodyZoom();
+      if (Math.abs(z - 1) > 0.01) return { x: clientX / z - r.left - el.clientLeft, y: clientY / z - r.top - el.clientTop };
+      return { x: clientX - r.left - el.clientLeft, y: clientY - r.top - el.clientTop };
+    }
+    return { x: (clientX - r.left) / k - el.clientLeft, y: (clientY - r.top) / k - el.clientTop };
   };
+  const deltaK = () => { const k = viewK(); return k === 1 ? bodyZoom() : k; };
   const toCanvas = (clientX, clientY) => { const l = localOf(clientX, clientY); return toCanvasLocal(l.x, l.y); };
   const centerOn = (cx, cy, sx, sy) => {
     const V = view.current, rad = (V.r * Math.PI) / 180, c = Math.cos(rad), s = Math.sin(rad);
@@ -820,7 +376,9 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     const V = view.current, rad = (V.r * Math.PI) / 180, c = Math.cos(rad) * V.s, s = Math.sin(rad) * V.s;
     const a = c * V.fx, b = s * V.fx, e = V.tx + (V.fx < 0 ? c * eng.W : 0), f2 = V.ty + (V.fx < 0 ? s * eng.W : 0);
     st2.style.transform = `matrix(${a},${b},${-s},${c},${e},${f2})`;
+    st2.style.setProperty("--inv", String(1 / V.s));   // 손잡이를 화면에서 같은 크기로
     setZoomPct(Math.round((V.s / fitScale(0)) * 100));
+    if (textRef.current) bump();                        // 글자 입력칸이 화면을 따라가게
   };
   const fitView = () => {
     const V = view.current, { w, h } = vpSize();
@@ -831,7 +389,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   };
   const zoomAt = (s, sx, sy) => {
     const V = view.current, q = toCanvasLocal(sx, sy);
-    V.s = clamp(s, fitScale(0) * 0.25, 8);
+    V.s = clamp(s, fitScale(0) * 0.25, 12);
     centerOn(q.x, q.y, sx, sy);
     V.fit = false;
     clampPan();
@@ -847,56 +405,55 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     applyView();
     bump();
   };
+  const refit = () => { view.current.fit = true; requestAnimationFrame(fitView); };
 
-  /* ---------- 초안 (sessionStorage) ---------- */
+  /* ---------- 변경 표시와 초안 ---------- */
 
-  const layerData = async (L) => {
-    if (L.enc && L.enc.ver === L.ver) return L.enc.data;
-    const data = await blobData(L.cv);
-    L.enc = { ver: L.ver, data };
-    return data;
-  };
-  const draftObj = (layers) => ({
-    v: 1, base: loadedRef.current || null, w: eng.W, h: eng.H, paper: st.current.paper,
-    active: eng.layers.indexOf(eng.active()), layers,
-  });
   const writeDraft = async () => {
-    const ver = draft.current.ver;
+    const D = draft.current;
+    if (D.writing) { D.again = true; return; }
+    // 획·변형·조정 미리보기가 레이어를 건드리는 동안에는 뜨지 않는다(반쯤 지운 그림이 초안에 들어가지 않게)
+    if (aliveRef.current && (eng.live || drag.current || xfRef.current || adjRef.current)) { clearTimeout(D.timer); D.timer = setTimeout(writeDraft, 600); return; }
+    D.writing = true;
+    const ver = D.ver;
     try {
       const layers = [];
-      for (const L of eng.layers) layers.push({ name: L.name, op: L.op, vis: L.vis, data: await layerData(L) });
-      if (ver !== draft.current.ver || !dirtyRef.current) return;
-      ss.set(dkey, draftObj(layers));
-      draft.current.fresh = true;
-      sketchDirty.current = false;
-    } catch (e) {
-      ss.del(dkey);
-    }
-  };
-  const writeDraftSync = () => {
-    try {
-      const layers = eng.layers.map((L) => ({
-        name: L.name, op: L.op, vis: L.vis,
-        data: L.enc && L.enc.ver === L.ver ? L.enc.data : L.cv.toDataURL("image/png"),
-      }));
-      ss.set(dkey, draftObj(layers));
-    } catch (e) { ss.del(dkey); }
+      for (const L of eng.layers) {
+        if (!L.dblob || L.dblob.ver !== L.ver) { const v0 = L.ver; L.dblob = { ver: v0, blob: await blobOf(L.cv) }; }
+        // saved: 이 레이어가 서버에 저장된 것과 같으면 그 문서 이름(초안에서 열어도 다시 올리지 않게)
+        layers.push({ id: L.id, name: L.name, op: L.op, vis: L.vis, blend: L.blend, alock: L.alock, lock: L.lock, blob: L.dblob.blob,
+          saved: L.saved && L.saved.ver === L.ver ? L.saved.parts : null });
+      }
+      if (ver === D.ver && dirtyRef.current) {
+        const rec = { v: 2, base: loadedRef.current || null, w: eng.W, h: eng.H, paper: eng.paper, active: eng.layers.indexOf(eng.active()), layers, log: packLog(eng.log()), guide: st.current.guide, at: Date.now() };
+        const ok = await idb.put(dkey, rec);
+        D.failed = !ok;
+        if (ok && ver === D.ver) D.fresh = true;
+        if (aliveRef.current && dirtyRef.current) sketchDirty.current = !ok;
+      }
+    } catch (e) {}
+    D.writing = false;
+    if (D.again) { D.again = false; writeDraft(); }
+    else if (!aliveRef.current) eng.dispose();     // 화면을 떠난 뒤 마지막 초안까지 썼으면 캔버스를 놓는다
   };
   const clearDraft = () => {
     clearTimeout(draft.current.timer);
     draft.current.ver++;
     draft.current.fresh = true;
-    ss.del(dkey);
+    idb.del(dkey);
   };
   const changed = () => {
     setDirty(true);
     dirtyRef.current = true;
+    changeSeq.current++;
+    lastChangeAt.current = Date.now();
     draft.current.fresh = false;
     draft.current.ver++;
     sketchDirty.unsaved = true;
-    sketchDirty.current = true;
+    // 화면을 떠날 때도 초안을 쓰므로(정리 함수), 초안 저장소를 쓸 수 없을 때만 「이동하면 사라진다」를 묻게 한다
+    sketchDirty.current = !idb.usable() || draft.current.failed;
     clearTimeout(draft.current.timer);
-    draft.current.timer = setTimeout(writeDraft, 800);
+    draft.current.timer = setTimeout(writeDraft, 1200);
   };
   const markClean = () => {
     setDirty(false);
@@ -904,90 +461,137 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     sketchDirty.unsaved = false;
     sketchDirty.current = false;
   };
+  /* 그림이나 레이어가 바뀐 뒤: 저장 필요 표시 + 다시 그리기 */
+  const touched = () => { changed(); bump(); };
 
   /* ---------- 불러오기 ---------- */
 
-  const ratioFor = (w, h) => {
-    const exact = RATIOS.find((r) => r.W === w && r.H === h);
-    if (exact) return exact;
-    const a = w / h;
-    return RATIOS.reduce((best, r) => (Math.abs(r.W / r.H - a) < Math.abs(best.W / best.H - a) ? r : best), RATIOS[0]);
+  const baseOp = () => {
+    // 불러온 그림은 과정 기록의 출발점이 된다(작은 그림 한 장으로)
+    const s = Math.min(1, 720 / Math.max(eng.W, eng.H));
+    const c = document.createElement("canvas");
+    c.width = Math.round(eng.W * s); c.height = Math.round(eng.H * s);
+    eng.compositeInto(c, null);
+    let snap = c.toDataURL("image/png");
+    if (snap.length > 200000) { const w = c.toDataURL("image/webp", 0.8); if (w.startsWith("data:image/webp")) snap = w; }
+    return { kind: "base", w: eng.W, h: eng.H, paper: eng.paper, layers: eng.layersMeta(), active: eng.layers.indexOf(eng.active()), snap, _img: c, t: Date.now() };
   };
-  const loadFrom = async (val, dr) => {
+  const loadFrom = async (val, dr, opt = {}) => {
     const seq = ++loadSeq.current;
     setLoading(true);
     setErr("");
+    loadFailRef.current = false; setLoadFail(false);
     try {
-      let W = RATIOS[0].W, H = RATIOS[0].H, list = null, active = null, pk = "white";
+      let size = { W: RATIOS[0].W, H: RATIOS[0].H }, list = null, active = null, paper = "white", past = null, g = null, savedParts = null, flat = false;
       if (dr) {
-        const imgs = await Promise.all(dr.layers.map((l) => loadImg(l.data)));
-        const R = ratioFor(dr.w, dr.h);
-        W = R.W; H = R.H; pk = dr.paper; active = dr.active;
-        list = dr.layers.map((l, i) => ({ name: l.name, op: l.op, vis: l.vis, img: imgs[i] }));
+        const imgs = await Promise.all(dr.layers.map((l) => blobImg(l.blob)));
+        size = sizeFor(dr.w, dr.h); paper = dr.paper; active = dr.active; g = dr.guide;
+        list = dr.layers.map((l, i) => ({ id: l.id, name: l.name, op: l.op, vis: l.vis, blend: l.blend, alock: l.alock, lock: l.lock, img: imgs[i] }));
+        past = dr.log ? unpackLog(dr.log) : null;
+        savedParts = opt.stale ? null : dr.layers.map((l) => (Array.isArray(l.saved) ? l.saved : null));
       } else if (val) {
+        paper = val.paper; g = val.guide;
         if (Array.isArray(val.layers) && val.layers.length) {
-          const datas = await Promise.all(val.layers.map((l) => Promise.resolve(store.get(owner, l.ref)).catch(() => null)));
+          const datas = await Promise.all(val.layers.map((l) => fetchLayer(store, owner, l)));
+          if (datas.some((d) => d === FAILED)) throw new Error("net");
           if (datas.every((d) => typeof d === "string" && d.startsWith("data:image"))) {
             const imgs = await Promise.all(datas.map(loadImg));
-            list = val.layers.map((l, i) => ({ name: l.name, op: l.op, vis: l.vis, img: imgs[i] }));
-          }
+            list = val.layers.map((l, i) => ({ id: l.id, name: l.name, op: l.op, vis: l.vis, blend: l.blend, alock: l.alock, lock: l.lock, img: imgs[i] }));
+            savedParts = val.layers.map((l) => (Array.isArray(l.parts) ? l.parts : l.ref ? [{ ref: l.ref }] : null));
+            if (val.log) past = await fetchLog(store, owner, val.log);
+          } else flat = true;
         }
-        let R = val.w && val.h ? ratioFor(val.w, val.h) : null;
         if (!list) {
-          const data = await store.get(owner, val.ref);
-          if (typeof data !== "string" || !data.startsWith("data:image")) throw new Error("missing");
-          const img = await loadImg(data);
-          if (!R) R = ratioFor(img.naturalWidth, img.naturalHeight);
+          const r = await readDoc(store, owner, val.ref);
+          if (!r.ok) throw new Error("net");
+          if (typeof r.data !== "string" || !r.data.startsWith("data:image")) throw new Error("missing");
+          const img = await loadImg(r.data);
           list = [{ name: "레이어 1", img }];
-        }
-        W = R.W; H = R.H; pk = val.paper;
+          if (val.w && val.h) size = sizeFor(val.w, val.h);
+          else { const R0 = ratioFor(img.naturalWidth, img.naturalHeight); size = { W: R0.W, H: R0.H }; }
+        } else size = sizeFor(val.w, val.h);
       }
       if (seq !== loadSeq.current) return;
-      eng.reset(W, H, list, active);
-      setPaper(PAPERS.some((p) => p.k === pk) ? pk : "white");
-      setDims({ W, H });
+      eng.reset(size.W, size.H, list, active);
+      eng.paper = PAPERS.some((p) => p.k === paper) ? paper : "white";
+      eng.past = past && past.length ? past : [list ? baseOp() : { kind: "new", w: eng.W, h: eng.H, paper: eng.paper, id: eng.layers[0].id, name: eng.layers[0].name, t: Date.now() }];
+      if (savedParts) eng.layers.forEach((L, i) => { if (savedParts[i]) L.saved = { ver: L.ver, parts: savedParts[i] }; });
+      eng.setSel(null);
+      if (g && typeof g === "object" && GUIDES.some((x) => x[0] === g.kind)) {
+        // Firestore는 배열 안의 배열을 받지 않아 소실점을 { x, y }로 저장한다
+        const vp = Array.isArray(g.vp) ? g.vp.map((p) => (Array.isArray(p) ? p : [p.x, p.y])).filter((p) => isFinite(p[0]) && isFinite(p[1])) : null;
+        setGuide((p) => ({ ...p, ...g, vp: vp && vp.length ? vp : null }));
+      }
+      setDims({ W: eng.W, H: eng.H });
       loadedRef.current = dr ? dr.base : val ? val.ref : null;
-      view.current.fit = true;
-      requestAnimationFrame(fitView);
-      if (dr) {
-        changed();
-        flash("저장하지 않은 그림을 다시 불러왔습니다.");
-      } else markClean();
+      remoteRef.current = !!opt.stale; setRemote(!!opt.stale);
+      refit();
+      if (dr) { changed(); draft.current.fresh = true; sketchDirty.current = false; flash(opt.stale ? "이 기기에서 그리던 그림을 불러왔습니다. 그 사이 다른 기기에서 저장된 그림은 저장 버전에 보관됩니다." : "저장하지 않은 그림을 다시 불러왔습니다."); }
+      else { markClean(); if (flat) flash("레이어를 찾지 못해 한 장으로 열었습니다."); }
     } catch (e) {
       if (seq !== loadSeq.current) return;
       eng.reset(RATIOS[0].W, RATIOS[0].H, null);
-      setDims({ W: RATIOS[0].W, H: RATIOS[0].H });
-      loadedRef.current = val ? val.ref : null;
-      requestAnimationFrame(fitView);
-      setErr(dr ? "저장하지 않은 그림을 다시 불러오지 못했습니다." : "저장된 스케치를 캔버스로 불러오지 못했습니다. 저장된 그림은 아래 작은 그림으로 볼 수 있습니다.");
+      eng.past = [{ kind: "new", w: eng.W, h: eng.H, paper: eng.paper, id: eng.layers[0].id, name: eng.layers[0].name, t: Date.now() }];
+      setDims({ W: eng.W, H: eng.H });
+      refit();
+      markClean();
+      if (dr) { loadedRef.current = opt.base !== undefined ? opt.base : null; setErr("저장하지 않은 그림을 다시 불러오지 못했습니다."); }
+      else if (e && e.message === "net") {
+        // 읽기 실패: 빈 캔버스에 그려서 저장하면 서버의 그림을 덮게 되므로, 다시 불러올 때까지 막는다
+        loadedRef.current = val ? val.ref : null;
+        loadFailRef.current = true; setLoadFail(true);
+      } else {
+        loadedRef.current = val ? val.ref : null;
+        setErr("저장된 스케치를 캔버스로 불러오지 못했습니다. 저장된 그림은 아래 작은 그림으로 볼 수 있습니다.");
+      }
     }
     if (seq === loadSeq.current) { setLoading(false); bump(); }
   };
 
-  /* 처음 열 때: 이 탭의 초안 → 저장된 스케치 → 빈 캔버스. 다른 기기에서 저장해 값이 바뀌면 저장 안 한 변경이 없을 때만 다시 읽는다 */
+  /* 처음 열 때: 이 브라우저의 초안 → 저장된 스케치 → 빈 캔버스.
+     다른 기기에서 저장해 값이 바뀌면 저장 안 한 변경이 없을 때만 다시 읽는다 */
   const curRef = cur ? cur.ref : null;
   useEffect(() => {
+    if (cleanup.current && cleanup.current.ref === curRef) {
+      cleanup.current.olds.forEach((r) => store.remove(owner, r));
+      cleanup.current = null;
+    }
+    const valNow = () => (vRef.current && typeof vRef.current === "object" && vRef.current.ref ? vRef.current : null);
     if (loadedRef.current === undefined) {
-      try {
-        for (let i = sessionStorage.length - 1; i >= 0; i--) {
-          const k = sessionStorage.key(i);
-          if (k && k.startsWith(DRAFT_PREFIX) && !k.startsWith(DRAFT_PREFIX + owner + ":")) sessionStorage.removeItem(k);
-        }
-      } catch (e) {}
-      const dr = ss.get(dkey);
-      if (dr && dr.v === 1 && Array.isArray(dr.layers) && dr.layers.length && dr.base === curRef) loadFrom(null, dr);
-      else { if (dr) ss.del(dkey); loadFrom(cur, null); }
+      loadedRef.current = null;
+      (async () => {
+        const keys = await idb.keys();
+        for (const k of keys || []) if (typeof k === "string" && !k.startsWith(owner + ":")) idb.del(k);
+        const dr = await idb.get(dkey);
+        const now = valNow();
+        const okDraft = dr && dr.v === 2 && Array.isArray(dr.layers) && dr.layers.length;
+        if (okDraft && dr.base === (now ? now.ref : null)) await loadFrom(null, dr);
+        // 초안의 바탕이 서버 값과 다르다(다른 기기에서 저장됨): 초안이 더 새것이면 초안을 열고, 서버 값은 다음 저장 때 버전으로 둔다
+        else if (okDraft && now && dr.at > (+new Date(now.at) || 0)) await loadFrom(null, dr, { stale: true, base: now.ref });
+        else { if (dr) idb.del(dkey); await loadFrom(now, null); }
+        initDone.current = true;
+        const later = valNow();
+        if (later && later.ref !== loadedRef.current && !dirtyRef.current && !loadFailRef.current) loadFrom(later, null);
+      })();
       return;
     }
-    if (curRef === loadedRef.current || dirtyRef.current) return;
+    if (!initDone.current || curRef === loadedRef.current || savingRef.current) return;
+    if (dirtyRef.current) {
+      // 그리는 동안 다른 기기에서 저장했거나 지웠다: 지금 그림은 그대로 두고, 저장할 때 그쪽 그림을 버전으로 둔다
+      remoteRef.current = true; setRemote(true);
+      eng.layers.forEach((L) => { L.saved = null; });
+      return;
+    }
     if (curRef) loadFrom(cur, null);
-    else loadedRef.current = null;
+    else { clearDraft(); loadFrom(null, null); }   // 저장된 스케치가 지워졌다(다른 기기에서 지움, 교사의 기록 초기화)
   }, [curRef]);
 
-  /* ---------- 마운트: 엔진 연결, 크기 변화, 휠, 정리 ---------- */
+  /* ---------- 마운트: 엔진 연결, 크기 변화, 휠, 자동 저장, 정리 ---------- */
 
   useEffect(() => {
+    aliveRef.current = true;
     eng.attach(hostRef.current);
+    if (typeof window.__SKX_DEBUG__ === "function") window.__SKX_DEBUG__({ eng, view, fn, st }); // 시험 도구용 연결(.tmpbuild/sketch-harness)
     const vp = viewRef.current;
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => {
       if (view.current.fit) fitView(); else { clampPan(); applyView(); }
@@ -995,24 +599,45 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     if (ro) ro.observe(vp);
     const wheel = (e) => fn.current.onWheel(e);
     vp.addEventListener("wheel", wheel, { passive: false });
+    const auto = setInterval(() => fn.current.autoTick(), 15000);
+    // 스페이스를 누른 채 창을 바꾸거나 포커스를 잃으면 keyup이 오지 않는다: 그때도 이동 상태를 푼다
+    const dropSpace = () => { spaceRef.current = false; if (viewRef.current) viewRef.current.classList.remove("space"); };
+    const vis = () => { dropSpace(); if (document.visibilityState === "hidden") fn.current.onHide(); };
+    const ku = (e) => { if (e.key === " ") dropSpace(); };
+    document.addEventListener("visibilitychange", vis);
+    document.addEventListener("keyup", ku, true);
+    window.addEventListener("blur", dropSpace);
+    sketchDirty.flush = () => fn.current.flush();
     return () => {
+      aliveRef.current = false;
       if (ro) ro.disconnect();
       vp.removeEventListener("wheel", wheel);
+      clearInterval(auto);
+      document.removeEventListener("visibilitychange", vis);
+      document.removeEventListener("keyup", ku, true);
+      window.removeEventListener("blur", dropSpace);
+      sketchDirty.flush = null;
       clearTimeout(draft.current.timer);
       clearTimeout(noteTimer.current);
-      if (dirtyRef.current && !draft.current.fresh) writeDraftSync();
+      clearTimeout(prefsTimer.current);
+      cancelAnimationFrame(rafRef.current);
+      fn.current.abortModes();
+      if (dirtyRef.current && !draft.current.fresh) writeDraft();   // 끝나면 writeDraft가 엔진을 놓는다
+      else if (!draft.current.writing) eng.dispose();
+      if (refCv.current) { freeCanvas(refCv.current); refCv.current = null; }
       sketchDirty.current = false;
       sketchDirty.unsaved = false;
     };
   }, []);
 
-  /* 잠금이 켜지면 그리던 획을 거두고 크게 그리기를 닫는다 */
+  /* 잠금이 켜지면 하던 일을 거두고 크게 그리기를 닫는다 */
   useEffect(() => {
     if (!locked) return;
-    if (drag.current) { eng.cancelLive(); drag.current = null; }
-    textRef.current = null;
-    setTextAt(null);
+    fn.current.abortModes();
+    setPanel(null);
     setFull(false);
+    // 잠그는 순간까지 그린 내용은 저장한다(잠금 중에도 올리기가 끝난 참조는 기록지에 적을 수 있다: setField의 upload)
+    if (dirtyRef.current && initDone.current) fn.current.save({ auto: true, force: true });
   }, [locked]);
 
   /* 크게 그리기: 페이지 스크롤을 막고, 포커스가 밖에 있어도 단축키가 듣게 한다 */
@@ -1030,49 +655,241 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       document.removeEventListener("keyup", ku);
     };
   }, [full]);
-  useEffect(() => { view.current.fit = true; requestAnimationFrame(fitView); }, [full]);
+  useEffect(() => { refit(); }, [full]);
+
+  /* ---------- 도구 고르기 ---------- */
+
+  const chooseColor = (c) => {
+    if (!isHex(c)) return;
+    c = c.toUpperCase();
+    setColor(c);
+    if (tool === "eraser" || tool === "smudge" || tool === "picker" || tool === "hand" || tool === "select" || tool === "xform") {
+      if (xfRef.current) applyXform();
+      setTool(lastBrush);
+    }
+  };
+  const selectTool = (k) => {
+    if (st.current.locked) return;
+    if (textRef.current) commitText();
+    if (adjRef.current) endAdjust(true);
+    if (k === tool) { if (isDrawBrush(k) || k === "eraser" || k === "smudge") setPanel((p) => (p === "brush" ? null : "brush")); return; }
+    if (xfRef.current) applyXform();
+    if (k === "xform") { if (!enterXform()) return; setPanel(null); }
+    if (tool !== "picker" && tool !== "hand" && tool !== "xform") prevTool.current = tool;
+    if (isDrawBrush(k)) setLastBrush(k);
+    setTool(k);
+  };
+  const doUndo = () => {
+    if (drag.current || st.current.locked) return;
+    if (textRef.current) { textRef.current = null; setTextAt(null); setTextVal(""); return; }
+    if (xfRef.current) { cancelXform(); return; }
+    if (adjRef.current) { endAdjust(false); return; }
+    const op = eng.hist[eng.hist.length - 1];
+    if (eng.undo()) { syncDims(); touched(); if (op) flash("되돌림: " + opLabel(op)); }
+  };
+  const doRedo = () => {
+    if (drag.current || st.current.locked || xfRef.current || adjRef.current || textRef.current) return;
+    const op = eng.redo[eng.redo.length - 1];
+    if (eng.redoOne()) { syncDims(); touched(); if (op) flash("다시 실행: " + opLabel(op)); }
+  };
+  const syncDims = () => { if (eng.W !== dims.W || eng.H !== dims.H) { setDims({ W: eng.W, H: eng.H }); refit(); } };
+
+  /* ---------- 변형 ---------- */
+
+  const enterXform = () => {
+    const L = eng.active();
+    if (!L || !L.vis) { flash("숨긴 레이어는 변형할 수 없습니다."); return false; }
+    if (L.lock) { flash("잠긴 레이어는 변형할 수 없습니다."); return false; }
+    const x = eng.beginXform(L, eng.sel);
+    if (!x.bbox) { eng.endXform(x, null); flash("변형할 그림이 없습니다."); return false; }
+    const [x0, y0, x1, y1] = x.bbox;
+    xfRef.current = { x, cx: (x0 + x1 + 1) / 2, cy: (y0 + y1 + 1) / 2, w: x1 - x0 + 1, h: y1 - y0 + 1, tx: 0, ty: 0, rot: 0, sx: 1, sy: 1 };
+    return true;
+  };
+  const xfMatrix = (X) => matTRS({ tx: X.tx, ty: X.ty, rot: X.rot, sx: X.sx, sy: X.sy, cx: X.cx, cy: X.cy });
+  const xfPreview = () => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      const X = xfRef.current;
+      if (!X) return;
+      eng.previewXform(X.x, xfMatrix(X));
+      bump();
+    });
+  };
+  function applyXform() {
+    const X = xfRef.current;
+    if (!X) return;
+    cancelAnimationFrame(rafRef.current);
+    xfRef.current = null; xfDrag.current = null;
+    const same = !X.tx && !X.ty && !X.rot && X.sx === 1 && X.sy === 1;
+    const op = eng.endXform(X.x, same ? null : xfMatrix(X));
+    if (op) { if (eng.sel) eng.setSel(null); touched(); } else bump();
+  }
+  function cancelXform() {
+    const X = xfRef.current;
+    if (!X) return;
+    cancelAnimationFrame(rafRef.current);
+    xfRef.current = null; xfDrag.current = null;
+    eng.endXform(X.x, null);
+    setTool(prevTool.current === "xform" ? lastBrush : prevTool.current);
+    bump();
+  }
+  const xfPatch = (patch) => { const X = xfRef.current; if (!X) return; Object.assign(X, typeof patch === "function" ? patch(X) : patch); xfPreview(); };
+  const xfDown = (e, mode, hx = 0, hy = 0) => {
+    const X = xfRef.current;
+    if (!X || st.current.locked) return;
+    e.preventDefault(); e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (x) {}
+    const q = toCanvas(e.clientX, e.clientY);
+    xfDrag.current = { id: e.pointerId, mode, hx, hy, q, s: { tx: X.tx, ty: X.ty, rot: X.rot, sx: X.sx, sy: X.sy }, a0: Math.atan2(q.y - (X.cy + X.ty), q.x - (X.cx + X.tx)) };
+  };
+  const xfMove = (e) => {
+    const d = xfDrag.current, X = xfRef.current;
+    if (!d || !X || d.id !== e.pointerId) return;
+    const q = toCanvas(e.clientX, e.clientY);
+    if (d.mode === "move") { X.tx = d.s.tx + (q.x - d.q.x); X.ty = d.s.ty + (q.y - d.q.y); }
+    else {
+      const ccx = X.cx + X.tx, ccy = X.cy + X.ty;
+      if (d.mode === "rot") {
+        let a = d.s.rot + (Math.atan2(q.y - ccy, q.x - ccx) - d.a0);
+        const step = Math.PI / 12, near = Math.round(a / (Math.PI / 2)) * (Math.PI / 2);
+        if (e.shiftKey) a = Math.round(a / step) * step;
+        else if (Math.abs(a - near) < 0.045) a = near;
+        X.rot = a;
+      } else {
+        const c = Math.cos(-X.rot), s = Math.sin(-X.rot);
+        const lx = c * (q.x - ccx) - s * (q.y - ccy), ly = s * (q.x - ccx) + c * (q.y - ccy);
+        const ax = Math.abs(d.s.sx), ay = Math.abs(d.s.sy);
+        let sx = d.hx ? Math.abs(lx) / (X.w / 2) : ax, sy = d.hy ? Math.abs(ly) / (X.h / 2) : ay;
+        if (d.hx && d.hy && (st.current.prefs.uniform || e.shiftKey)) { const k = Math.max(sx / ax, sy / ay); sx = ax * k; sy = ay * k; }
+        X.sx = Math.max(0.02, sx) * Math.sign(d.s.sx || 1);
+        X.sy = Math.max(0.02, sy) * Math.sign(d.s.sy || 1);
+      }
+    }
+    xfPreview();
+  };
+  const xfUp = (e) => { if (xfDrag.current && xfDrag.current.id === e.pointerId) xfDrag.current = null; };
+
+  /* ---------- 조정 ---------- */
+
+  const adjPreview = () => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      const A = adjRef.current;
+      if (A) eng.previewAdjust(A.a, A.type, A.params, A.seed);
+    });
+  };
+  const startAdjust = (type) => {
+    const L = eng.active(), def = ADJUSTS.find((a) => a.k === type);
+    if (!def || !L) return;
+    if (!L.vis) return flash("숨긴 레이어는 조정할 수 없습니다.");
+    if (L.lock) return flash("잠긴 레이어는 조정할 수 없습니다.");
+    if (textRef.current) commitText();
+    if (xfRef.current) applyXform();
+    if (adjRef.current) endAdjust(true);
+    const params = Object.fromEntries(def.params.map((p) => [p[0], p[4]]));
+    const A = { a: eng.beginAdjust(L), type, params, seed: (Math.random() * 1e9) | 0 };
+    setPanel(null);
+    if (!def.params.length) { eng.endAdjust(A.a, type, params, A.seed); touched(); return; }
+    adjRef.current = A;
+    setAdj({ type, params });
+    adjPreview();
+  };
+  const setAdjParam = (k, val) => {
+    const A = adjRef.current;
+    if (!A) return;
+    A.params = { ...A.params, [k]: val };
+    setAdj({ type: A.type, params: A.params });
+    adjPreview();
+  };
+  function endAdjust(apply) {
+    const A = adjRef.current;
+    if (!A) return;
+    cancelAnimationFrame(rafRef.current);
+    adjRef.current = null;
+    setAdj(null);
+    const op = eng.endAdjust(A.a, apply ? A.type : null, A.params, A.seed);
+    if (op) touched(); else bump();
+  }
+  /* 하던 일(획·변형·조정·글자)을 버리고 원래 그림으로 */
+  const abortModes = () => {
+    if (drag.current) { clearTimeout(drag.current.hold); eng.cancelLive(); drag.current = null; }
+    if (xfRef.current) { const X = xfRef.current; xfRef.current = null; xfDrag.current = null; eng.endXform(X.x, null); }
+    if (adjRef.current) { const A = adjRef.current; adjRef.current = null; eng.endAdjust(A.a, null); }
+    cancelAnimationFrame(rafRef.current);
+    textRef.current = null;
+    if (aliveRef.current) { setTextAt(null); setAdj(null); setTool((t) => (t === "xform" ? "pencil" : t)); }
+  };
+
+  /* ---------- 선택 ---------- */
+
+  const setSel = (sel) => { eng.setSel(sel); bump(); };
+  const addSelPart = (part) => {
+    const S = st.current, prev = eng.sel, mode = S.prefs.selOp;
+    if (mode === "sub" && !prev) return flash("뺄 선택 영역이 없습니다.");
+    const parts = mode === "new" || !prev ? [{ ...part, mode: "add" }] : [...prev.parts, { ...part, mode: mode === "sub" ? "sub" : "add" }];
+    // 반전된 선택에 더하거나 빼면 반전을 푼 모양으로는 나타낼 수 없으므로 새 선택으로 바꾼다
+    const sel = eng.setSel({ parts: prev && prev.inv && mode !== "new" ? [{ ...part, mode: "add" }] : parts, inv: false });
+    if (!sel) flash("선택된 곳이 없습니다.");
+    bump();
+  };
+  const selectAll = () => setSel({ parts: [{ type: "rect", x: 0, y: 0, w: eng.W, h: eng.H, mode: "add" }], inv: false });
+  const invertSel = () => { if (!eng.sel) return selectAll(); setSel({ parts: eng.sel.parts, inv: !eng.sel.inv }); };
+  const drawSelPreview = (d) => {
+    const p = selPathRef.current;
+    if (!p) return;
+    if (!d) { p.setAttribute("d", ""); return; }
+    if (d.kind === "rect") p.setAttribute("d", `M${d.x0},${d.y0}H${d.x1}V${d.y1}H${d.x0}Z`);
+    else if (d.kind === "ellipse") {
+      const cx = (d.x0 + d.x1) / 2, cy = (d.y0 + d.y1) / 2, rx = Math.abs(d.x1 - d.x0) / 2, ry = Math.abs(d.y1 - d.y0) / 2;
+      p.setAttribute("d", `M${cx - rx},${cy}a${rx},${ry} 0 1,0 ${rx * 2},0a${rx},${ry} 0 1,0 ${-rx * 2},0Z`);
+    } else {
+      let s = "";
+      for (let i = 0; i + 1 < d.pts.length; i += 2) s += (i ? "L" : "M") + d.pts[i].toFixed(1) + "," + d.pts[i + 1].toFixed(1);
+      p.setAttribute("d", s);
+    }
+  };
+  const clearSelArea = () => {
+    const L = eng.active();
+    if (!L || L.lock) return flash("잠긴 레이어는 지울 수 없습니다.");
+    eng.commit({ kind: "clear", sel: eng.sel || undefined, layers: [L.id] });
+    touched();
+  };
+  const fillSelArea = () => {
+    const L = eng.active();
+    if (!L || L.lock || !L.vis) return flash("잠겼거나 숨긴 레이어에는 칠할 수 없습니다.");
+    eng.commit({ kind: "shape", shape: "rect", x0: -2, y0: -2, x1: eng.W + 2, y1: eng.H + 2, color: st.current.color, size: 1, opacity: 1, dash: "solid", fill: true, sel: eng.sel || undefined, alock: L.alock || undefined, layers: [L.id] });
+    pushRecent(st.current.color);
+    touched();
+  };
+  const liftSel = (cut) => {
+    if (eng.layers.length >= MAX_LAYERS) return flash("레이어는 " + MAX_LAYERS + "장까지 만들 수 있습니다.");
+    if (eng.liftSel(cut)) { eng.setSel(null); touched(); }
+  };
 
   /* ---------- 그리기 동작 ---------- */
 
-  const pushRecent = (c) => {
-    if (!c) return;
-    setPrefs((p) => {
-      if (p.recent[0] === c) return p;
-      const n = { ...p, recent: [c, ...p.recent.filter((x) => x !== c)].slice(0, 8) };
-      try { ss.set(PREFS_KEY, n); } catch (e) {}
-      return n;
-    });
-  };
-  const chooseColor = (c) => {
-    setColor(c);
-    if (tool === "eraser" || tool === "picker" || tool === "hand") setTool(prevTool.current === "eraser" ? "pencil" : prevTool.current);
-  };
-  const selectTool = (k) => {
-    if (textAt) commitText();
-    if (k !== tool) { if (tool !== "picker" && tool !== "hand") prevTool.current = tool; setTool(k); }
-  };
-  const doUndo = () => { if (drag.current) return; if (eng.undo()) { changed(); bump(); } };
-  const doRedo = () => { if (drag.current) return; if (eng.redoOne()) { changed(); bump(); } };
-
   const pressureOf = (ev, T, d) => {
     const S = st.current;
-    if (!S.prefs.press || !T.press) return 1;
+    if (!S.prefs.press) return 1;
     if (ev.pointerType === "pen") return ev.pressure > 0 ? ev.pressure : d ? d.p : 0.5;
     if (T.speed && d) {
       const dt = Math.max(1, ev.timeStamp - d.lt);
       const vel = Math.hypot(ev.clientX - d.lcx, ev.clientY - d.lcy) / dt;
       const target = clamp(1.1 - vel * 0.3, 0.3, 1);
-      d.pv += (target - d.pv) * 0.2;
+      d.pv += (target - d.pv) * (1 - Math.pow(0.8, Math.min(3, dt / 16)));   // 표본이 촘촘해도(묶인 이벤트) 같은 빠르기로 따라간다
       return d.pv;
     }
     return 1;
   };
+  /* 펜을 많이 눕히면 연필·목탄이 넓고 옅게 칠해진다 */
+  const tiltOf = (ev) => (ev.pointerType === "pen" ? clamp((Math.hypot(ev.tiltX || 0, ev.tiltY || 0) - 35) / 35, 0, 1) : 0);
 
   const hoverCursor = (e) => {
     const el = cursorRef.current;
     if (!el) return;
-    const S = st.current, t = (drag.current && drag.current.tool) || S.tool, T = TOOL[t];
-    const sz = T && T.eng ? S.prefs[t].size * view.current.s : 0;
+    const S = st.current, t = (drag.current && drag.current.tool) || S.tool;
+    const sz = BRUSH[t] ? S.prefs[t].size * view.current.s : 0;
     if (e.pointerType === "touch" || sz < 4 || spaceRef.current) { el.style.display = "none"; return; }
     const l = localOf(e.clientX, e.clientY);
     el.style.display = "block";
@@ -1082,26 +899,42 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
   const hideCursor = () => { if (cursorRef.current) cursorRef.current.style.display = "none"; };
 
   const pickAt = (q) => {
-    const c = eng.pick(q.x, q.y, paperColor(st.current.paper));
+    const c = eng.pick(q.x, q.y, paperColor(eng.paper));
     if (c) setColor(c);
     return c;
   };
 
+  const keepView = () => { const V = view.current; return { s: V.s, r: V.r, tx: V.tx, ty: V.ty, fit: V.fit }; };
+  const backView = (v0) => { if (!v0) return; Object.assign(view.current, v0); applyView(); bump(); };
   const startPan = (e) => {
-    drag.current = { mode: "pan", id: e.pointerId, ptype: e.pointerType, cx: e.clientX, cy: e.clientY, tx: view.current.tx, ty: view.current.ty };
+    drag.current = { mode: "pan", id: e.pointerId, ptype: e.pointerType, cx: e.clientX, cy: e.clientY, tx: view.current.tx, ty: view.current.ty, v0: keepView(), go: e.pointerType !== "touch" };
     try { viewRef.current.setPointerCapture(e.pointerId); } catch (x) {}
-    viewRef.current.classList.add("panning");
+    if (drag.current.go) viewRef.current.classList.add("panning");
+  };
+  /* 하던 끌기를 거둔다(두 번째 손가락이 닿았거나, 펜이 손바닥 조작을 넘겨받을 때) */
+  const dropDrag = (d) => {
+    if (!d) return;
+    clearTimeout(d.hold);
+    if (d.mode === "draw" || d.mode === "shape" || d.mode === "quick") eng.cancelLive();
+    if (d.mode === "sel") drawSelPreview(null);
+    if (d.mode === "pick" && d.back) setTool(prevTool.current);
+    if (d.mode === "xf") xfDrag.current = null;
+    if (viewRef.current) viewRef.current.classList.remove("panning");
   };
   const startPinch = () => {
     const d = drag.current;
-    if (d && (d.mode === "draw" || d.mode === "shape")) eng.cancelLive(); // 두 번째 손가락이 닿으면 그리던 획을 버리고 화면 조작으로
+    const was = d && d.mode === "pinch" ? d : null;
+    if (d && !was) dropDrag(d);
     const [a, b] = [...touches.current.values()];
     const la = localOf(a.x, a.y), lb = localOf(b.x, b.y);
     const m = { x: (la.x + lb.x) / 2, y: (la.y + lb.y) / 2 };
     drag.current = {
-      mode: "pinch", ptype: "touch", t0: d && d.mode === "pinch" ? d.t0 : performance.now(), moved: d && d.mode === "pinch" ? d.moved : false,
-      fingers: Math.max(touches.current.size, d && d.mode === "pinch" ? d.fingers : 0),
+      mode: "pinch", ptype: "touch", t0: was ? was.t0 : performance.now(), moved: was ? was.moved : false,
+      fingers: Math.max(touches.current.size, was ? was.fingers : 0),
+      big: (was && was.big) || [...touches.current.values()].some((p) => p.w > 60),   // 손바닥처럼 넓은 접촉
+      v0: was ? was.v0 : d && d.v0 ? d.v0 : keepView(),
       d0: Math.hypot(la.x - lb.x, la.y - lb.y) || 1, m0: m, s0: view.current.s, q0: toCanvasLocal(m.x, m.y),
+      a0: Math.atan2(lb.y - la.y, lb.x - la.x), r0: view.current.r, rotOn: was ? was.rotOn : false,
     };
   };
   const movePinch = () => {
@@ -1110,99 +943,215 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     const la = localOf(pts[0].x, pts[0].y), lb = localOf(pts[1].x, pts[1].y);
     const dd = Math.hypot(la.x - lb.x, la.y - lb.y), m = { x: (la.x + lb.x) / 2, y: (la.y + lb.y) / 2 };
     if (Math.abs(dd - d.d0) > 10 || Math.hypot(m.x - d.m0.x, m.y - d.m0.y) > 10) d.moved = true;
-    if (!d.moved) return;
     const V = view.current;
-    V.s = clamp((d.s0 * dd) / d.d0, fitScale(0) * 0.25, 8);
+    if (st.current.prefs.rotGesture) {
+      const ang = Math.atan2(lb.y - la.y, lb.x - la.x);
+      let da = ((ang - d.a0) * 180) / Math.PI;
+      da = ((da + 540) % 360) - 180;
+      if (!d.rotOn && Math.abs(da) > 9) { d.rotOn = true; d.moved = true; d.a0 = ang; d.r0 = V.r; da = 0; }
+      if (d.rotOn) V.r = d.r0 + da;
+    }
+    if (!d.moved) return;
+    V.s = clamp((d.s0 * dd) / d.d0, fitScale(0) * 0.25, 12);
     centerOn(d.q0.x, d.q0.y, m.x, m.y);
     V.fit = false;
     clampPan();
     applyView();
   };
+  const endPinch = (d, tap) => {
+    drag.current = null;
+    const V = view.current;
+    if (d.rotOn) { const r = ((V.r % 360) + 540) % 360 - 180; if (Math.abs(r) < 5) turnView({ r: 0 }); else bump(); }
+    // 화면보다 작게 오므렸으면 화면에 맞춘다
+    if (d.moved && V.s < fitScale(V.r) * 0.96) fitView();
+    // 두 손가락으로 가볍게 치면 되돌리기, 세 손가락이면 다시 실행. 펜을 쓰는 중의 손바닥(넓은 접촉, 방금 펜이 닿음)은 치는 동작으로 보지 않는다
+    if (tap && !d.moved && !d.big && performance.now() - d.t0 < 320 && performance.now() - lastPen.current > 1000) {
+      if (d.fingers >= 3) doRedo(); else if (d.fingers === 2) doUndo();
+    }
+  };
 
+  /* 안내선에 맞춰 그리기: 처음 움직인 방향과 가장 가까운 안내 방향으로 획을 고정한다 */
+  const snapPt = (d, x, y) => {
+    const a = d.assist;
+    if (!a) return [x, y];
+    if (!a.dir) {
+      if (Math.hypot(x - d.x0, y - d.y0) < 10 / view.current.s) return [d.x0, d.y0];
+      const g = st.current.guide;
+      let s2 = [x, y];
+      try { s2 = assistSnap(g.kind, { step: g.step, vp: g.vp }, d.x0, d.y0, x, y); } catch (e) {}
+      const L = Math.hypot(s2[0] - d.x0, s2[1] - d.y0) || 1;
+      a.dir = [(s2[0] - d.x0) / L, (s2[1] - d.y0) / L];
+    }
+    const t = (x - d.x0) * a.dir[0] + (y - d.y0) * a.dir[1];
+    return [d.x0 + a.dir[0] * t, d.y0 + a.dir[1] * t];
+  };
+  /* 그리다 멈추면 도형으로 바로잡기 */
+  const tryQuick = (d) => {
+    if (drag.current !== d || d.mode !== "draw") return;
+    let fit = null;
+    try { fit = fitShape(d.op.pts); } catch (e) {}
+    if (!fit) return;
+    const o = d.op;
+    const sop = { kind: "shape", tool: "shape", quick: true, color: o.color, size: o.size, opacity: o.opacity, dash: "solid", fill: false, sym: o.sym, sel: o.sel, alock: o.alock, layers: o.layers };
+    if (fit.type === "line") Object.assign(sop, { shape: "line", x0: fit.x0, y0: fit.y0, x1: fit.x1, y1: fit.y1 });
+    else if (fit.type === "ellipse") Object.assign(sop, { shape: "ellipse", cx: fit.cx, cy: fit.cy, rx: fit.rx, ry: fit.ry, rot: fit.rot || 0 });
+    else if (fit.type === "rect") Object.assign(sop, { shape: "rect", cx: fit.cx, cy: fit.cy, w: fit.w, h: fit.h, rot: fit.rot || 0 });
+    else if (fit.type === "poly") Object.assign(sop, { shape: "poly", pts: fit.pts, closed: !!fit.closed });
+    else return;
+    eng.cancelLive();
+    if (!eng.beginLive(sop)) { drag.current = null; return; }
+    d.mode = "quick"; d.op = sop;
+    flash((QUICK_NAMES[fit.type === "ellipse" && fit.circle ? "circle" : fit.type] || "도형") + "으로 바로잡았습니다.");
+  };
+
+  const seePen = (e) => {
+    lastPen.current = performance.now();
+    const S = st.current;
+    if (!S.prefs.penAuto) {
+      // 펜을 처음 쓸 때 한 번만 손가락 그리기를 끈다. 그 뒤에는 학생이 고른 대로 둔다
+      setPref({ finger: false, penAuto: true });
+      if (S.prefs.finger) flash("펜이 감지되어 손가락으로는 화면 이동·확대만 합니다.");
+    }
+  };
   const onPointerDown = (e) => {
     const S = st.current;
-    if (S.locked || S.loading || S.busy) return;
+    if (S.locked || S.loading || S.loadFail || adjRef.current) return;
     if (e.pointerType === "touch" && !touchDev) setTouchDev(true);
-    if (e.pointerType === "pen" && !penSeen.current) {
-      penSeen.current = true;
-      if (S.prefs.finger) { setPref({ finger: false }); flash("펜이 감지되어 손가락으로는 화면 이동·확대만 합니다."); }
+    if (e.pointerType === "pen") seePen(e);
+    if (e.pointerType === "touch") {
+      // 방금까지 펜이 닿아 있었거나 떠 있었다면 이 접촉은 손바닥이다
+      if (ignored.current.has(e.pointerId)) return;
+      if (performance.now() - lastPen.current < 500) { ignored.current.add(e.pointerId); return; }
     }
-    if (rootRef.current && document.activeElement !== rootRef.current && !(S.textAt)) rootRef.current.focus({ preventScroll: true });
-    if (S.textAt) { commitText(); return; }
+    if (rootRef.current && document.activeElement !== rootRef.current && !textRef.current) rootRef.current.focus({ preventScroll: true });
+    if (textRef.current) { commitText(); return; }
     if (e.pointerType === "touch") {
       const d0 = drag.current;
-      if (d0 && d0.ptype !== "touch") return; // 펜·마우스로 그리는 중에 닿은 손(손바닥)은 무시
+      if (d0 && d0.ptype !== "touch") { ignored.current.add(e.pointerId); return; } // 펜·마우스로 그리는 중에 닿은 손(손바닥)은 무시
       if (e.isPrimary) touches.current.clear();
-      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY, w: Math.max(e.width || 0, e.height || 0) });
       if (touches.current.size >= 2) { startPinch(); return; }
       if (d0 && d0.mode === "pinch") return;
       if (!S.prefs.finger || S.tool === "hand") { startPan(e); return; }
     } else if (drag.current && drag.current.ptype === "touch") {
-      // 펜·마우스가 손가락 조작보다 앞선다: 손바닥으로 시작된 이동·획을 거두고 펜으로 그린다
-      if (drag.current.mode === "draw" || drag.current.mode === "shape") eng.cancelLive();
+      // 펜·마우스가 손가락 조작보다 앞선다: 손바닥으로 시작된 이동·획을 거두고(화면도 되돌리고) 펜으로 그린다
+      const d0 = drag.current;
+      dropDrag(d0);
+      if (d0.v0) backView(d0.v0);
       drag.current = null;
-      viewRef.current.classList.remove("panning");
+      touches.current.forEach((_, id) => ignored.current.add(id));
+      touches.current.clear();
     }
     if (e.pointerType === "mouse") {
       if (e.button === 1 || (e.button === 0 && (spaceRef.current || S.tool === "hand"))) { e.preventDefault(); startPan(e); return; }
       if (e.button !== 0) return;
       e.preventDefault();
-    } else if (S.tool === "hand" || spaceRef.current) { startPan(e); return; }
+    } else if (e.pointerType === "pen" && (S.tool === "hand" || spaceRef.current)) { startPan(e); return; }
     if (drag.current) return;
 
     const q = toCanvas(e.clientX, e.clientY);
     const penEraser = e.pointerType === "pen" && (e.button === 5 || (e.buttons & 32));
     const t = penEraser ? "eraser" : S.tool;
-    const T = TOOL[t];
-    if (t === "picker" || (e.altKey && T.eng)) {
+    const capture = () => { try { viewRef.current.setPointerCapture(e.pointerId); } catch (x) {} };
+    if (t === "xform") { xfDown(e, "move"); drag.current = { mode: "xf", id: e.pointerId, ptype: e.pointerType }; capture(); return; }
+    if (t === "picker" || (e.altKey && BRUSH[t])) {
       pickAt(q);
       drag.current = { mode: "pick", id: e.pointerId, ptype: e.pointerType, back: t === "picker" };
-      try { viewRef.current.setPointerCapture(e.pointerId); } catch (x) {}
+      capture();
       return;
     }
+    if (t === "select") {
+      const kind = S.prefs.selKind;
+      if (kind === "wand") {
+        addSelPart({ type: "wand", x: Math.floor(q.x), y: Math.floor(q.y), tol: S.prefs.wandTol, ref: S.prefs.fillRef, layer: eng.activeId });
+        return;
+      }
+      drag.current = { mode: "sel", id: e.pointerId, ptype: e.pointerType, kind, x0: q.x, y0: q.y, x1: q.x, y1: q.y, pts: [q.x, q.y] };
+      capture();
+      return;
+    }
+    const L = eng.active();
+    const blocked = !L.vis ? "숨긴 레이어에는 그릴 수 없습니다. 레이어 창에서 눈 모양 버튼을 눌러 보이게 하세요." : L.lock ? "잠긴 레이어에는 그릴 수 없습니다. 레이어 창에서 잠금을 푸세요." : "";
     if (t === "text") {
-      if (!eng.active().vis) { flash("숨긴 레이어에는 쓸 수 없습니다. 레이어 창에서 눈 모양 버튼을 눌러 보이게 하세요."); return; }
+      if (blocked) return flash(blocked);
       if (q.x < 0 || q.y < 0 || q.x > eng.W || q.y > eng.H) return;
       e.preventDefault();
+      // 입력칸은 화면에 똑바로 놓이므로, 뒤집히거나 돌아간 화면에서는 쓴 글자의 위치와 어긋난다: 화면을 바로 놓는다
+      if (view.current.fx < 0 || view.current.r % 360 !== 0) { turnView({ fx: 1, r: 0 }); flash("글자를 쓰는 동안 화면을 바로 놓았습니다."); }
       setTextVal("");
       textRef.current = { x: q.x, y: q.y };
       setTextAt(textRef.current);
       return;
     }
-    const L = eng.active();
-    if (!L.vis) { flash("숨긴 레이어에는 그릴 수 없습니다. 레이어 창에서 눈 모양 버튼을 눌러 보이게 하세요."); return; }
-    try { viewRef.current.setPointerCapture(e.pointerId); } catch (x) {}
+    if (blocked) return flash(blocked);
+    const common = { layers: [L.id], sel: eng.sel || undefined, alock: L.alock || undefined };
+    const g = S.guide;
+    const sym = g.kind === "sym" ? { kind: g.sym, cx: eng.W / 2, cy: eng.H / 2, n: g.n } : undefined;
+    if (t === "fill") {
+      if (q.x < 0 || q.y < 0 || q.x >= eng.W || q.y >= eng.H) return;
+      eng.commit({ kind: "fill", x: Math.floor(q.x), y: Math.floor(q.y), color: S.color, opacity: S.prefs.fillT.op, tol: S.prefs.fillTol, ref: S.prefs.fillRef, ...common });
+      pushRecent(S.color);
+      touched();
+      return;
+    }
+    capture();
     if (t === "shape") {
       const sk = S.prefs.shapeKind;
       const op = { kind: "shape", tool: "shape", shape: sk, x0: q.x, y0: q.y, x1: q.x, y1: q.y, color: S.color,
-        size: S.prefs.shape.size, opacity: S.prefs.shape.op, dash: S.prefs.dash, fill: (sk === "rect" || sk === "ellipse") && S.prefs.fill, layers: [L.id] };
-      eng.beginLive(op);
+        size: S.prefs.shape.size, opacity: S.prefs.shape.op, dash: S.prefs.dash, fill: (sk === "rect" || sk === "ellipse") && S.prefs.fill, sym, ...common };
+      if (!eng.beginLive(op)) return;
       drag.current = { mode: "shape", id: e.pointerId, ptype: e.pointerType, op, tool: t };
       return;
     }
-    const pr = S.prefs[t];
-    const op = { kind: "stroke", tool: t, color: S.color, size: pr.size, opacity: pr.op, dash: T.dash ? S.prefs.dash : "solid", layers: [L.id], pts: [] };
-    const d = { mode: "draw", id: e.pointerId, ptype: e.pointerType, op, T, tool: t, x0: q.x, y0: q.y, sx: q.x, sy: q.y, lt: e.timeStamp, lcx: e.clientX, lcy: e.clientY, pv: 1, p: 0.5, straight: false };
+    const T = BRUSH[t], pr = S.prefs[t];
+    const b = {};
+    for (const k of Object.keys(T.d)) if (k !== "size" && k !== "op") b[k] = pr[k];
+    const op = T.eng === "smudge"
+      ? { kind: "smudge", tool: t, size: pr.size, opacity: 1, b, g: S.prefs.gamma, pts: [], ...common }
+      : { kind: "stroke", tool: t, color: S.color, size: pr.size, opacity: pr.op, dash: T.dash ? S.prefs.dash : "solid", b, g: S.prefs.gamma, seed: (Math.random() * 1e9) | 0, pts: [], sym, ...common };
+    const d = { mode: "draw", id: e.pointerId, ptype: e.pointerType, op, T, tool: t, x0: q.x, y0: q.y, sx: q.x, sy: q.y, lt: e.timeStamp, lcx: e.clientX, lcy: e.clientY, pv: 1, p: 0.5, straight: false,
+      assist: g.assist && ASSIST_KINDS.includes(g.kind) && T.eng !== "smudge" ? {} : null,
+      quick: S.prefs.quick && !T.erase && (T.eng === "path" || T.eng === "grain" || T.eng === "nib"), hold: 0 };
     d.p = pressureOf(e, T, null);
     op.pts.push(q.x, q.y, d.p);
+    if (T.tilt && e.pointerType === "pen") op.tl = [tiltOf(e)];
+    if (!eng.beginLive(op)) return;
     drag.current = d;
-    eng.beginLive(op);
     hoverCursor(e);
   };
 
   const onPointerMove = (e) => {
-    if (e.pointerType === "touch" && touches.current.has(e.pointerId)) touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (e.pointerType === "pen") { if (!st.current.prefs.penAuto && !st.current.locked) seePen(e); else lastPen.current = performance.now(); }
+    if (e.pointerType === "touch") {
+      if (ignored.current.has(e.pointerId)) return;
+      if (touches.current.has(e.pointerId)) { const t0 = touches.current.get(e.pointerId); touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY, w: Math.max(t0.w, e.width || 0, e.height || 0) }); }
+    }
     const d = drag.current;
     if (!d) { hoverCursor(e); return; }
-    if (d.mode === "pinch") { movePinch(); return; }
+    if (d.mode === "pinch") { if ([...touches.current.values()].some((p) => p.w > 60)) d.big = true; movePinch(); return; }
     if (d.id !== e.pointerId) return;
+    if (d.mode === "xf") { xfMove(e); return; }
     if (d.mode === "pan") {
-      const V = view.current;
-      V.tx = d.tx + (e.clientX - d.cx); V.ty = d.ty + (e.clientY - d.cy); V.fit = false;
+      const V = view.current, K = deltaK();
+      const dx = (e.clientX - d.cx) / K, dy = (e.clientY - d.cy) / K;
+      // 손가락 이동은 8px 넘게 움직인 뒤에 시작한다(스친 손바닥에 화면이 밀리지 않게)
+      if (!d.go) { if (Math.hypot(dx, dy) < 8) return; d.go = true; viewRef.current.classList.add("panning"); }
+      V.tx = d.tx + dx; V.ty = d.ty + dy; V.fit = false;
       clampPan(); applyView();
       return;
     }
     if (d.mode === "pick") { pickAt(toCanvas(e.clientX, e.clientY)); return; }
+    if (d.mode === "sel") {
+      const q = toCanvas(e.clientX, e.clientY);
+      d.x1 = q.x; d.y1 = q.y;
+      if (e.shiftKey && d.kind !== "lasso") {
+        const m = Math.max(Math.abs(q.x - d.x0), Math.abs(q.y - d.y0));
+        d.x1 = d.x0 + Math.sign(q.x - d.x0 || 1) * m; d.y1 = d.y0 + Math.sign(q.y - d.y0 || 1) * m;
+      }
+      if (d.kind === "lasso") { const n = d.pts.length; if (Math.hypot(q.x - d.pts[n - 2], q.y - d.pts[n - 1]) > 2 / view.current.s) d.pts.push(q.x, q.y); }
+      drawSelPreview(d);
+      return;
+    }
     if (d.mode === "shape") {
       const q = toCanvas(e.clientX, e.clientY), op = d.op;
       let x1 = q.x, y1 = q.y;
@@ -1228,79 +1177,120 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       const q = toCanvas(e.clientX, e.clientY);
       d.p = pressureOf(e, d.T, d);
       op.pts = [d.x0, d.y0, op.pts[2], q.x, q.y, d.p];
+      if (op.tl) op.tl = [op.tl[0], tiltOf(e)];
       d.straight = true; d.sx = q.x; d.sy = q.y;
       eng.restartLive();
       hoverCursor(e);
       return;
     }
-    const list = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
-    const evs = list.length ? list : [e];
-    const k = 1 - clamp(st.current.prefs.smooth, 0, 10) * 0.085;
+    // 펜은 한 프레임 사이에 여러 표본을 보낸다. React의 합성 이벤트에는 묶인 표본이 없어 원래 이벤트에서 꺼낸다
+    const ne = e.nativeEvent || e;
+    const list = typeof ne.getCoalescedEvents === "function" ? ne.getCoalescedEvents() : [];
+    const evs = list.length ? list : [ne];
+    const k0 = 1 - clamp(st.current.prefs.smooth, 0, 10) * 0.085;   // 16ms(한 프레임)마다 따라가는 비율
     const minD = 0.75 / view.current.s;
+    let grew = false;
     for (const ev of evs) {
       const q = toCanvas(ev.clientX, ev.clientY);
+      const dt = clamp(ev.timeStamp - d.lt, 1, 48);
+      const k = k0 >= 1 ? 1 : 1 - Math.pow(1 - k0, dt / 16);
       const p = pressureOf(ev, d.T, d);
       d.lt = ev.timeStamp; d.lcx = ev.clientX; d.lcy = ev.clientY; d.p = p;
       d.sx += (q.x - d.sx) * k; d.sy += (q.y - d.sy) * k;
+      const [px, py] = snapPt(d, d.sx, d.sy);
       const n = op.pts.length;
-      if (Math.hypot(d.sx - op.pts[n - 3], d.sy - op.pts[n - 2]) < minD) continue;
-      op.pts.push(d.sx, d.sy, p);
+      if (Math.hypot(px - op.pts[n - 3], py - op.pts[n - 2]) < minD) continue;
+      op.pts.push(px, py, p);
+      if (op.tl) op.tl.push(tiltOf(ev));
+      grew = true;
     }
     eng.drawLive();
     hoverCursor(e);
+    if (d.quick && grew) { clearTimeout(d.hold); d.hold = setTimeout(() => tryQuick(d), 620); }
   };
 
   const finishDraw = (d, e) => {
     const op = d.op;
-    if (e && !d.straight && st.current.prefs.smooth > 0) {
+    clearTimeout(d.hold);
+    if (e && !d.straight && !d.assist && st.current.prefs.smooth > 0) {
       // 보정 때문에 뒤처진 끝을 펜을 뗀 곳까지 잇는다
       const q = toCanvas(e.clientX, e.clientY), n = op.pts.length;
-      if (Math.hypot(q.x - op.pts[n - 3], q.y - op.pts[n - 2]) > 0.75 / view.current.s) op.pts.push(q.x, q.y, d.p);
+      if (Math.hypot(q.x - op.pts[n - 3], q.y - op.pts[n - 2]) > 0.75 / view.current.s) { op.pts.push(q.x, q.y, d.p); if (op.tl) op.tl.push(op.tl[op.tl.length - 1] || 0); }
     }
+    if (op.tl && !op.tl.some((x) => x > 0)) delete op.tl;
     eng.endLive();
-    if (!d.T.erase) pushRecent(op.color);
-    changed();
-    bump();
+    if (op.kind === "stroke" && !d.T.erase) pushRecent(op.color);
+    touched();
   };
 
   const onPointerUp = (e) => {
-    if (e.pointerType === "touch") touches.current.delete(e.pointerId);
+    if (e.pointerType === "pen") lastPen.current = performance.now();
+    if (e.pointerType === "touch") {
+      if (ignored.current.delete(e.pointerId)) return;
+      touches.current.delete(e.pointerId);
+    }
     const d = drag.current;
     if (!d) return;
     if (d.mode === "pinch") {
-      if (touches.current.size === 0) {
-        drag.current = null;
-        // 두 손가락 탭은 되돌리기, 세 손가락 탭은 다시 실행
-        if (!d.moved && performance.now() - d.t0 < 320) { if (d.fingers >= 3) doRedo(); else if (d.fingers === 2) doUndo(); }
-      }
+      if (touches.current.size === 0) endPinch(d, true);
+      else if (touches.current.size >= 2) startPinch();   // 세 손가락에서 하나를 떼면 남은 둘로 기준을 다시 잡는다
       return;
     }
     if (d.id !== e.pointerId) return;
     drag.current = null;
     viewRef.current.classList.remove("panning");
-    if (d.mode === "draw") finishDraw(d, e);
+    if (d.mode === "xf") xfUp(e);
+    else if (d.mode === "draw") finishDraw(d, e);
+    else if (d.mode === "quick") { eng.endLive(); pushRecent(d.op.color); touched(); }
     else if (d.mode === "shape") {
       const op = d.op;
       if (Math.hypot(op.x1 - op.x0, op.y1 - op.y0) * view.current.s < 3) eng.cancelLive();
-      else { eng.endLive(); pushRecent(op.color); changed(); bump(); }
+      else { eng.endLive(); pushRecent(op.color); touched(); }
+    } else if (d.mode === "sel") {
+      drawSelPreview(null);
+      const w = Math.abs(d.x1 - d.x0), h = Math.abs(d.y1 - d.y0);
+      if (d.kind === "lasso") { if (d.pts.length >= 6) addSelPart({ type: "lasso", pts: d.pts }); }
+      else if (Math.max(w, h) * view.current.s < 4) { if (st.current.prefs.selOp === "new") setSel(null); }
+      else if (d.kind === "rect") addSelPart({ type: "rect", x: Math.min(d.x0, d.x1), y: Math.min(d.y0, d.y1), w, h });
+      else addSelPart({ type: "ellipse", cx: (d.x0 + d.x1) / 2, cy: (d.y0 + d.y1) / 2, rx: w / 2, ry: h / 2 });
     } else if (d.mode === "pick") {
       if (d.back) setTool(prevTool.current);
     }
   };
   const onPointerCancel = (e) => {
-    if (e.pointerType === "touch") touches.current.delete(e.pointerId);
+    if (e.pointerType === "touch") {
+      if (ignored.current.delete(e.pointerId)) return;
+      touches.current.delete(e.pointerId);
+    }
     const d = drag.current;
     if (!d || (d.mode !== "pinch" && d.id !== e.pointerId)) return;
-    if (d.mode === "pinch") { if (touches.current.size === 0) drag.current = null; return; }
+    if (d.mode === "pinch") {
+      // 브라우저가 터치를 거둬 갔다(손바닥 판정 등): 그 접촉이 옮긴 화면을 되돌린다
+      if (touches.current.size === 0) { drag.current = null; backView(d.v0); }
+      else if (touches.current.size >= 2) startPinch();
+      return;
+    }
     drag.current = null;
+    clearTimeout(d.hold);
     viewRef.current.classList.remove("panning");
-    if (d.mode === "draw" && e.pointerType !== "touch") finishDraw(d, null);
-    else if (d.mode === "draw" || d.mode === "shape") eng.cancelLive();
+    if (d.mode === "xf") xfUp(e);
+    else if (d.mode === "pan") { if (e.pointerType === "touch") backView(d.v0); }
+    else if (d.mode === "draw" && e.pointerType !== "touch") finishDraw(d, null);
+    else if (d.mode === "quick" && e.pointerType !== "touch") { eng.endLive(); touched(); }
+    else if (d.mode === "draw" || d.mode === "shape" || d.mode === "quick") eng.cancelLive();
+    else if (d.mode === "sel") drawSelPreview(null);
+    else if (d.mode === "pick" && d.back) setTool(prevTool.current);
+  };
+  /* 캡처를 잃었는데 up·cancel이 오지 않는 경우(브라우저가 포인터를 가져감)를 정리한다 */
+  const onLostCapture = (e) => {
+    const d = drag.current;
+    if (d && d.mode !== "pinch" && d.id === e.pointerId) onPointerCancel(e);
   };
 
   const onWheel = (e) => {
     const S = st.current;
     if (S.locked) return;
+    if (textRef.current) commitText();
     const l = localOf(e.clientX, e.clientY);
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
@@ -1308,29 +1298,41 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       zoomAt(view.current.s * k, l.x, l.y);
       return;
     }
-    const V = view.current;
-    const moved = V.s > fitScale(0) * 1.02 || V.r % 360 !== 0;
-    if (!S.full && !moved) return; // 맞춤 보기에서는 페이지를 스크롤한다
-    let dx = e.deltaX, dy = e.deltaY;
+    const V = view.current, K = deltaK();
+    let dx = e.deltaX / K, dy = e.deltaY / K;
     if (e.deltaMode === 1) { dx *= 16; dy *= 16; }
     if (e.shiftKey && !dx) { dx = dy; dy = 0; }
-    const tx0 = V.tx, ty0 = V.ty;
-    V.tx -= dx; V.ty -= dy; V.fit = false;
-    clampPan();
-    // 캔버스가 끝까지 밀렸으면 페이지가 스크롤되게 둔다
-    if (S.full || Math.abs(V.tx - tx0) > 0.5 || Math.abs(V.ty - ty0) > 0.5) { e.preventDefault(); applyView(); }
+    if (S.full) {
+      e.preventDefault();
+      V.tx -= dx; V.ty -= dy; V.fit = false;
+      clampPan(); applyView();
+      return;
+    }
+    // 본문 안에서는 캔버스가 화면(그리는 면) 밖으로 넘친 만큼만 휠로 옮기고, 끝에 닿으면 페이지가 스크롤되게 둔다
+    if (V.fit) return;
+    const { w, h } = vpSize();
+    const cs = [[0, 0], [eng.W, 0], [0, eng.H], [eng.W, eng.H]].map(([x, y]) => toScreen(x, y));
+    const x0 = Math.min(...cs.map((p) => p.x)), x1 = Math.max(...cs.map((p) => p.x)), y0 = Math.min(...cs.map((p) => p.y)), y1 = Math.max(...cs.map((p) => p.y));
+    const mx = dx > 0 ? Math.min(dx, Math.max(0, x1 - w)) : Math.max(dx, Math.min(0, x0));
+    const my = dy > 0 ? Math.min(dy, Math.max(0, y1 - h)) : Math.max(dy, Math.min(0, y0));
+    if (Math.abs(mx) < 0.5 && Math.abs(my) < 0.5) return;
+    e.preventDefault();
+    V.tx -= mx; V.ty -= my;
+    applyView();
   };
 
   const onKey = (e) => {
     const S = st.current;
-    if (S.locked) return;
+    if (S.locked || replay) return;
     const t = e.target;
     const typing = t && (t.tagName === "TEXTAREA" || t.tagName === "SELECT" || (t.tagName === "INPUT" && !["range", "color", "checkbox", "button", "file"].includes(t.type)));
     if (typing) return;
-    const k = e.key, mod = e.ctrlKey || e.metaKey;
+    const k = keyOf(e), mod = e.ctrlKey || e.metaKey;
     if (mod && (k === "z" || k === "Z")) { e.preventDefault(); if (e.shiftKey) doRedo(); else doUndo(); return; }
     if (mod && (k === "y" || k === "Y")) { e.preventDefault(); doRedo(); return; }
-    if (mod && (k === "s" || k === "S")) { e.preventDefault(); save(); return; }
+    if (mod && (k === "s" || k === "S")) { e.preventDefault(); if (dirtyRef.current) save(); return; }
+    if (mod && (k === "a" || k === "A")) { e.preventDefault(); selectAll(); return; }
+    if (mod && (k === "d" || k === "D")) { e.preventDefault(); setSel(null); return; }
     if (mod || e.altKey) return;
     if (k === " ") {
       if (t === rootRef.current || t === viewRef.current || t === document.body) {
@@ -1339,10 +1341,30 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       }
       return;
     }
-    if (k === "Escape") { if (S.full) { e.preventDefault(); setFull(false); } else if (showLayers) setShowLayers(false); return; }
+    if (k === "Escape") {
+      if (xfRef.current) { e.preventDefault(); cancelXform(); }
+      else if (adjRef.current) { e.preventDefault(); endAdjust(false); }
+      else if (S.panel) { e.preventDefault(); setPanel(null); }
+      else if (S.full) { e.preventDefault(); setFull(false); }
+      return;
+    }
+    if (k === "Enter") {
+      if (xfRef.current) { e.preventDefault(); applyXform(); setTool(prevTool.current === "xform" ? lastBrush : prevTool.current); }
+      else if (adjRef.current) { e.preventDefault(); endAdjust(true); }
+      return;
+    }
+    if (xfRef.current && /^Arrow/.test(k)) {
+      // 변형 중 화살표 키: 1px(Shift는 10px)씩 옮긴다
+      e.preventDefault();
+      const n = e.shiftKey ? 10 : 1, X = xfRef.current;
+      xfPatch({ tx: X.tx + (k === "ArrowLeft" ? -n : k === "ArrowRight" ? n : 0), ty: X.ty + (k === "ArrowUp" ? -n : k === "ArrowDown" ? n : 0) });
+      return;
+    }
+    if (xfRef.current || adjRef.current) return;
+    if ((k === "Delete" || k === "Backspace") && eng.sel) { e.preventDefault(); clearSelArea(); return; }
     if (k === "[" || k === "]") {
       const T = TOOL[S.tool];
-      if (!T.size) return;
+      if (!T || !T.min) return;
       e.preventDefault();
       const vv = sizeToSlider(T, S.prefs[S.tool].size) + (k === "]" ? 60 : -60);
       setToolPref(S.tool, { size: clamp(sliderToSize(T, clamp(vv, 0, 1000)), T.min, T.max) });
@@ -1352,8 +1374,11 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
     if (k === "-" || k === "_") { e.preventDefault(); zoomBy(0.8); return; }
     if (k === "0") { e.preventDefault(); fitView(); return; }
     if (k === "f" || k === "F") { e.preventDefault(); setFull((x) => !x); return; }
-    const T = TOOLS.find((x) => x.key === k.toLowerCase());
-    if (T) { e.preventDefault(); selectTool(T.k); }
+    if (k === "l" || k === "L") { e.preventDefault(); setPanel((p) => (p === "layers" ? null : "layers")); return; }
+    if (k === "c" || k === "C") { e.preventDefault(); setPanel((p) => (p === "color" ? null : "color")); return; }
+    if (k === "x" || k === "X") { e.preventDefault(); turnView({ fx: -view.current.fx }); return; }
+    const T = Object.values(TOOL).find((x) => x.key && x.key === k.toLowerCase());
+    if (T) { e.preventDefault(); if (T.k !== S.tool) selectTool(T.k); }
   };
   const onKeyUp = (e) => {
     if (e.key === " " && spaceRef.current) {
@@ -1361,84 +1386,72 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       if (viewRef.current) viewRef.current.classList.remove("space");
     }
   };
-  fn.current = { onWheel, onKey, onKeyUp };
 
   /* ---------- 글자 ---------- */
 
-  const commitText = () => {
+  function commitText() {
     const at = textRef.current, val = textValRef.current.replace(/\s+$/, "");
     textRef.current = null;
     setTextAt(null);
     setTextVal("");
     if (!at || !val.trim()) return;
-    const L = eng.active();
-    const S = st.current;
-    const op = { kind: "text", tool: "text", x: at.x, y: at.y, text: val, size: S.prefs.text.size, color: S.color, opacity: S.prefs.text.op, layers: [L.id] };
-    const go = () => { eng.commit(op); pushRecent(op.color); changed(); bump(); };
-    if (document.fonts && document.fonts.load) document.fonts.load(TEXT_FONT(op.size), val).then(go, go);
-    else go();
-  };
+    const L = eng.active(), S = st.current;
+    if (!L || L.lock || !L.vis) return;
+    const op = { kind: "text", tool: "text", x: at.x, y: at.y, text: val, size: S.prefs.text.size, font: S.prefs.font, color: S.color, opacity: S.prefs.text.op, sel: eng.sel || undefined, alock: L.alock || undefined, layers: [L.id] };
+    const go = () => {
+      if (!aliveRef.current || st.current.locked || !eng.layer(L.id)) return;
+      // 그 사이 획·변형·조정이 시작됐으면 끝난 뒤에 넣는다(미리보기가 글자를 덮지 않게)
+      if (eng.live || xfRef.current || adjRef.current) { setTimeout(go, 200); return; }
+      eng.commit(op); pushRecent(op.color); touched();
+    };
+    const font = textFont(op.size, op.font);
+    let ready = true;
+    try { ready = !document.fonts || !document.fonts.check || document.fonts.check(font, val); } catch (e) {}
+    if (ready) go();                                   // 입력칸이 같은 글꼴로 보여 주므로 대개 이미 준비돼 있다
+    else Promise.race([document.fonts.load(font, val), new Promise((r) => setTimeout(r, 1500))]).then(go, go);
+  }
 
-  /* ---------- 레이어·캔버스 ---------- */
+  /* ---------- 캔버스·사진·내보내기 ---------- */
 
-  const addLayer = () => {
-    if (eng.layers.length >= MAX_LAYERS) return flash("레이어는 4장까지 만들 수 있습니다.");
-    const L = eng.addLayer();
-    eng.activeId = L.id;
-    eng.mount();
-    bump();
-  };
-  const layerHasContent = (L) => {
-    let has = !!L.base;
-    for (const op of eng.hist) if (op.layers.includes(L.id)) has = op.kind !== "clear";
-    return has;
-  };
-  const removeLayer = (L) => {
-    if (eng.layers.length <= 1) return;
-    if (layerHasContent(L) && !window.confirm(`「${L.name}」을(를) 지울까요? 레이어 지우기는 되돌릴 수 없습니다.`)) return;
-    eng.removeLayer(L.id);
-    changed();
-    bump();
-  };
-  const setLayer = (L, patch) => { Object.assign(L, patch); eng.mount(); changed(); bump(); };
-  const clearAll = () => {
-    if (!eng.hasContent()) return;
-    eng.commit({ kind: "clear", layers: eng.layers.map((L) => L.id) });
-    changed();
-    bump();
-    flash("모두 지웠습니다. 되돌리기로 되살릴 수 있습니다.");
-  };
   const changeRatio = (k) => {
     const R = RATIOS.find((r) => r.k === k);
     if (!R || (R.W === eng.W && R.H === eng.H)) return;
     if (eng.hasContent() && !window.confirm("캔버스 비율을 바꾸면 지금 그림이 새 캔버스에 맞게 줄어들고, 되돌리기 기록이 지워집니다. 바꿀까요?")) return;
-    eng.resizeKeep(R.W, R.H);
-    setDims({ W: R.W, H: R.H });
-    view.current.fit = true;
-    requestAnimationFrame(fitView);
-    changed();
-    bump();
+    canvasOp("resize", { w: R.W, h: R.H });
+  };
+  const canvasOp = (type, arg) => {
+    abortModes();
+    eng.canvasOp(type, arg);
+    setGuide((g) => ({ ...g, vp: null }));
+    setDims({ W: eng.W, H: eng.H });
+    refit();
+    touched();
+  };
+  const turnCanvas = (type, arg) => {
+    if (eng.hist.length && !window.confirm("캔버스를 돌리거나 뒤집으면 되돌리기 기록이 지워집니다. 계속할까요?")) return;
+    canvasOp(type, arg);
   };
   const importPhoto = async (file) => {
     if (!file) return;
-    if (eng.layers.length >= MAX_LAYERS) return flash("레이어가 4장이라 더 불러올 수 없습니다. 레이어를 하나 지운 뒤 불러오세요.");
+    if (eng.layers.length >= MAX_LAYERS) return flash("레이어가 " + MAX_LAYERS + "장이라 더 불러올 수 없습니다. 레이어를 하나 지운 뒤 불러오세요.");
     let url = "";
     try {
       url = URL.createObjectURL(file);
       const img = await loadImg(url);
       const s = Math.min(eng.W / img.naturalWidth, eng.H / img.naturalHeight);
       const w = Math.round(img.naturalWidth * s), h = Math.round(img.naturalHeight * s);
-      const c = mkCanvas(w, h);
-      c.getContext("2d").drawImage(img, 0, 0, w, h);
-      const act = eng.active();
-      const L = eng.addLayer("사진", eng.layers.indexOf(act));
-      L.op = 0.6;
-      eng.activeId = act.id;
-      eng.mount();
-      eng.commit({ kind: "image", layers: [L.id], img: c, x: Math.round((eng.W - w) / 2), y: Math.round((eng.H - h) / 2), w, h });
-      changed();
-      setShowLayers(true);
-      bump();
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      const cx = c.getContext("2d");
+      cx.imageSmoothingQuality = "high";
+      cx.drawImage(img, 0, 0, w, h);
+      if (st.current.locked || !aliveRef.current) return;
+      const act = eng.active(), grp = "g" + eng.grpSeq++;
+      const N = eng.commit({ kind: "ladd", name: "사진", index: eng.layers.indexOf(act), activate: false, grp })._L;
+      eng.commit({ kind: "lset", id: N.id, patch: { op: 0.6 }, grp });
+      eng.commit({ kind: "image", img: c, x: Math.round((eng.W - w) / 2), y: Math.round((eng.H - h) / 2), w, h, layers: [N.id], grp });
+      setPanel("layers");
+      touched();
       flash("사진을 지금 레이어 아래에 불러왔습니다. 레이어 창에서 불투명도를 바꿀 수 있습니다.");
     } catch (e) {
       flash("사진을 불러오지 못했습니다. JPG나 PNG 파일인지 확인해 주세요.");
@@ -1446,162 +1459,422 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       if (url) URL.revokeObjectURL(url);
     }
   };
+  const exportImage = async (kind) => {
+    try {
+      const cv = eng.composite(kind === "png-t" ? null : paperColor(eng.paper));
+      const blob = await blobOf(cv, kind === "jpg" ? "image/jpeg" : "image/png", 0.92);
+      freeCanvas(cv);
+      const d = new Date();
+      download(blob, `에스키스_${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}_${pad2(d.getHours())}${pad2(d.getMinutes())}.${kind === "jpg" ? "jpg" : "png"}`);
+    } catch (e) { flash("그림 파일을 만들지 못했습니다."); }
+  };
+  const pasteCanvas = (c, name) => {
+    const act = eng.active(), grp = "g" + eng.grpSeq++;
+    const N = eng.commit({ kind: "ladd", name, index: eng.layers.indexOf(act) + 1, grp })._L;
+    const s2 = Math.min(1, eng.W / c.width, eng.H / c.height), w = Math.round(c.width * s2), h = Math.round(c.height * s2);
+    eng.commit({ kind: "image", paste: true, img: c, x: Math.round((eng.W - w) / 2), y: Math.round((eng.H - h) / 2), w, h, layers: [N.id], grp });
+    touched();
+  };
+  const pasteClip = async () => {
+    if (eng.layers.length >= MAX_LAYERS) return flash("레이어는 " + MAX_LAYERS + "장까지 만들 수 있습니다.");
+    try {
+      const items = await navigator.clipboard.read();
+      for (const it of items) {
+        const type = it.types.find((t) => t.startsWith("image/"));
+        if (!type) continue;
+        const img = await blobImg(await it.getType(type));
+        if (st.current.locked || !aliveRef.current) return;
+        const k = Math.min(1, eng.W / img.naturalWidth, eng.H / img.naturalHeight);
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        pasteCanvas(c, "붙여넣은 그림");
+        return flash("클립보드의 그림을 새 레이어로 붙여넣었습니다.");
+      }
+      flash("클립보드에 그림이 없습니다.");
+    } catch (e) { flash("클립보드를 읽지 못했습니다. 브라우저 권한을 확인해 주세요."); }
+  };
+  const copyClip = async () => {
+    try {
+      const cv = eng.composite(paperColor(eng.paper));
+      const blob = await blobOf(cv);
+      freeCanvas(cv);
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      flash("그림을 클립보드에 복사했습니다.");
+    } catch (e) { flash("클립보드에 복사하지 못했습니다. 그림 파일로 내려받아 주세요."); }
+  };
+  /* 참고 그림: 옆에 띄워 놓고 보면서 그린다. 눌러서 색을 가져올 수 있다. 저장되지 않고 이 화면에서만 보인다 */
+  const openRef = async (file) => {
+    if (!file) return;
+    try {
+      const img = await blobImg(file);
+      const k = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+      c.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0, c.width, c.height);
+      if (refCv.current) freeCanvas(refCv.current);
+      refCv.current = c;
+      setRefImg({ src: c.toDataURL("image/jpeg", 0.85), w: c.width, h: c.height });
+      setPanel("ref");
+    } catch (e) { flash("사진을 불러오지 못했습니다. JPG나 PNG 파일인지 확인해 주세요."); }
+  };
+  const pickRef = (e) => {
+    const c = refCv.current, r = e.currentTarget.getBoundingClientRect();
+    if (!c || !r.width) return;
+    const x = clamp(Math.floor(((e.clientX - r.left) / r.width) * c.width), 0, c.width - 1), y = clamp(Math.floor(((e.clientY - r.top) / r.height) * c.height), 0, c.height - 1);
+    const d = c.getContext("2d", { willReadFrequently: true }).getImageData(x, y, 1, 1).data;
+    chooseColor("#" + [d[0], d[1], d[2]].map((n) => n.toString(16).padStart(2, "0")).join("").toUpperCase());
+  };
+  const clearAll = () => {
+    if (!eng.hasContent()) return;
+    const ids = eng.layers.filter((L) => !L.lock).map((L) => L.id);
+    if (!ids.length) return flash("모든 레이어가 잠겨 있습니다.");
+    eng.commit({ kind: "clear", layers: ids });
+    touched();
+    flash("모두 지웠습니다. 되돌리기로 되살릴 수 있습니다.");
+  };
 
   /* ---------- 저장 ---------- */
 
-  const save = async () => {
+  const save = (opt = {}) => {
+    if (savePromise.current) return savePromise.current;
+    const p = doSave(opt).finally(() => { if (savePromise.current === p) savePromise.current = null; });
+    savePromise.current = p;
+    return p;
+  };
+  const doSave = async (opt) => {
     const S = st.current;
-    if (S.busy || S.loading || S.locked) return;
-    if (drag.current) return;
-    if (S.textAt) commitText();
+    if (savingRef.current || S.loading || S.loadFail || (S.locked && !opt.force) || drag.current || xfRef.current || adjRef.current) return false;
+    if (textRef.current) commitText();
+    savingRef.current = true;
     setBusy(true);
-    setErr("");
-    await new Promise((r) => setTimeout(r, 30)); // 「저장 중…」이 먼저 보이게
+    lastTry.current = Date.now();
+    if (!opt.auto) { setErr(""); await new Promise((r) => setTimeout(r, 30)); } // 「저장 중…」이 먼저 보이게
+    const seq = changeSeq.current;
+    const made = [];
+    let ok = false;
     try {
-      const comp = encodeOpaque(eng.composite(paperColor(S.paper)));
+      const ts = Date.now(), ref = fieldKey + "." + ts;
+      // 1) 지금 상태를 한꺼번에 문자열로 만든다(올리는 동안 그림이 바뀌어도 한 시점의 그림이 저장되게)
+      const whole = eng.composite(paperColor(eng.paper));
+      const comp = encodeOpaque(whole);
+      freeCanvas(whole);
       if (!comp) throw new Error("big");
-      const ref = fieldKey + "." + Date.now();
-      const ok = await store.putT(owner, ref, comp);
-      if (!ok) { setErr("스케치를 저장하지 못했습니다. 연결을 확인하고 다시 저장해 주세요. 그린 내용은 그대로 있습니다."); setBusy(false); return; }
-      let layers = [];
-      for (let i = 0; i < eng.layers.length; i++) {
-        const L = eng.layers[i];
-        const data = encodeAlpha(L.cv);
-        const lref = ref + ".L" + i;
-        if (!data || !(await store.putT(owner, lref, data))) { layers.forEach((l) => store.remove(owner, l.ref)); layers = null; break; }
-        layers.push({ ref: lref, name: L.name, op: Math.round(L.op * 100) / 100, vis: L.vis });
+      const Ls = eng.layers.slice(), metas = eng.layersMeta(), vers = Ls.map((L) => L.ver);
+      const reuse = Ls.map((L) => !!(L.saved && L.saved.ver === L.ver));
+      const enc = Ls.map((L, i) => (reuse[i] ? null : encodeLayer(L.cv)));
+      if (enc.some((d, i) => !reuse[i] && !d)) throw new Error("big");
+      const log = eng.log(), stats = logStats(log);
+      let logStr = LOG_PREFIX + packLog(log);
+      if (logStr.length > PART_MAX * 4) logStr = null;
+      const W = eng.W, H = eng.H, paper = eng.paper, g = S.guide;
+      // 2) 올린다. 제한 시간을 넘긴 쓰기도 나중에 반영될 수 있으므로, 올리기 전에 이름을 적어 두고 실패하면 지우기를 건다
+      made.push(ref);
+      if (!(await store.putT(owner, ref, comp))) throw new Error("net");
+      const layers = [];
+      for (let i = 0; i < Ls.length; i++) {
+        const parts = reuse[i] ? Ls[i].saved.parts : await putParts(store, owner, ref + ".L" + metas[i].id, enc[i]);
+        if (!parts) throw new Error("net");        // 한 장이라도 못 올리면 저장하지 않는다(레이어를 버리고 합쳐 저장하지 않는다)
+        if (!reuse[i]) made.push(...parts.map((p) => p.ref));
+        layers.push({ ...metas[i], parts });
       }
-      const prev = vRef.current;
-      const val = { ref, at: new Date().toISOString(), w: eng.W, h: eng.H, paper: S.paper };
-      if (layers) val.layers = layers;
+      let logParts = null;
+      if (logStr) { logParts = await putParts(store, owner, ref + ".log", logStr); if (logParts) made.push(...logParts.map((p) => p.ref)); }
+      // 3) 값. 앞의 저장본은 버전으로 두거나(keep) 지운다
+      const pv = vRef.current, prev = pv && typeof pv === "object" && pv.ref ? pv : null;
+      let versions = prev && Array.isArray(prev.versions) ? prev.versions.filter((x) => x && x.ref) : [];
+      const lastKept = Math.max(0, ...versions.map((x) => +new Date(x.at) || 0), prev && prev.keep ? +new Date(prev.at) || 0 : 0);
+      // 다른 기기에서 들어온 저장본(remote)은 이 기기가 본 적 없는 그림이므로 항상 버전으로 둔다
+      if (prev && (prev.keep || remoteRef.current)) versions = [...versions, { ref: prev.ref, at: prev.at || "", w: prev.w || 0, h: prev.h || 0, n: prev.stats ? prev.stats.n || 0 : 0 }];
+      versions = versions.slice(-VERSIONS_MAX);
+      const val = { ref, at: new Date(ts).toISOString(), w: W, h: H, paper, stats, keep: !!opt.version || ts - lastKept >= VERSION_GAP, layers };
+      if (logParts) val.log = { parts: logParts, n: log.length };
+      if (versions.length) val.versions = versions;
+      if (g && g.kind !== "none") val.guide = { kind: g.kind, step: g.step, vp: g.vp ? g.vp.map((p) => ({ x: p[0], y: p[1] })) : null, sym: g.sym, n: g.n, assist: !!g.assist };
+      const lockedNow = st.current.locked;
+      if (!aliveRef.current || (lockedNow && !opt.force)) throw new Error("lock");
+      const keep = new Set(refsOf(val));
+      cleanup.current = { ref, olds: prev ? refsOf(prev).filter((r) => !keep.has(r)) : [] };
       loadedRef.current = ref;
-      setField(fieldKey, val);
-      if (prev && typeof prev === "object") {
-        if (prev.ref) store.remove(owner, prev.ref);
-        (Array.isArray(prev.layers) ? prev.layers : []).forEach((l) => l && l.ref && store.remove(owner, l.ref));
-      }
-      clearDraft();
-      markClean();
-      if (!layers) flash("레이어가 커서 한 장으로 합쳐 저장했습니다. 다시 열면 레이어 1장으로 열립니다.");
+      setField(fieldKey, val, lockedNow ? { upload: true } : undefined);
+      Ls.forEach((L, i) => { L.saved = { ver: vers[i], parts: layers[i].parts }; });
+      remoteRef.current = false; setRemote(false);
+      ok = true;
+      lastSaveAt.current = ts;
+      setSavedAt(ts);
+      setAutoFail(0);
+      if (seq === changeSeq.current) { clearDraft(); markClean(); }
+      else { draft.current.fresh = false; draft.current.ver++; clearTimeout(draft.current.timer); draft.current.timer = setTimeout(writeDraft, 600); }
+      if (!logParts && !opt.auto && logStr === null) flash("과정 기록이 너무 길어 그림만 저장했습니다.");
     } catch (e) {
-      setErr(e && e.message === "big" ? "스케치가 너무 커서 저장하지 못했습니다. 에어브러시·목탄으로 넓게 칠한 부분을 줄여 보세요." : "스케치를 저장하지 못했습니다. 그린 내용은 그대로 있습니다.");
+      made.forEach((r) => store.remove(owner, r));
+      const m = e && e.message;
+      if (m === "big") setErr("스케치가 너무 커서 저장하지 못했습니다. 에어브러시·목탄으로 넓게 칠한 부분을 줄여 보세요.");
+      else if (m !== "lock") { if (opt.auto) setAutoFail((n) => n + 1); else setErr("스케치를 저장하지 못했습니다. 연결을 확인하고 다시 저장해 주세요. 그린 내용은 그대로 있습니다."); }
     }
-    setBusy(false);
+    savingRef.current = false;
+    if (aliveRef.current) setBusy(false);
+    return ok;
+  };
+  const autoTick = () => {
+    const S = st.current;
+    if (!S.prefs.autosave || !dirtyRef.current || savingRef.current || S.locked || S.loading || S.loadFail || drag.current || xfRef.current || adjRef.current || textRef.current) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    const now = Date.now();
+    // 실패한 뒤에는 간격을 벌린다(오프라인에서 쓰기가 대기열에 쌓이지 않게)
+    if (now - lastChangeAt.current < 2500 || now - lastSaveAt.current < AUTOSAVE_GAP || now - lastTry.current < AUTOSAVE_GAP) return;
+    save({ auto: true });
+  };
+  const onHide = () => {
+    if (!dirtyRef.current) return;
+    if (!draft.current.fresh) { clearTimeout(draft.current.timer); writeDraft(); }
+    if (st.current.prefs.autosave && Date.now() - lastTry.current > 20000 && !drag.current) save({ auto: true });
+  };
+  /* 나가기 전에 src-app.jsx가 부른다: 진행 중인 저장을 기다리고, 남은 변경이 있으면 한 번 저장해 본다 */
+  const flush = async () => {
+    if (savePromise.current) await savePromise.current;
+    if (dirtyRef.current && !st.current.locked) { abortModes(); await save({ auto: true }); }
+    return !dirtyRef.current;
   };
   const revertToSaved = () => {
     if (!cur) return;
     if (!window.confirm("저장한 뒤에 그린 내용을 버리고 저장한 그림으로 되돌릴까요?")) return;
+    abortModes();
     clearDraft();
     markClean();
     loadFrom(cur, null);
   };
+  const retryLoad = () => { abortModes(); loadFrom(cur, null); };
   const removeSaved = async () => {
     if (!cur || !confirmDel()) return;
-    const refs = [cur.ref, ...(Array.isArray(cur.layers) ? cur.layers.map((l) => l && l.ref) : [])].filter(Boolean);
+    const refs = refsOf(cur);
+    cleanup.current = null;
     loadedRef.current = null;
     setField(fieldKey, "");
     refs.forEach((r) => store.remove(owner, r));
+    eng.layers.forEach((L) => { L.saved = null; });
     if (eng.hasContent()) changed(); else { clearDraft(); markClean(); }
   };
+  /* 저장 버전을 불러온다. layer: 새 레이어로(지금 그림은 그대로), replace: 지금 그림을 그 버전으로 바꾼다. 둘 다 되돌릴 수 있다 */
+  const restoreVersion = async (ver, mode) => {
+    if (st.current.locked || drag.current) return;
+    if (mode === "layer" && eng.layers.length >= MAX_LAYERS) return flash("레이어는 " + MAX_LAYERS + "장까지 만들 수 있습니다.");
+    abortModes();
+    try {
+      const data = await store.get(owner, ver.ref);
+      if (typeof data !== "string" || !data.startsWith("data:image")) throw new Error("missing");
+      const img = await loadImg(data);
+      if (st.current.locked || !aliveRef.current) return;
+      const c = document.createElement("canvas");
+      c.width = eng.W; c.height = eng.H;
+      const s = Math.min(eng.W / img.naturalWidth, eng.H / img.naturalHeight);
+      const w = img.naturalWidth * s, h = img.naturalHeight * s;
+      c.getContext("2d").drawImage(img, (eng.W - w) / 2, (eng.H - h) / 2, w, h);
+      const grp = "g" + eng.grpSeq++;
+      if (mode === "replace") {
+        if (eng.layers.length > 1) eng.commit({ kind: "lflat", grp });
+        const B = eng.layers[0];
+        if (B.lock) eng.commit({ kind: "lset", id: B.id, patch: { lock: false }, grp });
+        eng.commit({ kind: "image", paste: true, img: c, x: 0, y: 0, w: eng.W, h: eng.H, layers: [B.id], grp });
+        flash("그 버전으로 되돌렸습니다. 되돌리기로 취소할 수 있습니다.");
+      } else {
+        const N = eng.commit({ kind: "ladd", name: "저장 버전 " + fmtTime(ver.at), index: eng.layers.length, grp })._L;
+        eng.commit({ kind: "image", paste: true, img: c, x: 0, y: 0, w: eng.W, h: eng.H, layers: [N.id], grp });
+        flash("저장 버전을 새 레이어로 불러왔습니다.");
+      }
+      touched();
+    } catch (e) { flash("저장 버전을 불러오지 못했습니다."); }
+  };
+
+  fn.current = { onWheel, onKey, onKeyUp, autoTick, onHide, abortModes, save, flush };
 
   /* ---------- 그리기 ---------- */
 
   const T = TOOL[tool];
-  const pr = prefs[tool];
-  const A = eng.active();
-  const isBrush = !!(T && T.eng);
-  const sizeCss = pr ? pr.size * view.current.s : 0;
-  const canUndo = eng.hist.length > 0, canRedo = eng.redo.length > 0;
+  const pr = tool === "fill" ? prefs.fillT : prefs[tool];
+  const hasSize = !!(T && T.min);
+  const drawTool = isDrawBrush(tool);
+  const brushLike = !!BRUSH[tool];
+  const X = xfRef.current;
+  const modal = !!X || !!adj;
+  const canUndo = eng.hist.length > 0 || modal, canRedo = eng.redo.length > 0 && !modal;
   const textPos = textAt ? toScreen(textAt.x, textAt.y) : null;
+  const sizeCss = hasSize && pr ? pr.size * view.current.s : 0;
+  const R = ratioFor(dims.W, dims.H);
+  const adjDef = adj ? ADJUSTS.find((a) => a.k === adj.type) : null;
+  const vps = guide.kind === "persp1" || guide.kind === "persp2"
+    ? (guide.vp && guide.vp.length >= (guide.kind === "persp2" ? 2 : 1) ? guide.vp : guide.kind === "persp2" ? [[dims.W * 0.08, dims.H * 0.42], [dims.W * 0.92, dims.H * 0.42]] : [[dims.W * 0.5, dims.H * 0.42]]).slice(0, guide.kind === "persp2" ? 2 : 1)
+    : null;
+  const gShown = vps ? { ...guide, vp: vps } : guide;
+  if (vps && guide.vp !== vps && st.current.guide === guide) st.current.guide = gShown;
 
   const toolBtn = (t) => (
     <button key={t.k} type="button" className={"skx-tool" + (tool === t.k ? " on" : "")} aria-pressed={tool === t.k}
-      title={`${t.name} (${t.key.toUpperCase()})`} onClick={() => selectTool(t.k)}>
-      <Icon k={t.k} /><span>{t.name}</span>
+      title={t.name + (t.key ? ` (${t.key.toUpperCase()})` : "")} onClick={() => selectTool(t.k)}>
+      <Icon k={t.k === "xform" ? "transform" : t.k} /><span>{t.name}</span>
     </button>
   );
-  const iconBtn = (k, label, onClick, opts = {}) => (
-    <button type="button" className={"skx-ib" + (opts.on ? " on" : "")} title={label} aria-label={label} aria-pressed={opts.on === undefined ? undefined : !!opts.on}
-      disabled={opts.disabled} onClick={onClick}><Icon k={k} /></button>
+  const menuBtn = (k, icon, name) => (
+    <button type="button" className={"skx-tool" + (panel === k ? " open" : "")} aria-expanded={panel === k} title={name} disabled={modal && k !== "adjust"}
+      onClick={() => setPanel((p) => (p === k ? null : k))}>
+      <Icon k={icon} /><span>{name}</span>
+    </button>
   );
-  const seg = (items, value, onPick, label) => (
-    <span className="skx-seg" role="group" aria-label={label}>
-      {items.map(([k, name]) => <button key={k} type="button" className={value === k ? "on" : ""} aria-pressed={value === k} onClick={() => onPick(k)}>{name}</button>)}
-    </span>
+  const vpDown = (e, i) => {
+    e.preventDefault(); e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (x) {}
+  };
+  const vpMove = (e, i) => {
+    if (!e.currentTarget.hasPointerCapture || !e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    const q = toCanvas(e.clientX, e.clientY);
+    setGuide((g) => { const vp = (vps || []).map((p) => p.slice()); vp[i] = [Math.round(q.x), Math.round(q.y)]; return { ...g, vp }; });
+  };
+  const xfCorners = X ? (() => {
+    const m = xfMatrix(X), hw = X.w / 2, hh = X.h / 2;
+    const P = (dx, dy) => matApply(m, X.cx + dx * hw, X.cy + dy * hh);
+    const c = [P(-1, -1), P(1, -1), P(1, 1), P(-1, 1)];
+    const top = P(0, -1), ctr = P(0, 0);
+    const L = Math.hypot(top[0] - ctr[0], top[1] - ctr[1]) || 1, off = 30 / view.current.s;
+    // 그림이 작으면 변 손잡이가 모서리 손잡이·몸통과 겹쳐 옮기기 어려우므로 숨긴다
+    const vs = view.current.s;
+    return { c, sides: [P(0, -1), P(1, 0), P(0, 1), P(-1, 0)], rot: [top[0] + ((top[0] - ctr[0]) / L) * off, top[1] + ((top[1] - ctr[1]) / L) * off], top,
+      wide: X.w * Math.abs(X.sx) * vs > 64, tall: X.h * Math.abs(X.sy) * vs > 64 };
+  })() : null;
+  const handle = (p, mode, hx, hy, label, cls = "") => (
+    <button key={label} type="button" className={"skx-h " + cls} style={{ left: p[0], top: p[1] }} aria-label={label} title={label}
+      onPointerDown={(e) => xfDown(e, mode, hx, hy)} onPointerMove={xfMove} onPointerUp={xfUp} onPointerCancel={xfUp} />
   );
 
   return (
     <div className="field span2">
       <label>{f.label}</label>
-      <div ref={rootRef} className={"skx" + (full ? " skx-full" : "")} tabIndex={-1} onKeyDown={onKey} onKeyUp={onKeyUp}>
+      <div ref={rootRef} className={"skx" + (full ? " skx-full" : "")} tabIndex={-1} onKeyDown={onKey} onKeyUp={onKeyUp}
+        onClick={(e) => { if (e.detail > 0 && e.target.closest && e.target.closest("button") && !textRef.current && !replay) rootRef.current.focus({ preventScroll: true }); }}>
         <div className="skx-bar">
-          <div className="skx-grp" role="toolbar" aria-label="그리기 도구">{TOOLS.slice(0, 7).map(toolBtn)}</div>
+          <div className="skx-grp">
+            {menuBtn("actions", "actions", "동작")}
+            {menuBtn("adjust", "adjust", "조정")}
+            {toolBtn(TOOL.select)}
+            {toolBtn(TOOL.xform)}
+            {menuBtn("guide", "grid", "안내선")}
+          </div>
           <span className="skx-sep" />
-          <div className="skx-grp" role="toolbar" aria-label="도형·글자·색 가져오기·이동">{TOOLS.slice(7).map(toolBtn)}</div>
+          <div className="skx-grp" role="toolbar" aria-label="그리기 도구">
+            <button type="button" className={"skx-tool skx-brushbtn" + (drawTool ? " on" : "") + (panel === "brush" ? " open" : "")} aria-pressed={drawTool}
+              title={"브러시: " + BRUSH[lastBrush].name + " (한 번 더 누르면 보관함)"} onClick={() => selectTool(lastBrush)}>
+              <Icon k={lastBrush} /><span>{BRUSH[lastBrush].name}</span>
+            </button>
+            {toolBtn(BRUSH.smudge)}
+            {toolBtn(BRUSH.eraser)}
+            {EXTRA.filter((t) => t.k !== "select" && t.k !== "xform").map(toolBtn)}
+          </div>
           <span className="skx-sep" />
           <div className="skx-grp skx-view-grp">
-            {iconBtn("undo", "되돌리기 (Ctrl+Z)", doUndo, { disabled: !canUndo })}
-            {iconBtn("redo", "다시 실행 (Ctrl+Shift+Z)", doRedo, { disabled: !canRedo })}
+            <IconBtn k="undo" label="되돌리기 (Ctrl+Z)" onClick={doUndo} disabled={!canUndo} />
+            <IconBtn k="redo" label="다시 실행 (Ctrl+Shift+Z)" onClick={doRedo} disabled={!canRedo} />
+            <IconBtn k="history" label="기록" onClick={() => setPanel((p) => (p === "history" ? null : "history"))} on={panel === "history"} disabled={modal} />
             <span className="skx-sep" />
-            {iconBtn("zoomOut", "축소 (-)", () => zoomBy(0.8))}
+            <IconBtn k="zoomOut" label="축소 (-)" onClick={() => zoomBy(0.8)} />
             <button type="button" className="skx-zoom" title="화면에 맞추기 (0)" onClick={fitView}>{zoomPct}%</button>
-            {iconBtn("zoomIn", "확대 (+)", () => zoomBy(1.25))}
-            {iconBtn("flip", "좌우 반전해서 보기", () => turnView({ fx: -view.current.fx }), { on: view.current.fx < 0 })}
-            {iconBtn("layers", "레이어", () => setShowLayers((x) => !x), { on: showLayers })}
-            {iconBtn(full ? "unfull" : "full", full ? "작게 보기 (Esc)" : "크게 그리기 (F)", () => setFull((x) => !x), { on: full })}
+            <IconBtn k="zoomIn" label="확대 (+)" onClick={() => zoomBy(1.25)} />
+            <IconBtn k="flip" label="좌우 반전해서 보기 (X)" onClick={() => turnView({ fx: -view.current.fx })} on={view.current.fx < 0} />
+            <span className="skx-sep" />
+            <IconBtn k="layers" label="레이어 (L)" onClick={() => setPanel((p) => (p === "layers" ? null : "layers"))} on={panel === "layers"} disabled={modal} />
+            <button type="button" className={"skx-colorbtn" + (panel === "color" ? " on" : "")} title="색 (C)" aria-label={"색 " + color} aria-expanded={panel === "color"}
+              onClick={() => setPanel((p) => (p === "color" ? null : "color"))}><i style={{ background: color }} /></button>
+            <IconBtn k={full ? "unfull" : "full"} label={full ? "작게 보기 (Esc)" : "크게 그리기 (F)"} onClick={() => setFull((x) => !x)} on={full} />
           </div>
         </div>
 
         <div className="skx-opts">
-          {tool === "shape" && <span className="skx-opt"><b>모양</b>{seg(SHAPES, prefs.shapeKind, (k) => setPref({ shapeKind: k }), "도형 모양")}</span>}
-          {pr && (
-            <span className="skx-opt">
-              <b>{tool === "text" ? "글자 크기" : "굵기"}</b>
-              <input type="range" min="0" max="1000" value={sizeToSlider(T, pr.size)} aria-label={tool === "text" ? "글자 크기" : "굵기"}
-                onChange={(e) => setToolPref(tool, { size: sliderToSize(T, +e.target.value) })} />
-              <span className="skx-num">{pr.size}px</span>
-              {tool !== "text" && <span className="skx-dot" aria-hidden="true"><i style={{ width: clamp(sizeCss, 1, 34), height: clamp(sizeCss, 1, 34), background: tool === "eraser" ? "#fff" : color, opacity: tool === "eraser" ? 1 : pr.op }} /></span>}
-            </span>
+          {adj && adjDef ? (
+            <>
+              <span className="skx-tip"><b>{adjDef.name}</b></span>
+              {adjDef.params.map(([k, name, min, max, , unit]) => (
+                <Range key={k} label={name} min={min} max={max} value={adj.params[k]} onChange={(val) => setAdjParam(k, val)} fmt={(x) => x + unit} />
+              ))}
+              <button type="button" className="btn small" onClick={() => endAdjust(true)}>적용</button>
+              <button type="button" className="btn small ghost" onClick={() => endAdjust(false)}>취소</button>
+            </>
+          ) : X ? (
+            <>
+              <button type="button" className={"skx-chip" + (prefs.uniform ? " on" : "")} aria-pressed={prefs.uniform} onClick={() => setPref({ uniform: !prefs.uniform })}>비율 유지</button>
+              <span className="skx-opt">
+                <IconBtn k="flip" label="좌우 뒤집기" onClick={() => xfPatch((x) => ({ sx: -x.sx }))} />
+                <IconBtn k="flipV" label="상하 뒤집기" onClick={() => xfPatch((x) => ({ sy: -x.sy }))} />
+                <IconBtn k="rotL" label="왼쪽으로 90° 돌리기" onClick={() => xfPatch((x) => ({ rot: x.rot - Math.PI / 2 }))} />
+                <IconBtn k="rotR" label="오른쪽으로 90° 돌리기" onClick={() => xfPatch((x) => ({ rot: x.rot + Math.PI / 2 }))} />
+              </span>
+              <button type="button" className="skx-chip" onClick={() => xfPatch({ tx: dims.W / 2 - X.cx, ty: dims.H / 2 - X.cy })}>가운데로</button>
+              <button type="button" className="skx-chip" onClick={() => xfPatch({ tx: 0, ty: 0, rot: 0, sx: 1, sy: 1 })}>처음대로</button>
+              <span className="skx-num">{Math.round(Math.abs(X.sx) * 100)}% · {Math.round((((X.rot * 180) / Math.PI) % 360 + 360) % 360)}°</span>
+              <button type="button" className="btn small" onClick={() => { applyXform(); setTool(prevTool.current === "xform" ? lastBrush : prevTool.current); }}>적용</button>
+              <button type="button" className="btn small ghost" onClick={cancelXform}>취소</button>
+            </>
+          ) : (
+            <>
+              {tool === "shape" && <span className="skx-opt"><b>모양</b><Seg items={SHAPES} value={prefs.shapeKind} onPick={(k) => setPref({ shapeKind: k })} label="도형 모양" /></span>}
+              {tool === "select" && (
+                <>
+                  <span className="skx-opt"><b>방법</b><Seg items={SEL_KINDS} value={prefs.selKind} onPick={(k) => setPref({ selKind: k })} label="선택 방법" /></span>
+                  <span className="skx-opt"><Seg items={SEL_OPS} value={prefs.selOp} onPick={(k) => setPref({ selOp: k })} label="선택 더하기·빼기" /></span>
+                  {prefs.selKind === "wand" && <Range label="허용 범위" min={0} max={128} value={prefs.wandTol} onChange={(x) => setPref({ wandTol: x })} />}
+                  <span className="skx-opt">
+                    <button type="button" className="skx-chip" onClick={selectAll}>전체</button>
+                    <button type="button" className="skx-chip" onClick={invertSel}>반전</button>
+                    <button type="button" className="skx-chip" disabled={!eng.sel} onClick={() => setSel(null)}>해제</button>
+                  </span>
+                  {eng.sel && (
+                    <span className="skx-opt">
+                      <button type="button" className="skx-chip" onClick={() => liftSel(false)}>복사해 새 레이어로</button>
+                      <button type="button" className="skx-chip" onClick={() => liftSel(true)}>잘라 새 레이어로</button>
+                      <button type="button" className="skx-chip" onClick={fillSelArea}>색 채우기</button>
+                      <button type="button" className="skx-chip" onClick={clearSelArea}>지우기</button>
+                    </span>
+                  )}
+                </>
+              )}
+              {hasSize && pr && (
+                <span className="skx-opt">
+                  <b>{tool === "text" ? "글자 크기" : "굵기"}</b>
+                  <input type="range" min="0" max="1000" value={sizeToSlider(T, pr.size)} aria-label={tool === "text" ? "글자 크기" : "굵기"}
+                    onChange={(e) => setToolPref(tool, { size: sliderToSize(T, +e.target.value) })} />
+                  <span className="skx-num">{pr.size}px</span>
+                  {tool !== "text" && <span className="skx-dot" aria-hidden="true"><i style={{ width: clamp(sizeCss, 1, 34), height: clamp(sizeCss, 1, 34), background: tool === "eraser" || tool === "smudge" ? "#fff" : color, opacity: tool === "eraser" || tool === "smudge" ? 1 : pr.op }} /></span>}
+                </span>
+              )}
+              {pr && tool !== "smudge" && (hasSize || tool === "fill") && (
+                <Range label="불투명도" min={5} max={100} value={Math.round(pr.op * 100)} onChange={(x) => setToolPref(tool === "fill" ? "fillT" : tool, { op: x / 100 })} fmt={(x) => x + "%"} />
+              )}
+              {tool === "smudge" && <Range label="번짐 세기" min={5} max={95} value={Math.round(prefs.smudge.strength * 100)} onChange={(x) => setToolPref("smudge", { strength: x / 100 })} fmt={(x) => x + "%"} />}
+              {tool === "fill" && (
+                <>
+                  <Range label="허용 범위" min={0} max={128} value={prefs.fillTol} onChange={(x) => setPref({ fillTol: x })} />
+                  <span className="skx-opt"><b>기준</b><Seg items={[["all", "모든 레이어"], ["layer", "이 레이어"]]} value={prefs.fillRef} onPick={(k) => setPref({ fillRef: k })} label="채우기 기준" /></span>
+                </>
+              )}
+              {tool === "text" && <span className="skx-opt"><b>글꼴</b><Seg items={TEXT_FONTS} value={prefs.font} onPick={(k) => setPref({ font: k })} label="글꼴" /></span>}
+              {T && T.dash && <span className="skx-opt"><b>선 모양</b><Seg items={DASHES} value={prefs.dash} onPick={(k) => setPref({ dash: k })} label="선 모양" /></span>}
+              {tool === "shape" && (prefs.shapeKind === "rect" || prefs.shapeKind === "ellipse") && (
+                <button type="button" className={"skx-chip" + (prefs.fill ? " on" : "")} aria-pressed={prefs.fill} onClick={() => setPref({ fill: !prefs.fill })}>안쪽 채우기</button>
+              )}
+              {brushLike && <button type="button" className={"skx-chip" + (panel === "brush" ? " on" : "")} aria-expanded={panel === "brush"} onClick={() => setPanel((p) => (p === "brush" ? null : "brush"))}>브러시 설정</button>}
+              {brushLike && <Range label="손떨림 보정" min={0} max={10} value={prefs.smooth} onChange={(x) => setPref({ smooth: x })} />}
+              {touchDev && (brushLike || tool === "shape" || tool === "text" || tool === "fill" || tool === "select") && (
+                <button type="button" className={"skx-chip" + (prefs.finger ? " on" : "")} aria-pressed={prefs.finger} onClick={() => setPref({ finger: !prefs.finger, penAuto: true })}
+                  title="끄면 손가락은 화면 이동·확대에만 쓰고, 그리기는 펜으로만 합니다">손가락으로 그리기</button>
+              )}
+              {tool === "picker" && <span className="skx-tip">캔버스를 누르면 그 색을 가져옵니다.</span>}
+              {tool === "hand" && <span className="skx-tip">끌어서 화면을 옮깁니다.</span>}
+              {tool === "text" && <span className="skx-tip">캔버스를 누른 뒤 글자를 쓰고 Enter를 누릅니다.</span>}
+              {tool === "fill" && <span className="skx-tip">선으로 둘러싸인 곳을 누르면 색이 채워집니다.</span>}
+            </>
           )}
-          {pr && (
-            <span className="skx-opt">
-              <b>불투명도</b>
-              <input type="range" min="5" max="100" value={Math.round(pr.op * 100)} aria-label="불투명도"
-                onChange={(e) => setToolPref(tool, { op: +e.target.value / 100 })} />
-              <span className="skx-num">{Math.round(pr.op * 100)}%</span>
-            </span>
-          )}
-          {T.dash && <span className="skx-opt"><b>선 모양</b>{seg(DASHES, prefs.dash, (k) => setPref({ dash: k }), "선 모양")}</span>}
-          {tool === "shape" && (prefs.shapeKind === "rect" || prefs.shapeKind === "ellipse") && (
-            <button type="button" className={"skx-chip" + (prefs.fill ? " on" : "")} aria-pressed={prefs.fill} onClick={() => setPref({ fill: !prefs.fill })}>안쪽 채우기</button>
-          )}
-          {isBrush && T.press && (
-            <button type="button" className={"skx-chip" + (prefs.press ? " on" : "")} aria-pressed={prefs.press} onClick={() => setPref({ press: !prefs.press })}
-              title="펜을 누르는 힘에 따라 굵기와 농도가 달라집니다">필압</button>
-          )}
-          {isBrush && (
-            <span className="skx-opt">
-              <b>손떨림 보정</b>
-              <input type="range" min="0" max="10" value={prefs.smooth} aria-label="손떨림 보정" onChange={(e) => setPref({ smooth: +e.target.value })} />
-              <span className="skx-num">{prefs.smooth}</span>
-            </span>
-          )}
-          {touchDev && (isBrush || tool === "shape" || tool === "text") && (
-            <button type="button" className={"skx-chip" + (prefs.finger ? " on" : "")} aria-pressed={prefs.finger} onClick={() => setPref({ finger: !prefs.finger })}
-              title="끄면 손가락은 화면 이동·확대에만 쓰고, 그리기는 펜으로만 합니다">손가락으로 그리기</button>
-          )}
-          {tool === "picker" && <span className="skx-tip">캔버스를 누르면 그 색을 가져옵니다.</span>}
-          {tool === "hand" && <span className="skx-tip">끌어서 화면을 옮깁니다.</span>}
-          {tool === "text" && <span className="skx-tip">캔버스를 누른 뒤 글자를 쓰고 Enter를 누릅니다.</span>}
         </div>
 
-        <div className={"skx-colors" + (tool === "eraser" || tool === "hand" ? " dim" : "")}>
-          <span className="skx-cur" title="색 고르기" style={{ background: color }}>
-            <input type="color" value={/^#[0-9A-F]{6}$/i.test(color) ? color.toLowerCase() : "#111111"} aria-label="색 고르기"
-              onChange={(e) => chooseColor(e.target.value.toUpperCase())} />
-          </span>
+        <div className={"skx-colors" + (tool === "eraser" || tool === "hand" || tool === "smudge" ? " dim" : "")}>
           <span className="skx-hex">{color}</span>
-          <span className="skx-pal" role="group" aria-label="팔레트">
+          <span className="skx-pal" role="group" aria-label="기본 팔레트">
             {PALETTE.map(([c, name]) => (
               <button key={c} type="button" className={"skx-sw" + (color === c ? " on" : "")} style={{ background: c }} title={name} aria-label={name}
                 aria-pressed={color === c} onClick={() => chooseColor(c)} />
@@ -1621,16 +1894,32 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
         <div className="skx-main">
           <div ref={viewRef} className={"skx-view tool-" + tool} style={{ aspectRatio: `${dims.W} / ${dims.H}` }}
             onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}
-            onPointerLeave={hideCursor} onContextMenu={(e) => e.preventDefault()}>
+            onLostPointerCapture={onLostCapture} onPointerLeave={hideCursor} onContextMenu={(e) => e.preventDefault()}>
             <div ref={stageRef} className="skx-stage" style={{ width: dims.W, height: dims.H }}>
-              <div className="skx-paper" style={{ background: paperColor(paper) }} />
+              <div className="skx-paper" style={{ background: paperColor(eng.paper) }} />
               <div ref={hostRef} className="skx-host" />
-              <Guides kind={guide} W={dims.W} H={dims.H} />
+              <Guides g={gShown} W={dims.W} H={dims.H} />
+              <svg className="skx-guide" viewBox={`0 0 ${dims.W} ${dims.H}`} width={dims.W} height={dims.H} aria-hidden="true">
+                <path ref={selPathRef} d="" fill="rgba(0,105,190,.08)" stroke="#0069be" strokeWidth="1.5" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" />
+                {xfCorners && <polygon points={xfCorners.c.map((p) => p.join(",")).join(" ")} fill="none" stroke="#0069be" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
+                {xfCorners && <line x1={xfCorners.top[0]} y1={xfCorners.top[1]} x2={xfCorners.rot[0]} y2={xfCorners.rot[1]} stroke="#0069be" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
+              </svg>
+              {xfCorners && !locked && (
+                <>
+                  {xfCorners.c.map((p, i) => handle(p, "scale", [-1, 1, 1, -1][i], [-1, -1, 1, 1][i], ["왼쪽 위", "오른쪽 위", "오른쪽 아래", "왼쪽 아래"][i] + " 모서리: 크기 바꾸기"))}
+                  {xfCorners.sides.map((p, i) => ((i % 2 ? xfCorners.wide : xfCorners.tall) ? handle(p, "scale", [0, 1, 0, -1][i], [-1, 0, 1, 0][i], ["위", "오른쪽", "아래", "왼쪽"][i] + " 변: 한쪽으로 늘이기", "side") : null))}
+                  {handle(xfCorners.rot, "rot", 0, 0, "돌리기", "rot")}
+                </>
+              )}
+              {vps && !modal && !locked && vps.map((p, i) => (
+                <button key={i} type="button" className="skx-h vp" style={{ left: p[0], top: p[1] }} aria-label={"소실점 " + (i + 1) + ": 끌어서 옮기기"} title="소실점: 끌어서 옮기기"
+                  onPointerDown={(e) => vpDown(e, i)} onPointerMove={(e) => vpMove(e, i)} />
+              ))}
             </div>
             <div ref={cursorRef} className="skx-cursor" />
             {textAt && textPos && (
               <input className="skx-textin" autoFocus value={textVal} placeholder="글자 입력" aria-label="캔버스에 쓸 글자"
-                style={textStyle(textPos, prefs.text.size * view.current.s, color)}
+                style={textStyle(textPos, prefs.text.size * view.current.s, color, prefs.font)}
                 onChange={(e) => setTextVal(e.target.value)} onBlur={commitText} onPointerDown={(e) => e.stopPropagation()}
                 onKeyDown={(e) => {
                   e.stopPropagation();
@@ -1639,72 +1928,148 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
                 }} />
             )}
             {loading && <div className="skx-load">불러오는 중…</div>}
+            {loadFail && !loading && (
+              <div className="skx-load skx-fail" role="alert">
+                <p>저장된 스케치를 불러오지 못했습니다. 연결을 확인해 주세요.</p>
+                <button type="button" className="btn small" onClick={retryLoad}>다시 불러오기</button>
+              </div>
+            )}
             {note && <div className="skx-toast" role="status">{note}</div>}
           </div>
 
-          {showLayers && (
-            <div className="skx-layers" role="group" aria-label="레이어">
-              <div className="skx-lhead">
-                <b>레이어</b>
-                <button type="button" className="skx-lbtn" onClick={addLayer} disabled={eng.layers.length >= MAX_LAYERS}><Icon k="plus" />새 레이어</button>
-                {iconBtn("close", "레이어 창 닫기", () => setShowLayers(false))}
+          {panel === "brush" && (
+            <div className="skx-pop right">
+              <BrushPanel tool={brushLike ? tool : lastBrush} prefs={prefs} color={color}
+                onPick={(k) => { if (k !== tool) selectTool(k); }}
+                onParam={(k, patch) => setToolPref(k, patch)}
+                onReset={(k) => setToolPref(k, { ...BRUSH[k].d })}
+                onClose={() => setPanel(null)} />
+            </div>
+          )}
+          {panel === "layers" && (
+            <div className="skx-pop right">
+              <LayersPanel eng={eng} tick={tick} flash={flash} onChange={touched}
+                onSelect={(id) => { eng.activeId = id; eng.mount(); bump(); }} onClose={() => setPanel(null)} />
+            </div>
+          )}
+          {panel === "color" && (
+            <div className="skx-pop right">
+              <PanelHead title="색" onClose={() => setPanel(null)} />
+              <ColorPanel color={color} onChange={chooseColor} recent={prefs.recent} basePalette={PALETTE}
+                palettes={prefs.palettes} onPalettes={(next) => setPref({ palettes: next })} />
+            </div>
+          )}
+          {panel === "history" && (
+            <div className="skx-pop right">
+              <HistoryPanel eng={eng} tick={tick} versions={cur && Array.isArray(cur.versions) ? cur.versions : []} cur={cur} owner={owner}
+                MediaThumb={MediaThumb} fmtTime={fmtTime} busy={busy || loading || locked}
+                onJump={(n) => { if (!drag.current && !locked && eng.jumpTo(n)) { syncDims(); touched(); } }}
+                onRestore={restoreVersion} onSaveVersion={() => save({ version: true })}
+                onReplay={() => setReplay(eng.log().slice())} onClose={() => setPanel(null)} />
+            </div>
+          )}
+          {panel === "adjust" && (
+            <div className="skx-pop left skx-menu">
+              <PanelHead title="조정" onClose={() => setPanel(null)} />
+              <p className="skx-mnote">지금 레이어{eng.sel ? "의 선택 영역" : ""}에 적용합니다.</p>
+              <ul>{ADJUSTS.map((a) => <li key={a.k}><button type="button" onClick={() => startAdjust(a.k)}>{a.name}</button></li>)}</ul>
+            </div>
+          )}
+          {panel === "guide" && (
+            <div className="skx-pop left skx-menu">
+              <PanelHead title="안내선" onClose={() => setPanel(null)} />
+              <div className="skx-msec">
+                <Seg items={GUIDES} value={guide.kind} onPick={(k) => setGuide((g) => ({ ...g, kind: k, vp: k === g.kind ? g.vp : null }))} label="안내선 종류" />
+                {(guide.kind === "grid" || guide.kind === "iso") && <Range label="간격" min={30} max={300} step={10} value={guide.step} onChange={(x) => setGuide((g) => ({ ...g, step: x }))} fmt={(x) => x + "px"} />}
+                {guide.kind === "sym" && <span className="skx-opt"><b>대칭</b><Seg items={SYMS} value={guide.sym} onPick={(k) => setGuide((g) => ({ ...g, sym: k }))} label="대칭 종류" /></span>}
+                {guide.kind === "sym" && guide.sym === "radial" && <Range label="갈래" min={3} max={12} value={guide.n} onChange={(x) => setGuide((g) => ({ ...g, n: x }))} />}
+                {guide.kind === "sym" && <p className="skx-mnote">한쪽에 그리면 반대쪽에도 함께 그려집니다.</p>}
+                {vps && <p className="skx-mnote">파란 점(소실점)을 끌어 옮깁니다.</p>}
+                {ASSIST_KINDS.includes(guide.kind) && (
+                  <button type="button" className={"skx-chip" + (guide.assist ? " on" : "")} aria-pressed={guide.assist} onClick={() => setGuide((g) => ({ ...g, assist: !g.assist }))}>안내선에 맞춰 그리기</button>
+                )}
               </div>
-              <ul>
-                {[...eng.layers].reverse().map((L, ri) => {
-                  const i = eng.layers.length - 1 - ri;
-                  const on = L.id === eng.activeId;
-                  return (
-                    <li key={L.id} className={on ? "on" : ""}>
-                      {iconBtn(L.vis ? "eye" : "eyeOff", L.vis ? L.name + " 숨기기" : L.name + " 보이기", () => setLayer(L, { vis: !L.vis }), { on: L.vis })}
-                      <button type="button" className="skx-lname" aria-pressed={on} onClick={() => { eng.activeId = L.id; eng.mount(); bump(); }}>
-                        <LayerThumb L={L} paper={paperColor(paper)} />
-                        <span>{L.name}{L.op < 1 ? ` · ${Math.round(L.op * 100)}%` : ""}</span>
-                      </button>
-                      {iconBtn("up", L.name + " 위로", () => { eng.moveLayer(L.id, 1); changed(); bump(); }, { disabled: i === eng.layers.length - 1 })}
-                      {iconBtn("down", L.name + " 아래로", () => { eng.moveLayer(L.id, -1); changed(); bump(); }, { disabled: i === 0 })}
-                      {iconBtn("trash", L.name + " 지우기", () => removeLayer(L), { disabled: eng.layers.length <= 1 })}
-                    </li>
-                  );
-                })}
-              </ul>
-              {A && (
-                <div className="skx-opt skx-lop">
-                  <b>{A.name} 불투명도</b>
-                  <input type="range" min="0" max="100" value={Math.round(A.op * 100)} aria-label={A.name + " 불투명도"}
-                    onChange={(e) => setLayer(A, { op: +e.target.value / 100 })} />
-                  <span className="skx-num">{Math.round(A.op * 100)}%</span>
-                </div>
-              )}
+            </div>
+          )}
+          {panel === "ref" && refImg && (
+            <div className="skx-pop left skx-ref">
+              <PanelHead title="참고 그림" onClose={() => setPanel(null)}>
+                <button type="button" className="skx-lbtn" onClick={() => refFile.current && refFile.current.click()}>다른 사진</button>
+              </PanelHead>
+              <img src={refImg.src} alt="참고 그림" draggable={false} onPointerDown={pickRef} />
+              <p className="skx-mnote">사진을 누르면 그 색을 가져옵니다. 참고 그림은 저장되지 않습니다.</p>
+            </div>
+          )}
+          {panel === "actions" && (
+            <div className="skx-pop left skx-menu">
+              <PanelHead title="동작" onClose={() => setPanel(null)} />
+              <div className="skx-msec">
+                <h4>캔버스</h4>
+                <span className="skx-opt"><b>비율</b><Seg items={RATIOS.map((r) => [r.k, r.name])} value={R.W === dims.W && R.H === dims.H ? R.k : ""} onPick={changeRatio} label="캔버스 비율" /></span>
+                <span className="skx-opt"><b>종이</b>
+                  <span className="skx-pal" role="group" aria-label="종이 색">
+                    {PAPERS.map((p) => (
+                      <button key={p.k} type="button" className={"skx-sw paper" + (eng.paper === p.k ? " on" : "")} style={{ background: p.c }} title={p.name + " 종이"}
+                        aria-label={p.name + " 종이"} aria-pressed={eng.paper === p.k} onClick={() => { if (eng.paper !== p.k) { eng.setPaper(p.k); touched(); } }} />
+                    ))}
+                  </span>
+                </span>
+                <span className="skx-opt"><b>캔버스 돌리기</b>
+                  <IconBtn k="rotL" label="캔버스를 왼쪽으로 90° 돌리기" onClick={() => turnCanvas("rot90", { dir: -1 })} />
+                  <IconBtn k="rotR" label="캔버스를 오른쪽으로 90° 돌리기" onClick={() => turnCanvas("rot90", { dir: 1 })} />
+                  <IconBtn k="flip" label="캔버스 좌우 뒤집기" onClick={() => turnCanvas("flipH")} />
+                  <IconBtn k="flipV" label="캔버스 상하 뒤집기" onClick={() => turnCanvas("flipV")} />
+                </span>
+                <span className="skx-opt"><b>화면 돌려 보기</b>
+                  <IconBtn k="rotL" label="왼쪽으로 15° 돌려 보기" onClick={() => turnView({ r: (view.current.r - 15) % 360 })} />
+                  <IconBtn k="rotR" label="오른쪽으로 15° 돌려 보기" onClick={() => turnView({ r: (view.current.r + 15) % 360 })} />
+                  {view.current.r % 360 !== 0 && <button type="button" className="skx-chip" onClick={() => turnView({ r: 0 })}>원래대로</button>}
+                </span>
+              </div>
+              <div className="skx-msec">
+                <h4>추가·지우기</h4>
+                <button type="button" className="skx-lbtn" onClick={() => fileRef.current && fileRef.current.click()}><Icon k="image" />사진 불러오기</button>
+                {typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.read && (
+                  <button type="button" className="skx-lbtn" onClick={pasteClip}><Icon k="copy" />클립보드 그림 붙여넣기</button>
+                )}
+                <button type="button" className="skx-lbtn" onClick={() => (refImg ? setPanel("ref") : refFile.current && refFile.current.click())}><Icon k="eye" />참고 그림 띄우기</button>
+                <button type="button" className="skx-lbtn" onClick={clearAll}><Icon k="trash" />모두 지우기</button>
+              </div>
+              <div className="skx-msec">
+                <h4>그림 파일로 내려받기</h4>
+                <button type="button" className="skx-lbtn" onClick={() => exportImage("png")}><Icon k="download" />PNG</button>
+                <button type="button" className="skx-lbtn" onClick={() => exportImage("png-t")}><Icon k="download" />PNG (투명 배경)</button>
+                <button type="button" className="skx-lbtn" onClick={() => exportImage("jpg")}><Icon k="download" />JPG</button>
+                {typeof ClipboardItem !== "undefined" && <button type="button" className="skx-lbtn" onClick={copyClip}><Icon k="copy" />클립보드에 복사</button>}
+              </div>
+              <div className="skx-msec">
+                <h4>설정</h4>
+                <button type="button" className={"skx-chip" + (prefs.press ? " on" : "")} aria-pressed={prefs.press} onClick={() => setPref({ press: !prefs.press })}>필압</button>
+                <button type="button" className={"skx-chip" + (prefs.quick ? " on" : "")} aria-pressed={prefs.quick} onClick={() => setPref({ quick: !prefs.quick })}
+                  title="선을 긋고 떼지 않은 채 잠깐 멈추면 직선·원·사각형으로 바뀝니다">멈추면 도형으로 바로잡기</button>
+                <button type="button" className={"skx-chip" + (prefs.rotGesture ? " on" : "")} aria-pressed={prefs.rotGesture} onClick={() => setPref({ rotGesture: !prefs.rotGesture })}>두 손가락으로 화면 돌리기</button>
+                <button type="button" className={"skx-chip" + (prefs.autosave ? " on" : "")} aria-pressed={prefs.autosave} onClick={() => setPref({ autosave: !prefs.autosave })}>2분마다 자동 저장</button>
+                <Range label="필압 세기" min={40} max={250} step={5} value={Math.round(prefs.gamma * 100)} onChange={(x) => setPref({ gamma: x / 100 })}
+                  fmt={(x) => (x < 90 ? "가볍게" : x > 115 ? "세게" : "보통")} />
+              </div>
+              <p className="skx-mnote skx-info">캔버스 {dims.W}×{dims.H}px · 레이어 {eng.layers.length}장 · 작업 {Math.max(0, eng.log().length - 1)}개</p>
             </div>
           )}
         </div>
-
-        <div className="skx-canvasbar">
-          <span className="skx-opt"><b>종이</b>
-            <span className="skx-pal" role="group" aria-label="종이 색">
-              {PAPERS.map((p) => (
-                <button key={p.k} type="button" className={"skx-sw paper" + (paper === p.k ? " on" : "")} style={{ background: p.c }} title={p.name + " 종이"}
-                  aria-label={p.name + " 종이"} aria-pressed={paper === p.k} onClick={() => { if (paper !== p.k) { setPaper(p.k); changed(); } }} />
-              ))}
-            </span>
-          </span>
-          <span className="skx-opt"><b>안내선</b>{seg(GUIDES, guide, setGuide, "안내선")}</span>
-          <span className="skx-opt"><b>캔버스</b>{seg(RATIOS.map((r) => [r.k, r.name]), ratioFor(dims.W, dims.H).k, changeRatio, "캔버스 비율")}</span>
-          <span className="skx-opt"><b>회전</b>
-            {iconBtn("rotL", "왼쪽으로 15° 돌려 보기", () => turnView({ r: (view.current.r - 15) % 360 }))}
-            {iconBtn("rotR", "오른쪽으로 15° 돌려 보기", () => turnView({ r: (view.current.r + 15) % 360 }))}
-            {view.current.r % 360 !== 0 && <button type="button" className="skx-chip" onClick={() => turnView({ r: 0 })}>원래대로</button>}
-          </span>
-          <span className="skx-opt">
-            <button type="button" className="btn small ghost" onClick={() => fileRef.current && fileRef.current.click()}>사진 불러오기</button>
-            <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { importPhoto(e.target.files && e.target.files[0]); e.target.value = ""; }} />
-            <button type="button" className="btn small ghost" onClick={clearAll}>모두 지우기</button>
-          </span>
-        </div>
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { importPhoto(e.target.files && e.target.files[0]); e.target.value = ""; }} />
+        <input ref={refFile} type="file" accept="image/*" hidden onChange={(e) => { openRef(e.target.files && e.target.files[0]); e.target.value = ""; }} />
 
         <div className="skx-foot">
-          <button type="button" className="btn small" disabled={busy || loading || !dirty} onClick={save}>{busy ? "저장 중…" : "스케치 저장"}</button>
-          {dirty && !busy && <span className="hint" style={{ color: "var(--seal)" }}>저장하지 않은 변경이 있습니다.</span>}
+          <button type="button" className="btn small" disabled={busy || loading || loadFail || !dirty || modal} onClick={() => save()}>{busy ? "저장 중…" : "스케치 저장"}</button>
+          {dirty && !busy && (
+            <span className="hint" style={{ color: "var(--seal)" }}>
+              {locked ? "잠금 전에 저장하지 못한 그림이 있습니다. 잠금이 풀리면 저장해 주세요."
+                : autoFail >= 2 ? "자동 저장에 실패했습니다. 연결을 확인하고 「스케치 저장」을 눌러 주세요."
+                : "저장하지 않은 변경이 있습니다." + (prefs.autosave ? " 잠시 뒤 자동으로 저장됩니다." : "")}
+            </span>
+          )}
+          {!dirty && savedAt > 0 && <span className="hint">저장했습니다.</span>}
+          {remote && dirty && <span className="hint">다른 기기에서 저장된 그림이 있습니다. 지금 그림을 저장하면 그 그림은 저장 버전에 보관됩니다.</span>}
           {cur && (
             <>
               <span className="hint">저장된 스케치 {fmtTime(cur.at)}</span>
@@ -1717,15 +2082,17 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
           <details className="skx-help">
             <summary>단축키와 손동작</summary>
             <ul>
-              <li>두 손가락으로 벌리거나 모으면 확대·축소, 끌면 이동, 두 손가락 탭은 되돌리기, 세 손가락 탭은 다시 실행</li>
+              <li>두 손가락: 벌리거나 모으면 확대·축소(끝까지 오므리면 화면 맞춤), 끌면 이동, 돌리면 화면 회전, 가볍게 치면 되돌리기. 세 손가락으로 치면 다시 실행</li>
               <li>펜을 쓰면 손가락으로는 그려지지 않습니다(손바닥이 닿아도 선이 생기지 않음). 「손가락으로 그리기」로 바꿀 수 있습니다.</li>
-              <li>Shift를 누른 채 그리면 직선, Alt를 누른 채 누르면 스포이트</li>
-              <li>Ctrl+휠 확대·축소, 스페이스바나 휠 버튼을 누른 채 끌면 이동</li>
-              <li>1~6 붓 종류, E 지우개, U 도형, T 글자, I 스포이트, H 이동, [ ] 굵기, 0 화면 맞춤, F 크게 그리기</li>
-              <li>Ctrl+Z 되돌리기, Ctrl+Shift+Z 다시 실행, Ctrl+S 저장</li>
+              <li>선을 긋고 떼지 않은 채 잠깐 멈추면 직선·원·사각형으로 바뀝니다. Shift를 누른 채 그리면 직선, Alt를 누른 채 누르면 스포이트</li>
+              <li>Ctrl+휠 확대·축소, 스페이스바나 휠 버튼을 누른 채 끌면 이동, 0 화면 맞춤, X 좌우 반전 보기, F 크게 그리기</li>
+              <li>1~9 붓, E 지우개, S 번짐, G 채우기, U 도형, T 글자, M 선택, V 변형, I 스포이트, H 이동, [ ] 굵기, L 레이어, C 색</li>
+              <li>Ctrl+Z 되돌리기, Ctrl+Shift+Z 다시 실행, Ctrl+S 저장, Ctrl+A 전체 선택, Ctrl+D 선택 해제, Delete 선택 영역 지우기</li>
+              <li>변형: 모서리를 끌면 크기, 위쪽 점을 끌면 회전(Shift는 15°씩), 화살표 키로 1px씩 옮기기, Enter 적용, Esc 취소</li>
             </ul>
           </details>
         </div>
+        {replay && <ReplayPlayer ops={replay} title="과정 다시 보기" onClose={() => setReplay(null)} />}
       </div>
     </div>
   );
@@ -1741,31 +2108,37 @@ export const SKETCH_CSS = `
 .skx-view-grp{margin-left:auto}
 .skx-sep{align-self:stretch;width:1px;min-height:24px;background:var(--line);margin:4px 3px}
 .skx-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:48px;height:50px;padding:4px 4px 3px;border:1px solid transparent;background:transparent;color:var(--ink);font-family:var(--sans);font-size:11.5px;line-height:1.1;cursor:pointer;white-space:nowrap}
-.skx-tool:hover{background:#ececec}
+.skx-tool:hover:not(:disabled){background:#ececec}
 .skx-tool.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.skx-tool.open{border-color:var(--ink)}
+.skx-tool:disabled{opacity:.35;cursor:default}
+.skx-brushbtn{min-width:64px;border-color:var(--line)}
 .skx-ib{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1px solid transparent;background:transparent;color:var(--ink);cursor:pointer}
 .skx-ib:hover:not(:disabled){background:#ececec}
 .skx-ib.on{border-color:var(--ink);background:#fff}
 .skx-ib:disabled{opacity:.3;cursor:default}
 .skx-zoom{min-width:52px;height:36px;border:1px solid var(--line);background:#fff;font-family:var(--sans);font-size:12.5px;font-variant-numeric:tabular-nums;cursor:pointer;color:var(--ink)}
+.skx-colorbtn{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;border:1px solid #9a9a9a;background:#fff;cursor:pointer}
+.skx-colorbtn i{display:block;width:26px;height:26px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.skx-colorbtn.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .skx-opts{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding:8px 10px;border-bottom:1px solid var(--line2);font-size:13px;min-height:50px}
-.skx-opt{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.skx-opt{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;flex-wrap:wrap}
 .skx-opt>b{font-weight:500;font-size:12.5px;color:var(--sub)}
 .skx input[type=range]{width:120px;height:26px;padding:0;margin:0;border:0;background:transparent;accent-color:var(--ink);cursor:pointer}
 .skx-num{min-width:40px;font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--ink)}
 .skx-dot{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--line2);background:repeating-conic-gradient(#f2f2f2 0 25%,#fff 0 50%) 0 0/10px 10px}
 .skx-dot i{display:block;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
-.skx-seg{display:inline-flex;border:1px solid #9a9a9a}
+.skx-seg{display:inline-flex;flex-wrap:wrap;border:1px solid #9a9a9a}
 .skx-seg button{padding:5px 10px;border:0;border-left:1px solid #ddd;background:#fff;font-family:var(--sans);font-size:12.5px;color:var(--ink);cursor:pointer}
 .skx-seg button:first-child{border-left:0}
 .skx-seg button.on{background:var(--ink);color:#fff}
 .skx-chip{padding:5px 11px;border:1px solid #9a9a9a;background:#fff;font-family:var(--sans);font-size:12.5px;color:var(--ink);cursor:pointer}
 .skx-chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.skx-chip:disabled{opacity:.4;cursor:default}
 .skx-tip{font-size:12.5px;color:var(--sub)}
+.skx-tip b{color:var(--ink);font-weight:700}
 .skx-colors{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 10px;border-bottom:1px solid var(--line2)}
-.skx-colors.dim .skx-pal,.skx-colors.dim .skx-cur{opacity:.45}
-.skx-cur{position:relative;display:inline-block;width:38px;height:38px;border:1px solid #9a9a9a;box-shadow:inset 0 0 0 2px #fff;cursor:pointer}
-.skx-cur input[type=color]{position:absolute;inset:0;width:100%;height:100%;opacity:0;padding:0;border:0;cursor:pointer}
+.skx-colors.dim .skx-pal{opacity:.45}
 .skx-hex{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums;min-width:58px}
 .skx-pal{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
 .skx-pal>b{font-weight:500;font-size:12.5px;color:var(--sub);margin-right:2px}
@@ -1777,34 +2150,41 @@ export const SKETCH_CSS = `
 .skx-view.tool-hand,.skx-view.space{cursor:grab}
 .skx-view.panning{cursor:grabbing}
 .skx-view.tool-text{cursor:text}
-.skx-stage{position:absolute;left:0;top:0;transform-origin:0 0;box-shadow:0 0 0 1px rgba(0,0,0,.2),0 3px 16px rgba(0,0,0,.14)}
+.skx-view.tool-xform{cursor:move}
+.skx-stage{position:absolute;left:0;top:0;transform-origin:0 0;box-shadow:0 0 0 1px rgba(0,0,0,.2),0 3px 16px rgba(0,0,0,.14);--inv:1}
 .skx-paper,.skx-host{position:absolute;inset:0}
 .skx-host canvas{position:absolute;left:0;top:0;width:100%;height:100%}
-.skx-guide{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.skx-host canvas.skx-selcv{mix-blend-mode:normal;pointer-events:none}
+.skx-guide{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.skx-h{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;padding:0;border:2px solid #0069be;background:#fff;border-radius:50%;transform:scale(var(--inv));cursor:nwse-resize;touch-action:none}
+.skx-h.side{border-radius:2px;width:14px;height:14px;margin:-7px 0 0 -7px;cursor:ew-resize}
+.skx-h.rot{background:#0069be;cursor:grab}
+.skx-h.vp{background:#0069be;border-color:#fff;box-shadow:0 0 0 2px #0069be;cursor:move}
+@media (pointer:coarse){.skx-h{width:26px;height:26px;margin:-13px 0 0 -13px}.skx-h.side{width:22px;height:22px;margin:-11px 0 0 -11px}}
 .skx-cursor{position:absolute;left:0;top:0;display:none;border-radius:50%;border:1px solid rgba(0,0,0,.75);box-shadow:0 0 0 1px rgba(255,255,255,.85);pointer-events:none}
-.skx .skx-textin,.skx .skx-textin:focus{position:absolute;z-index:4;width:auto;min-width:140px;padding:0;margin:0;border:0;outline:1px dashed #0069be;outline-offset:2px;background:rgba(255,255,255,.72);font-family:'Noto Sans KR','IBM Plex Sans KR',sans-serif;font-weight:500;line-height:1}
+.skx .skx-textin,.skx .skx-textin:focus{position:absolute;z-index:4;width:auto;min-width:140px;padding:0;margin:0;border:0;outline:1px dashed #0069be;outline-offset:2px;background:rgba(255,255,255,.72)}
 .skx-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.6);font-size:13px;color:var(--sub)}
+.skx-fail{flex-direction:column;gap:10px;background:rgba(255,255,255,.9);color:var(--ink);text-align:center;padding:16px;z-index:5}
+.skx-fail p{margin:0;font-size:13.5px;line-height:1.6}
+.skx-ref img{display:block;width:100%;height:auto;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}
+.skx-info{padding:8px 10px 10px}
 .skx-toast{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);max-width:calc(100% - 24px);padding:7px 12px;background:rgba(17,17,17,.88);color:#fff;font-size:12.5px;line-height:1.5;pointer-events:none;z-index:5}
-.skx-layers{position:absolute;right:8px;top:8px;z-index:6;width:268px;max-width:calc(100% - 16px);max-height:calc(100% - 16px);overflow:auto;background:#fff;border:1px solid var(--ink);box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:13px}
-.skx-lhead{display:flex;align-items:center;gap:6px;padding:6px 6px 6px 10px;border-bottom:1px solid var(--line2)}
-.skx-lhead b{flex:1;font-weight:700}
-.skx-lbtn{display:inline-flex;align-items:center;gap:3px;height:32px;padding:0 9px 0 5px;border:1px solid #9a9a9a;background:#fff;font-family:var(--sans);font-size:12.5px;cursor:pointer;color:var(--ink)}
+.skx-pop{position:absolute;top:8px;z-index:6;width:300px;max-width:calc(100% - 16px);max-height:calc(100% - 16px);overflow:auto;overscroll-behavior:contain;background:#fff;border:1px solid var(--ink);box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:13px}
+.skx-pop.right{right:8px}
+.skx-pop.left{left:8px}
+.skx-phead{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:6px;padding:6px 6px 6px 10px;border-bottom:1px solid var(--line2);background:#fff}
+.skx-phead b{flex:1;font-weight:700;font-size:13.5px}
+.skx-lbtn{display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 10px 0 6px;border:1px solid #9a9a9a;background:#fff;font-family:var(--sans);font-size:12.5px;cursor:pointer;color:var(--ink);white-space:nowrap}
 .skx-lbtn svg{width:16px;height:16px}
 .skx-lbtn:disabled{opacity:.4;cursor:default}
-.skx-layers ul{list-style:none;margin:0;padding:4px 0}
-.skx-layers li{display:flex;align-items:center;gap:2px;padding:2px 4px}
-.skx-layers li.on{background:#efefef;box-shadow:inset 3px 0 0 var(--seal)}
-.skx-layers li .skx-ib{width:30px;height:30px}
-.skx-layers li .skx-ib svg{width:17px;height:17px}
-.skx-layers li .skx-ib.on{border-color:transparent;background:transparent}
-.skx-lname{flex:1;min-width:0;display:flex;align-items:center;gap:7px;padding:3px 4px;border:0;background:transparent;font-family:var(--sans);font-size:13px;color:var(--ink);text-align:left;cursor:pointer}
-.skx-lname span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.skx-lthumb{flex:0 0 auto;border:1px solid var(--line)}
-.skx-lop{display:flex;padding:8px 10px;border-top:1px solid var(--line2);flex-wrap:wrap}
-.skx-lop input[type=range]{flex:1;min-width:90px}
-.skx-canvasbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding:8px 10px;border-top:1px solid var(--line2);font-size:13px}
-.skx-canvasbar .skx-opt{gap:5px}
-.skx-canvasbar .btn.small{white-space:nowrap}
+.skx-menu ul{list-style:none;margin:0;padding:4px 0}
+.skx-menu li button{display:block;width:100%;padding:9px 12px;border:0;background:transparent;font-family:var(--sans);font-size:13px;color:var(--ink);text-align:left;cursor:pointer}
+.skx-menu li button:hover{background:#efefef}
+.skx-msec{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border-bottom:1px solid var(--line2)}
+.skx-msec:last-child{border-bottom:0}
+.skx-msec h4{flex:1 1 100%;margin:0;font-size:12.5px;font-weight:700;color:var(--sub)}
+.skx-mnote{flex:1 1 100%;margin:0;padding:8px 10px 0;font-size:12.5px;color:var(--sub);line-height:1.5}
+.skx-msec .skx-mnote{padding:0}
 .skx-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 10px;border-top:1px solid var(--line2)}
 .skx-foot .mm-thumb{border:1px solid var(--line)}
 .skx-help{flex:1 1 100%;font-size:12.5px;color:var(--sub)}
@@ -1820,14 +2200,15 @@ export const SKETCH_CSS = `
   .skx-tool{min-width:44px;height:48px;font-size:11px}
   .skx-view-grp{margin-left:0}
   .skx input[type=range]{width:96px}
-  .skx-opts,.skx-canvasbar{gap:8px 12px}
-  .skx-layers{width:calc(100% - 16px)}
+  .skx-opts{gap:8px 12px}
+  .skx-pop{width:calc(100% - 16px)}
 }
+@media (pointer:coarse){.skx-sw{width:32px;height:32px}.skx-ib{width:40px;height:40px}.skx-chip{padding:8px 12px}.skx-seg button{padding:8px 11px}}
 /* 학습지 입력 잠금 */
 .ws-lockset:disabled .skx-view{pointer-events:none;cursor:not-allowed}
-.ws-lockset:disabled .skx-cur{pointer-events:none}
+.ws-lockset:disabled .skx-pop{display:none}
 `;
 
 export function SketchStyle() {
-  return <style>{SKETCH_CSS}</style>;
+  return <style>{SKETCH_CSS + SKETCH_COLOR_CSS + SKETCH_LAYERS_CSS + SKETCH_HISTORY_CSS + SKETCH_BRUSH_CSS + SKETCH_READ_CSS}</style>;
 }
