@@ -144,6 +144,8 @@ function route(key) {
   // 기록지 시점 사본: {학번}_{YYYYMMDDHH} — 자동 저장 때 학생이 쓰고 교사가 되돌린다 (src-ws-history.jsx)
   if (key.startsWith("wsh:")) return { kind: "doc", path: ["wsHistory", safe(key.slice(4))] };
   if (key.startsWith("grade:")) return { kind: "doc", path: ["grades", safe(key.slice(6))] };
+  // 교사 피드백 두 질문(fbForm·fbConcept): 학생 화면은 채점 문서(grades, 교사 전용)가 아니라 이것을 읽는다 (firestore.rules /feedback)
+  if (key.startsWith("feedback:")) return { kind: "doc", path: ["feedback", safe(key.slice(9))] };
   if (key.startsWith("survey:")) return { kind: "doc", path: ["surveys", safe(key.slice(7))] };
   if (key.startsWith("media:")) return { kind: "doc", path: ["media", safe(key.slice(6))] };
   if (key.startsWith("exhibit:")) return { kind: "doc", path: ["exhibit", safe(key.slice(8))] };

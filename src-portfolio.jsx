@@ -32,8 +32,8 @@ import {
 import { Status, PfNav, PfViewer, PfConfirm, Seg, NoteField, PfImg, CompareView, ProcessSlides, loadMedia, primeMedia, clearMedia, useAutoGrow, FOLIO_UI_CSS } from "./src-folio-ui.jsx";
 import { drafts, currentSid, getSaver, devId, watchAuthForDrafts, putMedia, encodeThumb, encodeImage, decodeImage, mediaCache, removeMedia, latePut } from "./src-photo-io.mjs";
 import { dHash, hamming } from "./src-photo-px.mjs";
-import { PhotoEditor, PE_CSS } from "./src-photo.jsx";
-import { PE_PANELS_CSS } from "./src-photo-panels.jsx";
+/* 편집기(src-photo.jsx)는 public/photo.js에 따로 있고 다듬기 화면을 처음 열 때 내려받는다 (src-photo-load.jsx) */
+import { LazyPhotoEditor, usePhotoCss, PHOTO_WAIT_CSS } from "./src-photo-load.jsx";
 
 export { folioProgress, folioUnits } from "./src-portfolio-core.mjs";
 
@@ -1701,7 +1701,7 @@ function RefinePanel(p) {
       ) : sendMsg.text ? <p className={"pf-res" + (sendMsg.err ? " err" : "")} role={sendMsg.err ? "alert" : "status"}>{sendMsg.text}</p> : null}
 
       {open ? (
-        <FolioBoundary key={open.k} owner={open.ro ? null : owner}><PhotoEditor owner={owner} store={store} ws={ws} setField={ctx.setField} wsSaved={wsSaved} locked={locked}
+        <FolioBoundary key={open.k} owner={open.ro ? null : owner}><LazyPhotoEditor owner={owner} store={store} ws={ws} setField={ctx.setField} wsSaved={wsSaved} locked={locked}
           readOnly={open.ro || preview || roEdit} preview={preview} inspectItems={inspectItems || []} saver={saver || undefined}
           onClose={onClose} openerRef={opener}
           registerFlush={(fn) => { folioDirty.flush = fn || null; }}
@@ -1778,7 +1778,7 @@ function FolioReadImpl({ f, ws: wsIn, owner, store, fmtTime, inspectItems, grade
         </section>
       ) : null}
       <PfViewer open={!!viewer} label={viewer ? viewer.label : ""} onClose={() => setViewer(null)}>{viewer ? viewer.node : null}</PfViewer>
-      {ed ? <FolioBoundary owner={null}><PhotoEditor owner={owner} store={store} ws={ws} wsSaved locked={false} readOnly preview={owner === "preview"} inspectItems={inspectItems || []}
+      {ed ? <FolioBoundary owner={null}><LazyPhotoEditor owner={owner} store={store} ws={ws} wsSaved locked={false} readOnly preview={owner === "preview"} inspectItems={inspectItems || []}
         onClose={() => setEd(false)} /></FolioBoundary> : null}
     </div>
   );
@@ -2239,7 +2239,9 @@ const PF_CSS = `
   .pf-rf{grid-template-columns:1fr}
 }
 `;
-/** <style>{FOLIO_UI_CSS + PF_CSS + PE_CSS + PE_PANELS_CSS}</style> */
+/** <style>{FOLIO_UI_CSS + PF_CSS + PHOTO_WAIT_CSS + editor CSS}</style>; the editor CSS (PE_CSS + PE_PANELS_CSS) comes with photo.js
+ *  and joins this same element once it is in, so its place in the cascade is the one it had in the single bundle */
 export function PortfolioStyle() {
-  return <style>{FOLIO_UI_CSS + PF_CSS + PE_CSS + PE_PANELS_CSS}</style>;
+  const peCss = usePhotoCss();
+  return <style>{FOLIO_UI_CSS + PF_CSS + PHOTO_WAIT_CSS + peCss}</style>;
 }

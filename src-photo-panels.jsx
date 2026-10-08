@@ -7,7 +7,8 @@
    · 슬라이더는 기본 <input type=range>: 움직이는 동안 미리 보기, 놓을 때(포인터 떼기·움직이는 키 떼기) 작업 내역 한 줄.
    ============================================================ */
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { NoteField, PfViewer, ProcessSlides } from "./src-folio-ui.jsx";
+/* app.js modules (one instance each) through src-photo-host.mjs: this file is in photo.js */
+import { NoteField, PfViewer, ProcessSlides, imageDims, decodeImage, prepareImage, imgErrText } from "./src-photo-host.mjs";
 import {
   STAGE_NOTE, NOTE_CAP, STAGES, ITEMS, KP, ROUTE, ROUTE_ITEM, LIMITS, KINDS, TCODE, BLENDS, ZONE, KEYS, pOk, feat, CLASS_DEFAULTS, OUT,
 } from "./src-folio-schema.mjs";
@@ -20,9 +21,7 @@ import {
   totalUpd, normEdit, fnv32,
 } from "./src-portfolio-core.mjs";
 import { autoLevels, greyPointCurves, curveLut, objectBox, cropForRatio, lightLinesMeet, alignSearch, diffMask, backgroundMask, histogram as pxHistogram } from "./src-photo-px.mjs";
-import { imageDims, decodeImage } from "./src-photo-io.mjs";
 import { suggestBarCm, markBox } from "./src-photo-marks.mjs";
-import { prepareImage, imgErrText } from "./src-media-img.js";
 import { imgPreset } from "./src-portfolio-text.mjs";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

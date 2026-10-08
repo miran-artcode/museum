@@ -194,7 +194,8 @@ export function PfNav({ role = "button", label, onActivate, pressed, expanded, s
 
 /* ---------- 페이지 스크롤 잠금 (검토 r4 F1) ----------
    편집기 덧창과 크게 보기 창이 겹쳐 열리고 닫히는 순서가 바뀌어도 body 스크롤이 돌아오도록 횟수를 센다.
-   처음 잠글 때의 overflow를 기억했다가 마지막 잠금이 풀릴 때 되돌린다. */
+   처음 잠글 때의 overflow를 기억했다가 마지막 잠금이 풀릴 때 되돌린다.
+   편집기(public/photo.js)도 이 모듈을 새로 묶지 않고 app.js의 것을 쓴다(src-photo-host.mjs): 횟수와 미디어 기억은 한 벌뿐이다. */
 let scrollLocks = 0, scrollSaved = "";
 /** reference-counted body scroll lock shared by PfViewer and the editor overlay → unlock() (idempotent) */
 export function lockScroll() {
@@ -410,7 +411,7 @@ export const FOLIO_UI_CSS = `
 .pf-vw-t{font-weight:600;font-size:15px;flex:1}
 .pf-vw-body{padding:12px;overflow:auto}
 .pf-vw-body > .pf-img{margin:0 auto;max-height:calc(100dvh - 140px);width:auto}
-.pf-wipe,.pf-range{width:100%;accent-color:var(--ink)}
+.pf-wipe,.pf-range{width:100%;min-width:0;accent-color:var(--ink)}
 .pf-cmp{display:flex;flex-direction:column;gap:10px}
 .pf-cmp-mode{align-self:flex-start}
 .pf-cmp-wipe{display:flex;flex-direction:column;gap:8px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}

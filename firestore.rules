@@ -34,7 +34,7 @@ service cloud.firestore {
       return student() && uid() == id;
     }
     // 보기 전용 계정(viewer@museum.class): 관리자 코드 칸에 참관용 코드를 넣어 들어온다. 코드는 저장소 어디에도 적지 않는다(공개 저장소).
-    // 수업 설정(meta/config)과 수업 자료(misc/lessonEdits)만 읽는다. 학생 개인 기록(기록지·채점·설문·상호평가·응시 기록)과
+    // 수업 설정(meta/config)과 수업 자료(misc/lessonEdits)만 읽는다. 학생 개인 기록(기록지·채점·피드백·설문·상호평가·응시 기록)과
     // 학번이 드러나는 문서(명부·제출작·media·명단·전시·연구)는 읽지 못하고, 아무것도 쓰지 못한다.
     function isViewer() {
       return signedIn() && uid() == 'viewer';
@@ -129,8 +129,18 @@ service cloud.firestore {
       allow delete: if isTeacher();
     }
 
-    // 채점 기록: 본인은 읽기만, 쓰기는 교사만
+    // 채점 기록: 교사만 읽고 쓴다. 루브릭 상·중·하와 근거 메모, 포트폴리오 점수(folio), 관찰 메모가 들어 있다.
+    // 2026-10-02 전에는 본인도 읽었다. 학생 화면에는 피드백 두 질문만 보였지만 개발자 도구로 문서 전체가 보였다.
+    // 학생에게 보내는 두 질문은 아래 feedback/{학번}에 따로 둔다. 보기 전용 계정도 읽지 못한다.
     match /grades/{sid} {
+      allow read: if isTeacher();
+      allow write: if isTeacher();
+    }
+
+    // 교사 피드백: 본인과 교사만 읽고, 쓰기·지우기는 교사만. 보기 전용 계정은 읽지 못한다.
+    // 담는 것은 조형 기준 질문(fbForm)·작품 개념 질문(fbConcept)과 저장 시각뿐이다. 교사 화면이 채점을 저장할 때
+    // grades/{학번}의 두 질문을 여기에 함께 쓰고, 학급을 불러올 때 빠진 것을 옮겨 쓴다. 원본은 채점 문서다 (src-app.jsx syncFeedback).
+    match /feedback/{sid} {
       allow read: if isOwner(sid) || isTeacher();
       allow write: if isTeacher();
     }

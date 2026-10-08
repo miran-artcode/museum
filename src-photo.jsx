@@ -10,15 +10,15 @@
      표시는 style.transform, 캔버스 픽셀, SVG 좌표 속성으로만 바꾼다.
    ============================================================ */
 import React, { useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { WsLockCtx, WsSavedCtx } from "./src-ws-lock.jsx";
-import { lockScroll } from "./src-folio-ui.jsx";
+/* WsLockCtx·WsSavedCtx, lockScroll and the IO singletons come from app.js through src-photo-host.mjs (this file is in photo.js) */
+import { WsLockCtx, WsSavedCtx, lockScroll } from "./src-photo-host.mjs";
 import { STAGES, STAGE_FEAT, KEYS, LIMITS, ITEMS, feat, pOk } from "./src-folio-schema.mjs";
 import { STAGE_TEXT, T, CELL_LABEL, ITEM_LABEL, CORE_TEXT, fmt, josa } from "./src-portfolio-text.mjs";
 import { PANEL_TEXT as P, OPT_TEXT as O, TOOL_TEXT, ERR_TEXT, SHORTCUT_TEXT, tooltip, histLabel } from "./src-photo-text.mjs";
 import { PhotoDoc, makeGfx } from "./src-photo-doc.mjs";
 import { Renderer } from "./src-photo-render.mjs";
 import { BrushEngine } from "./src-photo-brush.mjs";
-import * as IO from "./src-photo-io.mjs";
+import * as IO from "./src-photo-host.mjs";
 const { getSaver, devId, mediaCache, decodeImage, drafts, tabLock } = IO;
 import {
   normEdit, normSteps, normNotes, normTrash, baseChoice, routeInit, routedStages, stageRecUpdate, appendLog, classifyOp,
