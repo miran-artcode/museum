@@ -62,6 +62,8 @@ export const GRID_CSS = `
 
 /* ---------- 균형 격자 (열 수는 GridRuntime이 고른다) ----------
    --bal-min: 칸 최소 너비, --bal-max: 최대 열 수, --bal-maxw: 칸이 이보다 넓어지면 열을 늘린다.
+   --bal-last: 고르게 나눠도 마지막 줄에 한 칸만 남을 때. fill(줄 전체, 흐름·지표처럼 이어지는 것),
+   center(같은 크기로 가운데, 도판·카드처럼 그림이 있는 것), start(그대로 왼쪽, 입력칸·버튼).
    auto-fit·auto-fill은 너비만 보고 열을 정해 7단계가 6+1로 갈라지거나 2개 카드가 4열 격자의 절반을 비웠다.
    균형 격자는 칸 수와 너비를 함께 보고 한 줄에 다 들어가면 한 줄, 아니면 4+3·3+2처럼 고르게 나눈다. */
 .lz-steps{--bal-min:124px}
@@ -78,8 +80,22 @@ export const GRID_CSS = `
 .res-grid{--bal-min:250px}
 .at-settings,.qt-settings{--bal-min:150px}
 .ax-presets{--bal-min:200px}
+.rd-figs.c3,.rd-figs.c4,.rd-wk-grid,.vz-cards,.vz-cmp,.cardgrid,.res-grid{--bal-last:center}
+.at-settings,.qt-settings,.ax-presets{--bal-last:start}
 [data-bal="on"]{grid-template-columns:repeat(var(--bal-cols),minmax(0,1fr))!important}
-[data-bal="on"] > [data-bal-fill]{grid-column:1/-1}
+[data-bal="on"] > [data-bal-fill="fill"]{grid-column:1/-1}
+[data-bal="on"] > [data-bal-fill="center"]{grid-column:1/-1;justify-self:center;width:calc((100% - (var(--bal-cols) - 1) * var(--bal-gap)) / var(--bal-cols))}
+
+/* 버튼 묶음: 한 줄에 다 들어가면 그대로 두고, 줄이 바뀔 때만 같은 너비 버튼의 균형 격자로 바꾼다
+   (6차시 단계 버튼 일곱 개가 6+1로 갈라졌다). 칸 너비는 가장 긴 버튼에 맞춘다 */
+.pf-seg,.tf .seg{--bal-last:fill}
+.pf-seg[data-bal="on"],.tf .seg[data-bal="on"]{display:grid}
+
+/* 설문 척도 범례: 폰에서 다섯 단계가 4+1로 갈라지지 않게 다섯 칸에 번호 위·설명 아래 */
+@media(max-width:599px){
+  .sv-legend{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0 6px;text-align:center;line-height:1.35;word-break:keep-all}
+  .sv-legend b{display:block;margin:0 0 2px}
+}
 
 /* ---------- 가로 띠: 썸네일이 띠 끝에서 잘리지 않게 정수 개로 나눈다 ----------
    --strip-min: 썸네일 최소 너비. 넘치는 쪽 끝은 흐리게 해서 더 있다는 것을 보인다. */
@@ -93,6 +109,7 @@ export const GRID_CSS = `
 
 const BAL_SEL = ".lz-steps,.rd-wk-grid,.vz-cards,.vz-cmp,.vz-stats,.rd-figs.c3,.rd-figs.c4,.kpis,.at-kpis,.qt-sheet-kpis,.cardgrid,.res-grid,.at-settings,.qt-settings,.ax-presets";
 const STRIP_SEL = ".lz-strip,.iaid-row";
+const SEG_SEL = ".pf-seg,.tf .seg";
 
 const num = (cs, k, d) => { const v = parseFloat(cs.getPropertyValue(k)); return isFinite(v) ? v : d; };
 const innerW = (el, cs) => el.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
@@ -119,7 +136,9 @@ function balance(el) {
   const cs = getComputedStyle(el);
   const kids = shown(el);
   kids.forEach((c) => { if (c.hasAttribute("data-bal-fill")) c.removeAttribute("data-bal-fill"); });
-  if (cs.display !== "grid" || el.offsetParent === null) return;
+  if (el.offsetParent === null) return;
+  if (el.matches(SEG_SEL)) return segBalance(el, kids);
+  if (cs.display !== "grid") return;
   const gap = parseFloat(cs.columnGap) || 0;
   const W = innerW(el, cs);
   if (W <= 0) return;
@@ -127,10 +146,33 @@ function balance(el) {
   const fit = Math.max(1, Math.min(maxC, Math.floor((W + gap) / (min + gap))));
   const n = kids.length;
   const cols = pickCols(n, fit, maxw, W, gap);
+  setCols(el, cols, gap);
+  // 그래도 마지막 줄에 한 칸만 남으면(3칸·2열, 7칸·3열) --bal-last에 따라 줄 전체를 쓰거나 가운데에 둔다
+  const last = (cs.getPropertyValue("--bal-last") || "fill").trim();
+  if (cols > 1 && n > cols && n % cols === 1 && last !== "start") kids[n - 1].setAttribute("data-bal-fill", last);
+}
+
+function setCols(el, cols, gap) {
   if (el.dataset.bal !== "on") el.dataset.bal = "on";
   if (el.style.getPropertyValue("--bal-cols") !== String(cols)) el.style.setProperty("--bal-cols", String(cols));
-  // 그래도 마지막 줄에 한 칸만 남으면 그 칸이 줄 전체를 쓴다(3칸·2열, 7칸·3열)
-  if (cols > 1 && n > cols && n % cols === 1) kids[n - 1].setAttribute("data-bal-fill", "");
+  const g = gap + "px";
+  if (el.style.getPropertyValue("--bal-gap") !== g) el.style.setProperty("--bal-gap", g);
+}
+
+/* 버튼 묶음은 원래 flex. 균형 격자를 잠시 풀고 한 줄에 들어가는지 잰 뒤, 넘칠 때만 격자로 바꾼다 */
+function segBalance(el, kids) {
+  el.removeAttribute("data-bal");
+  if (kids.length < 3) return;
+  const tops = new Set(kids.map((k) => k.offsetTop));
+  if (tops.size <= 1) return;
+  const cs = getComputedStyle(el);
+  const gap = parseFloat(cs.columnGap) || 0;
+  const W = innerW(el, cs);
+  const widest = Math.max(...kids.map((k) => k.getBoundingClientRect().width));
+  const fit = Math.max(1, Math.floor((W + gap) / (widest + gap)));
+  const n = kids.length, cols = pickCols(n, fit, 0, W, gap);
+  setCols(el, cols, gap);
+  if (cols > 1 && n > cols && n % cols === 1) kids[n - 1].setAttribute("data-bal-fill", (cs.getPropertyValue("--bal-last") || "fill").trim());
 }
 
 function strip(el) {
@@ -156,7 +198,7 @@ function strip(el) {
 let watched = new WeakSet();
 let ro = null;
 function layoutAll() {
-  document.querySelectorAll(BAL_SEL).forEach((el) => { if (ro && !watched.has(el)) { watched.add(el); ro.observe(el); } balance(el); });
+  document.querySelectorAll(BAL_SEL + "," + SEG_SEL).forEach((el) => { if (ro && !watched.has(el)) { watched.add(el); ro.observe(el); } balance(el); });
   document.querySelectorAll(STRIP_SEL).forEach((el) => {
     if (!watched.has(el)) { watched.add(el); if (ro) ro.observe(el); el.addEventListener("scroll", () => strip(el), { passive: true }); }
     strip(el);
