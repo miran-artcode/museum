@@ -15,9 +15,10 @@ export const GATE_SECTIONS = [
     en: "QUESTION",
     title: "무엇이 미술이 되는가",
     body: "레디메이드·개념미술·극사실주의 감상, 나의 미술 정의문 쓰기",
-    img: "/img/lessons/L1_w_brillo.jpg",
-    alt: "앤디 워홀의 「브릴로 상자(비누 패드)」(1964), 흰 바탕의 빨강·파랑 글자 상자",
-    credit: "© Andy Warhol Foundation / ARS, New York · MoMA, 교육 목적 인용",
+    img: "/img/lessons/G1_fountain_cut.webp",
+    cut: true,
+    alt: "마르셀 뒤샹의 「샘」(1917), 앨프리드 스티글리츠가 찍은 기록 사진에서 배경을 지운 모습",
+    credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz(배경 제거)",
   },
   {
     no: "02",
@@ -25,9 +26,10 @@ export const GATE_SECTIONS = [
     en: "DESIGN",
     title: "문제 관찰과 유물 설계",
     body: "사회참여 미술 감상과 문제 관찰, 허구 유물의 세계관·화면 설계",
-    img: "/img/lessons/L2_w_maebyeong_nmk421.jpg",
-    alt: "청자 상감 구름 학 무늬 매병(고려, 뚜껑이 있는 매병, 국립중앙박물관 소장)",
-    credit: "국립중앙박물관 · 공공누리 제1유형(출처 표시)",
+    img: "/img/lessons/G2_tut_cut.webp",
+    cut: true,
+    alt: "투탕카멘의 황금 마스크(이집트 신왕국 제18왕조, 이집트 박물관 소장)에서 배경을 지운 모습",
+    credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Roland Unger(배경 제거)",
   },
   {
     no: "03",
@@ -35,9 +37,9 @@ export const GATE_SECTIONS = [
     en: "GENERATE",
     title: "생성과 다듬기",
     body: "프롬프트 작성과 AI 이미지 생성·선별, 다듬기와 작품 캡션 문구",
-    img: "/img/lessons/L6_w_pistoletto_venus.jpg",
-    alt: "미켈란젤로 피스톨레토의 「넝마의 비너스」, 흰 비너스 상과 알록달록한 헌 옷 더미",
-    credit: "© Michelangelo Pistoletto · 테이트, 교육 목적 인용",
+    img: "/img/lessons/L1_w_lewitt.jpg",
+    alt: "솔 르윗의 「월 드로잉」(Wall Drawing) 〈831: 기하학적 형태〉, 빌바오 구겐하임 미술관의 원색 벽면",
+    credit: "위키미디어 공용 · CC0 · 사진 Zarateman · 작품 © Estate of Sol LeWitt",
   },
   {
     no: "04",
@@ -45,9 +47,9 @@ export const GATE_SECTIONS = [
     en: "EXHIBIT",
     title: "전시와 비평",
     body: "작품화와 전시 구성, 두 번의 관람과 상호 비평, 단원 성찰",
-    img: "/img/lessons/L6_w_kawara.jpg",
-    alt: "온 카와라의 「Today」 연작 〈JAN. 9, 1986〉, 주황 바탕에 흰 날짜 글자",
-    credit: "© One Million Years Foundation · 데이비드 즈워너 갤러리, 교육 목적 인용",
+    img: "/img/lessons/G4_jaar_realpictures.jpg",
+    alt: "알프레도 자의 「르완다 프로젝트」 중 「리얼 픽처스」, 어두운 전시장 바닥에 빛을 받으며 놓인 검은 상자들",
+    credit: "© Alfredo Jaar · ArtThrob(2021) 기사 사진, 교육 목적 인용",
   },
 ];
 
@@ -93,7 +95,7 @@ export function GateSections({ onEnter }) {
       <div className="g4-grid">
         {GATE_SECTIONS.map((s) => (
           <article className="g4-col" key={s.no}>
-            <div className="g4-col-img">
+            <div className={"g4-col-img" + (s.cut ? " cut" : "")}>
               <img src={s.img} alt={s.alt} loading="lazy" />
             </div>
             {s.credit && <div className="g4-cr">{s.credit}</div>}
@@ -164,6 +166,8 @@ export const GATE_CSS = `
 .g4-col-img img{width:100%;height:100%;object-fit:cover;display:block;
   transition:transform .6s ease}
 .g4-col:hover .g4-col-img img{transform:scale(1.04)}
+.g4-col-img.cut{background:#fff}
+.g4-col-img.cut img{object-fit:contain;padding:8%}
 .g4-cr{font-size:11px;line-height:1.5;color:#767676;margin-top:6px;min-height:3em}
 .g4-col-txt{padding:16px 2px 26px;border-top:1px solid #111;margin-top:14px;position:relative}
 .g4-no{font-family:'Archivo',sans-serif;font-size:clamp(40px,4.5vw,56px);font-weight:900;line-height:1;letter-spacing:-.02em}
