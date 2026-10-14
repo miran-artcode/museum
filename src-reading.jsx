@@ -723,31 +723,31 @@ export const READING_CSS = `
 @media(max-width:560px){.rd-sum .rd-sum-x img:nth-child(n+2){display:none}
   .reading.rd-card>summary.rd-sum{flex-wrap:wrap;row-gap:6px}.rd-sum .rd-sum-t{order:5;flex-basis:100%}.rd-sum .rd-sum-x{margin-left:auto}}
 
-/* 본문: 문단은 46em(690px)에서 끊기므로, 카드가 그보다 넓으면 왼쪽에 몰리고 오른쪽이 빈다. 좌우 여백을 늘려 읽기 단을 카드 가운데 둔다 */
-.rd{padding:20px max(22px,calc((100% - 690px) / 2)) 22px;color:#1f1f1f;min-width:0;overflow-wrap:break-word}
+/* 본문: 글은 카드 너비를 다 쓰고 양쪽 정렬한다(너비 상한을 두면 카드 중간에서 줄이 끊겨 오른쪽이 빈다) */
+.rd{padding:20px 22px 22px;color:#1f1f1f;min-width:0;overflow-wrap:break-word}
 .rd img{max-width:100%}
 .rd::after{content:"";display:block;clear:both}
-.rd .rd-p{font-size:15px;line-height:1.9;margin:0 0 15px;max-width:46em;word-break:keep-all;overflow-wrap:break-word;text-align:left}
+.rd .rd-p{font-size:15px;line-height:1.9;margin:0 0 15px;word-break:keep-all;overflow-wrap:break-word;text-align:justify}
 .rd .rd-p.lead{font-size:16.5px;line-height:1.85;font-weight:500;color:var(--ink)}
 .rd-em{font-weight:700;color:var(--ink);background:linear-gradient(transparent 60%,#F6DCD7 60%)}
 .rd-a{color:var(--seal);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;overflow-wrap:anywhere}
 .rd-a::after{content:"↗";font-size:.78em;margin-left:1px;text-decoration:none;display:inline-block}
 .rd-a:hover{background:var(--seal-bg)}
-.rd-h{clear:both;font-size:17px;font-weight:700;line-height:1.45;margin:30px 0 12px;max-width:46em;word-break:keep-all;color:var(--ink)}
+.rd-h{clear:both;font-size:17px;font-weight:700;line-height:1.45;margin:30px 0 12px;word-break:keep-all;color:var(--ink)}
 .rd-h::before{content:"";display:block;width:28px;height:3px;background:var(--seal);margin-bottom:9px}
 .rd>.rd-h:first-child{margin-top:4px}
-.rd-q{clear:both;margin:22px 0 24px;padding:4px 0 4px 22px;border-left:3px solid var(--seal);max-width:44em;position:relative}
-.rd-q p{font-size:16.5px;line-height:1.8;font-weight:500;color:var(--ink);margin:0 0 6px;word-break:keep-all}
+.rd-q{clear:both;margin:22px 0 24px;padding:4px 0 4px 22px;border-left:3px solid var(--seal);position:relative}
+.rd-q p{font-size:16.5px;line-height:1.8;font-weight:500;color:var(--ink);margin:0 0 6px;word-break:keep-all;text-align:justify}
 .rd-q cite{display:block;font-style:normal;font-size:12.5px;line-height:1.6;color:var(--sub);margin-top:6px}
-.rd-key{clear:both;display:flex;gap:14px;align-items:flex-start;background:var(--ink);color:#fff;padding:16px 18px;margin:22px 0;max-width:46em}
+.rd-key{clear:both;display:flex;gap:14px;align-items:flex-start;background:var(--ink);color:#fff;padding:16px 18px;margin:22px 0}
 .rd-key-t{flex:0 0 auto;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,.7);padding:2px 7px;margin-top:3px}
-.rd-key p{margin:0;font-size:15.5px;line-height:1.8;font-weight:500;word-break:keep-all}
+.rd-key p{margin:0;font-size:15.5px;line-height:1.8;font-weight:500;word-break:keep-all;text-align:justify}
 .rd-key .rd-em{color:#fff;background:linear-gradient(transparent 62%,rgba(132,145,183,.9) 62%)}
 .rd-key .rd-a{color:#fff}
-.rd-lw{max-width:46em;margin:0 0 16px}
+.rd-lw{margin:0 0 16px}
 .rd-lw .rd-p{margin-bottom:8px}
 .rd-list{list-style:none;margin:0;padding:0;counter-reset:rdl}
-.rd-list li{position:relative;padding:9px 0 9px 38px;border-top:1px solid var(--line2);font-size:15px;line-height:1.8;word-break:keep-all}
+.rd-list li{position:relative;padding:9px 0 9px 38px;border-top:1px solid var(--line2);font-size:15px;line-height:1.8;word-break:keep-all;text-align:justify}
 .rd-list li:last-child{border-bottom:1px solid var(--line2)}
 .rd-list.ol li::before{counter-increment:rdl;content:counter(rdl);position:absolute;left:0;top:10px;width:25px;height:25px;border-radius:50%;background:var(--seal);color:#fff;font:700 12px/25px 'Archivo',sans-serif;text-align:center}
 .rd-list.ul li::before{content:"";position:absolute;left:9px;top:21px;width:7px;height:7px;background:var(--ink)}
