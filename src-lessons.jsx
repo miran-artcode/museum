@@ -62,7 +62,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L1_w_stieglitz.jpg",
-            cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
+            cap: "앨프리드 스티글리츠(Alfred Stieglitz), 「샘」(Fountain) 기록 사진(1917). 마르셀 뒤샹(Marcel Duchamp)이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
             credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz",
             link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573",
             srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg",
@@ -71,7 +71,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L1_w_lewitt.jpg",
-            cap: "솔 르윗, 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
+            cap: "솔 르윗(Sol LeWitt), 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태(Wall Drawing #831: Geometric Forms)〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
             credit: "위키미디어 공용 · CC0 · 사진 Zarateman · 작품 © Estate of Sol LeWitt / ARS, New York",
             link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504",
             srcPage: "https://commons.wikimedia.org/wiki/File:Bilbao_-_Museo_Guggenheim_-_Wall_Drawing_831_(Geometric_Forms),_de_Sol_LeWitt_6.JPG",
@@ -80,7 +80,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L1_w_brillo.jpg",
-            cap: "앤디 워홀, 「브릴로 상자(비누 패드)」(1964). 합판에 실크스크린과 아크릴. 슈퍼마켓의 세제 상자와 겉모습이 거의 같습니다. 눈에 보이는 차이로는 어느 쪽이 작품인지 설명할 수 없습니다. 뉴욕 현대미술관(MoMA) 소장.",
+            cap: "앤디 워홀(Andy Warhol), 「브릴로 상자(비누 패드)」(Brillo Box (Soap Pads), 1964). 합판에 실크스크린과 아크릴. 슈퍼마켓의 세제 상자와 겉모습이 거의 같습니다. 눈에 보이는 차이로는 어느 쪽이 작품인지 설명할 수 없습니다. 뉴욕 현대미술관(MoMA) 소장.",
             credit: "© Andy Warhol Foundation for the Visual Arts / ARS, New York · MoMA 소장품 페이지, 교육 목적 인용",
             link: "https://www.moma.org/collection/works/81384",
             at: 4,
@@ -134,7 +134,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L1_w_stieglitz.jpg",
-            cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
+            cap: "앨프리드 스티글리츠(Alfred Stieglitz), 「샘」(Fountain) 기록 사진(1917). 마르셀 뒤샹(Marcel Duchamp)이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
             credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz",
             link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573",
             srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg",
@@ -348,7 +348,7 @@ export const LESSONS_DEF = [
         images: [
           {
             src: "/img/lessons/L1_w_lewitt.jpg",
-            cap: "솔 르윗, 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
+            cap: "솔 르윗(Sol LeWitt), 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태(Wall Drawing #831: Geometric Forms)〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
             credit: "위키미디어 공용 · CC0 · 사진 Zarateman · 작품 © Estate of Sol LeWitt / ARS, New York",
             link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504",
             srcPage: "https://commons.wikimedia.org/wiki/File:Bilbao_-_Museo_Guggenheim_-_Wall_Drawing_831_(Geometric_Forms),_de_Sol_LeWitt_6.JPG",
@@ -467,7 +467,7 @@ export const LESSONS_DEF = [
         images: [
           {
             src: "/img/lessons/L1_w_brillo.jpg",
-            cap: "앤디 워홀, 「브릴로 상자(비누 패드)」(1964). 합판에 실크스크린과 아크릴. 슈퍼마켓의 세제 상자와 겉모습이 거의 같습니다. 눈에 보이는 차이로는 어느 쪽이 작품인지 설명할 수 없습니다. 뉴욕 현대미술관(MoMA) 소장.",
+            cap: "앤디 워홀(Andy Warhol), 「브릴로 상자(비누 패드)」(Brillo Box (Soap Pads), 1964). 합판에 실크스크린과 아크릴. 슈퍼마켓의 세제 상자와 겉모습이 거의 같습니다. 눈에 보이는 차이로는 어느 쪽이 작품인지 설명할 수 없습니다. 뉴욕 현대미술관(MoMA) 소장.",
             credit: "© Andy Warhol Foundation for the Visual Arts / ARS, New York · MoMA 소장품 페이지, 교육 목적 인용",
             link: "https://www.moma.org/collection/works/81384",
             at: 0,
@@ -484,7 +484,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L1_w_lewitt.jpg",
-            cap: "솔 르윗, 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
+            cap: "솔 르윗(Sol LeWitt), 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태(Wall Drawing #831: Geometric Forms)〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
             credit: "위키미디어 공용 · CC0 · 사진 Zarateman · 작품 © Estate of Sol LeWitt / ARS, New York",
             link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504",
             srcPage: "https://commons.wikimedia.org/wiki/File:Bilbao_-_Museo_Guggenheim_-_Wall_Drawing_831_(Geometric_Forms),_de_Sol_LeWitt_6.JPG",
@@ -493,7 +493,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L1_w_stieglitz.jpg",
-            cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
+            cap: "앨프리드 스티글리츠(Alfred Stieglitz), 「샘」(Fountain) 기록 사진(1917). 마르셀 뒤샹(Marcel Duchamp)이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
             credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz",
             link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573",
             srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg",
@@ -637,7 +637,7 @@ export const LESSONS_DEF = [
       {
         stage: "감상 3", h: "사진과 경쟁한 손: 극사실주의",
         p: [
-          "개념미술이 물질을 줄여 가던 같은 시기, 미국의 다른 작가들은 반대 방향으로 갔습니다. 사진과 구별하기 어려운 회화와 조각을 손으로 만든 것입니다. 척 클로스(Chuck Close)는 얼굴 사진에 격자를 긋고 칸마다 옮겨 그려 2미터가 넘는 초상을 완성했습니다. 관람자는 멀리서 사진으로 보다가 가까이 가서야 붓 자국을 발견합니다. [리처드 에스테스(Richard Estes)](https://en.wikipedia.org/wiki/Richard_Estes)는 도시의 유리창 반사를 사진보다 선명하게 그렸고, [두에인 핸슨(Duane Hanson)](https://en.wikipedia.org/wiki/Duane_Hanson)은 실물 크기 인체 조각에 실제 옷을 입혀 전시장에 세워 관람자가 말을 걸게 만들었습니다.",
+          "개념미술이 물질을 줄여 가던 같은 시기, 미국의 다른 작가들은 반대 방향으로 갔습니다. 사진과 구별하기 어려운 회화와 조각을 손으로 만든 것입니다. 척 클로스(Chuck Close)는 얼굴 사진에 격자를 긋고 칸마다 옮겨 그려 2미터가 넘는 초상을 완성했습니다. 관람자는 멀리서 사진으로 보다가 가까이 가서야 붓 자국을 발견합니다. [리처드 에스테스(Richard Estes)](https://en.wikipedia.org/wiki/Richard_Estes)는 도시의 유리창 반사를 사진보다 선명하게 그렸고, [듀안 핸슨(Duane Hanson)](https://en.wikipedia.org/wiki/Duane_Hanson)은 실물 크기 인체 조각에 실제 옷을 입혀 전시장에 세워 관람자가 말을 걸게 만들었습니다.",
           "## 얼굴을 찍은 사진을 그린 그림",
           "[클로스](https://en.wikipedia.org/wiki/Chuck_Close)의 「빅 셀프 포트레이트」(Big Self-Portrait, 1967~68)를 자세히 봅시다. 결과물은 사진의 표면 특성까지 그대로 재현합니다. 초점이 맞은 부분과 흐린 부분, 피부의 미세한 결, 사진 특유의 얕은 심도까지 회화로 옮겨졌습니다. 중요한 것은 그가 사람 대신 사진을 보고 그렸다는 사실입니다. 이 그림의 대상은 얼굴이 아니라 얼굴의 사진입니다. 클로스는 자신을 ‘포토리얼리스트’로 부르는 것을 좋아하지 않았습니다. 그의 관심은 사실적인 재현이 아니라 이미지를 만드는 절차였기 때문입니다. 그의 유명한 말이 이 태도를 요약합니다.",
           "> “영감은 아마추어를 위한 것이다. 나머지 우리는 그냥 나와서 일을 시작할 뿐이다.”\n> 출처: 척 클로스, 조 피그와의 인터뷰(2006년 4월), 『Inside the Painter’s Studio』(2009) 42쪽. [출처 확인](https://quoteinvestigator.com/2022/08/28/inspiration/)",
@@ -665,7 +665,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L1_w_hanson.jpg",
-            cap: "두에인 핸슨, 「관광객들」(Tourists, 1970). 폴리에스터 수지와 유리섬유로 실제 사람에게서 본을 떠 실물 크기로 만든 두 인물에 유화 물감을 칠하고 진짜 옷을 입히고 카메라와 가방을 더한 조각입니다. 두 인물은 각각 따로 본을 떴으며 실제로는 서로 만난 적이 없습니다. 스코틀랜드 국립미술관(에든버러) 소장, 1979년 구입.",
+            cap: "듀안 핸슨, 「관광객들」(Tourists, 1970). 폴리에스터 수지와 유리섬유로 실제 사람에게서 본을 떠 실물 크기로 만든 두 인물에 유화 물감을 칠하고 진짜 옷을 입히고 카메라와 가방을 더한 조각입니다. 두 인물은 각각 따로 본을 떴으며 실제로는 서로 만난 적이 없습니다. 스코틀랜드 국립미술관(에든버러) 소장, 1979년 구입.",
             credit: "Flickr · CC BY-NC-SA 2.0 · 사진 Leo Reynolds · 작품 © Estate of Duane Hanson / VAGA at ARS, NY · DACS, London",
             link: "https://www.nationalgalleries.org/art-and-artists/297/tourists-1970",
             srcPage: "https://www.flickr.com/photos/lwr/25066818553",
@@ -700,7 +700,7 @@ export const LESSONS_DEF = [
             items: [
               { t: "워커 아트 센터 소장 「빅 셀프 포트레이트」 작품 기록", u: "https://walkerart.org/collections/artworks/big-self-portrait" },
               { t: "MoMA 소장 리처드 에스테스 「이중 자화상」 작품 기록", u: "https://www.moma.org/collection/works/80047" },
-              { t: "스코틀랜드 국립미술관 소장 두에인 핸슨 「관광객들」 작품 기록", u: "https://www.nationalgalleries.org/art-and-artists/297/tourists-1970" },
+              { t: "스코틀랜드 국립미술관 소장 듀안 핸슨 「관광객들」 작품 기록", u: "https://www.nationalgalleries.org/art-and-artists/297/tourists-1970" },
             ],
           },
         ],
@@ -722,9 +722,9 @@ export const LESSONS_DEF = [
             ],
           },
           {
-            a: "두에인 핸슨", w: "「관광객들」", y: "1970", d: "실물 크기 채색 조각. 전시장에서 사람으로 읽히는 경험",
+            a: "듀안 핸슨", w: "「관광객들」", y: "1970", d: "실물 크기 채색 조각. 전시장에서 사람으로 읽히는 경험",
             links: [
-              { t: "두에인 핸슨", u: "https://en.wikipedia.org/wiki/Duane_Hanson" },
+              { t: "듀안 핸슨", u: "https://en.wikipedia.org/wiki/Duane_Hanson" },
               { t: "하이퍼리얼리즘", u: "https://ko.wikipedia.org/wiki/하이퍼리얼리즘" },
               { t: "스코틀랜드 국립미술관 소장 기록", u: "https://www.nationalgalleries.org/art-and-artists/297/tourists-1970", k: "원문" },
               { t: "Art UK 작품 기록", u: "https://artuk.org/discover/artworks/tourists-270879" },
@@ -831,7 +831,7 @@ export const LESSONS_DEF = [
         images: [
           {
             src: "/img/lessons/L1_w_stieglitz.jpg",
-            cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
+            cap: "앨프리드 스티글리츠(Alfred Stieglitz), 「샘」(Fountain) 기록 사진(1917). 마르셀 뒤샹(Marcel Duchamp)이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
             credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz",
             link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573",
             srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg",
@@ -840,7 +840,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L1_w_lewitt.jpg",
-            cap: "솔 르윗, 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
+            cap: "솔 르윗(Sol LeWitt), 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태(Wall Drawing #831: Geometric Forms)〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
             credit: "위키미디어 공용 · CC0 · 사진 Zarateman · 작품 © Estate of Sol LeWitt / ARS, New York",
             link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504",
             srcPage: "https://commons.wikimedia.org/wiki/File:Bilbao_-_Museo_Guggenheim_-_Wall_Drawing_831_(Geometric_Forms),_de_Sol_LeWitt_6.JPG",
@@ -999,7 +999,7 @@ export const LESSONS_DEF = [
         },
         {
           src: "/img/lessons/L1_w_stieglitz.jpg",
-          cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
+          cap: "앨프리드 스티글리츠(Alfred Stieglitz), 「샘」(Fountain) 기록 사진(1917). 마르셀 뒤샹(Marcel Duchamp)이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
           credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz",
           link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573",
           srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg",
@@ -1008,7 +1008,7 @@ export const LESSONS_DEF = [
         },
         {
           src: "/img/lessons/L1_w_lewitt.jpg",
-          cap: "솔 르윗, 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
+          cap: "솔 르윗(Sol LeWitt), 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태(Wall Drawing #831: Geometric Forms)〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
           credit: "위키미디어 공용 · CC0 · 사진 Zarateman · 작품 © Estate of Sol LeWitt / ARS, New York",
           link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504",
           srcPage: "https://commons.wikimedia.org/wiki/File:Bilbao_-_Museo_Guggenheim_-_Wall_Drawing_831_(Geometric_Forms),_de_Sol_LeWitt_6.JPG",
@@ -1209,7 +1209,7 @@ export const LESSONS_DEF = [
     {
       stage: "강의·감상 2", h: "브로타에스: 작가가 미술관을 만들다",
       p: [
-        "[마르셀 브로타에스(Marcel Broodthaers)](https://en.wikipedia.org/wiki/Marcel_Broodthaers)는 1968년 브뤼셀 자택에 「현대미술관, 독수리 부서」(Musée d’Art Moderne, Département des Aigles, 1968~72)라는 가상의 미술관을 열었습니다. 관장은 자신, 소장품은 빈 운송 상자와 그림엽서였습니다. 전시된 것은 그림이 아니라 그림을 옮기는 상자, 그림이 걸릴 빈 액자, 그리고 ‘미술관’이라는 이름이었습니다. 관람객은 작품을 보러 왔지만 미술관의 골격만을 봅니다. 이 작업은 한 번의 전시가 아니라 1968년부터 1972년까지 이어진 하나의 작품이었고, 그동안 뒤셀도르프와 1972년 [카셀 도쿠멘타](https://en.wikipedia.org/wiki/Documenta_5) 등으로 장소를 옮기며 전개되었습니다. 실제 미술관이 학예부·등록부·보존부·홍보부로 나뉘듯, 브로타에스는 이 조직 구조를 그대로 흉내 내면서 각 부서의 이름을 작품의 제목으로 삼았습니다.",
+        "[마르셀 브로타에스(Marcel Broodthaers)](https://en.wikipedia.org/wiki/Marcel_Broodthaers)는 1968년 브뤼셀 자택에 「현대미술관, 독수리 부서」(Musée d’Art Moderne, Département des Aigles, 1968~72)라는 가상의 미술관을 열었습니다. 관장은 자신, 소장품은 빈 운송 상자와 그림엽서였습니다. 전시된 것은 그림이 아니라 그림을 옮기는 상자, 그림이 걸릴 빈 액자, 그리고 ‘미술관’이라는 이름이었습니다. 관람객은 작품을 보러 왔지만 미술관의 골격만을 봅니다. 이 작업은 한 번의 전시가 아니라 1968년부터 1972년까지 이어진 하나의 작품이었고, 그동안 뒤셀도르프와 1972년 [카셀 도큐멘타](https://en.wikipedia.org/wiki/Documenta_5) 등으로 장소를 옮기며 전개되었습니다. 실제 미술관이 학예부·등록부·보존부·홍보부로 나뉘듯, 브로타에스는 이 조직 구조를 그대로 흉내 내면서 각 부서의 이름을 작품의 제목으로 삼았습니다.",
         "## 왜 독수리였을까",
         "왜 하필 독수리였을까요. 독수리는 제국의 문장, 국가의 상징, 화폐의 각인, 상표에 반복해서 등장하는 도상입니다. 1972년 뒤셀도르프 전시에서 브로타에스는 여러 기관에서 빌린, 시대와 지역이 전혀 다른 독수리 도상 수백 점을 진열하고 번호를 붙였습니다. 형태는 닮았지만 의미는 제도가 정한다는 것을 보여 주기 위한 선택이었습니다.",
         "그의 이력도 이 작업을 이해하는 열쇠입니다. 그는 40세까지 시인이었고, 팔리지 않은 자기 시집을 석고에 굳혀 [첫 조형 작업](https://smak.be/en/artworks/le-pense-bete-3492)을 만들며 미술로 넘어왔습니다. 유통되지 못한 언어에서 출발한 작가였기에, 사물을 유통하는 기관 그 자체를 작업의 재료로 삼을 수 있었습니다.",
@@ -1239,7 +1239,7 @@ export const LESSONS_DEF = [
         },
         {
           src: "/img/lessons/L2_w_broodthaers_pub.jpg",
-          cap: "마르셀 브로타에스, 「현대미술관, 독수리 부서」 중 〈광고 부문〉(1972), 카셀 도쿠멘타 5 전시장. ‘현대미술관 독수리 부서’라고 쓴 간판 앞에 한 사람이 서 있고, 왼쪽 벽에는 〈형상 부문〉의 진열품을 찍은 사진들이 걸려 있습니다. 미술관의 부서 이름이 그대로 작품 제목이 된 예입니다.",
+          cap: "마르셀 브로타에스, 「현대미술관, 독수리 부서」 중 〈광고 부문〉(1972), 카셀 도큐멘타 5 전시장. ‘현대미술관 독수리 부서’라고 쓴 간판 앞에 한 사람이 서 있고, 왼쪽 벽에는 〈형상 부문〉의 진열품을 찍은 사진들이 걸려 있습니다. 미술관의 부서 이름이 그대로 작품 제목이 된 예입니다.",
           credit: "© Maria Gilissen / ARS, New York / SABAM, Brussels · 사진 Maria Gilissen · 뉴욕 현대미술관(MoMA) 오디오 해설 페이지, 교육 목적 인용",
           link: "https://www.moma.org/audio/playlist/25/463",
           at: 2,
@@ -1262,7 +1262,7 @@ export const LESSONS_DEF = [
             { y: "1969", t: "17세기 부문", d: "9월, 안트베르펜에서 일주일 남짓 엽니다." },
             { y: "1970", t: "재무부 부문", d: "1970~71년. 미술관을 파산을 이유로 판다고 알리고, 독수리 엠블럼을 새긴 금괴를 금 시세의 두 배에 팝니다." },
             { y: "1972", t: "형상 부문", d: "5~7월, 뒤셀도르프 쿤스트할레. 독수리 도상 수백 점에 ‘이것은 미술 작품이 아니다’ 팻말을 붙입니다." },
-            { y: "1972", t: "광고 부문", d: "6~10월, 카셀 도쿠멘타 5. 〈형상 부문〉의 사진과 자료로 또 하나의 전시를 만듭니다." },
+            { y: "1972", t: "광고 부문", d: "6~10월, 카셀 도큐멘타 5. 〈형상 부문〉의 사진과 자료로 또 하나의 전시를 만듭니다." },
           ],
           note: "뉴욕 현대미술관(MoMA)은 이 가상 미술관의 활동 기간을 1968~1972년으로 적고 있습니다.",
         },
@@ -2512,7 +2512,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L3_w_beuys_1.jpg",
-            cap: "요제프 보이스, 「7000그루의 참나무」(1982~87, 부제 ‘도시 행정 대신 도시 숲 가꾸기’). 카셀 프리데리치아눔 정면 잔디밭의 참나무 두 그루와 밑동의 현무암 기둥입니다. 오른쪽은 1982년 보이스가 도쿠멘타 7을 위해 처음 심은 나무, 왼쪽은 1987년 아들 벤첼이 심은 마지막 나무입니다. 나무마다 현무암 기둥 하나를 짝지어 세운 이 사업은 시민이 함께 만드는 ‘사회적 조각’의 대표 사례입니다.",
+            cap: "요제프 보이스, 「7000그루의 참나무」(1982~87, 부제 ‘도시 행정 대신 도시 숲 가꾸기’). 카셀 프리데리치아눔 정면 잔디밭의 참나무 두 그루와 밑동의 현무암 기둥입니다. 오른쪽은 1982년 보이스가 도큐멘타 7을 위해 처음 심은 나무, 왼쪽은 1987년 아들 벤첼이 심은 마지막 나무입니다. 나무마다 현무암 기둥 하나를 짝지어 세운 이 사업은 시민이 함께 만드는 ‘사회적 조각’의 대표 사례입니다.",
             credit: "위키미디어 공용 · CC BY-SA 4.0 · 사진 Codc",
             link: "https://www.7000eichen.de/",
             srcPage: "https://commons.wikimedia.org/wiki/File:7000_Eichen_vor_Fridericianum.jpg",
@@ -2521,7 +2521,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L3_w_beuys_2.jpg",
-            cap: "요제프 보이스, 「7000그루의 참나무」(1982~87) 기록 사진, 1982년 6월. 도쿠멘타 7 개막 무렵 프리데리치아눔 앞에 현무암 기둥 7,000개를 쌓아 시작한 더미로, 나무 한 그루가 심길 때마다 돌 하나를 옮겨 세워 더미가 조금씩 줄어들도록 했습니다. 건물 프리즈의 글귀는 로렌스 위너의 작품입니다.",
+            cap: "요제프 보이스, 「7000그루의 참나무」(1982~87) 기록 사진, 1982년 6월. 도큐멘타 7 개막 무렵 프리데리치아눔 앞에 현무암 기둥 7,000개를 쌓아 시작한 더미로, 나무 한 그루가 심길 때마다 돌 하나를 옮겨 세워 더미가 조금씩 줄어들도록 했습니다. 건물 프리즈의 글귀는 로렌스 위너의 작품입니다.",
             credit: "위키미디어 공용 · CC BY-SA 2.5 · 사진 J. Bunse",
             link: "https://www.7000eichen.de/",
             srcPage: "https://commons.wikimedia.org/wiki/File:Documenta_7_Beuys_Weiner_Fridericianum_1982.jpg",
@@ -2864,7 +2864,7 @@ export const LESSONS_DEF = [
         },
         {
           src: "/img/lessons/L4_w_usewear.jpg",
-          cap: "앙토니 보렐 외, 「석기 표면의 사용흔 검출과 특성 분석 최적화」(『사이언티픽 리포츠』 11, 2021)의 그림 1. 석기 표면 두 영역(Zone 12·13)을 마찰 실험 전(0회)과 1만 회 반복 후에 고배율로 비교한 도판으로, 반복된 마찰 뒤 표면의 거칠기와 광택 분포가 달라진 것이 보입니다.",
+          cap: "앙토니 보렐(Antony Borel) 외, 「석기 표면의 사용흔 검출과 특성 분석 최적화」(『사이언티픽 리포츠』 11, 2021)의 그림 1. 석기 표면 두 영역(Zone 12·13)을 마찰 실험 전(0회)과 1만 회 반복 후에 고배율로 비교한 도판으로, 반복된 마찰 뒤 표면의 거칠기와 광택 분포가 달라진 것이 보입니다.",
           credit: "Borel et al. 2021, Scientific Reports · CC BY 4.0",
           link: "https://doi.org/10.1038/s41598-021-03663-4",
           srcPage: "https://www.nature.com/articles/s41598-021-03663-4/figures/1",
@@ -3125,7 +3125,7 @@ export const LESSONS_DEF = [
       images: [
         {
           src: "/img/lessons/L4_w_usewear.jpg",
-          cap: "앙토니 보렐 외, 「석기 표면의 사용흔 검출과 특성 분석 최적화」(『사이언티픽 리포츠』 11, 2021)의 그림 1. 석기 표면 두 영역(Zone 12·13)을 마찰 실험 전(0회)과 1만 회 반복 후에 고배율로 비교한 도판으로, 반복된 마찰 뒤 표면의 거칠기와 광택 분포가 달라진 것이 보입니다.",
+          cap: "앙토니 보렐(Antony Borel) 외, 「석기 표면의 사용흔 검출과 특성 분석 최적화」(『사이언티픽 리포츠』 11, 2021)의 그림 1. 석기 표면 두 영역(Zone 12·13)을 마찰 실험 전(0회)과 1만 회 반복 후에 고배율로 비교한 도판으로, 반복된 마찰 뒤 표면의 거칠기와 광택 분포가 달라진 것이 보입니다.",
           credit: "Borel et al. 2021, Scientific Reports · CC BY 4.0",
           link: "https://doi.org/10.1038/s41598-021-03663-4",
           srcPage: "https://www.nature.com/articles/s41598-021-03663-4/figures/1",
@@ -4448,7 +4448,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L1_w_lewitt.jpg",
-            cap: "솔 르윗, 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
+            cap: "솔 르윗(Sol LeWitt), 「월 드로잉」 연작 중 〈월 드로잉 831: 기하학적 형태(Wall Drawing #831: Geometric Forms)〉(1997), 빌바오 구겐하임 미술관 설치 모습. 벽면은 르윗의 지시문에 따라 미술관 인력이 그렸고, 전시가 끝나면 다시 칠해져 사라집니다. 소유·판매·보관되는 것은 이 벽면이 아니라 지시문입니다.",
             credit: "위키미디어 공용 · CC0 · 사진 Zarateman · 작품 © Estate of Sol LeWitt / ARS, New York",
             link: "https://www.tate.org.uk/art/artists/sol-lewitt-1504",
             srcPage: "https://commons.wikimedia.org/wiki/File:Bilbao_-_Museo_Guggenheim_-_Wall_Drawing_831_(Geometric_Forms),_de_Sol_LeWitt_6.JPG",
@@ -5810,7 +5810,7 @@ export const LESSONS_DEF = [
           },
           {
             src: "/img/lessons/L1_w_stieglitz.jpg",
-            cap: "앨프리드 스티글리츠, 「샘」 기록 사진(1917). 마르셀 뒤샹이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
+            cap: "앨프리드 스티글리츠(Alfred Stieglitz), 「샘」(Fountain) 기록 사진(1917). 마르셀 뒤샹(Marcel Duchamp)이 'R. Mutt 1917'로 서명해 독립미술가협회전에 출품했다가 전시를 거부당한 소변기를, 스티글리츠가 291 화랑에서 촬영한 젤라틴 실버 프린트입니다. 원본 「샘」은 사라졌고 이 사진이 1917년 5월 잡지 『블라인드 맨』 2호에 실려 작품을 오늘날까지 전하고 있습니다.",
             credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz",
             link: "https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573",
             srcPage: "https://commons.wikimedia.org/wiki/File:Marcel_Duchamp,_1917,_Fountain,_photograph_by_Alfred_Stieglitz.jpg",
