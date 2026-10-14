@@ -122,7 +122,7 @@ export const PRESETS = [
   { k: "see", label: "크게 보기", sub: "글자 150%, 간격 넓게, 고대비, 버튼 크게", set: { text: 150, spacing: true, contrast: "high", targets: true, underline: true } },
   { k: "listen", label: "들으며 읽기", sub: "읽어 주기 도구, 작품 설명 펼치기, 말로 입력", set: { tts: true, desc: true, dict: true } },
   { k: "words", label: "글로 보기", sub: "실시간 자막, 쉬운 말 요약, 핵심 용어, 다른 감각 관찰", set: { cap: true, easy: true, gloss: true, alt: true } },
-  { k: "lang", label: "두 언어로 보기", sub: "도움 언어를 고르면 번역을 원문 아래에 함께 보입니다", set: { bilingual: true, gloss: true, easy: true, tts: true } },
+  { k: "lang", label: "두 언어로 보기", sub: "도움 언어를 고르면 번역을 원문 아래에 함께 보여 줍니다", set: { bilingual: true, gloss: true, easy: true, tts: true } },
 ];
 
 export function applyPreset(p, key) {
@@ -372,7 +372,7 @@ export const USE_KINDS = [
   { k: "easy", label: "쉬운 말 요약 보기" },
   { k: "desc", label: "작품 설명 열기" },
   { k: "descTts", label: "작품 설명 듣기" },
-  { k: "cap", label: "자막 받은 분" },
+  { k: "cap", label: "자막 받은 시간(분)" },
   { k: "dict", label: "말로 입력" },
   { k: "alt", label: "다른 감각 관찰 보기" },
   { k: "memo", label: "내 언어 메모" },
@@ -471,6 +471,6 @@ export const SUPPORT_CODEBOOK = [
   ["pref_capSize", "자막 글자 크기 m·l·xl"],
   ["pref_dict", "말로 입력 버튼 보이기"],
   ["pref_alt", "다른 감각 관찰 방법 보이기"],
-  ...USE_KINDS.map((x) => ["use_" + x.k, x.label + " 횟수 (전 차시 합계" + (x.k === "cap" ? ", 단위: 분" : "") + ")"]),
+  ...USE_KINDS.map((x) => ["use_" + x.k, x.label + (x.k === "cap" ? " (전 차시 합계)" : " 횟수 (전 차시 합계)")]),
   ["(긴 표) session·kind·count", "차시별·지원 종류별 횟수"],
 ];

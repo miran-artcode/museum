@@ -842,8 +842,8 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
       <div className="qz-cover" role="alertdialog" aria-modal="true" aria-labelledby="qz-p-h">
         <div className="qz-cover-in">
           <div className="qz-cover-k">전체 일시정지</div>
-          <h2 id="qz-p-h" className="qz-cover-h">선생님이 시험을 잠시 멈췄습니다. 잠시 기다려 주세요.</h2>
-          <p>남은 시간은 멈춰 있고, 재개되면 멈춘 시간이 그대로 보전됩니다. 이 화면을 닫지 마세요.</p>
+          <h2 id="qz-p-h" className="qz-cover-h">선생님이 시험을 잠시 멈췄습니다. 기다려 주세요.</h2>
+          <p>남은 시간은 멈춰 있고, 다시 시작하면 멈춘 때부터 이어집니다. 이 화면을 닫지 마세요.</p>
           <p className="hint">남은 시간 {fmtMMSS(Math.max(0, remain))} (정지)</p>
         </div>
       </div>
@@ -854,7 +854,7 @@ function ExamSession({ sid, cfg, bank, init, live, font, setFont, onDone }) {
         <div className="qz-cover-in">
           <div className="qz-cover-k">전체화면</div>
           <h2 id="qz-f-h" className="qz-cover-h">전체화면을 벗어났습니다.</h2>
-          <p>10초 안에 돌아오면 기록만 남고, 넘기면 경고가 됩니다. 남은 시간은 계속 줄어듭니다.</p>
+          <p>10초 안에 돌아오면 기록만 되고, 넘기면 경고가 됩니다. 남은 시간은 계속 줄어듭니다.</p>
           <button type="button" className="btn qz-big" onClick={() => enterFullscreen()} autoFocus>전체화면으로 돌아가기</button>
         </div>
       </div>
@@ -1005,7 +1005,7 @@ function ResultView({ v, cfg }) {
       <div className="card qz-card">
         <div className="card-head"><span className="card-code">기록</span><span className="card-title">내 화면 이탈 기록</span><span className="card-sess">경고 {r.warnCount != null ? r.warnCount : Number(v.warn) || 0}회 · 잠금 {r.lockCount != null ? r.lockCount : (v.lock && v.lock.count) || 0}회</span></div>
         <div className="card-body">
-          <p className="hint" style={{ marginBottom: 10 }}>기록은 점수를 깎지 않습니다. 선생님이 현장에서 확인해 「오탐」으로 표시한 기록은 그대로 남되 그렇게 표시됩니다.</p>
+          <p className="hint" style={{ marginBottom: 10 }}>기록은 점수를 깎지 않습니다. 선생님이 현장에서 확인해 「오탐」으로 표시한 기록은 지우지 않고 「오탐」 표시와 함께 보입니다.</p>
           {events.length === 0 ? <div className="ok-note">이탈 기록이 없습니다.</div> : (
             <div className="tbl-scroll">
               <table className="qz-score" aria-label="이탈 기록">
@@ -1203,8 +1203,8 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
             <li>「시험 시작」을 누르면 전체화면으로 바뀌고 이 창이 화면 전체를 덮습니다. 브라우저가 전체화면을 막으면 시작할 수 없으니 선생님께 알려 주세요.</li>
             <li>다른 창·탭으로 2초 이상 나가거나 전체화면을 10초 넘게 벗어나면 경고가 기록됩니다. 시작 뒤 30초는 준비 구간이라 경고로 세지 않습니다.</li>
             <li>경고가 {cfg.warnLimit || 3}회가 되면 시험이 잠기고 남은 시간이 멈춥니다. 선생님이 풀어 주면 이어 풉니다. 기록은 점수를 깎지 않습니다.</li>
-            <li>우클릭·복사·붙여넣기·인쇄·저장 단축키는 막히고 기록만 남습니다. F12 같은 개발자 도구 단축키는 경고가 됩니다.</li>
-            <li>새로고침이나 PC 고장 뒤 다시 로그인하면 같은 블록의 같은 자리에서 이어 풉니다. 제출한 블록은 다시 열리지 않습니다.</li>
+            <li>우클릭·복사·붙여넣기·인쇄·저장 단축키는 막히고 기록만 됩니다. F12 같은 개발자 도구 단축키는 경고가 됩니다.</li>
+            <li>새로고침이나 PC 고장 뒤 다시 로그인하면 같은 블록에서 이어 풉니다. 고른 답은 저장되어 있습니다. 제출한 블록은 다시 열리지 않습니다.</li>
             <li>남은 시간은 서버 시각으로 잽니다. 시간이 끝나면 지금 블록이 그대로 자동 제출됩니다.</li>
           </ul>
         </details>
@@ -1260,8 +1260,8 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
             {dup && <div className="warn-note" role="alert">다른 곳에서 응시 중입니다. 같은 학번이 다른 브라우저에서 시험을 보고 있어 여기서는 이어 풀 수 없습니다. 선생님이 「세션 초기화」를 누르면 이 버튼이 다시 활성화됩니다.</div>}
             {locked && <div className="warn-note" role="alert">시험이 잠겨 있습니다. 선생님을 불러 주세요. 선생님이 풀어 주면 「이어서 풀기」가 활성화됩니다.</div>}
             {lv.resumeOk && !locked && <div className="ok-note">선생님이 응시를 다시 열었습니다. 같은 문항·순서로 남은 블록을 이어 풉니다.</div>}
-            {!locked && !dup && <p style={{ fontSize: 13, lineHeight: 1.6 }}>「이어서 풀기」를 누르면 전체화면으로 바뀌고 같은 블록의 같은 자리에서 이어 풉니다. 고른 답은 저장되어 있고, 남은 시간은 처음 시작한 시각 기준으로 이어집니다.</p>}
-            {cfg.paused && <div className="warn-note" role="status">선생님이 시험을 잠시 멈췄습니다. 재개되면 「이어서 풀기」가 활성화됩니다. 멈춘 시간은 보전됩니다.</div>}
+            {!locked && !dup && <p style={{ fontSize: 13, lineHeight: 1.6 }}>「이어서 풀기」를 누르면 전체화면으로 바뀌고 같은 블록에서 이어 풉니다. 고른 답은 저장되어 있고, 남은 시간은 처음 시작한 시각 기준으로 이어집니다.</p>}
+            {cfg.paused && <div className="warn-note" role="status">선생님이 시험을 잠시 멈췄습니다. 재개되면 「이어서 풀기」가 활성화됩니다. 남은 시간은 멈춘 때부터 이어집니다.</div>}
             {!bankOk && (bankGot ? <div className="warn-note">문항 은행이 아직 올라오지 않았습니다. 선생님께 알려 주세요.</div> : <div className="warn-note">문항 은행을 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.</div>)}
             {err && <div className="warn-note" role="alert">{err}</div>}
             <button type="button" className="btn qz-big" disabled={busy || locked || waitDup || !bankOk || !!cfg.paused} onClick={() => openSession(false)}>{busy ? "잇는 중…" : "이어서 풀기"}</button>

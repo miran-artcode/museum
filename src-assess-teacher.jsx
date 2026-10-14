@@ -37,7 +37,7 @@ const K_MIN = K_FLOOR, K_MAX = 30;   // 작품당 20회 노출(k≥10)이 SSR .8
 
 /* 단계를 바꾸기 전에 띄우는 확인 문장 — 학생 화면에 무엇이 나타나는지를 말한다 */
 const STAGE_CONFIRM = {
-  closed: "「닫힘」으로 바꿉니다. 학생 화면에서 상호평가가 사라지고 어떤 단계도 진행할 수 없게 됩니다.",
+  closed: "「닫힘」으로 바꿉니다. 학생 화면에서 상호평가가 사라지고 어떤 단계도 진행할 수 없습니다.",
   submit: "「제출」 단계로 바꿉니다. 학생은 기록지의 최종 작품(대표 이미지·작품 캡션·작가 노트)을 확인하고 제출을 확정합니다. 확정한 제출은 학생이 고칠 수 없습니다.",
   self1: "「자기평가 ①」 단계로 바꿉니다. 학생은 자기 작품을 옆에 두고 여섯 문항을 네 수준으로 평가하고, 2학년 전체에서 앞에서 몇 % 안에 들지 예측합니다. 단계는 다섯 반에 한꺼번에 적용되므로 작품 제출도 모든 반에서 닫힙니다.",
   peer: "「동료 비교」 단계로 바꿉니다. 학생은 확정된 명단에서 배정된 쌍을 차례로 비교합니다. 고른 것은 되돌릴 수 없습니다.",
@@ -630,7 +630,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
                   ok={q && q.connectivity ? !!q.connectivity.connected : null} />
                 <QTile n={sec(q && q.medianMs)} l="중앙 판정 시간" />
                 <QTile n={q && q.fastN != null ? q.fastN : "-"} l={FAST_SEC + "초 미만 판정"} s={q && q.fastOverrideN != null ? "경고 뒤 그대로 넘긴 판정 " + q.fastOverrideN : ""} ok={q && q.fastN != null ? q.fastN === 0 : null} />
-                <QTile n={q && q.droppedN != null ? q.droppedN : "-"} l="배정표와 맞지 않아 제외한 판정" s={q && q.droppedJudges && q.droppedJudges.length ? q.droppedJudges.join(", ") : "학생 문서에 배정에 없는 판정이 있으면 집계에서 뺀다"} ok={q && q.droppedN != null ? q.droppedN === 0 : null} />
+                <QTile n={q && q.droppedN != null ? q.droppedN : "-"} l="배정표와 맞지 않아 제외한 판정" s={q && q.droppedJudges && q.droppedJudges.length ? q.droppedJudges.join(", ") : "배정에 없는 판정이 학생 문서에 있으면 집계에서 뺍니다"} ok={q && q.droppedN != null ? q.droppedN === 0 : null} />
                 <QTile n={q && q.dupWhyN != null ? q.dupWhyN : "-"} l="겹치는 이유 문장" />
                 <QTile n={pct(q && q.plateOpenRate)} l="작품 캡션 펼침률" />
                 <QTile n={pct(q && q.hardRate)} l="「판단이 어려웠다」 비율" />

@@ -381,7 +381,7 @@ export function AccessPanel({ onClose }) {
           <h3><Lb k="input" lang={lang} /></h3>
           <Toggle k="dict" lang={lang} on={p.dict} onChange={(v) => set({ dict: v })}
             disabled={!ax.cfg.dictation || !sttSupported()}
-            note={!sttSupported() ? "이 브라우저는 말로 입력을 지원하지 않습니다." : !ax.cfg.dictation ? "선생님이 켜면 쓸 수 있습니다." : "기기 안 인식이 안 되는 브라우저에서는 말한 소리가 브라우저 회사의 서버로 갑니다."} />
+            note={!sttSupported() ? "이 브라우저는 말로 입력을 지원하지 않습니다." : !ax.cfg.dictation ? "선생님이 켜면 쓸 수 있습니다." : "기기 안 인식이 안 되는 브라우저에서는 말한 소리가 브라우저 회사의 서버로 전송됩니다."} />
         </section>
 
         <div className="ax-panel-foot">

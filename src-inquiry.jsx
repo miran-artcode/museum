@@ -471,7 +471,7 @@ export function InquiryAidConfig({ cfgAll, setCfgAll, setMsg }) {
       <div className="card-body">
         <p style={{ fontSize: 13, marginBottom: 12 }}>
           탐구 질문은 <b>먼저 쓰고 → 첫 답을 확정하고 → 되묻기를 받아 → 같은 칸에서 고치는</b> 순서로 진행됩니다.
-          기본값은 앞 차시에서 앱이 많이 묻고 뒤로 갈수록 학생이 스스로 묻도록 줄어드는 일정입니다.
+          기본값은 앞 차시에서는 앱이 많이 묻고, 뒤 차시로 갈수록 앱의 질문을 줄여 학생이 스스로 묻게 하는 일정입니다.
           학급의 형편에 따라 차시별로 바꿀 수 있습니다. 이미 첫 답을 확정한 학생의 기록은 그때의 수준이 그대로 남습니다.
         </p>
         <div className="tbl-scroll"><table className="roster">

@@ -581,7 +581,7 @@ export function SketchPad({ f, fieldKey, v, setField, owner, store, MediaThumb, 
       loadedRef.current = dr ? dr.base : val ? val.ref : null;
       remoteRef.current = !!opt.stale; setRemote(!!opt.stale);
       refit();
-      if (dr) { changed(); draft.current.fresh = true; sketchDirty.current = false; if (dr.hold) { autoHold.current = true; setHold(true); sketchDirty.unsaved = false; } flash(opt.stale ? "이 기기에서 그리던 그림을 불러왔습니다. 그 사이 다른 기기에서 저장된 그림은 저장 버전에 보관됩니다." : "저장하지 않은 그림을 다시 불러왔습니다."); }
+      if (dr) { changed(); draft.current.fresh = true; sketchDirty.current = false; if (dr.hold) { autoHold.current = true; setHold(true); sketchDirty.unsaved = false; } flash(opt.stale ? "이 기기에서 그리던 그림을 불러왔습니다. 그사이 다른 기기에서 저장된 그림은 저장 버전에 보관됩니다." : "저장하지 않은 그림을 다시 불러왔습니다."); }
       else { markClean(); if (flat) flash("레이어를 찾지 못해 한 장으로 열었습니다."); }
     } catch (e) {
       if (seq !== loadSeq.current) return;

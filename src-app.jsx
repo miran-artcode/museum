@@ -1010,7 +1010,7 @@ const CHANGE_PAIRS = [
     label: "점검에서 찾은 문제와 고친 결과",
     before: { k: "s5c.inspect", where: "5차시 기록 J", kind: "inspect" },
     after: { k: "s6a.diff", where: "6차시 기록 M" },
-    look: "불성립으로 표시한 항목이 실제 수정으로 이어졌는지, 고치지 않기로 한 항목에 이유가 있는지 확인함.",
+    look: "‘안 맞음’으로 표시한 항목이 실제 수정으로 이어졌는지, 고치지 않기로 한 항목에 이유가 있는지 확인함.",
   },
   {
     dim: "동료 의견 처리",
@@ -6581,7 +6581,7 @@ function TimeScatter({ rows, hoverId, setHoverId, onSel }) {
         {data.length >= 5 && (
           <g fontSize={10} fill="var(--sub)">
             <text x={L + 4} y={T + 12}>시간 짧고 산출 높음: 작성 경위 확인</text>
-            <text x={W - R - 4} y={py(0) - 8} textAnchor="end">시간 길고 산출 낮음: 막힌 지점 지원</text>
+            <text x={W - R - 4} y={py(0) - 8} textAnchor="end">시간 길고 산출 낮음: 막힌 부분 지원</text>
           </g>
         )}
         {data.map((r) => (
@@ -6759,7 +6759,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
               );
             });
           })()}
-          <p className="hint" style={{ marginTop: 8 }}>막대는 지표별 만점(빗금 뒤 숫자) 기준이라 행끼리 눈으로 비교할 수 있습니다. 불성립 발견과 제외 근거가 낮으면 5차시 이중 점검 시범을 보강합니다.</p>
+          <p className="hint" style={{ marginTop: 8 }}>막대는 지표별 만점(빗금 뒤 숫자) 기준이라 행끼리 눈으로 비교할 수 있습니다. 「안 맞는 곳 찾기」와 「제외 근거」가 낮으면 5차시 이중 점검 시범을 보강합니다.</p>
         </div>
       </div>
 
@@ -6834,20 +6834,20 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
             <div className="kpi"><div className="n">{simAll.cls.peerSimMed != null ? Math.round(simAll.cls.peerSimMed) + "%" : "—"}</div><div className="l">서술 유사도 중앙값</div></div>
             <div className="kpi"><div className="n">{simAll.cls.structSimMed != null ? Math.round(simAll.cls.structSimMed) + "%" : "—"}</div><div className="l">구조 유사도 중앙값</div></div>
             <div className="kpi"><div className="n">{simAll.cls.lexPool || "—"}</div><div className="l">학급 어휘 풀</div></div>
-            <div className="kpi"><div className="n">{simAll.cls.attitudeEnt != null ? simAll.cls.attitudeEnt + "%" : "—"}</div><div className="l">태도 선택의 고름</div></div>
+            <div className="kpi"><div className="n">{simAll.cls.attitudeEnt != null ? simAll.cls.attitudeEnt + "%" : "—"}</div><div className="l">태도 선택의 고른 정도</div></div>
           </div>
-          <AxisStripRow axis={{ key: "peerSim", name: "학급 평균 유사도", desc: "내 서술이 나머지 학생 서술과 얼마나 겹치는가 (높을수록 무난함)" }}
+          <AxisStripRow axis={{ key: "peerSim", name: "학급 평균 유사도", desc: "한 학생의 서술이 나머지 학생 서술과 얼마나 겹치는가 (높을수록 무난함)" }}
             rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).peerSim }))}
             hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
           <AxisStripRow axis={{ key: "structSim", name: "구조 유사도", desc: "단어가 달라도 문장 수·나열 표지·연결어의 뼈대가 같은 정도" }}
             rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).structSim }))}
             hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
-          <AxisStripRow axis={{ key: "mattr", name: "어휘 다양성", desc: "토큰 50개 창을 밀며 잰 TTR의 평균(MATTR). 글 길이에 견고해 '나만 쓴 단어 수'보다 신뢰할 수 있다. 토큰 50개를 못 채우면 계산하지 않는다" }} first
+          <AxisStripRow axis={{ key: "mattr", name: "어휘 다양성", desc: "토큰 50개 창을 밀며 잰 TTR의 평균(MATTR). 글 길이의 영향을 덜 받아 '나만 쓴 단어 수'보다 믿을 만하다. 토큰 50개를 못 채우면 계산하지 않는다" }} first
             rows={rows.map((r) => ({ id: r.id, nick: r.nick, v: (simAll.per[r.id] || {}).mattr }))}
             hoverId={hoverId} setHoverId={setHoverId} onSel={onSel} />
           <p className="hint" style={{ marginTop: 8 }}>
             <b>구조 유사도를 함께 보는 이유.</b> 학생은 가져온 글을 그대로 내지 않고 고쳐서 냅니다. 그러면 단어는 바뀌지만 뼈대는 남습니다.
-            서술 유사도는 낮은데 구조 유사도만 높은 학생이 있다면 그 자리를 먼저 읽어 보십시오.
+            서술 유사도는 낮은데 구조 유사도만 높은 학생이 있다면 그 학생의 글을 먼저 읽어 보십시오.
           </p>
           <p className="hint" style={{ marginTop: 6, color: "var(--seal)" }}>
             이 표는 <b>표절 탐지가 아닙니다.</b> 유사도가 높다는 것은 베꼈다는 뜻이 아니라 같은 말을 썼다는 뜻이며,
@@ -6860,7 +6860,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
         <div className="card-head"><span className="card-code">읽는 법</span><span className="card-title">이 지표가 재는 것과 재지 못하는 것</span></div>
         <div className="card-body" style={{ fontSize: 13 }}>
           <p>이 화면의 숫자는 기록의 <b>양과 폭</b>을 셉니다. 답이 좋은지는 재지 못하므로, 점수는 어느 학생의 기록부터 읽을지 고르는 입구로만 쓰고 판단은 본문을 읽고 내립니다.</p>
-          <p style={{ marginTop: 6 }}>남다름은 학급 안 단어 비교라 같은 문제를 다른 말로 쓴 학생이 높게 나올 수 있고, 학급이 바뀌면 점수도 바뀝니다. 채집의 폭은 기기·촬영 환경의 영향을 받으므로 성적에 직접 반영하지 않고 격려와 관찰에 씁니다.</p>
+          <p style={{ marginTop: 6 }}>남다름은 학급 안 단어 비교라 같은 문제를 다른 말로 쓴 학생이 높게 나올 수 있고, 학급이 바뀌면 점수도 바뀝니다. 모으기의 폭은 기기·촬영 환경의 영향을 받으므로 성적에 직접 반영하지 않고 격려와 관찰에 씁니다.</p>
           <p style={{ marginTop: 6 }}>축마다 성격과 만점 기준이 달라 여섯 축을 하나의 점수로 합치지 않습니다. 「축 평균」은 정렬과 산점도를 위한 참고값입니다.</p>
           <p style={{ marginTop: 6 }}><b>붙여넣기 지표</b>는 외부 글이 들어온 시점과 분량을 알려 줄 뿐 <b>출처를 알려 주지 않습니다.</b> 학생이 고른 출처 표시가 없으면 AI인지 검색 결과인지 자기가 앞서 쓴 글인지 구분되지 않습니다. 전유율은 붙인 앞 120자가 최종문에 남았는지로 어림한 값이라 긴 글에서는 거칠게 나옵니다.</p>
           <p style={{ marginTop: 6 }}><b>유사도 지표</b>는 학급을 규준으로 한 상대값입니다. 학급이 바뀌면 값도 바뀌고, 같은 과제를 성실히 수행한 학생끼리 높게 나오는 것이 정상입니다. 표절 판정이나 징계의 근거로 쓸 수 없습니다.</p>
@@ -7167,7 +7167,7 @@ function TeacherGuide() {
               <p style={{ marginBottom: 10 }}>
                 <b>이론적 기반.</b> 이 단원이 기르려는 창의성은 Kaufman과 Beghetto의 4C 모형에서 <b>mini-c</b>(학습 과정에서 자기에게 새로운 해석)와{" "}
                 <b>little-c</b>(일상의 문제를 새롭고 적절하게 해결하는 창의성)입니다. big-C(역사적 창의성)는 학교 수업의 측정 대상이 아니므로,
-                수업과 측정 모두 little-c 수준의 행동·인식·산출을 겨냥합니다. 수업 설계의 축은 세 가지입니다.
+                수업과 측정 모두 little-c 수준의 행동·인식·산출을 겨냥합니다. 수업 설계의 바탕은 세 가지입니다.
                 ① Guilford의 확산적 사고와 수렴적 사고의 순환: 생성 회차(발산)와 선별·제외(수렴)가 한 차시 안에서 반복되게 함.
                 ② Amabile의 성분 이론: 영역 지식(1~4차시의 미술사·형식 학습), 창의적 사고 과정(점검·수정·전유), 내적 동기(자기 접점에서 출발하는 문제 선정)를 각 차시에 배치함.
                 ③ 인간-AI 공동창작 연구의 관점: 생성형 AI를 아이디어를 대신 내는 기계가 아니라 <b>발산을 넓히는 도구</b>로 두고,
@@ -7203,7 +7203,7 @@ function TeacherGuide() {
       <div className="card">
         <div className="card-body">
           <details>
-            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>유물 발상 단계 운영: 일곱 단계와 돌아보기를 수업 시간에 어떻게 굴리는가</summary>
+            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>유물 발상 단계 운영: 일곱 단계와 돌아보기를 수업 시간에 어떻게 진행하는가</summary>
             <div style={{ fontSize: 13, lineHeight: 1.8, marginTop: 10 }}>
               <p style={{ marginBottom: 10 }}>
                 「유물 발상 단계」는 관찰한 사회 문제나 사회 현상을 그 장소에 실제로 있는 유물(사물)에 드러난 사용 흔적으로 시각화하는 일곱 단계입니다.
@@ -7230,7 +7230,7 @@ function TeacherGuide() {
               </table>
               <p style={{ margin: "12px 0 10px" }}>
                 <b>단계 1은 2차시 끝 8분 안에 교실에서 고르게 하고, 단계 2는 한 주 과제입니다.</b> 다섯 가지 관찰 방법을 1분씩 훑고 학생이 그 자리에서 하나를 고르고 나갑니다.
-                방법마다 잘 잡히는 것과 놓치는 것이 다르므로, 학급 안에서 방법이 갈리면 3차시 도입에서 같은 동네인데 다른 것이 모였다는 사실을 바로 보여 줄 수 있습니다.
+                방법마다 잘 잡히는 것과 놓치는 것이 다르므로, 학급 안에서 방법이 나뉘면 3차시 도입에서 같은 동네인데 다른 것이 모였다는 사실을 바로 보여 줄 수 있습니다.
                 <b> 3차시 수업이 끝날 때까지 2차시 탭을 닫지 마세요.</b> 학생이 단계 3에서 문제를 정하며 장면을 고치러 돌아갑니다.
                 과제를 못 해 온 학생은 도입 8분 동안 장면 한두 줄만 적게 하고 시작합니다.
               </p>
@@ -7244,12 +7244,12 @@ function TeacherGuide() {
               </table>
               <p style={{ margin: "12px 0 10px" }}>
                 <b>여덟 방법은 감상에서 작품으로 익히고, 돌아보기에서 가장 가까운 방법과 이유 한 줄만 받습니다.</b> 이 단원의 결과물(실재한 적 없는 유물의 기록 사진과 작품 캡션)은
-                가림과 우회 · 허구와 파라픽션 · 증거와 포렌식을 겹친 형식이라는 사실을 감상 시간에 미리 밝히세요. 형식을 감춘 채 고르라고 하면 학생은 교사가 원하는 답을 짐작합니다.
+                가림과 우회 · 허구와 파라픽션 · 증거와 포렌식을 합친 형식이라는 사실을 감상 시간에 미리 밝히세요. 형식을 감춘 채 고르라고 하면 학생은 교사가 원하는 답을 짐작합니다.
                 그래서 방법 고르기는 발상 단계 앞이 아니라 뒤에 둡니다. 흔적이라는 구체 재료가 생긴 뒤에 자기 작업의 위치를 짚는 사후 위치 짓기입니다.
                 돌아보기 8분이 모자라면 「가까운 방법」은 4차시 도입 5분으로 미뤄도 됩니다.
               </p>
               <p style={{ margin: "12px 0 10px" }}>
-                <b>단계 4의 다섯 이유가 이 활동의 핵심입니다.</b> 보이지 않는 것을 곧바로 그리라고 하면 대부분 상징(눈물·사슬·시든 꽃)으로 도망갑니다.
+                <b>단계 4의 다섯 이유가 이 활동의 핵심입니다.</b> 보이지 않는 것을 곧바로 그리라고 하면 대부분 상징(눈물·사슬·시든 꽃)에 기댑니다.
                 ‘무엇이 보이지 않는가’ 대신 ‘왜 보이지 않는가’를 먼저 묻고, 그 이유에 따라 찾을 곳을 정해 줍니다.
               </p>
               <table className="match-tbl">
@@ -7265,18 +7265,18 @@ function TeacherGuide() {
                 ② 단계 4에서 이유가 모두 같은 학생에게는 다른 이유의 예를 하나 들어 주고 한 줄만 더 찾게 합니다.
                 ③ 단계 5에서 ‘누가 어떻게 만지나’를 못 채운 학생에게는 그 물건은 자국이 생기지 않으므로 빼게 합니다.
                 ④ 단계 6에서 자국 칸에 마음·의미·상징의 말을 쓴 학생에게는 “그것을 사진으로 찍으면 무엇이 찍히나요”라고 되묻고(화면에도 경고가 뜹니다),
-                ‘하루 몇 번씩, 몇 년 동안’ 칸이 빈 학생에게는 “하루 몇 번, 몇 년이면 그 자국이 생길까요”로 어림해 보게 합니다. 6차시의 ‘낡음과 낡을 이유의 차이’가 여기서 갈립니다.
+                ‘하루 몇 번씩, 몇 년 동안’ 칸이 빈 학생에게는 “하루 몇 번, 몇 년이면 그 자국이 생길까요”로 어림해 보게 합니다. 6차시의 ‘낡음과 낡을 이유의 차이’가 여기서 정해집니다.
               </p>
               <p style={{ marginBottom: 10 }}>
                 <b>단계 7은 반드시 짝 활동으로 합니다. 서로 4분씩.</b> 문제 이름을 감추고 물건과 흔적 두 줄만 읽어 주게 하세요. 다르게 읽히는 것이 정상이며,
                 그때 어느 단계로 돌아갈지 정하고 실제로 돌아가 고치는 일이 이 단원에서 가장 값진 기록입니다.
                 되돌아간 단계와 고친 내용은 「사고 과정」 탭과 학생 상세의 「발상 과정」 탭에 그대로 쌓입니다.
-                시간이 남는 학생만 「짝 한 명 더」를 씁니다. 시간이 모자라면 감상 끝 3분 예행, 「짝 한 명 더」·「자국 하나 더」, 단계 4·5의 셋째 줄 순서로 버립니다.
+                시간이 남는 학생만 「짝 한 명 더」를 씁니다. 시간이 모자라면 감상 끝 3분 예행, 「짝 한 명 더」·「자국 하나 더」, 단계 4·5의 셋째 줄 순서로 뺍니다.
               </p>
               <p>
                 <b>문장은 「이 문장 저장하기」로 저장합니다.</b> 학생이 문장을 고쳐 쓴 뒤 이 버튼을 누르면 그때의 문장이 따로 저장됩니다.
                 단계 6의 첫 문장과 단계 7의 마지막 문장을 나란히 놓은 것이 이 단원의 사전·사후 자료가 되고, 그 사이의 문장들이 사고의 이동 경로가 됩니다.
-                수업 중에 “지금 문장으로 한 번 남겨 두세요”라고 한 번만 말해 주면 자료가 훨씬 두꺼워집니다.
+                수업 중에 “지금 문장을 한 번 저장해 두세요”라고 한 번만 말해 주면 자료가 훨씬 풍부해집니다.
                 발상 단계의 결론(문제·안 보이는 것·물건·흔적·태도)은 돌아보기의 「내 발상 한눈에」에 자동으로 모이고, 4차시 유물 설계 카드 맨 위에 다시 뜹니다.
               </p>
             </div>
@@ -7290,7 +7290,7 @@ function TeacherGuide() {
               <p style={{ marginBottom: 10 }}>
                 「연구」 탭은 학급 기록을 논문에 바로 쓸 수 있는 다섯 가지 자료 구조와 세 가지 문서(모두 여덟 파일)로 바꿔 줍니다.
                 내려받는 파일에는 학번·별명·계정 정보가 들어가지 않고, 학생마다 한 번 무작위로 정해 고정한 가명 번호(P와 네 글자)와 학급 코드(C1…)만 남습니다.
-                익명 번호와 학번의 대응표는 화면에서만 보이며 파일로 나가지 않으므로, 필요하면 교사가 따로 안전한 곳에 보관하세요.
+                가명 번호와 학번의 대응표는 화면에서만 보이며 파일로 나가지 않으므로, 필요하면 교사가 따로 안전한 곳에 보관하세요.
               </p>
               <table className="match-tbl">
                 <thead><tr><th style={{ width: 130 }}>파일</th><th style={{ width: 150 }}>한 행의 단위</th><th>논문의 어느 자리에 쓰는가</th></tr></thead>
@@ -7450,7 +7450,7 @@ function LadderMap({ ws }) {
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">단계</span><span className="card-title">일곱 단계의 오르기</span></div>
+        <div className="card-head"><span className="card-code">단계</span><span className="card-title">일곱 단계 진행</span></div>
         <div className="card-body">
           <div className="funnel">
             {tm.stages.map((s) => {
@@ -7464,7 +7464,7 @@ function LadderMap({ ws }) {
               );
             })}
           </div>
-          <p className="hint" style={{ marginTop: 10 }}>초록은 그 단계를 다 채운 상태, 흐린 색은 채우는 중입니다. 글자 수와 구체성은 그 단계에 남긴 글 전체를 대상으로 셉니다.</p>
+          <p className="hint" style={{ marginTop: 10 }}>초록은 그 단계를 다 채운 상태, 흐린 색은 채우는 중입니다. 글자 수와 구체성은 그 단계에 쓴 글 전체를 대상으로 셉니다.</p>
         </div>
       </div>
 
@@ -7488,7 +7488,7 @@ function LadderMap({ ws }) {
         </div>
         <div className="pair-look">
           {tm.overlap == null ? "두 문장이 모두 있어야 견줄 수 있습니다."
-            : "두 문장의 어휘가 " + tm.overlap + "% 겹칩니다. 겹침이 낮고 구체성이 오른 경우가 말이 바뀐 자리입니다."}
+            : "두 문장의 어휘가 " + tm.overlap + "% 겹칩니다. 겹침이 낮고 구체성이 올랐다면 말이 바뀐 것입니다."}
         </div>
       </div>
 
@@ -7601,7 +7601,7 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
     <div>
       <div className="kpis">
         <div className="kpi"><div className="n">{r2(mean(rows.map((r) => r.tm.depth)))}</div><div className="l">평균 도달 단계 (7 만점)</div></div>
-        <div className="kpi"><div className="n">{rows.filter((r) => r.tm.depth >= 7).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">일곱 단계를 다 오른 학생</div></div>
+        <div className="kpi"><div className="n">{rows.filter((r) => r.tm.depth >= 7).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {N}</span></div><div className="l">일곱 단계를 다 마친 학생</div></div>
         <div className="kpi"><div className="n">{rows.reduce((a, r) => a + r.tm.revisitN, 0)}</div><div className="l">학급 전체 되돌림 횟수</div></div>
         <div className="kpi"><div className="n">{st.n ? (st.diffM > 0 ? "+" : "") + r2(st.diffM) : "-"}</div><div className="l">구체성 평균 변화 (첫 문장 → 마지막 문장)</div></div>
       </div>
@@ -7625,7 +7625,7 @@ function TranslationPanel({ ids, roster, wsMap, onSel }) {
               );
             })}
           </div>
-          <p className="hint" style={{ marginTop: 10 }}>완료가 급격히 줄어드는 단계가 이 학급이 막힌 지점입니다. 그 단계의 질문을 다음 차시 도입에서 다시 다룹니다.</p>
+          <p className="hint" style={{ marginTop: 10 }}>완료가 급격히 줄어드는 단계가 이 학급이 막힌 곳입니다. 그 단계의 질문을 다음 차시 도입에서 다시 다룹니다.</p>
         </div>
       </div>
 
@@ -7853,7 +7853,7 @@ const RESEARCH_VARS = [
   { k: "paste_untouched_n", name: "붙인 뒤 손대지 않은 건수", unit: "건", def: "붙인 뒤 같은 칸을 다시 고친 기록(settle)이 없는 붙여넣기의 수", get: (c) => c.pm.untouchedN },
   { k: "paste_emptied_n", name: "붙인 뒤 칸을 비운 건수", unit: "건", def: "붙여넣은 칸이 최종적으로 비어 있는 붙여넣기의 수 (잔존 0으로 전유율에 들어감)", get: (c) => c.pm.emptiedN },
   { k: "ai_type", name: "유형", unit: "명목", def: "붙여넣기가 없고 쓴 글(10자 이상 칸)이 있으면 직접 씀. 붙여넣기가 있으면 같은 학급(반)의 붙여넣은 학생 전유율 중앙값(ap_med)과 견주어, 중앙값을 엄격히 넘고 0보다 크면 전유, 같거나 낮으면 대리 서술. 붙여넣은 학생이 학급에 3명 미만이면 빈칸. 쓴 글이 없으면 빈칸", get: (c) => c.pm.type || "", text: true },
-  { k: "ap_med", name: "학급 전유율 중앙값", unit: "%", def: "ai_type을 가른 기준값. 그 학생이 속한 학급(반)에서 붙여넣기가 있는 학생들의 전유율 중앙값. 같은 학급 안에서는 모두 같은 값", get: (c) => (c.clsStat && c.clsStat.typeN >= 3 ? c.clsStat.apMed : null), noDesc: true },
+  { k: "ap_med", name: "학급 전유율 중앙값", unit: "%", def: "ai_type을 정한 기준값. 그 학생이 속한 학급(반)에서 붙여넣기가 있는 학생들의 전유율 중앙값. 같은 학급 안에서는 모두 같은 값", get: (c) => (c.clsStat && c.clsStat.typeN >= 3 ? c.clsStat.apMed : null), noDesc: true },
 
   /* 지우고 다시 쓴 흔적 */
   { k: "rewrite_depth", name: "개작의 깊이", unit: "%", def: "남겨 둔 이전 문장이 최종문과 얼마나 멀어졌는가의 평균", get: (c) => c.rv.depth },
@@ -7874,7 +7874,7 @@ const RESEARCH_VARS = [
   { k: "peer_sim", name: "학급 평균 유사도", unit: "%", def: "내 서술과 같은 학급(반)의 나머지 학생 서술의 3-gram 유사도 평균 (소수 한 자리)", get: (c) => c.sim.peerSim },
   { k: "nn_sim", name: "최근접 유사도", unit: "%", def: "같은 학급(반)에서 가장 비슷한 한 명과의 유사도 (소수 한 자리)", get: (c) => c.sim.nnSim },
   { k: "struct_sim", name: "구조 유사도", unit: "%", def: "문장 수·나열 표지·연결어의 뼈대가 같은 학급(반)과 얼마나 겹치는가 (소수 한 자리)", get: (c) => c.sim.structSim },
-  { k: "mattr", name: "어휘 다양성 MATTR", unit: "0–100", def: "토큰 " + MATTR_WIN + "개 창을 한 칸씩 밀며 잰 TTR의 평균. 글 길이에 견고하다. 토큰이 " + MATTR_WIN + "개 미만이면 빈칸", get: (c) => c.sim.mattr },
+  { k: "mattr", name: "어휘 다양성 MATTR", unit: "0–100", def: "토큰 " + MATTR_WIN + "개 창을 한 칸씩 밀며 잰 TTR의 평균. 글 길이의 영향을 덜 받는다. 토큰이 " + MATTR_WIN + "개 미만이면 빈칸", get: (c) => c.sim.mattr },
   { k: "hdd", name: "어휘 다양성 HD-D", unit: "0–100", def: "토큰 " + HDD_SAMPLE + "개를 뽑았을 때 각 단어가 한 번이라도 나올 확률의 합 ÷ " + HDD_SAMPLE + ". 토큰이 " + HDD_SAMPLE + "개 미만이면 빈칸", get: (c) => c.sim.hdd },
   { k: "tokens_n", name: "서술 토큰 수", unit: "개", def: "서술 칸 전체의 어절 토큰 수(조사·어미 제거 후). 어휘 다양성 지표의 포함 기준 판정에 쓴다", get: (c) => c.sim.tokensN },
   /* hapax는 글이 길수록 커져 짧은 글에서는 어휘가 아니라 길이를 잰다 — 보조로만 둔다 */
@@ -8055,7 +8055,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     store.getSafe(PID_KEY).then((r) => {
       if (!alive) return;
       if (r.ok) { const m = normPidMap(r.data); pidRef.current = m; setPidMap(m); setPidErr(""); }
-      else setPidErr("가명 번호 지도를 읽지 못했습니다. 내려받기 전에 연결을 확인하세요.");
+      else setPidErr("가명 번호 대응표를 읽지 못했습니다. 내려받기 전에 연결을 확인하세요.");
     });
     return () => { alive = false; };
   }, [sampleMode]);
@@ -8341,7 +8341,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       L.push(mdRow([a, ...corrKeys.map((b) => (a === b ? "1" : r2(pearson(cv[a], cv[b]))))]));
     });
     L.push("");
-    L.push("빈칸은 두 변수 모두에 값이 있는 참여자가 3명 미만이어서 계산하지 않은 자리입니다.");
+    L.push("빈칸은 두 변수 모두에 값이 있는 참여자가 3명 미만이어서 계산하지 않은 칸입니다.");
     L.push("");
     return L.join("\n");
   };
@@ -8391,11 +8391,11 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       ["head_text", "가져온 문장의 앞 120자"],
     ].forEach((r) => L.push(mdRow(r)));
     L.push("");
-    L.push("수집 범위는 기록지의 모든 입력 칸입니다. 서술 칸뿐 아니라 표·발상 단계·점검표 안의 칸에 붙여넣은 것도 같은 방식으로 남습니다. 20자 미만의 붙여넣기는 기록하지 않습니다.");
+    L.push("수집 범위는 기록지의 모든 입력 칸입니다. 서술 칸뿐 아니라 표·발상 단계·점검표 안의 칸에 붙여넣은 것도 같은 방식으로 기록됩니다. 20자 미만의 붙여넣기는 기록하지 않습니다.");
     L.push("");
     L.push("## 토큰화의 한계");
     L.push("");
-    L.push("어휘 지표(MATTR·HD-D·hapax·tokens_n, 남다름의 어휘 비교)는 형태소 분석기 없이 어절 끝의 흔한 조사·어미를 규칙으로 한 번만 잘라 낸 토큰을 씁니다. 그래서 같은 말이 다른 토큰이 되기도 합니다. 「고양이」는 끝 글자 「이」를 조사로 보아 「고양」이 되고, 「고양이는」은 「는」만 떼어 「고양이」가 됩니다(「예술가」는 「예술」, 「예술가는」은 「예술가」도 같습니다). 논문에 싣는 어휘 지표는 내보낸 원문을 형태소 분석기(예: Kiwi, MeCab-ko)로 다시 토큰화해 산출하기를 권합니다.");
+    L.push("어휘 지표(MATTR·HD-D·hapax·tokens_n, 남다름의 어휘 비교)는 형태소 분석기 없이 어절 끝의 흔한 조사·어미를 규칙으로 한 번만 잘라 낸 토큰을 씁니다. 그래서 같은 말이 다른 토큰이 되기도 합니다. 「고양이」는 끝 글자 「이」를 조사로 보아 「고양」이 되고, 「고양이는」은 「는」만 떼어 「고양이」가 됩니다(「예술가」가 「예술」, 「예술가는」이 「예술가」가 되는 것도 같습니다). 논문에 싣는 어휘 지표는 내보낸 원문을 형태소 분석기(예: Kiwi, MeCab-ko)로 다시 토큰화해 산출하기를 권합니다.");
     L.push("");
     L.push("## 성향 설문·앵커 판정 파일 (「설문」·「연구」 탭, 학번 포함)");
     L.push("");
@@ -8415,7 +8415,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("## 단계와 기록 칸의 대응");
     L.push("");
-    L.push("2026-09 개정으로 단계는 아홉에서 일곱이 되었다. 옛 코드 대응: T5→단계 4, T6→단계 5, T7→단계 6, T8·T9→단계 7, 옛 T4(드러내는 방법)는 돌아보기의 「가까운 방법」으로 옮겼다. 개정 전 기록의 단계 2·3 편집 시각은 s3a에 합쳐져 있고, 개정 뒤 단계 3의 시각은 s3p에 남는다. 발상 단계의 한 줄 이유(max 100자 이상)은 서술 칸과 함께 동질화 지표에 들어간다.");
+    L.push("2026-09 개정으로 단계는 아홉에서 일곱이 되었다. 옛 코드 대응: T5→단계 4, T6→단계 5, T7→단계 6, T8·T9→단계 7, 옛 T4(드러내는 방법)는 돌아보기의 「가까운 방법」으로 옮겼다. 개정 전 기록의 단계 2·3 편집 시각은 s3a에 합쳐져 있고, 개정 뒤 단계 3의 시각은 s3p에 남는다. 발상 단계의 한 줄 이유(max 100자 이상)는 서술 칸과 함께 동질화 지표에 들어간다.");
     L.push("");
     L.push(mdHead(["단계", "이름", "해당 기록 칸", "학생이 하는 일", "내놓을 것"]));
     TRANSLATE_STAGES.forEach((st) => L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, st.keys.join(" / "), st.ask, st.out])));
@@ -8469,7 +8469,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("연구 문제");
     L.push("");
-    L.push("1. 학생들은 사회 문제를 어떤 관찰 방법으로 모으며, 방법의 선택은 모이는 장면을 어떻게 달라지게 하는가.");
+    L.push("1. 학생들은 사회 문제를 어떤 관찰 방법으로 모으며, 방법에 따라 모이는 장면은 어떻게 달라지는가.");
     L.push("2. 흔적을 설계한 뒤 학생들은 자기 작업이 사회참여 미술의 어느 방법에 가장 가깝다고 짚으며, 그 이유를 어떻게 대는가.");
     L.push("3. 보이지 않는 대상을 유물(사물)에 드러난 사용 흔적으로 옮기는 동안 학생의 진술은 어떻게 달라지는가.");
     L.push("4. 짝에게 읽히기에서 의도와 다른 읽기를 만난 학생은 사고를 어떻게 고치는가.");
@@ -8489,14 +8489,14 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push(mdHead(["단계", "이름", "학생이 하는 일", "내놓을 것", "교사가 보는 곳"]));
     TRANSLATE_STAGES.forEach((st) => L.push(mdRow(["단계 " + st.n + " (" + st.key + ")", st.name, st.ask, st.out, st.look])));
     L.push("");
-    L.push("발상 단계에는 세 번의 선택 지점이 있다. 단계 1의 관찰 방법, 단계 4의 안 보이는 이유, 그리고 일곱 단계를 다 마친 뒤 돌아보기에서 짚는 가까운 방법(사회참여 미술의 여덟 방법 가운데 하나)이다. 세 지점 모두 고르기만 하는 것이 아니라 고른 이유를 한 줄 적게 했다. 가까운 방법은 사전 설계 선택이 아니라 사후 위치 짓기다. 이 단원의 결과물 형식이 이미 정해져 있는 조건에서 사전 선택은 교사의 답을 짐작하는 일이 되기 쉬우므로, 흔적이라는 구체 재료가 생긴 뒤에 자기 작업의 자리를 짚게 했다.");
+    L.push("발상 단계에서 학생은 세 가지를 고른다. 단계 1의 관찰 방법, 단계 4의 안 보이는 이유, 그리고 일곱 단계를 다 마친 뒤 돌아보기에서 짚는 가까운 방법(사회참여 미술의 여덟 방법 가운데 하나)이다. 세 가지 모두 고른 이유를 한 줄 적게 했다. 가까운 방법은 사전 설계 선택이 아니라 사후 위치 짓기다. 이 단원의 결과물 형식이 이미 정해져 있는 조건에서 사전 선택은 교사의 답을 짐작하는 일이 되기 쉬우므로, 흔적이라는 구체 재료가 생긴 뒤에 자기 작업의 위치를 짚게 했다.");
     L.push("");
     L.push("단계 1에서 학생은 다섯 가지 관찰 방법 가운데 하나를 고른다. ‘잘 살펴보라’는 지시만으로는 자료가 모이지 않으므로 방법을 명시하고, 방법마다 잘 잡히는 것과 놓치는 것을 함께 제시했다. 놓칠 것 같은 것을 적는 칸은 선택으로 두었다.");
     L.push("");
     L.push(mdHead(["관찰 방법", "이론적 출처", "잘 잡아내는 것", "놓치는 것"]));
     OBS_METHODS.forEach((m) => L.push(mdRow([m.label, m.from, m.good, m.miss])));
     L.push("");
-    L.push("돌아보기에서 학생은 사회참여 미술이 사회를 드러내 온 여덟 가지 방법 가운데 자기 작업과 가장 가까운 것 하나를 짚고 그 이유를 한 줄 적는다. 여덟 방법은 3차시 감상에서 작품으로 익힌다. 이 단원의 결과물 자체는 가림과 우회 · 허구와 파라픽션 · 증거와 포렌식 세 방법을 겹쳐 놓은 형식이며, 이 사실을 학생에게 미리 밝힌다. 같은 입장에서 말하는 태도(고발·경고·공감·기록·질문)와 그 이유도 정하며, 이것이 4차시 캡션의 말투와 7차시 진열의 기준이 된다.");
+    L.push("돌아보기에서 학생은 사회참여 미술이 사회를 드러내 온 여덟 가지 방법 가운데 자기 작업과 가장 가까운 것 하나를 짚고 그 이유를 한 줄 적는다. 여덟 방법은 3차시 감상에서 작품으로 익힌다. 이 단원의 결과물 자체는 가림과 우회 · 허구와 파라픽션 · 증거와 포렌식 세 방법을 합친 형식이며, 이 사실을 학생에게 미리 밝힌다. 이때 말하는 태도(고발·경고·공감·기록·질문)와 그 이유도 정하며, 이것이 4차시 캡션의 말투와 7차시 진열의 기준이 된다.");
     L.push("");
     L.push(mdHead(["방법", "대표 작업", "관람자가 하는 일", "이 방법의 위험"]));
     ENGAGE_MODES.forEach((m) => L.push(mdRow([m.label + (UNIT_MODES.includes(m.k) ? " (단원 형식)" : ""), m.works, m.does, m.risk])));
@@ -8510,7 +8510,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 기록지의 모든 서술문과 표 입력값 (단계·차시·항목 단위로 구분됨)");
     L.push("- 흔적 문장을 저장한 이력 (학생이 「이 문장 저장하기」를 누를 때마다 그 시점의 문장이 따로 저장됨)");
     L.push("- 고쳐 쓰기 이력 (앞선 기록에서 2분 이상 지난 뒤 길이가 8자를 넘게 달라지거나 어휘 겹침이 0.6 미만으로 떨어지면 이전 문장을 보관. 길이는 그대로인 채 내용만 바뀐 개작을 놓치지 않기 위해 두 조건을 함께 둔다)");
-    L.push("- 붙여넣기 기록 (기록 칸에 20자 이상이 붙여넣어진 시각·칸·글자 수·UTF-8 바이트 수·붙이기 직전 그 칸의 길이·앞 120자. 클립보드 전문은 저장하지 않는다" + (askUsed ? ". 붙여넣은 직후 학습자가 고른 출처 자기보고(AI로 만든 글 · 인터넷·자료에서 · 내가 앞서 쓴 글 · 그 밖, 답하지 않고 닫을 수 있음)도 함께 저장한다)" : ". 출처는 수집하지 않는다)"));
+    L.push("- 붙여넣기 기록 (기록 칸에 20자 이상을 붙여넣은 시각·칸·글자 수·UTF-8 바이트 수·붙이기 직전 그 칸의 길이·앞 120자. 클립보드 전문은 저장하지 않는다" + (askUsed ? ". 붙여넣은 직후 학습자가 고른 출처 자기보고(AI로 만든 글 · 인터넷·자료에서 · 내가 앞서 쓴 글 · 그 밖, 답하지 않고 닫을 수 있음)도 함께 저장한다)" : ". 출처는 수집하지 않는다)"));
     L.push("- 생성 회차마다 실제로 사용한 프롬프트 전문");
     L.push("- 항목별 최초·최종 입력 시각과 편집 횟수");
     L.push("- 차시별 머문 시간과 강의 노트 열람 시간 (창에 초점이 있고 30초 안에 움직임, 2분 안에 클릭·키 입력·스크롤이 있던 5초 단위만 누적. 조건에 못 미친 시간은 「켜 둔 채 비활동」으로 따로 누적)");
@@ -8558,13 +8558,13 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("구조 유사도를 내용 유사도와 따로 둔 이유는, 학생이 가져온 글을 그대로 제출하지 않고 고쳐 쓰는 경우 어휘는 달라지지만 문장 수·나열 표지·연결어의 배치는 남기 때문이다. 내용 유사도만 보면 이 경우를 놓친다. 다만 본 연구의 구조 유사도는 문장 수·나열 표지·연결어·문말 어미의 일치를 세는 표층 지표이며, 품사 태그열의 압축비로 구조 다양성을 재는 방식과는 다르다. 후자는 형태소 분석을 전제하므로 수집 도구 안에서 계산하지 않고 별도 처리 단계로 남긴다. 「연구자 서술: 구조 다양성 지표의 선택과 그 한계」");
     L.push("");
-    L.push("어휘 다양성은 MATTR(창 " + MATTR_WIN + ")과 HD-D(표본 " + HDD_SAMPLE + ")로 잰다. 두 지표 모두 글의 길이에 견고하다. 참여자별 토큰 수(tokens_n)를 함께 보고하며, 창 또는 표본 크기에 미치지 못하는 참여자는 해당 지표를 결측으로 둔다. 최소 토큰 수에 따른 포함 기준은 분석 전에 정한다. 「연구자 서술: 사전 등록한 포함 기준」");
+    L.push("어휘 다양성은 MATTR(창 " + MATTR_WIN + ")과 HD-D(표본 " + HDD_SAMPLE + ")로 잰다. 두 지표 모두 글 길이의 영향을 덜 받는다. 참여자별 토큰 수(tokens_n)를 함께 보고하며, 창 또는 표본 크기에 미치지 못하는 참여자는 해당 지표를 결측으로 둔다. 최소 토큰 수에 따른 포함 기준은 분석 전에 정한다. 「연구자 서술: 사전 등록한 포함 기준」");
     L.push("");
-    L.push("특정 참여자만 사용한 어휘의 수(hapax)는 글이 길수록 커져 짧은 글에서는 어휘의 다양성이 아니라 분량을 재게 되므로 주 지표로 쓰지 않고, 토큰 수와 함께 볼 때에만 보조적으로 해석한다.");
+    L.push("특정 참여자만 사용한 어휘의 수(hapax)는 글이 길수록 커져 짧은 글에서는 어휘의 다양성이 아니라 분량을 재므로 주 지표로 쓰지 않고, 토큰 수와 함께 볼 때에만 보조적으로 해석한다.");
     L.push("");
     L.push("토큰화는 형태소 분석기를 쓰지 않고 어절 끝의 흔한 조사·어미를 규칙으로 한 번 잘라 내는 방식이다. 그래서 「고양이」와 「고양이는」이 「고양」과 「고양이」라는 다른 토큰이 되는 일이 생긴다. 형태소 분석기와 품사 필터를 적용한 값과는 직접 비교할 수 없으므로 다른 연구의 수치와 나란히 놓지 않으며, 논문의 어휘 지표는 형태소 분석기로 다시 토큰화해 산출한다. 「연구자 서술: 재토큰화에 쓴 분석기」");
     L.push("");
-    L.push("학급 내 유사도는 참여자 " + N + "명의 모든 쌍을 견주므로 비교 횟수가 참여자 수의 제곱에 비례한다. 글 전체의 3-gram을 그대로 대조하면 계산량이 감당하기 어려워지므로, 각 참여자의 3-gram 가운데 해시값이 작은 " + SKETCH_K + "개를 뽑아 만든 축약본 위에서 자카드를 산출하였다(k-최소값 추정). 같은 3-gram은 언제나 같은 해시를 가지므로 두 참여자에게서 같은 조각이 함께 뽑히며, 축약본을 다 채우지 못할 만큼 글이 짧은 경우에는 전체를 대조한 값과 일치한다. 앞부분만 잘라 비교하는 방식은 뒤쪽 차시의 서술이 통째로 빠지므로 사용하지 않았다.");
+    L.push("학급 내 유사도는 참여자 " + N + "명의 모든 쌍을 견주므로 비교 횟수가 참여자 수의 제곱에 비례한다. 글 전체의 3-gram을 그대로 대조하면 계산량이 감당하기 어려워지므로, 각 참여자의 3-gram 가운데 해시값이 작은 " + SKETCH_K + "개를 뽑아 만든 축약본 위에서 자카드를 산출하였다(k-최소값 추정). 같은 3-gram에서는 언제나 같은 해시가 나오므로 두 참여자에게서 같은 조각이 함께 뽑히며, 축약본을 다 채우지 못할 만큼 글이 짧은 경우에는 전체를 대조한 값과 일치한다. 앞부분만 잘라 비교하는 방식은 뒤쪽 차시의 서술이 통째로 빠지므로 사용하지 않았다.");
     L.push("");
     L.push("선택 분포의 고른 정도는 섀넌 엔트로피를 <b>고를 수 있었던 선택지의 수</b>로 정규화한 값이다. 실제로 선택된 선택지만으로 정규화하면 다섯 선택지 가운데 둘만 남은 학급이 최댓값으로 나타나 쏠림이 거꾸로 읽힌다.".replace(/<\/?b>/g, ""));
     L.push("");
@@ -8601,7 +8601,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
         "출처가 비어 있는 건은 미응답이며 생성형 도구에서 온 것으로 간주하지 않았다.");
       L.push("");
       L.push("가져온 문장이 최종 서술문에 거의 그대로(잔존율 60% 이상) 남은 것은 " + kept + "건이었다. 유형별 분포는 " +
-        AI_TYPES.map((t) => t + " " + tCount(t) + "명").join(" · ") + "이며, 유형은 학급(반)마다 붙여넣은 학생의 전유율 중앙값을 기준으로 가른 상대 구분이다(중앙값을 엄격히 넘고 0보다 클 때 전유, 같으면 대리 서술). 붙여넣은 학생이 3명 미만인 학급과 쓴 글이 없는 학생은 유형을 매기지 않았다.");
+        AI_TYPES.map((t) => t + " " + tCount(t) + "명").join(" · ") + "이며, 유형은 학급(반)마다 붙여넣은 학생의 전유율 중앙값을 기준으로 나눈 상대 구분이다(중앙값을 엄격히 넘고 0보다 클 때 전유, 같으면 대리 서술). 붙여넣은 학생이 3명 미만인 학급과 쓴 글이 없는 학생은 유형을 매기지 않았다.");
       L.push("");
       L.push(mdHead(["지표", "평균", "표준편차", "중앙값", "최소", "최대", "n"]));
       ["paste_n", "src_ratio", "approp", "paste_settle", "rewrite_depth", "peer_sim", "nn_sim", "struct_sim", "mattr", "hdd", "tokens_n"].forEach((k) => {
@@ -8653,7 +8653,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("「연구자 서술: 선택의 이유를 코딩 시트에서 인용해 유형화. 방법을 고르기만 한 경우와 이유까지 쓴 경우의 차이」");
     L.push("");
-    L.push("### 3.3 보이지 않는 것을 가르는 방식");
+    L.push("### 3.3 보이지 않는 것을 나누는 방식");
     L.push("");
     L.push("학생들이 적어 놓은 안 보이는 것은 1인당 평균 " + say("invis_n", "개") + "였고, 서로 다른 이유의 수는 평균 " + say("invis_type_n", "가지") + "였다. 전체 " + tt + "건의 이유 선택 가운데 가장 많이 고른 이유는 ‘" + topLabel + "’" + josaRo(topLabel) + " " + (tc[topType] || 0) + "건(" + (tt ? Math.round(((tc[topType] || 0) / tt) * 100) : 0) + "%)이었다.");
     L.push("");
@@ -8662,7 +8662,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("「연구자 서술: 이유 분포가 뜻하는 바」");
     L.push("");
-    L.push("### 3.4 물건 후보와 흔적으로의 표현");
+    L.push("### 3.4 물건 후보와 흔적 표현");
     L.push("");
     L.push("물건 후보는 1인당 평균 " + say("cand_n", "개") + " 나왔고, 흔적 네 칸에서 동작과 반복(하루 몇 번씩, 몇 년 동안)까지 적은 행은 평균 " + say("causal_n", "행") + "이었다. 뺀 물건의 이유를 적은 학생은 " + cases.filter((c) => c.tm.dropWhy === 1).length + "명이었다.");
     L.push("");
@@ -8675,7 +8675,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       L.push("");
       L.push("두 문장의 어휘 겹침은 평균 " + say("lex_overlap", "%") + "였고, 문장 길이는 첫 문장 " + say("len_pre", "자") + "에서 마지막 문장 " + say("len_post", "자") + "로 바뀌었다.");
     } else {
-      L.push("첫 문장과 마지막 문장을 모두 남긴 참여자가 아직 없어 이 절의 수치는 산출하지 않았다.");
+      L.push("첫 문장과 마지막 문장을 모두 쓴 참여자가 아직 없어 이 절의 수치는 산출하지 않았다.");
     }
     L.push("");
     L.push("「연구자 서술: 진술이 바뀐 방향에 대한 질적 서술. 사전·사후 쌍 파일의 pre_text와 post_text를 나란히 인용합니다」");
@@ -8744,7 +8744,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 연구자료_붙여넣기단위.csv: 가져온 문장 1건이 1행 (" + pasteTotal + "건). 칸·시각·분량·출처 자기보고·손댄 시간·잔존율과 문구 앞 120자.");
     L.push("- 연구자료_단계단위.csv: 참여자 × 단계가 1행. 단계별 도달·글자 수·구체성·편집 시각.");
     L.push("- 연구자료_코딩시트.csv: 참여자 × 항목 × 문장이 1행. code_1·code_2·memo 열은 연구자가 채우는 빈칸.");
-    L.push("- 연구자료_사전사후쌍.csv: 같은 질문에 두 번 답한 자리의 텍스트 쌍과 지표 차이.");
+    L.push("- 연구자료_사전사후쌍.csv: 같은 질문에 두 번 답한 곳의 텍스트 쌍과 지표 차이.");
     L.push("- 연구자료_탐구되묻기.csv: 참여자 × 탐구 질문이 1행. 첫 답·고친 답·받은 되묻기·스스로 쓴 질문.");
     L.push("- 기술통계.md: 표 1~6.");
     L.push("- 변수사전.md: 전체 변수의 조작적 정의와 산출식.");
@@ -8796,7 +8796,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
         </div>
       )}
       <div className="card">
-        <div className="card-head"><span className="card-code">연구 1</span><span className="card-title">익명 처리</span></div>
+        <div className="card-head"><span className="card-code">연구 1</span><span className="card-title">가명 처리</span></div>
         <div className="card-body">
           <p style={{ fontSize: 13, marginBottom: 10 }}>
             학생마다 한 번 무작위로 정한 가명 번호(P와 네 글자)와 무작위 순서의 학급 코드(C1…)를 붙입니다. 번호는 처음 내려받을 때 만들어 저장하고 다시 바꾸지 않습니다. 내려받는 파일에는 학번·별명·계정 정보가 들어가지 않고, 행은 가명 번호 순입니다.
@@ -8817,7 +8817,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
           <div className="tbl-scroll" style={{ maxHeight: 240, overflow: "auto" }}>
             <table className="stat-tbl">
               <thead><tr>
-                <th style={{ width: 56 }}>익명</th><th style={{ width: 66 }}>학번</th><th style={{ width: 96 }}>별명</th>
+                <th style={{ width: 56 }}>가명</th><th style={{ width: 66 }}>학번</th><th style={{ width: 96 }}>별명</th>
                 {CONSENT_ON && (<>
                 {CONSENT_ITEMS.map((it) => (
                   <th key={it.k} style={{ width: 74, textAlign: "center" }} title={it.desc + " " + it.need}>{it.label}</th>
@@ -8885,7 +8885,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
             </b>
           </label>
           <p className="hint" style={{ marginTop: 4 }}>
-            기록지 서술에 동의하지 않은 학생은 행만 빠지는 것이 아니라 <b>학급 규준에서도 빠집니다.</b> 학급 어휘 풀·유사도 평균·유형을 가르는
+            기록지 서술에 동의하지 않은 학생은 행만 빠지는 것이 아니라 <b>학급 규준에서도 빠집니다.</b> 학급 어휘 풀·유사도 평균·유형을 정하는
             전유율 중앙값이 모두 분석 대상 {N}명으로만 계산되므로, 남은 학생의 값이 빠진 학생의 글에 좌우되지 않습니다.
             가명 번호는 동의 표시와 관계없이 학생마다 고정되어 바뀌지 않습니다.
           </p>
@@ -9501,7 +9501,7 @@ function TeacherApp({ onExit, onGallery }) {
                         })}
                       </tbody>
                     </table></div>
-                    <p className="hint" style={{ marginTop: 10 }}>차시를 닫아도 학생이 이미 작성한 내용은 저장된 상태로 남고, 교사 화면에서는 계속 열람과 채점이 됩니다.</p>
+                    <p className="hint" style={{ marginTop: 10 }}>차시를 닫아도 학생이 이미 작성한 내용은 저장된 상태로 남고, 교사 화면에서는 계속 열람하고 채점할 수 있습니다.</p>
                     <p className="hint" style={{ marginTop: 6 }}>2차시는 3차시 수업이 끝날 때까지 열어 두세요. 유물 발상 단계의 단계 1·2(한 주 과제)가 2차시 탭에 있어, 학생이 3차시에 문제를 정하며 장면을 고치러 돌아갑니다.</p>
                     {isOpen(openMap, "3차시") && !isOpen(openMap, "2차시") && (
                       <p className="warn-note" style={{ marginTop: 8 }}>2차시가 닫혀 있습니다. 학생이 유물 발상 단계의 단계 1·2(관찰 방법·장면)를 고칠 수 없습니다.</p>
@@ -9539,7 +9539,7 @@ function TeacherApp({ onExit, onGallery }) {
                         })}
                       </tbody>
                     </table></div>
-                    <p className="hint" style={{ marginTop: 10 }}>같은 문항을 두 번 실시해 변화를 잽니다. 학생에게는 성적과 무관함을 반드시 미리 알립니다. 성향 설문은 <b>반드시 1차시에</b> 받습니다. 8차시 상호평가 직전에 AI 태도를 물으면 그 질문이 판정 기준을 흔듭니다.</p>
+                    <p className="hint" style={{ marginTop: 10 }}>같은 문항을 두 번 실시해 변화를 잽니다. 학생에게는 성적과 무관함을 반드시 미리 알립니다. 성향 설문은 <b>반드시 1차시에</b> 받습니다. 8차시 상호평가 직전에 AI 태도를 물으면 그 질문이 판정에 영향을 줍니다.</p>
                   </div>
                 </div>
                 <div className="card">
@@ -9547,7 +9547,7 @@ function TeacherApp({ onExit, onGallery }) {
                   <div className="card-body">
                     <p style={{ fontSize: 13, marginBottom: 12 }}>
                       켜면 학생이 20자 이상을 붙여넣은 직후 화면 아래에 한 줄이 떠 <b>어디에서 가져왔는지 스스로 고르게</b> 합니다.
-                      고른 값은 연구 자료의 <span className="mono">src_selfreport</span> 열에 남습니다.
+                      고른 값은 연구 자료의 <span className="mono">src_selfreport</span> 열에 저장됩니다.
                       끄면 학생 화면에 아무 반응도 나타나지 않고 기록만 조용히 쌓입니다.
                     </p>
                     <div className="tbl-scroll"><table className="roster">
@@ -9859,7 +9859,7 @@ function ChangeMap({ ws, owner }) {
               <div className="mm-strip">
                 {(d["s5b.rounds"] || []).map((r, i) => (r && r.img ? <MediaThumb key={i} owner={owner} refId={r.img} alt={i + 1 + "회차"} size={110} /> : null))}
               </div>
-              <span className="hint">회차 순서대로 놓고 보면 무엇을 고치기로 했는지가 화면에 남습니다.</span>
+              <span className="hint">회차 순서대로 놓고 보면 무엇을 고치기로 했는지가 화면에 드러납니다.</span>
             </div>
           )}
           {mediaCount(d) === 0 && <p className="hint">아직 올라온 사진이나 녹음이 없습니다.</p>}

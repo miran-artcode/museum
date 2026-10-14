@@ -76,7 +76,7 @@ export function useQuizAccMigrate({ enabled, cfgRaw, acc, onNote }) {
       busy.current = false;
       if (noteRef.current) {
         noteRef.current(cleared === true
-          ? { kind: "ok", text: "학생별 시간 배수·이미지 제외" + (ids.length ? " " + ids.length + "명의 값" : "") + "을 학생끼리 볼 수 없는 저장 위치로 옮겼습니다." }
+          ? { kind: "ok", text: "학생별 시간 배수·이미지 제외" + (ids.length ? " " + ids.length + "명의 값을" : "를") + " 학생끼리 볼 수 없는 저장 위치로 옮겼습니다." }
           : { kind: "warn", text: "학생별 시간 배수·이미지 제외를 학생끼리 볼 수 없는 저장 위치로 옮기지 못했습니다. 연결을 확인하고 이 탭을 다시 여세요." });
       }
     })();

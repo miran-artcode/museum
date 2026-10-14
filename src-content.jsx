@@ -706,7 +706,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
 
       <div className={"ed-bar " + (dirty ? "on" : "")}>
         <span className="ed-state">{dirty ? "저장하지 않은 변경이 있습니다" : edited ? "저장됨 · 이 차시에 고친 내용이 있습니다" : "저장됨 · 원래 자료 그대로입니다"}</span>
-        <button className="btn small ghost" onClick={() => setPreview((p) => !p)}>{preview ? "편집으로" : "학생 화면 미리보기"}</button>
+        <button className="btn small ghost" onClick={() => setPreview((p) => !p)}>{preview ? "편집으로" : "학생 화면 미리 보기"}</button>
         <button className="btn small ghost" onClick={resetLesson} disabled={!edited}>{n}차시 원래대로</button>
         <button className="btn small" onClick={save} disabled={busy}>{busy ? "저장 중…" : "저장"}</button>
       </div>
@@ -838,7 +838,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                                 hint="답의 보기를 나열하지 말고, 학생이 쓴 것을 가리키는 한 문장으로 씁니다. 학생마다 다른 줄이 배정되므로 다섯 줄쯤 둡니다. 비워 두면 원본으로 돌아갑니다."
                                 min={3} max={10} value={arrToLines(probes)} onChange={(v) => setFld(sec.id, f.k, { probes: linesToArr(v) })} />
                             ) : (
-                              <EdArea label="생각 단계 (학생 화면에는 「도움말」 상자로 보입니다)" hint="한 줄에 하나씩. 비워 두면 도우미 상자가 사라집니다." min={2} max={10}
+                              <EdArea label="생각 단계 (학생 화면에는 「도움말」 상자로 보입니다)" hint="한 줄에 하나씩. 비워 두면 「도움말」 상자가 사라집니다." min={2} max={10}
                                 value={arrToLines(steps)} onChange={(v) => setFld(sec.id, f.k, { steps: linesToArr(v) })} />
                             )}
                           </div>
@@ -848,7 +848,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                   </details>
                 );
               })}
-              <p className="hint">항목 이름(l1.q1 같은 것)은 기록이 저장되는 위치라 바뀌지 않습니다. 질문만 고쳐도 이미 저장된 학생 답은 그대로 남습니다. 화살표가 붙은 항목(유물 발상 단계 단계 3)은 오른쪽 키에 저장됩니다.</p>
+              <p className="hint">항목 이름(l1.q1 같은 것)은 기록이 저장되는 위치라 바뀌지 않습니다. 질문만 고쳐도 이미 저장된 학생 답은 그대로 남습니다. 화살표가 붙은 항목(유물 발상 단계의 단계 3)은 오른쪽 키에 저장됩니다.</p>
             </div>
           </div>
 

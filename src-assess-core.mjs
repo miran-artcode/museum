@@ -1074,7 +1074,7 @@ export function aggregate({ roster, assessMap, subMap, cfg, splitReps = 25 }) {
   if (quality.perWorkMean < QUALITY_MIN.perWork) reasons.push("작품당 평균 비교 수가 " + fmtNum(quality.perWorkMean, 1) + "회로 " + QUALITY_MIN.perWork + "회에 못 미칩니다.");
   if (!quality.connectivity.connected) reasons.push("비교 그래프가 하나로 이어지지 않습니다. 아직 판정하지 않은 학생이 있으면 기다리고, 모두 마쳤는데도 그렇다면 명단을 다시 확정해야 합니다.");
   if (quality.droppedN) reasons.push("배정표와 맞지 않는 판정 " + quality.droppedN + "건을 제외했습니다 (" + quality.droppedJudges.join(", ") + ").");
-  if (quality.ssr != null && quality.ssr < QUALITY_MIN.ssr) reasons.push("척도분리신뢰도(SSR)가 " + fmtNum(quality.ssr) + "로 " + QUALITY_MIN.ssr + " 아래입니다.");
+  if (quality.ssr != null && quality.ssr < QUALITY_MIN.ssr) reasons.push("척도 분리 신뢰도(SSR)가 " + fmtNum(quality.ssr) + "로 " + QUALITY_MIN.ssr + " 아래입니다.");
   else if (quality.ssr != null && quality.ssr < QUALITY_MIN.ssrAdopt) cautions.push("SSR " + fmtNum(quality.ssr) + "은(는) 논문 채택 기준 " + QUALITY_MIN.ssrAdopt + "에는 못 미칩니다. 공개는 되지만 결과 화면에 주의 문구가 표시되고, 판정을 더 받으면 나아집니다.");
   if (quality.splitHalf.median != null && quality.splitHalf.median < QUALITY_MIN.splitHalf) cautions.push("판정자 반분 신뢰도 중앙값 " + fmtNum(quality.splitHalf.median) + "(보정 전 " + fmtNum(quality.splitHalf.medianRaw) + ")은 반쪽 자료의 작품당 노출이 절반이라 낮게 나오는 것이 보통이므로 보고 지표로만 둡니다.");
   if (quality.splitHalf.median == null && main.length) cautions.push("반분 신뢰도를 계산할 만큼 판정자가 모이지 않았습니다.");

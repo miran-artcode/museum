@@ -56,7 +56,7 @@ export const TRANSLATE_STAGES = [
   { key: "T3", n: 3, session: "3차시", sec: "s3p", name: "문제 정하기", full: "문제를 정한다",
     keys: ["s3a.problem", "s3a.contact", "s3a.why"],
     ask: "단계 2에 기록한 세 장면이 공통으로 보여 주는 사회 문제나 사회 현상이 무엇인지, 그것을 내가 어디서 직접 만나는지 적습니다.",
-    out: "문제 한 마디, 만나는 때와 곳, 뺀 문제와 비교한 이유",
+    out: "문제 한마디, 만나는 때와 곳, 뺀 문제와 비교한 이유",
     look: "만나는 때와 곳이 실제 동선에 있는지" },
   { key: "T4", n: 4, session: "3차시", sec: "s3t1", name: "안 보이는 것 찾기", full: "안 보이는 것과 이유를 찾는다",
     keys: ["s3t1.list", "s3t1.pick", "s3t1.pickWhy"],

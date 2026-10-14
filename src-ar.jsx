@@ -300,7 +300,7 @@ function HallView({ api, expo, works, reveal, hallRef, paused, focus, setFocus, 
           <button className="btn small ghost" onClick={go((x) => x.prev())} disabled={focus <= 0}>이전</button>
           <span className="arx-count">{focus <= 0 ? "서문" : focus >= n - 1 ? "끝" : focus + " / " + (n - 2)}</span>
           <button className="btn small ghost" onClick={go((x) => x.next())} disabled={focus >= n - 1}>다음</button>
-          <button className="btn small ghost arx-fold" onClick={() => setFold((f) => !f)} aria-expanded={!fold}>{fold ? "캡션 펴기" : "캡션 접기"}</button>
+          <button className="btn small ghost arx-fold" onClick={() => setFold((f) => !f)} aria-expanded={!fold}>{fold ? "캡션 펼치기" : "캡션 접기"}</button>
         </div>
         {!fold && (
           <div className="arx-panel-in">

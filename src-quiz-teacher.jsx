@@ -962,7 +962,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
           <span className="card-sess">{bankOk ? bank.ver : "은행 없음"}</span></div>
         <div className="card-note">
           quiz-bank/bank.json 을 고르면 검증 결과가 먼저 나옵니다. 오류가 없을 때만 올릴 수 있고, 공개부(문두·보기·정답 해시)는 quizBank/v1, 정답·해설·출처는 교사만 읽는 quizKeys/v1 로 나뉩니다.
-          보기가 4개뿐이라 정답 해시는 비밀이 아니며 채점의 권위는 이 화면의 재계산에 있습니다.
+          보기가 4개뿐이라 정답 해시는 비밀이 아니며 채점은 이 화면에서 다시 계산한 값을 기준으로 합니다.
         </div>
         <div className="card-body">
           <div className="at-row">
@@ -1095,7 +1095,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
           <span className="card-sess">시작 {nStarted}/{ids.length} · 완료 {nDone}</span></div>
         <div className="card-note">
           빨간 칸(잠김·중복 접속·연결 끊김)으로 갑니다. 시스템은 기록하고 멈추고 교사를 부를 뿐 점수를 깎지 않습니다.
-          해제할 때 「보전」이 켜져 있으면 잠겨 있던 시간이 남은 시간에 더해집니다. 부정으로 판단하면 끕니다.
+          해제할 때 「보전」에 체크되어 있으면 잠겨 있던 시간이 남은 시간에 더해집니다. 부정으로 판단하면 체크를 해제합니다.
         </div>
         <div className="card-body">
           <div className="kpis">
@@ -1487,7 +1487,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
             </div>
           </div>
           <p className="hint">
-            시간표: 개인 타이머 40분, 최장 경로 3→4→5→5가 33분 20초. 학생 화면의 권장 종료는 블록 번호 기준 {BLOCK_END_MIN.map((m, i) => "블록 " + (i + 1) + " " + m + "분").join(" · ")}(급을 드러내지 않기 위해 누적으로 보입니다).
+            시간표: 개인 타이머 40분, 최장 경로 3→4→5→5가 33분 20초. 학생 화면의 권장 종료는 블록 번호 기준 {BLOCK_END_MIN.map((m, i) => "블록 " + (i + 1) + " " + m + "분").join(" · ")}(급을 드러내지 않으려고 누적 시간으로 보여 줍니다).
             라우팅 4/3/2: 순수 추측(p=.25)이 한 블록에서 오를 확률 1.6%. 5급 최종급이면 구조상 c ≥ 14. 영역: {[1, 2, 3, 4].map((a) => AREA_MARK[a] + " " + AREAS[a]).join(" · ")}.
           </p>
           <details className="qt-details"><summary>경계 사례 11개 (학생에게 보여 줄 표. 「나」와 「가」가 도달과 유지의 차이를, 「라」가 총 정답 수가 같아도 마지막 급이 다르면 점수가 다름을 보입니다)</summary>
