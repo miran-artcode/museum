@@ -19,6 +19,7 @@ import { CardMedia, CardMediaStyle } from "./src-card-media.jsx";
 import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
 import { UxStyle, ConfirmButton, session, TeacherTabs, VIEWER_TABS, TEACHER_TAB_GROUPS } from "./src-ux.jsx";
+import { GridStyle, GridRuntime } from "./src-grid.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { useExhibitPublisher, useExhibits, exhibitOf } from "./src-exhibit.jsx";
 import { ArExpoEntry, ArDeepLink, ArStyle } from "./src-ar.jsx";
@@ -10497,6 +10498,7 @@ function App() {
       <ThemeStyle />
       <UxStyle />
       <ArStyle />
+      <GridStyle /><GridRuntime />
       {restoring && <div style={{ padding: "60px 16px", textAlign: "center", color: "var(--sub)", fontSize: 13 }}>기록실을 여는 중…</div>}
       {view === "gate" && !restoring && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
