@@ -688,7 +688,7 @@ export function LessonMap({ L, bodyRef }) {
 
 export const READING_CSS = `
 /* 차시 흐름 */
-.lz-map{border:1px solid var(--line);border-top:2px solid var(--ink);background:#fff;margin:0 0 16px;padding:12px 0 4px}
+.lz-map{border:1px solid var(--line);border-top:2px solid var(--ink);background:#fff;margin:0 0 16px;padding:12px 0 4px;container-type:inline-size}
 .lz-map-h{display:flex;align-items:baseline;gap:8px;padding:0 16px;font-size:13px;font-weight:700;color:var(--ink)}
 .lz-map-h span{font-size:11.5px;font-weight:500;color:var(--sub)}
 .lz-steps{list-style:none;margin:0;padding:10px 16px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 0}
@@ -699,14 +699,15 @@ export const READING_CSS = `
 .lz-steps button{all:unset;cursor:pointer;font-size:12px;line-height:1.45;color:var(--sub);word-break:keep-all;border-bottom:1px solid transparent}
 .lz-steps button:hover,.lz-steps button:focus-visible{color:var(--seal);border-bottom-color:var(--seal)}
 .lz-steps button:focus-visible{outline:2px solid var(--seal);outline-offset:2px}
-.lz-strip{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 12px;scroll-snap-type:x proximity}
+.lz-strip{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 12px;scroll-snap-type:x mandatory;scroll-padding:0 16px;scrollbar-width:thin}
 .lz-strip-i{all:unset;cursor:pointer;flex:0 0 96px;width:96px;scroll-snap-align:start;display:flex;flex-direction:column;gap:4px}
-.lz-strip-i img,.lz-strip-ph{display:block;width:96px;height:96px;object-fit:cover;background:#f2f2f0;border:1px solid var(--line2)}
+.lz-strip-i img,.lz-strip-ph{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;background:#f2f2f0;border:1px solid var(--line2)}
 .lz-strip-i span{font-size:11px;line-height:1.35;color:var(--sub);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:keep-all}
 .lz-strip-i:hover img,.lz-strip-i:focus-visible img{outline:2px solid var(--seal);outline-offset:-2px}
 .lz-strip-i:focus-visible{outline:2px solid var(--seal);outline-offset:2px}
-@media(max-width:560px){.lz-steps{grid-template-columns:1fr;gap:0}.lz-steps li{border-top:0;border-left:2px solid var(--line2);padding:0 0 12px 18px}
-  .lz-steps li::before{top:2px;left:-6px}.lz-step-n{position:static;margin-bottom:1px}}
+/* 흐름이 좁은 상자에 들어가면(폰·좁은 창) 세로 타임라인. 열 수는 src-grid.jsx 균형 격자가 고르므로 --bal-min을 크게 해 한 열로 둔다 */
+@container (max-width:479px){.lz-steps{--bal-min:100000px;gap:0;padding-left:22px}.lz-steps li{border-top:0;border-left:2px solid var(--line2);padding:0 0 12px 18px}
+  .lz-steps li:last-child{border-left-color:transparent}.lz-steps li::before{top:2px;left:-6px}.lz-step-n{position:static;margin-bottom:1px}}
 
 /* 읽기 자료 카드 */
 .reading.rd-card{margin-bottom:12px}
@@ -718,7 +719,9 @@ export const READING_CSS = `
 .rd-sum .rd-seen{margin-left:4px}
 .reading.rd-card[open]>summary.rd-sum{border-bottom:1px solid var(--line2)}
 .reading.rd-card[open]>summary .rd-sum-x{display:none}
-@media(max-width:560px){.rd-sum .rd-sum-x img:nth-child(n+2){display:none}}
+/* 폰: 제목이 표시·번호·썸네일 사이에 끼어 서너 줄로 접히지 않게, 첫 줄에 표시·번호·썸네일, 둘째 줄에 제목 전체 너비 */
+@media(max-width:560px){.rd-sum .rd-sum-x img:nth-child(n+2){display:none}
+  .reading.rd-card>summary.rd-sum{flex-wrap:wrap;row-gap:6px}.rd-sum .rd-sum-t{order:5;flex-basis:100%}.rd-sum .rd-sum-x{margin-left:auto}}
 
 /* 본문 */
 .rd{padding:20px 22px 22px;color:#1f1f1f;min-width:0;overflow-wrap:break-word}
