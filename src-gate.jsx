@@ -15,9 +15,9 @@ export const GATE_SECTIONS = [
     en: "QUESTION",
     title: "무엇이 미술이 되는가",
     body: "레디메이드·개념미술·극사실주의 감상, 나의 미술 정의문 쓰기",
-    img: "/img/lessons/L1_w_stieglitz.jpg",
-    alt: "마르셀 뒤샹의 「샘」(1917), 앨프리드 스티글리츠가 찍은 기록 사진",
-    credit: "퍼블릭 도메인 · 위키미디어 공용 · 사진 Alfred Stieglitz",
+    img: "/img/lessons/L1_w_brillo.jpg",
+    alt: "앤디 워홀의 「브릴로 상자(비누 패드)」(1964), 흰 바탕의 빨강·파랑 글자 상자",
+    credit: "© Andy Warhol Foundation / ARS, New York · MoMA, 교육 목적 인용",
   },
   {
     no: "02",
@@ -35,9 +35,9 @@ export const GATE_SECTIONS = [
     en: "GENERATE",
     title: "생성과 다듬기",
     body: "프롬프트 작성과 AI 이미지 생성·선별, 다듬기와 작품 캡션 문구",
-    img: "/img/lessons/L6_w_kintsugi.jpg",
-    alt: "깨진 곳을 옻으로 붙이고 이음선에 금분을 얹은 킨츠기 다완",
-    credit: "위키미디어 공용 · CC0 · 사진 Daderot",
+    img: "/img/lessons/L6_w_pistoletto_venus.jpg",
+    alt: "미켈란젤로 피스톨레토의 「넝마의 비너스」, 흰 비너스 상과 알록달록한 헌 옷 더미",
+    credit: "© Michelangelo Pistoletto · 테이트, 교육 목적 인용",
   },
   {
     no: "04",
@@ -45,9 +45,9 @@ export const GATE_SECTIONS = [
     en: "EXHIBIT",
     title: "전시와 비평",
     body: "작품화와 전시 구성, 두 번의 관람과 상호 비평, 단원 성찰",
-    img: "/img/lessons/L3_w_realpictures.jpg",
-    alt: "어두운 전시장 바닥에서 빛을 받은 검은 인쇄물 더미",
-    credit: "© Alfredo Jaar · 작가 공식 사이트, 교육 목적 인용",
+    img: "/img/lessons/L6_w_kawara.jpg",
+    alt: "온 카와라의 「Today」 연작 〈JAN. 9, 1986〉, 주황 바탕에 흰 날짜 글자",
+    credit: "© One Million Years Foundation · 데이비드 즈워너 갤러리, 교육 목적 인용",
   },
 ];
 
