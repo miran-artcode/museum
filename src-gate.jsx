@@ -37,9 +37,9 @@ export const GATE_SECTIONS = [
     en: "GENERATE",
     title: "생성과 다듬기",
     body: "프롬프트 작성과 AI 이미지 생성·선별, 다듬기와 작품 캡션 문구",
-    img: "/img/lessons/L1_w_lewitt.jpg",
-    alt: "솔 르윗의 「월 드로잉」(Wall Drawing) 〈831: 기하학적 형태〉, 빌바오 구겐하임 미술관의 원색 벽면",
-    credit: "위키미디어 공용 · CC0 · 사진 Zarateman · 작품 © Estate of Sol LeWitt",
+    img: "/img/lessons/G3_lewitt_wd915.jpg",
+    alt: "개념미술가 솔 르윗(Sol LeWitt)의 「월 드로잉」(Wall Drawing) 〈#915: 호, 원, 불규칙한 띠〉(1999), 매스 모카 흰 전시장의 긴 벽을 채운 원색 호와 동심원",
+    credit: "© Estate of Sol LeWitt · 매스 모카(MASS MoCA) 소장 · Google Arts & Culture, 교육 목적 인용",
   },
   {
     no: "04",
