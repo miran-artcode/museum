@@ -1,5 +1,5 @@
 /* ============================================================
-   사이드바·고정 머리 계층 (2026-10-14)
+   사이드바·고정 머리 계층 (2026-10-14, 같은 날 위계 보강: 이 화면 차례를 지금 차시 아래 2단계로)
    · 1200px 이상에서 학생·교사 화면 왼쪽에 사이드바를 둔다
      - 학생: 차시 목록(진행 점·잠김)과 최종 평가·쪽지시험, 그 아래 「이 화면 차례」(강의 노트·학습지 카드로 이동, 지금 읽는 카드 표시)
      - 교사: 교사 탭 묶음(TEACHER_TAB_GROUPS)을 세로로 펼친다
@@ -51,8 +51,9 @@ html.nav-sv .sess-tabs{position:static;border-bottom:0}
     max-height:calc(100dvh - var(--top-h) - 32px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:#bbb transparent;
     margin-top:16px;padding:0 4px 24px 0;font-size:13px}
 }
-.sn-group{margin-bottom:18px}
-.sn-l{display:block;font-family:var(--sans);font-size:11px;font-weight:700;color:var(--sub);margin:0 0 6px 10px}
+/* 위계: 묶음 이름(굵은 머리글과 선) › 1단계 항목(차시·교사 탭) › 2단계 항목(이 화면 차례, 세로선 위에 들여 씀) */
+.sn-group{margin-bottom:22px}
+.sn-l{display:block;font-family:var(--sans);font-size:11.5px;font-weight:700;letter-spacing:.04em;color:var(--ink);margin:0 0 6px;padding:0 10px 6px;border-bottom:1px solid var(--line)}
 .sn-list{list-style:none;margin:0;padding:0}
 .sn-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:6px 10px;border:0;border-left:2px solid transparent;
   background:none;color:var(--ink);font-family:var(--sans);font-size:13px;line-height:1.4;cursor:pointer}
@@ -65,9 +66,14 @@ html.nav-sv .sess-tabs{position:static;border-bottom:0}
 .sn-dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;border:1px solid var(--line);background:transparent}
 .sn-dot.part{background:linear-gradient(90deg,var(--patina) 50%,transparent 50%);border-color:var(--patina)}
 .sn-dot.done{background:var(--patina);border-color:var(--patina)}
-.sn-toc{border-left:1px solid var(--line2);margin-left:10px}
-.sn-toc .sn-item{padding:4px 10px;font-size:12.5px;color:var(--sub);border-left-width:2px;margin-left:-1px}
-.sn-toc .sn-item.on{color:var(--ink);background:none;font-weight:700}
+.sn-toc{border-left:1px solid var(--line2);margin:2px 0 8px 26px}
+.sn-toc .sn-item{padding:4px 10px;font-size:12.5px;color:var(--sub);margin-left:-1px}
+.sn-toc .sn-item:hover{color:var(--ink);background:none}
+.sn-toc .sn-item.on{color:var(--ink);background:none;font-weight:700;border-left-color:var(--seal)}
+.sn-toc-l{display:block;margin:4px 0 2px 36px;font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--sub)}
+/* 교사: 묶음 아래 탭을 세로선 위에 들여 써서 묶음 이름과 단계를 나눈다 */
+.sn-teacher .sn-list{border-left:1px solid var(--line2);margin-left:10px}
+.sn-teacher .sn-item{margin-left:-1px;padding-left:12px}
 .sn-code{flex:0 0 auto;font-size:11px;color:var(--sub);font-weight:400}
 .sn-title{min-width:0;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .sn-top{margin:4px 0 0 10px}
@@ -194,6 +200,22 @@ const dotClass = (r) => "sn-dot" + (r >= 1 ? " done" : r > 0 ? " part" : "");
    sessions: [{ name, open, on, ratio }], extras: [{ key, label, on, go }], tocKey: 화면이 바뀔 때 차례를 다시 읽는 열쇠 */
 export function StudentSideNav({ sessions, onSession, extras, tocKey }) {
   const [toc, active] = useToc(tocKey);
+  // 이 화면 차례는 지금 연 차시(또는 최종 평가·쪽지시험) 바로 아래에 2단계로 붙인다
+  const tocList = toc.length > 1 && (
+    <>
+      <span className="sn-toc-l" aria-hidden="true">이 화면 차례</span>
+      <ul className="sn-list sn-toc" aria-label="이 화면 차례">
+        {toc.map((t) => (
+          <li key={t.id}>
+            <button className={"sn-item" + (active === t.id ? " on" : "")} aria-current={active === t.id ? "location" : undefined} onClick={() => goTo(t.id)}>
+              <span className="sn-title">{t.code && <span className="sn-code">{t.code} </span>}{t.title}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+  const anyOn = sessions.some((s) => s.on) || extras.some((x) => x.on);
   return (
     <nav className="side-nav" aria-label="차시와 이 화면 차례">
       <div className="sn-group">
@@ -207,6 +229,7 @@ export function StudentSideNav({ sessions, onSession, extras, tocKey }) {
                 <span>{s.name}</span>
                 {s.open ? <span className="sn-pct">{Math.round(s.ratio * 100)}%</span> : <span className="sn-lock">잠김</span>}
               </button>
+              {s.on && tocList}
             </li>
           ))}
           {extras.map((x) => (
@@ -214,25 +237,13 @@ export function StudentSideNav({ sessions, onSession, extras, tocKey }) {
               <button className={"sn-item" + (x.on ? " on" : "")} aria-current={x.on ? "page" : undefined} onClick={x.go}>
                 <span className="sn-dot part" aria-hidden="true" /><span>{x.label}</span>
               </button>
+              {x.on && tocList}
             </li>
           ))}
         </ul>
       </div>
-      {toc.length > 1 && (
-        <div className="sn-group">
-          <span className="sn-l">이 화면 차례</span>
-          <ul className="sn-list sn-toc">
-            {toc.map((t) => (
-              <li key={t.id}>
-                <button className={"sn-item" + (active === t.id ? " on" : "")} aria-current={active === t.id ? "location" : undefined} onClick={() => goTo(t.id)}>
-                  <span className="sn-title">{t.code && <span className="sn-code">{t.code} </span>}{t.title}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <button className="btn small ghost sn-top" onClick={() => window.scrollTo({ top: 0, behavior: reduceMotion() ? "auto" : "smooth" })}>맨 위로</button>
-        </div>
-      )}
+      {!anyOn && tocList && <div className="sn-group">{tocList}</div>}
+      {toc.length > 1 && <button className="btn small ghost sn-top" onClick={() => window.scrollTo({ top: 0, behavior: reduceMotion() ? "auto" : "smooth" })}>맨 위로</button>}
     </nav>
   );
 }
@@ -240,7 +251,7 @@ export function StudentSideNav({ sessions, onSession, extras, tocKey }) {
 /* 교사 사이드바: 교사 탭 묶음을 세로로. groups는 보기 전용 계정이면 이미 걸러서 넘긴다 */
 export function TeacherSideNav({ groups, tab, onSwitch, dirty }) {
   return (
-    <nav className="side-nav" aria-label="교사 화면 메뉴">
+    <nav className="side-nav sn-teacher" aria-label="교사 화면 메뉴">
       {groups.map((g) => (
         <div className="sn-group" key={g.name}>
           <span className="sn-l">{g.name}</span>
