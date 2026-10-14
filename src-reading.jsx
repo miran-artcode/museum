@@ -658,7 +658,7 @@ export function LessonMap({ L, bodyRef }) {
   return (
     <div className="lz-map">
       <ReadingStyle />
-      <div className="lz-map-h">이번 차시 흐름 <span>읽기 자료 {rds.length}편</span></div>
+      <div className="lz-map-h">이번 차시 흐름 <span>오늘 읽기 {rds.length}편</span></div>
       <ol className="lz-steps">
         {stages.map((s, k) => (
           <li key={k}>
