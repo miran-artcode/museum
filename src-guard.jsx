@@ -240,7 +240,7 @@ export function ContentGuard({ sid, cfgAll, quiz }) {
 export function GuardNotice() {
   return (
     <div className="gd-note">
-      이 강의 노트의 작품 사진과 인용문은 저작권법 제25조에 따라 수업 목적으로만 이용할 수 있습니다. 복사하거나 캡처해 다른 곳에 올리지 마세요.
+      작품 사진과 인용문은 수업 목적으로만 씁니다(저작권법 제25조). 복사·캡처해 다른 곳에 올리지 마세요.
     </div>
   );
 }

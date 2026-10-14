@@ -57,11 +57,11 @@ export function GateHeader({ onEnter, onUnits, onTeacher, onGallery, onDemo }) {
     <header className="g4-header">
       <div className="g4-strip">
         <nav className="g4-strip-nav">
-          <button onClick={onUnits}>ABOUT</button>
-          <button onClick={onGallery}>GALLERY</button>
-          <button onClick={onDemo}>DEMO</button>
-          <button onClick={onTeacher}>FOR TEACHERS</button>
-          <button className="g4-strip-join" onClick={onEnter}>JOIN</button>
+          <button onClick={onUnits}>수업 소개</button>
+          <button onClick={onGallery}>전시장</button>
+          <button onClick={onDemo}>예시 기록지</button>
+          <button onClick={onTeacher}>교사</button>
+          <button className="g4-strip-join" onClick={onEnter}>기록실 입장</button>
         </nav>
       </div>
       <div className="g4-masthead">
@@ -88,7 +88,7 @@ export function GateSections({ onEnter }) {
       <div className="g4-units-cap">
         <span>고2 미술 · 8차시 · 2026</span>
         <span>실재한 적 없는 유물 이미지로 구성한 허구의 아카이브 전시</span>
-        <span>FOUR CHAPTERS</span>
+        <span>네 개의 장</span>
       </div>
       <div className="g4-grid">
         {GATE_SECTIONS.map((s) => (
@@ -126,7 +126,7 @@ export const GATE_CSS = `
 .g4-strip{border-bottom:1px solid #e6e6e6}
 .g4-strip-nav{max-width:1280px;margin:0 auto;padding:8px 20px;display:flex;justify-content:flex-end;gap:22px}
 .g4-strip-nav button{background:none;border:none;cursor:pointer;color:#555;
-  font-family:'Archivo','Noto Sans KR',sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;padding:8px 0}
+  font-family:'Noto Sans KR','Archivo',sans-serif;font-size:12px;font-weight:700;letter-spacing:.02em;padding:8px 0}
 .g4-strip-nav button:hover{color:#000}
 .g4-strip-join{color:#000 !important;border-bottom:2px solid #000 !important}
 

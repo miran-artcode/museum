@@ -2454,6 +2454,25 @@ body{background:var(--bg)}
 .prog-bar{flex:1;height:6px;background:var(--line2);position:relative}
 .prog-bar i{position:absolute;left:0;top:0;bottom:0;background:var(--patina)}
 .prog-num{font-family:var(--mono);font-size:12px;color:var(--sub)}
+.todo-card{margin-bottom:14px}
+.todo-list{list-style:none;margin:0;padding:6px 0}
+.todo-row{display:grid;grid-template-columns:26px auto 1fr auto;gap:10px;align-items:baseline;width:100%;padding:7px 18px;border:none;background:transparent;font-family:inherit;color:inherit;text-align:left;cursor:pointer;font-size:13px}
+.todo-row:hover{background:var(--card2)}
+.todo-row:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.todo-n{font-family:var(--mono);font-size:11px;color:var(--sub);text-align:center}
+.todo-head{font-family:var(--mono);font-size:11px;color:var(--seal);letter-spacing:.06em;white-space:nowrap}
+.todo-title{font-weight:600;line-height:1.4}
+.todo-sub{font-family:var(--mono);font-size:11px;color:var(--sub);white-space:nowrap}
+.todo-list li.done .todo-n{color:var(--patina)}
+.todo-list li.done .todo-title{color:var(--sub);font-weight:500}
+.todo-foot{font-size:11px;color:var(--sub);padding:6px 18px 10px;border-top:1px dashed var(--line2)}
+@media (max-width:599px){.todo-row{grid-template-columns:22px 1fr auto;padding:7px 12px}.todo-head{display:none}}
+.ladder-mini{margin:0 0 12px}
+.lm-row{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card2);padding:6px 10px;margin-bottom:10px}
+.lm-now{font-family:var(--mono);font-size:11px;color:var(--seal);letter-spacing:.08em;white-space:nowrap}
+.lm-nav{background:transparent;border:none;font-family:inherit;font-size:12px;color:var(--ink);cursor:pointer;padding:4px 0;text-align:left}
+.lm-nav:hover{text-decoration:underline}
+.lm-nav:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .sess-tabs{display:flex;gap:6px;overflow-x:auto;padding:10px 0 16px;scrollbar-width:none}
 .sess-tabs::-webkit-scrollbar{display:none}
 .sess-tab{flex:0 0 auto;padding:7px 13px;border:1px solid var(--line);background:var(--card);font-size:13px;cursor:pointer;display:flex;gap:7px;align-items:center;font-family:var(--sans)}
@@ -2649,7 +2668,7 @@ body{background:var(--bg)}
 .stage-tag{font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--card);background:var(--ink);padding:2px 7px;margin-right:4px;font-weight:400;flex:0 0 auto}
 .stage-tag.ped{background:var(--seal)}
 .reading.pedagogy{border-left:3px solid var(--seal)}
-.lesson-guide{font-size:11px;color:var(--sub);padding:8px 18px;border-top:1px dashed var(--line2)}
+.lesson-guide{font-size:12px;color:var(--sub);padding:8px 18px;border-top:1px dashed var(--line2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
 /* 전시장 */
 .gal-hero{text-align:center;padding:34px 16px 10px}
@@ -2866,7 +2885,7 @@ function LessonPanel({ L, teacher, onReading }) {
     closed.forEach((d) => { d.open = true; });
   };
   return (
-    <div className="lesson">
+    <div className="lesson" id={"lesson-" + L.n} style={{ scrollMarginTop: "var(--sv-top, 60px)" }}>
       <div className="lesson-head">
         <span className="lesson-n">{L.n}차시 {teacher ? "수업 안내" : "강의 노트"}</span>
         <span className="lesson-title" role="heading" aria-level="2">{L.title}</span>
@@ -2927,7 +2946,10 @@ function LessonPanel({ L, teacher, onReading }) {
         )}
       </div>
       {!teacher && <AccessMemo L={L} />}
-      {!teacher && <div className="lesson-guide">읽기 자료를 읽은 뒤 「배움 확인 {L.n}」, 「탐구 질문 {L.n}」에 답합니다. 답은 자동으로 저장됩니다.</div>}
+      {!teacher && <div className="lesson-guide">
+        <span>다 읽었으면 아래 카드에 답합니다.</span>
+        <button type="button" className="btn small ghost" onClick={() => { const el = document.getElementById("sec-l" + L.n); if (el) el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" }); }}>배움 확인 {L.n}으로 ↓</button>
+      </div>}
       {!teacher && <GuardNotice />}
     </div>
   );
@@ -3051,6 +3073,24 @@ function LadderRail({ sec, ws }) {
     }
     nav.go(st.session, st.sec);
   };
+  /* 한 탭에 발상 단계 카드가 여럿이면(3차시는 다섯) 일곱 칸 표시줄은 첫 카드에만 두고,
+     나머지 카드에는 「앞 단계 · 지금 단계 · 다음 단계」 한 줄만 둔다. 같은 표시줄이 다섯 번 반복되면 화면이 어지럽다 */
+  const firstLadder = SCHEMA.filter((s) => s.session === sec.session && s.ladder)[0];
+  const compact = !!firstLadder && firstLadder.id !== sec.id && !!cur;
+  if (compact) {
+    const idx = TRANSLATE_STAGES.indexOf(cur);
+    const prev = TRANSLATE_STAGES[idx - 1], next = TRANSLATE_STAGES[idx + 1];
+    return (
+      <div className="ladder-mini">
+        <div className="lm-row">
+          {prev ? <button type="button" className="lm-nav" onClick={() => go(prev)}>← 단계 {prev.n} {prev.name}</button> : <span />}
+          <span className="lm-now">단계 {cur.n} / {TRANSLATE_STAGES.length}</span>
+          {next ? <button type="button" className="lm-nav" onClick={() => go(next)}>단계 {next.n} {next.name} →</button> : <span />}
+        </div>
+        {note && <div className="ld-note" role="status">{note}</div>}
+      </div>
+    );
+  }
   return (
     <div>
       <div className="ladder">
@@ -3305,7 +3345,7 @@ function PickInvField({ f, fieldKey, v, setField, ws }) {
     <div className="field span2">
       <label>{f.label}</label>
       {list.length === 0 ? (
-        <span className="hint">위 목록을 먼저 채우면 여기에서 고를 수 있습니다.</span>
+        <span className="hint">위 목록을 먼저 채우면 여기에서 고를 수 있습니다. </span>
       ) : (
         <div className="toggle-row col">
           {list.map((r, i) => {
@@ -4884,6 +4924,46 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
     </div>
   );
 }
+/* 이 차시에서 할 일. 탭 맨 위에서 강의 노트와 기록 카드를 순서대로 보여 주고, 누르면 그 카드로 간다.
+   학생이 「이 화면에서 무엇을 하는지」를 설문·강의 노트 아래로 내려가지 않고도 알게 하기 위한 카드다. */
+function TodoCard({ tab, secs, ws }) {
+  const L = LESSONS.find((x) => x.session === tab);
+  const jump = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
+  };
+  const lessonId = L ? "lesson-" + L.n : null;
+  const rows = [];
+  if (L) rows.push({ id: lessonId, head: "강의 노트", title: L.title, sub: "읽기 자료 " + L.readings.length + "편", done: null });
+  for (const sec of secs) {
+    const p = sectionProgress(sec, ws);
+    rows.push({ id: "sec-" + sec.id, head: sectionHead(sec), title: sec.title, sub: p.total ? p.done + "/" + p.total : "", done: p.total > 0 && p.done >= p.total, hw: !!sec.hw });
+  }
+  if (!rows.length) return null;
+  return (
+    <div className="card todo-card">
+      <div className="card-head">
+        <span className="card-code">오늘 할 일</span>
+        <span className="card-title" role="heading" aria-level="2">{tab}: 위에서 아래 순서로 합니다</span>
+      </div>
+      <ol className="todo-list">
+        {rows.map((r, i) => (
+          <li key={r.id || i} className={r.done ? "done" : ""}>
+            <button type="button" className="todo-row" onClick={() => jump(r.id)}>
+              <span className="todo-n">{r.done ? "✓" : i + 1}</span>
+              <span className="todo-head">{r.head}</span>
+              <span className="todo-title">{r.title}{r.hw && <span className="hw-chip">한 주 과제</span>}</span>
+              <span className="todo-sub">{r.sub}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+      <div className="todo-foot">강의 노트 안의 「내 생각 쓰기」는 선택입니다. 답은 쓰는 대로 저장됩니다.</div>
+    </div>
+  );
+}
+
 /* ---------- 학생 화면 (실시간 저장) ---------- */
 
 /* 전시장에 다녀오는 학번. 학생 화면은 전시장에 가면 닫혔다가 돌아오면 새로 열린다 (방문 횟수를 다시 세지 않기 위함) */
@@ -5598,6 +5678,10 @@ function StudentApp({ me, onExit, onGallery }) {
 
   const pct = overallProgress(ws);
   const secs = SCHEMA.filter((s) => s.session === tab);
+  // 설문을 펼치는 탭: 사전은 열린 첫 차시, 사후는 열린 마지막 차시
+  const openSess = SESSIONS.filter((s) => isOpen(openMap, s));
+  const svHome = openSess[0] || SESSIONS[0];
+  const svHomePost = openSess[openSess.length - 1] || SESSIONS[SESSIONS.length - 1];
 
   /* 단계 표시줄·단계 3 카드가 다른 차시 탭의 카드로 갈 때 쓴다: 탭을 옮긴 뒤 그 카드로 스크롤 */
   const navGo = async (session, secId) => {
@@ -5621,7 +5705,7 @@ function StudentApp({ me, onExit, onGallery }) {
     <div>
       <div className="topbar">
         <div className="topbar-in">
-          <div className="brand" role="heading" aria-level="1">허구의 아카이브 기록실<small lang="en">STUDENT · {me.sid}</small></div>
+          <div className="brand" role="heading" aria-level="1">허구의 아카이브 기록실<small>학생 · {me.sid}</small></div>
           <div className="top-right">
             <span>{me.nick}</span>
             <span translate="no"
@@ -5744,15 +5828,28 @@ function StudentApp({ me, onExit, onGallery }) {
           </div>
         )}
 
-        {loaded && survey && surveyOpen(svCfg, "pre") && (
+        {/* 설문은 한 탭에만 펼친다(사전: 열린 첫 차시, 사후: 열린 마지막 차시). 다른 탭에서는 한 줄 안내만.
+            설문 카드가 모든 차시 탭 맨 위에 서면 학생이 「이 차시에서 무엇을 하는지」를 설문 아래로 내려가야 알게 된다. */}
+        {loaded && !assessOn && !quizOn && <TodoCard tab={tab} secs={secs} ws={ws} />}
+        {loaded && survey && surveyOpen(svCfg, "pre") && (tab === svHome ? (
           <SurveyCard phase="pre" block={survey.pre} busy={svBusy} saveInfo={svSave}
             onChange={(b) => svChange("pre", b)} onSubmit={() => svSubmit("pre")} />
-        )}
-        {loaded && survey && surveyOpen(svCfg, "post") && (
+        ) : !svDone(survey.pre) && (
+          <div className="ok-note stage-open" role="status">
+            <span>사전 설문(약 5분)이 {svHome} 탭에 있습니다.</span>
+            <button className="btn small" onClick={() => switchTab(svHome)}>설문으로 이동</button>
+          </div>
+        ))}
+        {loaded && survey && surveyOpen(svCfg, "post") && (tab === svHomePost ? (
           <SurveyCard phase="post" block={survey.post} busy={svBusy} saveInfo={svSave}
             onChange={(b) => svChange("post", b)} onSubmit={() => svSubmit("post")} />
-        )}
-        {loaded && survey && surveyOpen(svCfg, "sPre") && (
+        ) : !svDone(survey.post) && (
+          <div className="ok-note stage-open" role="status">
+            <span>사후 설문이 {svHomePost} 탭에 있습니다.</span>
+            <button className="btn small" onClick={() => switchTab(svHomePost)}>설문으로 이동</button>
+          </div>
+        ))}
+        {loaded && survey && surveyOpen(svCfg, "sPre") && tab === svHome && (
           // 사전 설문 두 개가 동시에 열렸을 때는 순서를 정해 준다 — 첫 설문을 마치기 전에는 접어 둠
           surveyOpen(svCfg, "pre") && !(survey.pre && survey.pre.submittedAt) ? (
             <details className="card" style={{ marginBottom: 14 }}>
@@ -5767,7 +5864,7 @@ function StudentApp({ me, onExit, onGallery }) {
               onChange={(b) => stChange("pre", b)} onSubmit={() => stSubmit("pre")} />
           )
         )}
-        {loaded && survey && surveyOpen(svCfg, "sPost") && (
+        {loaded && survey && surveyOpen(svCfg, "sPost") && tab === svHomePost && (
           <StanceCard phase="post" block={(survey.stance || {}).post} busy={svBusy} saveInfo={svSave}
             onChange={(b) => stChange("post", b)} onSubmit={() => stSubmit("post")} />
         )}
