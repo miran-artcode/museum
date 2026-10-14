@@ -32,6 +32,8 @@ export const BLOCK_END_MIN = [7, 15, 25, 35];                       // 블록별
 export const ROUTE_UP = 4, ROUTE_DOWN = 2;                          // 정답 4 이상 상승, 2 이하 하강, 3 유지
 export const MIN_ANSWERED = 10;                                     // 이보다 적게 응답하면 E 2점
 export const STEM_MAX = { 1: 60, 2: 80, 3: 120, 4: 160, 5: 220 };  // 문두 글자 상한
+// 원어 병기 괄호 「(Marcel Duchamp)」「(Fountain, 1917)」는 읽기 분량에서 뺀다(2026-10-14 표기 통일)
+export const stemLen = (s) => String(s || "").replace(/([^()]*[A-Za-zÀ-ÿ][^()]*)/g, "").length;
 export const CASE_MAX_5 = 140;                                      // 5급 사례 서술 상한(문항 필드 caseLen 로 검사)
 export const MAX_EVENTS = 300;
 export const IMAGE_MAX = 12;           // 은행 전체 이미지 문항 상한(§5.6, 8%)
@@ -825,7 +827,7 @@ export function validateBank(bank) {
     if (!opts.some((o) => o && o.id === it.answer)) errors.push(tag + ": answer가 보기에 없습니다");
     const stem = trimStr(it.stem);
     if (!stem) errors.push(tag + ": 문두가 비어 있습니다");
-    else if (STEM_MAX[it.level] && stem.length > STEM_MAX[it.level]) warnings.push(tag + ": 문두가 " + STEM_MAX[it.level] + "자를 넘습니다(" + stem.length + "자)");
+    else if (STEM_MAX[it.level] && stemLen(stem) > STEM_MAX[it.level]) warnings.push(tag + ": 문두가 " + STEM_MAX[it.level] + "자를 넘습니다(" + stemLen(stem) + "자)");
     if (it.image) {
       if (it.level === 5 || it.level === 1) errors.push(tag + ": " + it.level + "급에는 이미지를 둘 수 없습니다");
       if (!it.image.src || !String(it.image.src).startsWith("/img/lessons/")) errors.push(tag + ": 이미지 src는 /img/lessons/ 로 시작해야 합니다");
