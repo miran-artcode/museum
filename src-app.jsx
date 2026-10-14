@@ -20,6 +20,7 @@ import { GateStyle, GateHeader, GateSections } from "./src-gate.jsx";
 import { ThemeStyle } from "./src-theme.jsx";
 import { UxStyle, ConfirmButton, session, TeacherTabs, VIEWER_TABS, TEACHER_TAB_GROUPS } from "./src-ux.jsx";
 import { GridStyle, GridRuntime } from "./src-grid.jsx";
+import { NavStyle, NavRuntime, StudentSideNav, TeacherSideNav } from "./src-nav.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { useExhibitPublisher, useExhibits, exhibitOf } from "./src-exhibit.jsx";
 import { ArExpoEntry, ArDeepLink, ArStyle } from "./src-ar.jsx";
@@ -5637,6 +5638,13 @@ function StudentApp({ me, onExit, onGallery }) {
           </div>
         </div>
       </div>
+      <div className="nav-shell">
+      {loaded && <StudentSideNav tocKey={tab + (assessOn ? ":assess" : quizOn ? ":quiz" : "")} onSession={switchTab}
+        sessions={SESSIONS.map((s) => ({ name: s, open: isOpen(openMap, s), on: tab === s && !assessOn && !quizOn, ratio: sessionProgress(s, ws) }))}
+        extras={[
+          ...(peerStage !== "closed" ? [{ key: "assess", label: "최종 평가", on: assessOn, go: () => goStage("assess") }] : []),
+          ...(quizStage !== "closed" ? [{ key: "quiz", label: "쪽지시험", on: quizOn, go: () => goStage("quiz") }] : []),
+        ]} />}
       <div className="wrap" role="main" id="main">
         {removed && (
           <div className="warn-note" role="alert" style={{ marginBottom: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -5789,6 +5797,7 @@ function StudentApp({ me, onExit, onGallery }) {
         {loaded && !assessOn && !quizOn && isOpen(openMap, tab) && secs.filter((s) => s.kind !== "learn" && s.kind !== "inquiry").map((sec) => (
           <SectionCard key={sec.id} sec={sec} ws={ws} setField={setField} />
         ))}
+      </div>
       </div>
 
       {/* 수업 자료 보호(src-guard.jsx): 복사·저장 막기, 캡처 순간 가리기, 학번 워터마크. 입력칸·붙여넣기는 막지 않는다 */}
@@ -9384,6 +9393,9 @@ function TeacherApp({ onExit, onGallery }) {
           </div>
         </div>
       </div>
+      <div className="nav-shell">
+      {(!sel || viewerOnly) && <TeacherSideNav tab={tab} onSwitch={switchTab} dirty={edDirty}
+        groups={TEACHER_TAB_GROUPS.map((g) => ({ ...g, tabs: viewerOnly ? g.tabs.filter((t) => VIEWER_TABS.includes(t)) : g.tabs })).filter((g) => g.tabs.length)} />}
       <div className="wrap wide">
         <CaptionOnAir />
         {authApi.isViewer() && <div className="sample-banner">보기 전용 계정으로 들어왔습니다. 수업 안내·수업 자료·학습 지원 설정만 볼 수 있고, 학생별 기록과 학번은 보이지 않으며 내려받기와 저장은 할 수 없습니다.</div>}
@@ -9740,6 +9752,7 @@ function TeacherApp({ onExit, onGallery }) {
             )}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
@@ -10499,6 +10512,7 @@ function App() {
       <UxStyle />
       <ArStyle />
       <GridStyle /><GridRuntime />
+      <NavStyle /><NavRuntime />
       {restoring && <div style={{ padding: "60px 16px", textAlign: "center", color: "var(--sub)", fontSize: 13 }}>기록실을 여는 중…</div>}
       {view === "gate" && !restoring && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}
