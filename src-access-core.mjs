@@ -452,7 +452,7 @@ export function supportCsvLong(rows) {
 }
 
 export const SUPPORT_CODEBOOK = [
-  ["pid", "연구 탭과 같은 익명 참여자 번호"],
+  ["pid", "연구 탭과 같은 가명 참여자 번호"],
   ["pref_text", "글자 크기(%). 100·125·150·175·200"],
   ["pref_spacing", "줄·글자 간격 넓게 (1=켬)"],
   ["pref_contrast", "none·high(흰 바탕 고대비)·dark(검은 바탕 고대비)"],

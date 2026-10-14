@@ -38,7 +38,7 @@ export const TOOL_TEXT = {
   measure: { name: "길이 맞추기", key: "", ps: "눈금자 도구, 측정 비율 설정", hint: "치수를 아는 부분을 따라 선을 긋습니다." },
   scaleBar: { name: MARK_TEXT.sb, key: "", ps: "축척 표시자" },
   grayCard: { name: MARK_TEXT.gs, key: "", ps: "" },
-  text: { name: MARK_TEXT.txt, key: "T", ps: "수평 문자 도구", hint: "허구 표기는 이미지가 아니라 작품 캡션에 씁니다." },
+  text: { name: MARK_TEXT.txt, key: "T", ps: "수평 문자 도구", hint: "허구 고지는 이미지가 아니라 작품 캡션에 씁니다." },
   colorCard: { name: "색 기준표 (24색)", key: "", ps: "" },
   tag: { name: MARK_TEXT.tg, key: "", ps: "", hint: "작품 캡션의 번호와 같게 씁니다." },
   compare: { name: "전후 비교", key: "\\", ps: "" },

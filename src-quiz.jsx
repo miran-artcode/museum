@@ -972,7 +972,7 @@ function ResultView({ v, cfg }) {
           <p className="hint">4개 이상 맞히면 다음 블록이 한 급 오르고, 3개면 그대로, 2개 이하면 한 급 내려갑니다. 마지막 블록에서 2개 이하면 최종급이 한 급 내려갑니다.</p>
           <div className="qz-h">점수표의 내 행</div>
           <ScoreTable rowIdx={rowIdx} incomplete={rowIdx < 0} />
-          <p className="hint">이 검사의 등급 판정에는 ±1등급의 오차가 있을 수 있습니다. 이의는 응시 기록표로 답하며, 선생님께 말씀해 주세요.</p>
+          <p className="hint">이 검사의 등급 판정에는 ±1등급의 오차가 있을 수 있습니다. 이의가 있으면 선생님께 말씀해 주세요. 응시 기록표를 근거로 답합니다.</p>
         </div>
       </div>
 

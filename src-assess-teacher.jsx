@@ -42,7 +42,7 @@ const STAGE_CONFIRM = {
   self1: "「자기평가 ①」 단계로 바꿉니다. 학생은 자기 작품을 옆에 두고 여섯 문항을 네 수준으로 평가하고, 2학년 전체에서 앞에서 몇 % 안에 들지 예측합니다. 단계는 다섯 반에 한꺼번에 적용되므로 작품 제출도 모든 반에서 닫힙니다.",
   peer: "「동료 비교」 단계로 바꿉니다. 학생은 확정된 명단에서 배정된 쌍을 차례로 비교합니다. 고른 것은 되돌릴 수 없습니다.",
   self2: "「자기평가 ②」 단계로 바꿉니다. 학생은 ①의 답을 보지 않은 채 다시 평정해 확정한 뒤, ①과 나란히 놓고 변화 사유를 씁니다.",
-  result: "「결과 공개」 단계로 바꿉니다. 집계된 결과가 「공개 범위」 설정대로(밴드·백분위·등수) 학생에게 보입니다.",
+  result: "「결과 공개」 단계로 바꿉니다. 집계된 결과가 「결과 공개 범위」 설정대로(밴드·백분위·등수) 학생에게 보입니다.",
 };
 const REVEALS = [
   { k: "band", label: "밴드(상·중·하)" }, { k: "pct", label: "백분위" }, { k: "rank", label: "등수" }, { k: "none", label: "보이지 않음" },
@@ -463,7 +463,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
               </div>
             </div>
             <div className="field">
-              <label>학생에게 보여 줄 결과 범위</label>
+              <label>결과 공개 범위</label>
               <select value={live.reveal} disabled={sampleMode} onChange={(e) => edit("reveal", e.target.value)}>
                 {REVEALS.map((r) => <option key={r.k} value={r.k}>{r.label}</option>)}
               </select>
@@ -639,7 +639,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
               </div>
               {q && q.tagDist && (
                 <p className="hint" style={{ marginBottom: 12 }}>
-                  결정적 축 태그 분포: {TAG_OPTIONS.map((c) => c.label + " " + (q.tagDist[c.k] || 0)).join(" · ")}
+                  결정적 기준 태그 분포: {TAG_OPTIONS.map((c) => c.label + " " + (q.tagDist[c.k] || 0)).join(" · ")}
                 </p>
               )}
 
@@ -702,7 +702,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
       <div className="card at-card">
         <div className="card-head"><span className="card-code">상호평가 5</span><span className="card-title">CSV: 연구 자료 다섯 파일</span></div>
         <div className="card-note">
-          제출(작품 단위) · 판정(판정 단위, 옛 명단의 판정은 valid=0) · 자기평가(학생×단계) · 집계(작품 점수) · 판정자(적합도·위치 편향·시간). 학번 대신 <b>「연구」 탭과 같은 규칙의 익명 번호</b>(학번 정렬 순 P01…)를 씁니다.
+          제출(작품 단위) · 판정(판정 단위, 옛 명단의 판정은 valid=0) · 자기평가(학생×단계) · 집계(작품 점수) · 판정자(적합도·위치 편향·시간). 학번 대신 <b>「연구」 탭과 같은 규칙의 가명 번호</b>(학번 정렬 순 P01…)를 씁니다.
         </div>
         <div className="card-body">
           <div className="at-row">

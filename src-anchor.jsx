@@ -347,7 +347,7 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
       <div className="card-head"><span className="card-code">앵커</span><span className="card-title">고지 라벨을 바꿔 붙인 네 쌍</span></div>
       <div className="card-note">
         같은 이미지에 <b>「AI 활용 범위」 문구만 다르게</b> 붙여 학번 끝자리 홀짝으로 번갈아 보여 줍니다(무작위 배정이 아니라 교대 배정).
-        끝자리가 학생 특성과 무관하다고 보면 두 조건의 선택률 차이가 <b>고지가 깎는 양</b>의 추정치입니다.
+        끝자리가 학생 특성과 무관하다고 보면 두 조건의 선택률 차이가 <b>고지 때문에 줄어드는 선택률</b>의 추정치입니다.
         학급 밖 예시 유물이라 어떤 학생도 이 조작 때문에 손해 보지 않습니다.
       </div>
       <div className="card-body">
@@ -396,12 +396,12 @@ export function AnchorPanel({ ids, roster, surveyMap, cfg, onSave, sampleMode })
           <div className="kpi"><b>{pct(plateRate)}</b><span>작품 캡션을 펼쳐 본 비율</span></div>
         </div>
         <p className="hint" style={{ marginTop: 8 }}>
-          「AI 전면」 선택률이 <b>50%보다 낮을수록</b> 학급이 고지를 깎은 것입니다. 정확히 50%면 라벨이 판정을 바꾸지 않았다는 뜻입니다.
-          축 분포: {tagN.map((x) => x.t.label + " " + x.n).join(" · ")}
+          「AI 전면」 선택률이 <b>50%보다 낮을수록</b> 학급이 「AI 전면」 고지가 붙은 쪽을 낮게 평가한 것입니다. 정확히 50%면 라벨이 판정을 바꾸지 않았다는 뜻입니다.
+          기준 분포: {tagN.map((x) => x.t.label + " " + x.n).join(" · ")}
         </p>
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
           <button className="btn" onClick={exportCSV} disabled={!doneRows.length}>앵커 판정 CSV 내려받기</button>
-          <span className="hint">성향 설문 점수와 학번으로 이어 붙여 분석합니다. <b>이 파일에는 학번·별명이 들어갑니다.</b> 「연구」 탭의 익명 자료와 섞이지 않게 보관하세요.</span>
+          <span className="hint">성향 설문 점수와 학번으로 이어 붙여 분석합니다. <b>이 파일에는 학번·별명이 들어갑니다.</b> 「연구」 탭의 가명 자료와 섞이지 않게 보관하세요.</span>
         </div>
         <div className="warn-note" style={{ marginTop: 12 }}>
           <b>판정이 끝나면 반드시 알려 주세요.</b> 같은 이미지에 서로 다른 고지 문구를 붙였다는 사실을 밝히고,

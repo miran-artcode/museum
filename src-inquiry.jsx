@@ -15,7 +15,7 @@ import { fbStore } from "./src-fb.js";
         (문제를 먼저 붙들게 한 뒤 도움을 주는 편이 배움이 깊다는 ‘생산적 실패’의 순서)
      ② 첫 답을 굳힌다 — 그 순간의 글이 첫 답으로 따로 남는다.
      ③ 되묻는다 — 답의 내용을 주지 않고 학생 자신의 문장을 찌르는 질문이 온다.
-        질문별 되묻기(그 질문에만 맞는 것)와 공통 되묻기(개념·설계에 두루 쓰는 것)를
+        질문별 되묻기(그 질문에만 맞는 것)와 공통 추가 질문(개념·설계에 두루 쓰는 것)를
         학번+질문으로 정한 순서로 배정하므로 옆 사람과 다른 되묻기를 받는다.
      ④ 같은 칸에서 고친다 — 덧붙여도, 지워도, 뒤집어도 된다. 첫 답과 고친 답이 나란히 남는다.
 
@@ -48,7 +48,7 @@ const REV_GAP_MS = 30000;   // 고친 시각은 30초에 한 번만 갱신 (매 
 /* ---------- 지원 수준 ---------- */
 export const INQ_LEVELS = [
   { k: "full", label: "전부", sub: "답을 저장하면 추가 질문 둘(문항별 하나 + 공통 하나)이 바로 옴" },
-  { k: "probe", label: "되묻기·스스로", sub: "추가 질문 하나 + 학생이 만드는 질문 하나" },
+  { k: "probe", label: "추가 질문·스스로", sub: "추가 질문 하나 + 학생이 만드는 질문 하나" },
   { k: "self", label: "스스로", sub: "학생이 만드는 질문 먼저, 추가 질문은 요청할 때만" },
 ];
 /* 기본 일정 — 앞에서는 앱이 묻고 뒤로 갈수록 학생이 묻는다 */
@@ -438,7 +438,7 @@ export function InquiryTrace({ sec, f, ws }) {
   return (
     <div className="inq-trace">
       <div className="inq-tl">
-        <span className="inq-acc">되묻기 흔적</span>
+        <span className="inq-acc">추가 질문 흔적</span>
         {tr.v1Level ? "수준 " + levelLabel(tr.v1Level) : "확정 전"}
         {route ? " · 출발점 " + route.label : ""}
         {tr.v1 ? " · 첫 답 " + tr.v1.trim().length + "자 → 지금 " + fin.trim().length + "자 · 겹침 " + sim + "%" : ""}
@@ -446,7 +446,7 @@ export function InquiryTrace({ sec, f, ws }) {
       </div>
       {tr.v1 && <div className="inq-tv"><b>첫 답</b>{tr.v1}</div>}
       {Array.isArray(tr.probes) && tr.probes.length > 0 && (
-        <div className="inq-tv"><b>받은 되묻기</b>{tr.probes.map((p, i) => <div key={p.id + i}>{i + 1}. {p.t}</div>)}</div>
+        <div className="inq-tv"><b>받은 추가 질문</b>{tr.probes.map((p, i) => <div key={p.id + i}>{i + 1}. {p.t}</div>)}</div>
       )}
       {filled(tr.selfQ) && <div className="inq-tv"><b>스스로 쓴 질문</b>{tr.selfQ}</div>}
     </div>
@@ -462,15 +462,15 @@ export function InquiryAidConfig({ cfgAll, setCfgAll, setMsg }) {
     const ok = await fbStore.setT("config", { inqAid: next, inqAidUpdated: now() }, { merge: true });
     if (ok) {
       setCfgAll({ ...(cfgAll || {}), inqAid: next });
-      setMsg(code + "차시 되묻기 수준을 " + (k ? "「" + levelLabel(k) + "」로 바꿨습니다." : "기본값으로 되돌렸습니다.") + " 접속 중인 학생 화면에 바로 반영됩니다.");
+      setMsg(code + "차시 추가 질문 수준을 " + (k ? "「" + levelLabel(k) + "」로 바꿨습니다." : "기본값으로 되돌렸습니다.") + " 접속 중인 학생 화면에 바로 반영됩니다.");
     } else setMsg("설정 저장에 실패했습니다.");
   };
   return (
     <div className="card">
-      <div className="card-head"><span className="card-code">되묻기</span><span className="card-title">탐구 질문의 지원 수준</span></div>
+      <div className="card-head"><span className="card-code">추가 질문</span><span className="card-title">탐구 질문의 지원 수준</span></div>
       <div className="card-body">
         <p style={{ fontSize: 13, marginBottom: 12 }}>
-          탐구 질문은 <b>먼저 쓰고 → 첫 답을 확정하고 → 되묻기를 받아 → 같은 칸에서 고치는</b> 순서로 진행됩니다.
+          탐구 질문은 <b>먼저 쓰고 → 첫 답을 확정하고 → 추가 질문을 받아 → 같은 칸에서 고치는</b> 순서로 진행됩니다.
           기본값은 앞 차시에서는 앱이 많이 묻고, 뒤 차시로 갈수록 앱의 질문을 줄여 학생이 스스로 묻게 하는 일정입니다.
           학급의 형편에 따라 차시별로 바꿀 수 있습니다. 이미 첫 답을 확정한 학생의 기록은 그때의 수준이 그대로 남습니다.
         </p>
@@ -506,8 +506,8 @@ export function InquiryAidConfig({ cfgAll, setCfgAll, setMsg }) {
           {INQ_LEVELS.map((l) => <li key={l.k}><b>{l.label}</b>: {l.sub}</li>)}
         </ul>
         <p className="hint" style={{ marginTop: 6 }}>
-          되묻기 문장은 「수업 편집」 탭의 탐구 질문 항목에서 고칩니다. 답의 보기를 나열하지 않고, 학생이 쓴 것을 가리키는 한 문장으로 씁니다.
-          공통 되묻기(개념 {INQ_GENERIC["개념"].length}개 · 설계 {INQ_GENERIC["설계"].length}개)는 코드에 있습니다.
+          추가 질문 문장은 「수업 편집」 탭의 탐구 질문 항목에서 고칩니다. 답의 보기를 나열하지 않고, 학생이 쓴 것을 가리키는 한 문장으로 씁니다.
+          공통 추가 질문(개념 {INQ_GENERIC["개념"].length}개 · 설계 {INQ_GENERIC["설계"].length}개)는 코드에 있습니다.
         </p>
       </div>
     </div>

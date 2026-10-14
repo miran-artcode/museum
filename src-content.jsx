@@ -148,7 +148,7 @@ export function staleEdits(content, lessonDefs, schemaDefs) {
     SEC_PROPS.forEach((p) => { const st = propState(s, p, sec[p]); if (st === "changed" || st === "legacy") out.push({ kind: "secs", id: sec.id, p, st, n: L && L.n, where: sec.session + " · " + sec.id + " " + (p === "title" ? "구간 제목" : "구간 안내문"), val: s[p] }); });
     sec.fields.forEach((f) => {
       const key = sec.id + "." + f.k, o = c.fields[key];
-      FIELD_PROPS.forEach((p) => { const st = propState(o, p, f[p]); if (st === "changed" || st === "legacy") out.push({ kind: "fields", id: key, p, st, n: L && L.n, where: sec.session + " · " + key + " " + (p === "label" ? "발문" : p === "steps" ? "생각 단계" : "되묻기"), val: o[p] }); });
+      FIELD_PROPS.forEach((p) => { const st = propState(o, p, f[p]); if (st === "changed" || st === "legacy") out.push({ kind: "fields", id: key, p, st, n: L && L.n, where: sec.session + " · " + key + " " + (p === "label" ? "발문" : p === "steps" ? "생각 단계" : "추가 질문"), val: o[p] }); });
     });
   });
   return out;
@@ -807,7 +807,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
           </div>
 
           <div className="card">
-            <div className="card-head"><span className="card-code">학습지</span><span className="card-title">학생이 답할 발문과 생각 단계·되묻기</span></div>
+            <div className="card-head"><span className="card-code">학습지</span><span className="card-title">학생이 답할 발문과 생각 단계·추가 질문</span></div>
             <div className="card-body">
               {secs.length === 0 && <p className="hint">이 차시에는 학습지 항목이 없습니다.</p>}
               {secs.map((sec) => {
@@ -834,7 +834,7 @@ export function ContentEditor({ lessonDefs, schemaDefs, LessonPanel, onDirty }) 
                             <EdArea label="발문 (학생에게 보이는 질문)" min={2} max={8} value={label} onChange={(v) => setFld(sec.id, f.k, { label: v })} />
                             {isInq ? (
                               /* 탐구 질문은 생각 계단 대신 되묻기를 쓴다 — 첫 답을 굳힌 뒤 학생마다 다른 줄이 배정된다 */
-                              <EdArea label="되묻기 (첫 답을 확정한 뒤 배정되는 질문, 한 줄에 하나씩)"
+                              <EdArea label="추가 질문 (첫 답을 확정한 뒤 배정되는 질문, 한 줄에 하나씩)"
                                 hint="답의 보기를 나열하지 말고, 학생이 쓴 것을 가리키는 한 문장으로 씁니다. 학생마다 다른 줄이 배정되므로 다섯 줄쯤 둡니다. 비워 두면 원본으로 돌아갑니다."
                                 min={3} max={10} value={arrToLines(probes)} onChange={(v) => setFld(sec.id, f.k, { probes: linesToArr(v) })} />
                             ) : (

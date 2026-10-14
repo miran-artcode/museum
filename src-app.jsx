@@ -3660,7 +3660,7 @@ function CardPick({ f, fieldKey, v, setField, ws }) {
               <div className="pc-row"><b>관람자가 하는 일</b><span>{cur.does}</span></div>
               <div className="pc-row ok"><b>이럴 때 맞습니다</b><span>{cur.fit}</span></div>
               <div className="pc-row no"><b>이 방법의 위험</b><span>{cur.risk}</span></div>
-              <p className="pc-unit">이 단원의 형식은 <b>가림과 우회 · 허구와 파라픽션 · 증거와 포렌식</b>을 합친 것입니다. 다른 방법을 골라도 됩니다. 그 방법은 4차시 캡션 문구나 진열에서 살릴 수 있습니다.</p>
+              <p className="pc-unit">이 단원의 형식은 <b>가림과 우회 · 허구와 파라픽션 · 증거와 포렌식</b>을 합친 것입니다. 다른 방법을 골라도 됩니다. 그 방법은 6차시 작품 캡션 문구나 7차시 진열에서 살릴 수 있습니다.</p>
             </div>
           )}
         </div>
@@ -4697,7 +4697,7 @@ function SurveyMini({ sv }) {
             <div style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{post.extra.e3}</div>
           </div>
         )}
-        <p className="hint" style={{ marginTop: 8 }}>자기보고 점수는 행동 지표(창의성 축)·기록(변화 쌍)과 함께 볼 때에만 해석합니다. 점수 자체를 성적에 쓰지 않습니다.</p>
+        <p className="hint" style={{ marginTop: 8 }}>자기보고 점수는 행동 지표(창의성 차원)·기록(변화 쌍)과 함께 볼 때에만 해석합니다. 점수 자체를 성적에 쓰지 않습니다.</p>
       </div>
     </div>
   );
@@ -6279,12 +6279,12 @@ function TeacherStudentView({ sid, roster, wsData, gradeData, surveyData, onBack
                   </tbody>
                 </table>
                 <p className="hint" style={{ marginTop: 8 }}>
-                  <b>학생 화면에는 이 기록이 전혀 나타나지 않습니다.</b> 붙여넣기가 감지되어도 학생은 아무 표시도 보지 못하며,
-                  이 표는 교사만 봅니다. 그래서 수집 사실을 학생이 알 수 있는 통로는 <b>동의 절차의 「붙여넣기 기록」 항목과 사전 안내뿐</b>입니다. 반드시 실제로 알려 주십시오.
-                  가져온 문장의 앞 120자만 남긴 것이며 붙여넣은 글 전체는 저장하지 않습니다.
-                  <b>어디에서 온 글인지는 이 기록이 말해 주지 않습니다.</b> 생성형 도구인지, 검색 결과인지,
+                  <b>이 표는 교사만 봅니다.</b> 「출처 묻기」를 꺼 두면 붙여넣기가 감지되어도 학생은 아무 표시도 보지 못합니다.
+                  그래서 수집 사실을 학생이 알 수 있는 통로는 <b>동의 절차의 「붙여넣기 기록」 항목과 사전 안내뿐</b>입니다. 반드시 실제로 알려 주십시오.
+                  가져온 문장의 앞 120자만 저장한 것이며 붙여넣은 글 전체는 저장하지 않습니다.
+                  <b>어디에서 온 글인지는 학생이 「출처 묻기」에 답한 내용 말고는 이 기록이 말해 주지 않습니다.</b> 생성형 도구인지, 검색 결과인지,
                   학생이 앞 차시에 쓴 자기 글을 옮긴 것인지 구분되지 않습니다. 판단하시려면 글 자체를 읽으셔야 합니다.
-                  붙여넣기 자체는 잘못이 아니며, 이 표는 채점이 아니라 함께 읽을 자리를 고르는 데 씁니다.
+                  붙여넣기 자체는 잘못이 아니며, 이 표는 채점이 아니라 함께 읽을 글을 고르는 데 씁니다.
                 </p>
               </details>
             </div>
@@ -6559,7 +6559,7 @@ function TimeScatter({ rows, hoverId, setHoverId, onSel }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <svg viewBox={"0 0 " + W + " " + H} style={{ width: "100%", minWidth: 480 }} role="img" aria-label="머문 시간 대비 기록 산출 산점도">
-        <title>가로: 총 활동 시간(분) · 세로: 창의성 축 평균(0~100). 점 하나가 학생 한 명.</title>
+        <title>가로: 총 활동 시간(분) · 세로: 창의성 차원 평균(0~100). 점 하나가 학생 한 명.</title>
         {[0, 50, 100].map((v) => (
           <g key={v}>
             <line x1={L} y1={py(v)} x2={W - R} y2={py(v)} stroke="var(--line2)" strokeWidth={1} />
@@ -6589,7 +6589,7 @@ function TimeScatter({ rows, hoverId, setHoverId, onSel }) {
             fill={r.id === hoverId ? "var(--seal)" : "var(--patina)"} fillOpacity={r.id === hoverId ? 1 : 0.65}
             stroke="var(--card)" strokeWidth={1.5} style={{ cursor: "pointer" }}
             onMouseEnter={() => setHoverId(r.id)} onMouseLeave={() => setHoverId(null)} onClick={() => onSel(r.id)}>
-            <title>{r.nick + " · " + r.min + "분 · 축 평균 " + r.score}</title>
+            <title>{r.nick + " · " + r.min + "분 · 차원 평균 " + r.score}</title>
           </circle>
         ))}
         {hoverId && (() => {
@@ -6602,7 +6602,7 @@ function TimeScatter({ rows, hoverId, setHoverId, onSel }) {
         <details style={{ marginTop: 6 }}>
           <summary className="hint" style={{ cursor: "pointer" }}>표로 보기 (터치 화면용, 점과 같은 값)</summary>
           <div className="tbl-scroll"><table className="tbl" style={{ marginTop: 8, minWidth: 360 }}>
-            <thead><tr><th>별명</th><th style={{ width: 90 }}>머문 시간</th><th style={{ width: 90 }}>축 평균</th><th style={{ width: 70 }}></th></tr></thead>
+            <thead><tr><th>별명</th><th style={{ width: 90 }}>머문 시간</th><th style={{ width: 90 }}>차원 평균</th><th style={{ width: 70 }}></th></tr></thead>
             <tbody>
               {data.map((r) => (
                 <tr key={r.id}>
@@ -6637,7 +6637,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
   // 학생 0명일 때 0으로 채운 카드 8장을 그리면 고장 난 화면처럼 보인다
   if (!ids.length) {
     return <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
-      학생 기록이 쌓이면 창의성 6축 대시보드가 여기에 나타납니다.
+      학생 기록이 쌓이면 창의성 6개 차원 대시보드가 여기에 나타납니다.
     </div></div>;
   }
 
@@ -6678,13 +6678,13 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
     <div>
       <div className="kpis">
         <div className="kpi"><div className="n">{rows.filter((r) => overallProgress(wsMap[r.id]) > 0).length}<span style={{ fontSize: 15, color: "var(--sub)" }}> / {ids.length}</span></div><div className="l">기록을 시작한 학생</div></div>
-        <div className="kpi"><div className="n">{meanMed != null ? fmt1(meanMed) : "—"}</div><div className="l">축 평균의 학급 중앙값</div></div>
+        <div className="kpi"><div className="n">{meanMed != null ? fmt1(meanMed) : "—"}</div><div className="l">차원 평균의 학급 중앙값</div></div>
         <div className="kpi"><div className="n" style={zeroMedia.length ? { color: "var(--seal)" } : {}}>{zeroMedia.length}</div><div className="l">미디어 0건 학생</div></div>
         <div className="kpi"><div className="n">{editSum}</div><div className="l">고쳐 쓴 흔적 합계</div></div>
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">창의성 1</span><span className="card-title">여섯 축의 학급 분포</span></div>
+        <div className="card-head"><span className="card-code">창의성 1</span><span className="card-title">여섯 차원의 학급 분포</span></div>
         <div className="card-body">
           {CREATIVITY_AXES.map((axis, i) => (
             <AxisStripRow key={axis.key} axis={axis} first={i === CREATIVITY_AXES.length - 1}
@@ -6693,13 +6693,13 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
           ))}
           <p className="hint" style={{ marginTop: 8 }}>
             점 하나가 학생 한 명입니다 (0~100). 굵은 세로선은 학급 중앙값. 점을 누르면 그 학생의 기록으로 들어갑니다.
-            여섯 축을 거미줄 그림으로 겹치지 않은 이유: {ids.length}명의 다각형은 겹쳐 읽을 수 없어, 축마다 같은 자 위에 펼쳤습니다.
+            여섯 차원을 거미줄 그림으로 겹치지 않은 이유: {ids.length}명의 다각형은 겹쳐 읽을 수 없어, 차원마다 같은 자 위에 펼쳤습니다.
           </p>
         </div>
       </div>
 
       <div className="card">
-        <div className="card-head"><span className="card-code">창의성 2</span><span className="card-title">창의성 대장: 학생 × 축</span></div>
+        <div className="card-head"><span className="card-code">창의성 2</span><span className="card-title">창의성 대장: 학생 × 차원</span></div>
         <div className="card-body">
           <div className="tbl-scroll">
             <table className="roster">
@@ -6709,7 +6709,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
                   {CREATIVITY_AXES.map((a) => (
                     <th key={a.key} style={{ cursor: "pointer" }} title={a.desc} onClick={() => setSortKey(a.key)}>{a.short}{sortKey === a.key ? " ▾" : ""}</th>
                   ))}
-                  <th style={{ cursor: "pointer" }} onClick={() => setSortKey("mean")}>축 평균{sortKey === "mean" ? " ▾" : ""}</th>
+                  <th style={{ cursor: "pointer" }} onClick={() => setSortKey("mean")}>차원 평균{sortKey === "mean" ? " ▾" : ""}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -6736,7 +6736,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
               </tbody>
             </table>
           </div>
-          <p className="hint" style={{ marginTop: 8 }}>축 이름을 누르면 그 축이 높은 순으로 정렬됩니다. 「—」 표시는 0점이 아니라 계산할 기록이 아직 없다는 뜻입니다.</p>
+          <p className="hint" style={{ marginTop: 8 }}>차원 이름을 누르면 그 차원이 높은 순으로 정렬됩니다. 「—」 표시는 0점이 아니라 계산할 기록이 아직 없다는 뜻입니다.</p>
         </div>
       </div>
 
@@ -6861,7 +6861,7 @@ function CreativityPanel({ ids, roster, wsMap, onSel }) {
         <div className="card-body" style={{ fontSize: 13 }}>
           <p>이 화면의 숫자는 기록의 <b>양과 폭</b>을 셉니다. 답이 좋은지는 재지 못하므로, 점수는 어느 학생의 기록부터 읽을지 고르는 입구로만 쓰고 판단은 본문을 읽고 내립니다.</p>
           <p style={{ marginTop: 6 }}>남다름은 학급 안 단어 비교라 같은 문제를 다른 말로 쓴 학생이 높게 나올 수 있고, 학급이 바뀌면 점수도 바뀝니다. 모으기의 폭은 기기·촬영 환경의 영향을 받으므로 성적에 직접 반영하지 않고 격려와 관찰에 씁니다.</p>
-          <p style={{ marginTop: 6 }}>축마다 성격과 만점 기준이 달라 여섯 축을 하나의 점수로 합치지 않습니다. 「축 평균」은 정렬과 산점도를 위한 참고값입니다.</p>
+          <p style={{ marginTop: 6 }}>차원마다 성격과 만점 기준이 달라 여섯 차원을 하나의 점수로 합치지 않습니다. 「차원 평균」은 정렬과 산점도를 위한 참고값입니다.</p>
           <p style={{ marginTop: 6 }}><b>붙여넣기 지표</b>는 외부 글이 들어온 시점과 분량을 알려 줄 뿐 <b>출처를 알려 주지 않습니다.</b> 학생이 고른 출처 표시가 없으면 AI인지 검색 결과인지 자기가 앞서 쓴 글인지 구분되지 않습니다. 전유율은 붙인 앞 120자가 최종문에 남았는지로 어림한 값이라 긴 글에서는 거칠게 나옵니다.</p>
           <p style={{ marginTop: 6 }}><b>유사도 지표</b>는 학급을 규준으로 한 상대값입니다. 학급이 바뀌면 값도 바뀌고, 같은 과제를 성실히 수행한 학생끼리 높게 나오는 것이 정상입니다. 표절 판정이나 징계의 근거로 쓸 수 없습니다.</p>
         </div>
@@ -7177,7 +7177,7 @@ function TeacherGuide() {
                 <b>측정 설계.</b> 단일집단 사전·사후 설계에 과정 데이터를 더한 혼합 설계입니다. 세 자료를 삼각검증합니다.
                 ① <b>자기보고</b>: 사전·사후 24문항 설문(창의적 자기효능감 Beghetto 2006 · Karwowski 2011, 창의적 정체성 Karwowski 2011,
                 아이디어 행동 RIBS Runco 외 2001, 창의성 성장 신념 Karwowski 2014, 일상 창의 행동, AI 협업 창의성 인식). 같은 문항을 두 번 실시하고
-                역문항 3개(a12·a15·a23)로 무성의 응답을 점검합니다. ② <b>행동 지표</b>: 창의성 6축(유창성·융통성·독창성·정교성·과정·멀티모달)을 기록 데이터에서 계산.
+                역문항 3개(a12·a15·a23)로 무성의 응답을 점검합니다. ② <b>행동 지표</b>: 창의성 6개 차원(유창성·융통성·독창성·정교성·과정·멀티모달)을 기록 데이터에서 계산.
                 ③ <b>질적 기록</b>: 변화 쌍 {CHANGE_PAIRS.length}곳(사전·사후로 같은 질문에 두 번 답한 곳), 고쳐 쓰기 이력, 성찰문, 스스로 만든 질문(문제 발견).
                 통제집단이 없으므로 설문 변화만으로 효과를 주장하지 않고, 세 자료가 같은 방향을 가리키는지 서술하는 것이 정직한 분석입니다.
               </p>
@@ -7192,7 +7192,7 @@ function TeacherGuide() {
                 실시 전에 반드시 안내할 것: 정답이 없다는 것, 성적과 무관하다는 것, 잘 보이려는 답이 아니라 지금의 생각을 고르라는 것.
               </p>
               <p>
-                <b>연구 윤리.</b> 논문화하려면 학교장·보호자·학생의 사전 동의(연구 목적, 수집 항목, 익명 처리, 참여 거부 가능)를 받고,
+                <b>연구 윤리.</b> 논문화하려면 학교장·보호자·학생의 사전 동의(연구 목적, 수집 항목, 가명 처리, 참여 거부 가능)를 받고,
                 분석 자료에서 학번을 가명 코드로 바꿉니다. 별명·기록에 실명과 개인정보가 들어가지 않게 하는 운영 원칙은 README를 따릅니다.
                 설문 미제출·중도 이탈 학생의 자료는 분석에서 제외하되 그 수를 보고합니다.
               </p>
@@ -7264,7 +7264,7 @@ function TeacherGuide() {
                 <b>순회 지도의 순서.</b> ① 단계 3에서 「직접 본 게 있나요?」 없으면 문제를 바꾸게 합니다.
                 ② 단계 4에서 이유가 모두 같은 학생에게는 다른 이유의 예를 하나 들어 주고 한 줄만 더 찾게 합니다.
                 ③ 단계 5에서 ‘누가 어떻게 만지나’를 못 채운 학생에게는 그 물건은 자국이 생기지 않으므로 빼게 합니다.
-                ④ 단계 6에서 자국 칸에 마음·의미·상징의 말을 쓴 학생에게는 “그것을 사진으로 찍으면 무엇이 찍히나요”라고 되묻고(화면에도 경고가 뜹니다),
+                ④ 단계 6에서 자국 칸에 마음·의미·상징의 말을 쓴 학생에게는 “그것을 사진으로 찍으면 무엇이 찍히나요”라고 추가로 묻고(화면에도 경고가 뜹니다),
                 ‘하루 몇 번씩, 몇 년 동안’ 칸이 빈 학생에게는 “하루 몇 번, 몇 년이면 그 자국이 생길까요”로 어림해 보게 합니다. 6차시의 ‘낡음과 낡을 이유의 차이’가 여기서 정해집니다.
               </p>
               <p style={{ marginBottom: 10 }}>
@@ -7819,9 +7819,9 @@ const RESEARCH_VARS = [
   { k: "media_n", name: "멀티모달 자료 수", unit: "건", def: "기록지에 올린 사진·음성·스케치·영상의 총 건수", get: (c) => mediaCount(c.ws) },
   { k: "edit_n", name: "고쳐 쓴 횟수", unit: "회", def: "자동 저장이 남긴 수정 이력의 건수", get: (c) => (c.ws._log || []).length },
   /* 탐구 질문의 되묻기 — 첫 답을 굳힌 뒤 답이 움직였는가 */
-  { k: "inq_frozen_n", name: "탐구 첫 답 확정 수", unit: "개", def: "탐구 질문(개념·설계 16칸) 가운데 첫 답을 확정해 되묻기 단계에 들어간 칸의 수", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => r.v1).length },
-  { k: "inq_moved_n", name: "되묻기 뒤 움직인 수", unit: "개", def: "첫 답을 확정한 칸 가운데 고친 답이 첫 답과 달라진 수 (글자 2그램 겹침 < .90 또는 길이 차 > 8자)", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => r.v1 && ((r.sim != null && r.sim < 0.9) || Math.abs(r.final.trim().length - r.v1.trim().length) > 8)).length },
-  { k: "inq_selfq_n", name: "스스로 쓴 질문 수", unit: "개", def: "되묻기 단계에서 학생이 자기 답에 던진 질문을 쓴 칸의 수", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => filled(r.selfQ)).length },
+  { k: "inq_frozen_n", name: "탐구 첫 답 확정 수", unit: "개", def: "탐구 질문(개념·설계 16칸) 가운데 첫 답을 확정해 추가 질문 단계에 들어간 칸의 수", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => r.v1).length },
+  { k: "inq_moved_n", name: "추가 질문 뒤 움직인 수", unit: "개", def: "첫 답을 확정한 칸 가운데 고친 답이 첫 답과 달라진 수 (글자 2그램 겹침 < .90 또는 길이 차 > 8자)", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => r.v1 && ((r.sim != null && r.sim < 0.9) || Math.abs(r.final.trim().length - r.v1.trim().length) > 8)).length },
+  { k: "inq_selfq_n", name: "스스로 쓴 질문 수", unit: "개", def: "추가 질문 단계에서 학생이 자기 답에 던진 질문을 쓴 칸의 수", get: (c) => inquiryTraceRows(c.ws, SCHEMA).filter((r) => filled(r.selfQ)).length },
   { k: "dwell_min", name: "머문 시간", unit: "분", def: "창에 초점이 있고 30초 안에 움직임·2분 안에 클릭·키·스크롤이 있던 5초 단위의 합", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.sec || 0), 0) / 60) },
   { k: "read_min", name: "읽기 자료 열람", unit: "분", def: "강의 노트를 펼쳐 둔 채 머문 시간(같은 판정)", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.readSec || 0), 0) / 60) },
   { k: "idle_min", name: "켜 둔 채 비활동", unit: "분", def: "창은 보이고 초점도 있으나 조작 조건에 못 미친 5초 단위의 합. 머문 시간에서 걸러 낸 양", get: (c) => Math.round(Object.values(c.ws._act || {}).reduce((a, x) => a + (x.idleSec || 0), 0) / 60) },
@@ -8251,7 +8251,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
           r.v1At, r.revAt, gap]);
       });
     });
-    download("연구자료_탐구되묻기" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
+    download("연구자료_탐구추가질문" + tag + "_" + stamp + ".csv", toCSV(head, rows), "text/csv");
   };
 
   /* ---------- 5. 기술통계 (Markdown) ---------- */
@@ -8572,7 +8572,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("### 2.5 분석 방법");
     L.push("");
-    L.push("참여자 단위(wide), 단계 단위(long), 붙여넣기 단위(long), 문장 단위(코딩 시트)의 네 가지 구조로 자료를 펼쳤다. 붙여넣기 단위 자료는 가져온 문장 한 건을 한 행으로 삼아 그 문장이 놓인 칸·분량·학생의 출처 자기보고·붙인 뒤 손댄 시간·최종문에서의 잔존율을 함께 담으며, 참여자 단위의 집계값은 이 표에서 산출한 것이다. 양적 자료는 기술통계로 요약하고 사전·사후 대응 비교를 함께 보았다. 사전·사후 비교에서는 차이점수 대신 사후 점수를 종속변수로, 사전 점수를 공변량으로 투입한 공분산분석을 사용해 평균 회귀의 영향을 줄였다. 여러 척도와 축을 동시에 대조하므로 다중비교에는 위양성 발견율(FDR) 보정을 적용하였다. 「연구자 서술: 적용한 보정 절차와 유의수준」");
+    L.push("참여자 단위(wide), 단계 단위(long), 붙여넣기 단위(long), 문장 단위(코딩 시트)의 네 가지 구조로 자료를 펼쳤다. 붙여넣기 단위 자료는 가져온 문장 한 건을 한 행으로 삼아 그 문장이 놓인 칸·분량·학생의 출처 자기보고·붙인 뒤 손댄 시간·최종문에서의 잔존율을 함께 담으며, 참여자 단위의 집계값은 이 표에서 산출한 것이다. 양적 자료는 기술통계로 요약하고 사전·사후 대응 비교를 함께 보았다. 사전·사후 비교에서는 차이점수 대신 사후 점수를 종속변수로, 사전 점수를 공변량으로 투입한 공분산분석을 사용해 평균 회귀의 영향을 줄였다. 여러 척도와 차원을 동시에 대조하므로 다중비교에는 위양성 발견율(FDR) 보정을 적용하였다. 「연구자 서술: 적용한 보정 절차와 유의수준」");
     L.push("");
     L.push("동질화 지표는 분석 단위가 둘로 나뉜다. 학생 한 명이 학급의 나머지와 얼마나 겹치는가(개인 수준)와 학급 전체의 어휘 풀·선택 분포가 얼마나 좁아졌는가(학급 수준)는 서로 다른 질문이며, 두 수준의 결론이 엇갈릴 수 있다. 두 수준을 함께 보고한다.");
     L.push("");
@@ -8695,7 +8695,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("");
     L.push("### 3.7 창의성 지표와 인식 설문");
     L.push("");
-    L.push(mdHead(["축", "n", "M", "SD"]));
+    L.push(mdHead(["차원", "n", "M", "SD"]));
     CREATIVITY_AXES.forEach((a) => { const d = g("cr_" + a.key); L.push(mdRow([a.name, d.n, r2(d.m), r2(d.sd)])); });
     L.push("");
     if (svSt.n) {
@@ -8745,7 +8745,7 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
     L.push("- 연구자료_단계단위.csv: 참여자 × 단계가 1행. 단계별 도달·글자 수·구체성·편집 시각.");
     L.push("- 연구자료_코딩시트.csv: 참여자 × 항목 × 문장이 1행. code_1·code_2·memo 열은 연구자가 채우는 빈칸.");
     L.push("- 연구자료_사전사후쌍.csv: 같은 질문에 두 번 답한 곳의 텍스트 쌍과 지표 차이.");
-    L.push("- 연구자료_탐구되묻기.csv: 참여자 × 탐구 질문이 1행. 첫 답·고친 답·받은 되묻기·스스로 쓴 질문.");
+    L.push("- 연구자료_탐구추가질문.csv: 참여자 × 탐구 질문이 1행. 첫 답·고친 답·받은 추가 질문·스스로 쓴 질문.");
     L.push("- 기술통계.md: 표 1~6.");
     L.push("- 변수사전.md: 전체 변수의 조작적 정의와 산출식.");
     L.push("");
@@ -8773,8 +8773,8 @@ function ResearchPanel({ ids, roster, wsMap, gradeMap, surveyMap, sampleMode, op
       p: "참여자 × 항목 × 문장이 1행. 1차 자동 표지(단계·구체어 적중)를 붙여 두고 code_1·code_2·memo 열은 연구자가 채우도록 비워 둡니다.", go: exportCoding },
     { k: "pairs", h: "사전·사후 텍스트 쌍", fn: "연구자료_사전사후쌍" + tag + "_" + stamp + ".csv",
       p: "흔적 문장의 첫 문장과 마지막 문장, 저장한 문장 사이의 이동, 단원 안의 사고 변화 쌍 " + CHANGE_PAIRS.length + "종을 텍스트와 지표 차이로 나란히 담습니다.", go: exportPairs },
-    { k: "inquiry", h: "탐구 되묻기 단위 자료", fn: "연구자료_탐구되묻기" + tag + "_" + stamp + ".csv",
-      p: "참여자 × 탐구 질문(개념·설계)이 1행. 출발점, 첫 답과 고친 답, 겹침·구체성 차이, 받은 되묻기와 스스로 쓴 질문, 확정 뒤 고친 시간을 담습니다. 되묻기 뒤에 답이 움직였는지가 이 파일의 질문입니다.", go: exportInquiry },
+    { k: "inquiry", h: "탐구 추가 질문 단위 자료", fn: "연구자료_탐구추가질문" + tag + "_" + stamp + ".csv",
+      p: "참여자 × 탐구 질문(개념·설계)이 1행. 출발점, 첫 답과 고친 답, 겹침·구체성 차이, 받은 추가 질문과 스스로 쓴 질문, 확정 뒤 고친 시간을 담습니다. 추가 질문 뒤에 답이 움직였는지가 이 파일의 질문입니다.", go: exportInquiry },
     askResearchFile({ cases, exportCases, tag, stamp, download, toCSV, agreed: consentAgreed, lessons: LESSONS }),
     { k: "desc", h: "기술통계 표", fn: "기술통계" + tag + "_" + stamp + ".md",
       p: "표 1 기술통계, 표 2 단계 도달, 표 3 안 보이는 이유 분포, 표 4 선택 분포, 표 5 사전·사후 비교, 표 6 상관. 마크다운 표라 논문 편집기에 그대로 붙습니다.", go: () => download("기술통계" + tag + "_" + stamp + ".md", descriptivesMD(), "text/markdown") },
@@ -9378,7 +9378,7 @@ function TeacherApp({ onExit, onGallery }) {
     // 파일명에 개인정보 포함 사실을 박아 둔다 — 연구 탭의 익명 CSV와 뒤섞이는 사고 방지
     a.href = url; a.download = "허구의아카이브_학급기록_학번별명포함" + (sampleMode ? "_표본" : "") + "_" + stamp + ".csv"; a.click();
     URL.revokeObjectURL(url);
-    setMsg("CSV를 내려받았습니다. 이 파일에는 학번과 별명이 그대로 들어 있습니다. 외부 공유 전에 확인하세요. (연구용 익명 자료는 「연구」 탭)");
+    setMsg("CSV를 내려받았습니다. 이 파일에는 학번과 별명이 그대로 들어 있습니다. 외부 공유 전에 확인하세요. (연구용 가명 자료는 「연구」 탭)");
   };
 
   return (
@@ -9711,7 +9711,7 @@ function TeacherApp({ onExit, onGallery }) {
                 <div className="card">
                   <div className="card-head"><span className="card-code">설정 1</span><span className="card-title">내보내기</span></div>
                   <div className="card-body">
-                    <p style={{ fontSize: 13, marginBottom: 10 }}>학번·별명·차시별 기록률·루브릭 등급·관찰 체크·피드백을 CSV 파일로 내려받습니다. 채점 협의 자료나 성적 입력 참고 자료로 쓸 수 있습니다. <b>이 파일에는 학번과 별명이 들어갑니다.</b> 익명 연구 자료는 「연구」 탭에서 받으세요.</p>
+                    <p style={{ fontSize: 13, marginBottom: 10 }}>학번·별명·차시별 기록률·루브릭 등급·관찰 체크·피드백을 CSV 파일로 내려받습니다. 채점 협의 자료나 성적 입력 참고 자료로 쓸 수 있습니다. <b>이 파일에는 학번과 별명이 들어갑니다.</b> 가명 연구 자료는 「연구」 탭에서 받으세요.</p>
                     <button className="btn" disabled={!ids.length} onClick={exportCSV}>CSV 내려받기</button>
                     {!ids.length && <p className="hint" style={{ marginTop: 6 }}>등록된 학생이 없어 내려받을 내용이 없습니다.</p>}
                   </div>

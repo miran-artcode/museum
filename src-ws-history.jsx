@@ -130,7 +130,7 @@ export function WsHistoryCard({ sid, ws, busy, onRestored, setMsg }) {
     const msg = sid + " 학생의 기록지를 " + fmt(row.at) + " 상태로 되돌립니다.\n" +
       (changed ? "(화면을 연 뒤 학생이 기록을 고쳤습니다. 아래 「지금」은 서버의 최신 기록입니다.)\n" : "") +
       "지금: 채운 칸 " + c.fields + "개 · " + c.chars.toLocaleString() + "자 → 되돌린 뒤: 채운 칸 " + s.fields + "개 · " + s.chars.toLocaleString() + "자\n\n" +
-      "되돌리기 직전 상태도 사본으로 남기므로 다시 되돌릴 수 있습니다.\n학생이 접속 중이면 학생 화면도 되돌린 내용을 바로 받습니다. 학생이 그 순간 고치고 있던 칸만 학생 쪽 값이 남습니다.\n진행할까요?";
+      "되돌리기 직전 상태도 사본으로 저장하므로 다시 되돌릴 수 있습니다.\n학생이 접속 중이면 학생 화면도 되돌린 내용을 바로 받습니다. 학생이 그 순간 고치고 있던 칸만 학생 쪽 값이 남습니다.\n진행할까요?";
     if (!window.confirm(msg)) { setWorking(false); return; }
     // 확인 창이 떠 있던 사이의 저장까지 사본에 담기 위해 한 번 더 읽는다
     const live = await readLive();
@@ -158,7 +158,7 @@ export function WsHistoryCard({ sid, ws, busy, onRestored, setMsg }) {
       <div className="card-head"><span className="card-code">관리 0</span><span className="card-title">기록 되돌리기</span></div>
       <div className="card-body">
         <p style={{ fontSize: 13, marginBottom: 10 }}>
-          학생 기록지는 자동 저장될 때마다 1시간 단위 사본이 남습니다(시간대마다 마지막 상태 하나). 잘못 지웠거나 옛 기기의 사본이 새 기록을 덮었을 때 그 시점으로 되돌립니다.
+          학생 기록지는 자동 저장될 때마다 1시간 단위 사본이 저장됩니다(시간대마다 마지막 상태 하나). 잘못 지웠거나 옛 기기의 사본이 새 기록을 덮었을 때 그 시점으로 되돌립니다.
           지금 기록: 채운 칸 <b>{cur.fields}</b>개 · <b>{cur.chars.toLocaleString()}</b>자.
         </p>
         {rows === null ? <p className="hint">사본을 불러오는 중…</p>

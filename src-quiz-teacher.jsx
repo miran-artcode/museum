@@ -1335,7 +1335,7 @@ export function QuizPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg, o
             <button type="button" className="btn small ghost" disabled={!stats} onClick={() => exportKind("items")}>문항 통계 CSV</button>
           </div>
           <p className="hint">
-            파일 이름은 <span className="mono">쪽지시험_&lt;종류&gt;_&lt;yymmdd&gt;.csv</span>. 학번 대신 「연구」 탭과 같은 규칙의 익명 번호(학번 정렬 순 P01…)를 씁니다. 셀 앞의 <span className="mono">'</span>는 수식 주입을 막는 표시이니 그대로 두세요.
+            파일 이름은 <span className="mono">쪽지시험_&lt;종류&gt;_&lt;yymmdd&gt;.csv</span>. 학번 대신 「연구」 탭과 같은 규칙의 가명 번호(학번 정렬 순 P01…)를 씁니다. 셀 앞의 <span className="mono">'</span>는 수식 주입을 막는 표시이니 그대로 두세요.
             응답 CSV는 한 행이 학생×문항이며 정오는 정정 전 정답 키로 셉니다(corrected 열 참고).
           </p>
         </div>
