@@ -15,7 +15,8 @@ export const THEME_CSS = `
   --bg:#fff; --card:#fff; --card2:#f6f6f6;
   --ink:#111; --sub:#6e6e6e;
   --line:#ddd; --line2:#ebebeb;
-  --seal:#B5382A; --seal-bg:#F8ECEA;
+  --seal:#56669A; --seal-bg:#ECEFF6; /* 강조색: 기준색 #8491B7을 글자 대비 4.5:1 이상으로 어둡게 한 톤 */
+  --seal-fill:#8491B7;
   --patina:#31684F; --patina-bg:#EAF1ED;
   --amber:#6F5527; /* 4.5:1 미달이던 #96712F를 글자용으로는 어둡게; 점·막대 채움은 --amber-fill */
   --amber-fill:#96712F;
