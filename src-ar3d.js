@@ -22,7 +22,7 @@ import { planHall, plateRows, BASE_NOTICE, DEFAULT_NOTICE, isWallFixture, HALL }
 
 const FONT = '"Noto Sans KR","IBM Plex Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif';
 const LATIN = '"Archivo","Noto Sans KR",sans-serif';
-const C = { ink: "#111111", sub: "#6e6e6e", seal: "#B5382A", line: "#d9d9d9", paper: "#ffffff" };
+const C = { ink: "#111111", sub: "#6e6e6e", seal: "#56669A", line: "#d9d9d9", paper: "#ffffff" };
 const IS_IOS = typeof navigator !== "undefined" &&
   (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
 
@@ -903,7 +903,7 @@ export function mountArViewer(container, o) {
   mv.setAttribute("exposure", "1");
   mv.setAttribute("camera-orbit", wall ? "0deg 82deg auto" : "22deg 68deg auto");
   mv.setAttribute("alt", "작품 " + (o.work.no || "") + " 3D 모델");
-  mv.style.cssText = "width:100%;height:100%;background-color:#efeee9;--progress-bar-color:#B5382A";
+  mv.style.cssText = "width:100%;height:100%;background-color:#efeee9;--progress-bar-color:#56669A";
   const btn = document.createElement("button");
   btn.slot = "ar-button";
   btn.className = "arv-arbtn";

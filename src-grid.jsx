@@ -63,10 +63,11 @@ export const GRID_CSS = `
 /* ---------- 균형 격자 (열 수는 GridRuntime이 고른다) ----------
    --bal-min: 칸 최소 너비, --bal-max: 최대 열 수, --bal-maxw: 칸이 이보다 넓어지면 열을 늘린다.
    --bal-last: 고르게 나눠도 마지막 줄에 한 칸만 남을 때. fill(줄 전체, 흐름·지표처럼 이어지는 것),
-   center(같은 크기로 가운데, 도판·카드처럼 그림이 있는 것), start(그대로 왼쪽, 입력칸·버튼).
+   center(같은 크기로 가운데, 도판·카드처럼 그림이 있는 것), start(그대로 왼쪽, 입력칸·버튼),
+   spread(한 칸이든 여러 칸이든 마지막 줄의 칸들이 줄을 나눠 채운다. 4+3이면 셋째 줄 칸이 1/3씩. 차시 흐름처럼 오른쪽 빈칸이 어색한 것).
    auto-fit·auto-fill은 너비만 보고 열을 정해 7단계가 6+1로 갈라지거나 2개 카드가 4열 격자의 절반을 비웠다.
    균형 격자는 칸 수와 너비를 함께 보고 한 줄에 다 들어가면 한 줄, 아니면 4+3·3+2처럼 고르게 나눈다. */
-.lz-steps{--bal-min:124px}
+.lz-steps{--bal-min:124px;--bal-last:spread}
 .rd-wk-grid{--bal-min:220px;--bal-maxw:480px}
 .vz-cards{--bal-min:150px}
 .vz-cmp{--bal-min:200px}
@@ -84,6 +85,8 @@ export const GRID_CSS = `
 .at-settings,.qt-settings,.ax-presets{--bal-last:start}
 [data-bal="on"]{grid-template-columns:repeat(var(--bal-cols),minmax(0,1fr))!important}
 [data-bal="on"] > [data-bal-fill="fill"]{grid-column:1/-1}
+[data-bal="on"][data-bal-sub] > *{grid-column:span var(--bal-span)}
+[data-bal="on"][data-bal-sub] > [data-bal-fill="spread"]{grid-column:span var(--bal-span-last)}
 [data-bal="on"] > [data-bal-fill="center"]{grid-column:1/-1;justify-self:center;width:calc((100% - (var(--bal-cols) - 1) * var(--bal-gap)) / var(--bal-cols))}
 
 /* 버튼 묶음: 한 줄에 다 들어가면 그대로 두고, 줄이 바뀔 때만 같은 너비 버튼의 균형 격자로 바꾼다
@@ -99,8 +102,9 @@ export const GRID_CSS = `
 
 /* ---------- 가로 띠: 썸네일이 띠 끝에서 잘리지 않게 정수 개로 나눈다 ----------
    --strip-min: 썸네일 최소 너비. 넘치는 쪽 끝은 흐리게 해서 더 있다는 것을 보인다. */
-.lz-strip{--strip-min:96px}
-.iaid-row{--strip-min:132px}
+.lz-strip{--strip-min:96px;--strip-max:200px;--strip-wide:1}
+.lz-strip[data-strip~="wide"] .lz-strip-i :is(img,.lz-strip-ph){aspect-ratio:auto;height:var(--strip-max);object-fit:contain}
+.iaid-row{--strip-min:132px;--strip-max:240px}
 [data-strip] > *{flex:0 0 var(--strip-w)!important;width:var(--strip-w)!important;min-width:0}
 [data-strip~="r"]{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 36px),transparent)}
 [data-strip~="l"]{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 36px),transparent)}
@@ -146,10 +150,23 @@ function balance(el) {
   const fit = Math.max(1, Math.min(maxC, Math.floor((W + gap) / (min + gap))));
   const n = kids.length;
   const cols = pickCols(n, fit, maxw, W, gap);
+  const last = (cs.getPropertyValue("--bal-last") || "fill").trim();
+  const r = n % cols;
+  // spread: 열 수와 마지막 줄 칸 수의 최소공배수로 잘게 나눈 격자에서 위 줄은 L/cols, 마지막 줄은 L/r칸씩 차지한다
+  if (last === "spread" && cols > 1 && n > cols && r > 0) {
+    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+    const L = (cols * r) / gcd(cols, r);
+    setCols(el, L, gap);
+    el.style.setProperty("--bal-span", String(L / cols));
+    el.style.setProperty("--bal-span-last", String(L / r));
+    if (!el.hasAttribute("data-bal-sub")) el.setAttribute("data-bal-sub", "");
+    kids.slice(n - r).forEach((c) => c.setAttribute("data-bal-fill", "spread"));
+    return;
+  }
+  if (el.hasAttribute("data-bal-sub")) el.removeAttribute("data-bal-sub");
   setCols(el, cols, gap);
   // 그래도 마지막 줄에 한 칸만 남으면(3칸·2열, 7칸·3열) --bal-last에 따라 줄 전체를 쓰거나 가운데에 둔다
-  const last = (cs.getPropertyValue("--bal-last") || "fill").trim();
-  if (cols > 1 && n > cols && n % cols === 1 && last !== "start") kids[n - 1].setAttribute("data-bal-fill", last);
+  if (last !== "spread" && cols > 1 && n > cols && n % cols === 1 && last !== "start") kids[n - 1].setAttribute("data-bal-fill", last);
 }
 
 function setCols(el, cols, gap) {
@@ -186,11 +203,19 @@ function strip(el) {
   const x = (W + gap) / (min + gap);
   let k = Math.max(1, Math.round(x));
   if ((W - (k - 1) * gap) / k < min * 0.8) k = Math.max(1, Math.floor(x));
-  const w = Math.floor(((W - (k - 1) * gap) / k) * 10) / 10 + "px";
+  // 썸네일이 모두 한 줄에 들어가면 개수로 나눠 줄을 채운다(오른쪽 빈칸 방지). 너무 커지지 않게 --strip-max에서 멈춘다
+  const n = el.children.length;
+  if (n > 0 && n <= k) k = n;
+  const max = num(cs, "--strip-max", 0);
+  let wv = (W - (k - 1) * gap) / k;
+  // 몇 개 안 되어 상한을 넘을 때: --strip-wide가 있으면 칸은 줄을 채우고 도판만 상한 높이 안에 자르지 않고 담는다(wide), 없으면 상한에서 멈춘다
+  let wide = false;
+  if (n <= k && max > 0 && wv > max) { if (num(cs, "--strip-wide", 0)) wide = true; else wv = max; }
+  const w = Math.floor(wv * 10) / 10 + "px";
   if (el.style.getPropertyValue("--strip-w") !== w) el.style.setProperty("--strip-w", w);
   // 스크롤 위치에 따라 넘치는 쪽 끝을 흐리게
   const more = (el.scrollLeft > 2 ? "l " : "") + (el.scrollLeft + el.clientWidth < el.scrollWidth - 2 ? "r" : "");
-  const v = ("on " + more).trim();
+  const v = ("on " + (wide ? "wide " : "") + more).trim();
   if (el.getAttribute("data-strip") !== v) el.setAttribute("data-strip", v);
 }
 

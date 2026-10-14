@@ -33,7 +33,7 @@ export const UX_CSS = `
 .stmt-tpl small,.stmt-vers .v .n,.conc-chip,.pc-tag,.pc-from,.risk-echo b,.obs-echo b,
 .inq-acc,.inq-tv b,.as-work-h,.as-lab,.as-plate-hidden,.as-tag,
 .qz-item-n,.qz-cover-k,.qz-path-k,.qz-tag,.st-sec-n,.an-plate-hidden,
-.lz-notice-tag,.lz-asks-h,.ed-qtype,.exs .exs-head .exs-acc,.exs .exs-meta{font-family:var(--sans);letter-spacing:0}
+.lz-notice-tag,.lz-asks-h,.ed-qtype,.exs .exs-head .exs-acc,.exs .exs-meta,.todo-head,.todo-n{font-family:var(--sans);letter-spacing:0}
 .card-sess,.q-type,.prev-l,.think-steps .ts-t,.pair-dim,.pair-where,.std-chip,.works-tbl caption,
 .ld-step .k,.carry b,.hw-chip,.stmt-tpl small,.stmt-vers .v .n,.conc-chip,.pc-tag,.risk-echo b,.obs-echo b{font-size:11px}
 .card-code,.lesson-n,.pair-dim,.carry b,.q-type,.prev-l,.think-steps .ts-t,.risk-echo b,.obs-echo b,

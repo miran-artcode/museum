@@ -987,7 +987,7 @@ html[data-ax-spacing] body :is(p,li,dd,dt,td,th,label,summary,.hint,.card-note,.
 html[data-ax-spacing] body p{margin-bottom:1.1em}
 
 /* ---------- 고대비: 흰 바탕에 검은 글자, 회색 글자를 짙게, 선을 굵게 ---------- */
-html[data-ax-contrast="high"]{--ink:#000;--sub:#2b2b2b;--line:#4a4a4a;--line2:#6a6a6a;--seal:#8e1b10;--patina:#1d4a35;--amber:#4d3a14;--card2:#f2f2f2}
+html[data-ax-contrast="high"]{--ink:#000;--sub:#2b2b2b;--line:#4a4a4a;--line2:#6a6a6a;--seal:#2E3A66;--patina:#1d4a35;--amber:#4d3a14;--card2:#f2f2f2}
 html[data-ax-contrast="high"] body{color:#000}
 html[data-ax-contrast="high"] :is(.card,.lesson,.btn,.field input,.field textarea,.field select,.sess-tab,.reading){border-color:#000!important}
 html[data-ax-contrast="high"] ::placeholder{color:#4a4a4a;opacity:1}

@@ -761,7 +761,7 @@ const AR_CSS = `
 .arq-no{font-family:'Archivo','Noto Sans KR',sans-serif;font-weight:900;font-size:20px;color:#111}
 .arq-title{font-size:11px;color:#666;margin-top:2px}
 .arq-how{font-size:11.5px;color:#111;margin-top:6px;line-height:1.5}
-.arq-notice{font-size:10.5px;color:#B5382A;margin-top:5px}
+.arq-notice{font-size:10.5px;color:var(--seal);margin-top:5px}
 .arq-print-root{display:none}
 @media print{
   body.arx-printing > *:not(.arq-print-root){display:none!important}

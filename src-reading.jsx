@@ -742,7 +742,7 @@ export const READING_CSS = `
 .rd-key{clear:both;display:flex;gap:14px;align-items:flex-start;background:var(--ink);color:#fff;padding:16px 18px;margin:22px 0;max-width:46em}
 .rd-key-t{flex:0 0 auto;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,.7);padding:2px 7px;margin-top:3px}
 .rd-key p{margin:0;font-size:15.5px;line-height:1.8;font-weight:500;word-break:keep-all}
-.rd-key .rd-em{color:#fff;background:linear-gradient(transparent 62%,rgba(181,56,42,.85) 62%)}
+.rd-key .rd-em{color:#fff;background:linear-gradient(transparent 62%,rgba(132,145,183,.9) 62%)}
 .rd-key .rd-a{color:#fff}
 .rd-lw{max-width:46em;margin:0 0 16px}
 .rd-lw .rd-p{margin-bottom:8px}
@@ -780,7 +780,7 @@ export const READING_CSS = `
 .rd-fig-d.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .rd-fig-m{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 10px;margin-top:5px;font-size:11px;line-height:1.5}
 .rd-fig-cr{color:#8a8a8a}
-.rd-fig-m a{color:var(--seal);text-decoration:none;border-bottom:1px solid rgba(181,56,42,.4);white-space:nowrap}
+.rd-fig-m a{color:var(--seal);text-decoration:none;border-bottom:1px solid rgba(86,102,154,.4);white-space:nowrap}
 .rd-fig-m a:hover{border-bottom-color:var(--seal)}
 .rd-figs.c4 .rd-fig-cr,.rd-figs.c3 .rd-fig-cr{display:block;width:100%}
 @media(min-width:760px){
@@ -807,7 +807,7 @@ export const READING_CSS = `
 .rd-box-cap b{display:block;font-size:14.5px;color:#fff;margin-bottom:4px}
 .rd-box-cap p{margin:0 0 6px;color:#d6d6d6}
 .rd-box-cap .rd-fig-cr{color:#aaa}
-.rd-box-cap .rd-fig-m a{color:#ffb4a8;border-bottom-color:rgba(255,180,168,.5)}
+.rd-box-cap .rd-fig-m a{color:#C3CBE3;border-bottom-color:rgba(195,203,227,.5)}
 
 /* 도식 공통 */
 .vz{clear:both;margin:24px 0 28px;border:1px solid var(--line);background:#fff;padding:16px 18px 18px}
