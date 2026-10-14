@@ -560,3 +560,26 @@ npm test    # src-guard-core.test.mjs(설정 기본값·변경 기록·캡처 �
 **교사 화면.** 학생 상세에서 세 회차·돌아보기·다듬기 과정·수정 기록(개입 정도와 판정 포함)을 보고, 회차마다 관찰의 구체성·판단의 근거·다음 수정과의 연결(각 0~2점)과 결정의 출처(0~2점)를 매깁니다. 점수는 채점 문서(`grades/{학번}`의 `folio`)에 기존 채점과 함께 저장됩니다. 이미지 완성도와 학생의 자기 평점은 점수에 넣지 않습니다. 예상을 이미지보다 먼저 썼는지, 바뀐 줄 수, 다음 수정이 다음 회차의 노린 것으로 이어졌는지, 원인을 줄 번호로 짚었는지, 「도움 보기」를 연 횟수는 참고 지표로만 보입니다.
 
 **파일과 시험.** `src-portfolio.jsx`(카드·교사 화면), `src-folio-ui.jsx`(공용 부품), `src-portfolio-core.mjs`(기록 계산), `src-folio-schema.mjs`(키·상한·기능 켜고 끄기 `FEATURES`), `src-portfolio-text.mjs`·`src-photo-text.mjs`(화면 문구), `src-photo.jsx`·`src-photo-panels.jsx`(편집기 화면), `src-photo-doc.mjs`(레이어 문서·작업 내역), `src-photo-render.mjs`(합성), `src-photo-px.mjs`(픽셀 계산), `src-photo-brush.mjs`(붓), `src-photo-marks.mjs`(표식), `src-photo-io.mjs`(저장·업로드·임시 보관). `npm test`에 단위 시험 다섯 파일이 들어 있고, 화면 시험 도구는 `.tmpbuild/folio-harness/`(카드·다듬기·저장)와 `.tmpbuild/folio-harness-d/`(편집기)에 있습니다(공개 저장소에는 없음).
+
+
+## 19. PhotoCraft로 다듬기: Photoshop식 편집기
+
+6차시 「다듬기 기록」(기록 M, `s6a`) 첫머리의 「PhotoCraft로 다듬기」 칸(`s6a.pc`)에서 학생이 고른 이미지를 [PhotoCraft](https://github.com/storytold/photocraft)(Photoshop을 Rust로 다시 만든 오픈 소스 편집기, MIT/Apache-2.0) 웹판으로 열어 다듬고, 결과를 기록지에 저장합니다.
+
+- **불러올 작품**: 6차시 포트폴리오의 회차 이미지, 이미지 다듬기 결과, 「다듬기 전·후 화면」, 5차시 생성 회차 결과, 4차시 디지털 에스키스와 에스키스 사진. 처음에는 3회차에서 고른 이미지가 선택되어 있습니다. PhotoCraft의 File › Open으로 기기의 파일도 열 수 있습니다.
+- **편집 기능**: 레이어·마스크·조정 레이어(레벨·곡선·색조/채도·색상 균형 등 16종), 필터, 선택 도구, 복구 브러시·도장·닷지/번, 글자, 작업 내역 등 PhotoCraft 기능을 그대로 씁니다. 창 오른쪽 「안내」에는 다듬기에서 고칠 것(6차시 3회차 「다듬기에서 고칠 방법」, 5차시 이중 점검표의 불성립 항목, 다듬기 기록 글)과 메뉴 찾기 표가 있습니다.
+- **저장**: 「기록지에 저장」을 누르면 PhotoCraft의 빠른 내보내기(PNG)를 불러 현재 화면을 받고, 사진 규정(`photo`, 긴 변 1600px)대로 줄여 「다듬기 후 화면」(`s6a.afterImg`)에 넣습니다. 「다듬기 전 화면」이 비어 있으면 고른 원본도 넣습니다. 학생이 메뉴에서 PNG·JPG로 내보내도 같은 길로 저장됩니다. `.pcraft`·`.psd` 같은 작업 파일은 기기에 내려받기만 하고 기록지에는 넣지 않습니다(레이어는 서버에 보관되지 않습니다). `s6a.pc`에는 고른 이미지, 저장 횟수, 마지막 시각만 남깁니다.
+- **화면 언어**: PhotoCraft 웹판 0.8.2는 메뉴 글자에 한글 글꼴을 쓰지 못해 메뉴를 영어로 고정했습니다. 함께 올리는 나눔고딕(OFL)은 글자 레이어의 한글에 쓰입니다.
+- **기기 조건**: WebGPU 또는 WebGL2가 필요하고, 처음 열 때 약 10 MB(압축 기준)를 받습니다. 크롬북·iPad 실기기 성능은 아직 확인하지 않았습니다.
+
+**파일과 설치**
+
+| 파일 | 역할 |
+|---|---|
+| `src-pc.jsx` | 칸(`PcPad`), 전체 화면 창, 읽기 화면(`PcRead`), 불러올 이미지 목록(`pcSources`), 고칠 것(`pcPlan`) |
+| `src-pc-bridge.js` | PhotoCraft 페이지 안에서 wasm보다 먼저 실행: 부모 창이 보낸 이미지를 캔버스에 끌어다 놓은 것처럼 열고, 이미지 내보내기를 부모에게 넘기고, 영어 화면과 저장 단축키를 환경설정에 넣는다 |
+| `scripts/photocraft-fetch.mjs` | `npm run build` 마지막 단계. 고정 버전의 릴리스 zip과 나눔고딕을 받아 SHA-256을 확인하고 `node_modules/.cache/photocraft/`에 보관한 뒤 `public/photocraft/`에 푼다 |
+
+`public/photocraft/`(wasm 24 MB)는 gitignore 대상이라 저장소에 없습니다. `git archive HEAD`로 푼 배포용 트리에서도 `npm run build`가 다시 만듭니다(인터넷 연결 필요, 캐시가 있으면 내려받지 않음). PhotoCraft 버전을 올릴 때는 `photocraft-fetch.mjs`의 `PC_VERSION`과 SHA-256(릴리스의 `SHA256SUMS.txt`)을 바꾸고 화면 시험을 다시 돌립니다. 보고 전용 CSP(`Content-Security-Policy-Report-Only`)는 PhotoCraft의 인라인 모듈 스크립트와 wasm 컴파일을 보고하므로, CSP를 강제로 바꿀 때는 `/photocraft/**`에 `'wasm-unsafe-eval'`과 해당 인라인 스크립트를 허용해야 합니다.
+
+화면 시험: `.tmpbuild/pc-harness/`(`run1.mjs`는 PhotoCraft 단독 연결, `app/build.mjs` 뒤 `run-app.mjs`는 대역 DB의 학생 화면에서 고르기·열기·저장·닫기, `W=1024 H=768`로 크기 지정).

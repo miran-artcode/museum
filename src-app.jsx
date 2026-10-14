@@ -41,6 +41,7 @@ import { A11yStyle, A11yRuntime } from "./src-access-a11y.jsx";
 import { supportCsv, SUPPORT_CODEBOOK } from "./src-access-core.mjs";
 import { SketchPad, SketchRead, SketchStyle, sketchDirty } from "./src-sketch.jsx";
 import { FolioPad, FolioRead, PortfolioStyle, folioDirty, folioGate, folioProgress, folioUnits } from "./src-portfolio.jsx";
+import { PcPad, PcRead } from "./src-pc.jsx";
 import {
   ATTITUDES, ATTITUDE_HINTS, LADDER_INTRO, TRANSLATE_STAGES, REFLECT_KEYS, DERIVE_KEYS,
   LEGACY_BACK, normBack, backLabel, SYMBOL_WORDS, findSymbol, SCHEMA_REV, REV_SECTIONS,
@@ -580,6 +581,7 @@ const SCHEMA_DEF = [
       { k: "partial", t: "text", label: "부분 수정 (부위·방법)" },
       { k: "edit", t: "text", label: "화면 편집 (자르기·밝기·톤)" },
       { k: "diff", t: "area", label: "수정 전후의 차이와 이유" },
+      { k: "pc", t: "photocraft", opt: true, label: "PhotoCraft로 다듬기" },
       { k: "beforeImg", t: "image", opt: true, label: "다듬기 전 화면", mm: true },
       { k: "afterImg", t: "image", opt: true, label: "다듬기 후 화면", mm: true },
     ],
@@ -2156,7 +2158,7 @@ function fieldUnits(f, v) {
     }); break;
     case "cards": push("고른 것", cardLabel(f.src, v)); break;
     case "folio": folioUnits(f, v).forEach((u) => push(u.sub, u.text)); break;
-    case "image": case "images": case "audio": case "video": case "sketch": case "links": break;
+    case "image": case "images": case "audio": case "video": case "sketch": case "links": case "photocraft": break;
     default: push("", typeof v === "string" ? v : ""); break;
   }
   return out;
@@ -3889,6 +3891,8 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
     );
   }
   if (f.t === "folio") return <FolioField f={f} fieldKey={key} v={v} setField={setField} ws={ws} />;
+  if (f.t === "photocraft") return <PcPad f={f} fieldKey={key} v={v} setField={setField} ws={ws} owner={OWNER} store={mediaStore} MediaThumb={MediaThumb}
+    prepareImage={prepareImage} imgPresetOf={imgPresetOf} imgErrText={imgErrText} inspectItems={INSPECT_ITEMS} />;
   if (f.t === "audio") {
     return <AudioField f={f} fieldKey={key} v={v} setField={setField} />;
   }
@@ -4121,6 +4125,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
 /* ---------- 읽기 전용 렌더러 (교사 열람용) ---------- */
 
 function FieldReader({ sec, f, ws, owner, grade, onGrade, onGradeSave }) {
+  if (f.t === "photocraft") return <PcRead f={f} v={(ws || {})[fkey(sec, f)]} />;
   if (f.t === "folio") return <FolioRead f={f} ws={ws || {}} owner={owner || OWNER} store={mediaStore} MediaThumb={MediaThumb} fmtTime={fmtTime} inspectItems={INSPECT_ITEMS} grade={grade || null} onGrade={onGrade || null} onGradeSave={onGradeSave || null} />;
   const key = fkey(sec, f);
   const v = ws[key];

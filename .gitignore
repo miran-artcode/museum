@@ -13,3 +13,6 @@ quiz-bank/bank.json
 quiz-bank/items/
 public/quiz-bank/
 .backup/
+
+# PhotoCraft 웹판(wasm 24 MB)은 저장소에 넣지 않는다. npm run build가 scripts/photocraft-fetch.mjs로 고정 버전을 받아 푼다
+public/photocraft/
