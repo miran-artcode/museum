@@ -723,8 +723,8 @@ export const READING_CSS = `
 @media(max-width:560px){.rd-sum .rd-sum-x img:nth-child(n+2){display:none}
   .reading.rd-card>summary.rd-sum{flex-wrap:wrap;row-gap:6px}.rd-sum .rd-sum-t{order:5;flex-basis:100%}.rd-sum .rd-sum-x{margin-left:auto}}
 
-/* 본문 */
-.rd{padding:20px 22px 22px;color:#1f1f1f;min-width:0;overflow-wrap:break-word}
+/* 본문: 문단은 46em(690px)에서 끊기므로, 카드가 그보다 넓으면 왼쪽에 몰리고 오른쪽이 빈다. 좌우 여백을 늘려 읽기 단을 카드 가운데 둔다 */
+.rd{padding:20px max(22px,calc((100% - 690px) / 2)) 22px;color:#1f1f1f;min-width:0;overflow-wrap:break-word}
 .rd img{max-width:100%}
 .rd::after{content:"";display:block;clear:both}
 .rd .rd-p{font-size:15px;line-height:1.9;margin:0 0 15px;max-width:46em;word-break:keep-all;overflow-wrap:break-word;text-align:left}
