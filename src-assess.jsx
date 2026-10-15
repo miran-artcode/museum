@@ -132,7 +132,7 @@ export function waitNote({ stage, roster, pairs, s2Done, noWork }) {
    탭 본체 — 구독·단계 결정·진행 띠
    ============================================================ */
 
-export function AssessTab({ me, ws, cfgAll, sampleMode }) {
+export function AssessTab({ me, ws, cfgAll, sampleMode, onGoTab }) {
   const sid = me && me.sid ? String(me.sid) : "";
   const cfg = peerCfg(cfgAll);
   const stage = cfg.stage;
@@ -237,7 +237,7 @@ export function AssessTab({ me, ws, cfgAll, sampleMode }) {
       </div></div>
     );
   } else if (cur === "submit" || (stage === "submit" && subDone)) {
-    screen = <SubmitScreen sid={sid} ws={ws} sub={sub} roster={roster} stage={stage} sampleMode={sampleMode} onSkip={() => setSkipSub(true)} />;
+    screen = <SubmitScreen sid={sid} ws={ws} sub={sub} roster={roster} stage={stage} sampleMode={sampleMode} onSkip={() => setSkipSub(true)} onGoTab={onGoTab} />;
   } else if (cur === "self1") {
     screen = <SelfScreen key="s1" sid={sid} phase="s1" block={self.s1} prev={null} n={n} sub={sub} subFail={!!subFail} reloadSubs={reloadSubs} sampleMode={sampleMode} />;
   } else if (cur === "peer") {
@@ -284,7 +284,7 @@ export function StepStrip({ cur, done, avail, noWork }) {
    1. 제출 — 기록지의 초안을 확인·수정하고 확정한다
    ============================================================ */
 
-export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }) {
+export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip, onGoTab }) {
   const draft = useMemo(() => { try { return submissionFromWs(ws || {}, sid) || {}; } catch (e) { return {}; } }, [ws, sid]);
   const [d, setD] = useState(() => ({ no: draft.no || "", title: draft.title || "", plate: { ...(draft.plate || {}) }, note: draft.note || "" }));
   const [img, setImg] = useState(undefined);   // undefined 읽는 중 · null 없음/실패 · 문자열 dataURL
@@ -385,7 +385,10 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
               {img ? <img src={img} alt={"내 작품 「" + (d.title || "무제") + "」"} /> : <span className="ph">{img === undefined ? "불러오는 중…" : "이미지 없음"}</span>}
             </div>
             {img === null && (
-              <div className="warn-note" style={{ marginTop: 8 }}>대표 이미지를 아직 올리지 않았거나 불러오지 못했습니다. 7차시 「전시 출품」에서 대표 이미지를 먼저 올려 주세요.</div>
+              <div className="warn-note" style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ flex: 1, minWidth: 200 }}>대표 이미지가 없어 아직 제출할 수 없습니다. 7차시 「전시 출품」에서 대표 이미지를 올린 뒤 이 화면으로 돌아오세요.</span>
+                {onGoTab && <button type="button" className="btn small ghost" onClick={() => onGoTab("7차시")}>7차시로 이동</button>}
+              </div>
             )}
           </div>
           <div className="as-grid2">
@@ -410,7 +413,7 @@ export function SubmitScreen({ sid, ws, sub, roster, stage, sampleMode, onSkip }
         </div>
         {warn && <div className="warn-note" role="alert">{warn}</div>}
         <div className="sv-foot">
-          <ConfirmButton className="btn" disabled={busy || sampleMode} precheck={submitCheck} onConfirm={submit} yes="확정"
+          <ConfirmButton className="btn" disabled={busy || sampleMode || img === null} precheck={submitCheck} onConfirm={submit} yes="확정"
             ask="제출을 확정하면 이 내용이 그대로 고정되어 2학년 전체 비교 대상이 됩니다. 고치려면 선생님께 해제를 요청해야 합니다. 지금 확정할까요?"
             label={busy ? "저장 중…" : "제출 확정"} />
           {canSkip && <button type="button" className="btn ghost" disabled={busy || sampleMode} onClick={onSkip}>제출하지 않고 다음 단계로</button>}
@@ -653,7 +656,7 @@ export function SelfScreen({ sid, phase, block, prev, n, sub, subFail, reloadSub
               )}
               {warn && <div className="warn-note" role="alert">{warn}</div>}
               <div className="sv-foot">
-                <button className="btn" disabled={busy || sampleMode} onClick={submit2}>{busy ? "저장 중…" : "제출"}</button>
+                <ConfirmButton className="btn" disabled={busy || sampleMode} onConfirm={submit2} yes="제출" label={busy ? "저장 중…" : "자기평가 ② 제출"} ask="제출하면 고칠 수 없습니다. 지금 제출할까요?" />
                 <span className="hint">제출하면 고칠 수 없습니다.</span>
               </div>
             </div>

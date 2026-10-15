@@ -421,7 +421,7 @@ export function AssessPanel({ ids, roster, wsMap, cfgAll, sampleMode, onSaveCfg,
       {/* ---------------- 카드 1 · 단계 ---------------- */}
       <div className="card at-card">
         <div className="card-head"><span className="card-code">상호평가 1</span><span className="card-title">단계: 2학년 다섯 반을 한 스위치로</span>
-          <span className="card-sess">{cfg.stage}</span></div>
+          <span className="card-sess">{(STAGES.find((s) => s.k === cfg.stage) || {}).label || cfg.stage}</span></div>
         <div className="card-note">
           단계는 2학년 다섯 반 전체에 한꺼번에 적용됩니다. 한 반 수업에서 연 단계는 다른 반 학생에게도 열리므로, 수업이 끝나면 「닫힘」으로 돌려 두고 다음 반 수업에서 다시 여세요. 앞 단계로 되돌리는 것도 막지 않지만, 학생이 이미 확정한 제출·판정은 되돌아가지 않습니다.
         </div>
