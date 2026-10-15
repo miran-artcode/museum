@@ -597,7 +597,7 @@ export function ReadingCard({ rd, i, count, L, seen, onToggle, extra }) {
         {(thumbs.length > 0 || nViz > 0) && (
           <span className="rd-sum-x" aria-hidden="true">
             {thumbs.map((x, k) => <SumThumb key={k} src={x.src} />)}
-            {nViz > 0 && <span className="rd-sum-v">도식 {nViz}</span>}
+            {nViz > 0 && <span className="rd-sum-v">그림 {nViz}</span>}
           </span>
         )}
         {seen && <span className="rd-seen" aria-label="펼쳐 본 자료">✓</span>}
@@ -614,7 +614,7 @@ function StripThumb({ it, onClick }) {
   const { title } = capParts(it.img.cap);
   const label = nameOf(it.img.cap) ? "「" + nameOf(it.img.cap) + "」" : (title || "").slice(0, 18);
   return (
-    <button type="button" className="lz-strip-i" onClick={onClick} title={title}>
+    <button type="button" className="lz-strip-i" onClick={onClick} title={title} aria-label={label || title || "작품 보기"}>
       {url ? <img src={url} alt="" loading="lazy" /> : <span className="lz-strip-ph" />}
       <span>{label}</span>
     </button>

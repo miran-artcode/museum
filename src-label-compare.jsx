@@ -110,7 +110,7 @@ export function LabelCompare({ compact }) {
 }
       `}</style>
       <div className="lcmp-head">
-        <span className="lcmp-acc">LABEL A / LABEL B</span>
+        <span className="lcmp-acc">캡션 A · 캡션 B</span>
         <h4>자료: 작품 캡션 두 장 비교</h4>
         <button type="button" className="lcmp-fold" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? "접기" : "펼치기"}

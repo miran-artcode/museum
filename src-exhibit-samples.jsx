@@ -174,7 +174,7 @@ function SampleImg({ id, alt }) {
 
 /* ---------- 전시장 예시 벽면 ---------- */
 
-export function ExhibitSamples({ showPlate }) {
+export function ExhibitSamples({ showPlate, tail = true }) {
   return (
     <div className="exs">
       <style>{`
@@ -197,14 +197,12 @@ export function ExhibitSamples({ showPlate }) {
         <img src="/img/examples/exhibit-wall.jpg" alt="교실 벽면에 유물 기록 사진 세 점이 검은 액자에 걸려 있고, 각 액자 아래에 작은 작품 캡션이 붙어 있는 전시 진열 예시" />
         <figcaption>
           <b>전시 진열 예시</b> · 유물 기록 사진과 작품 캡션, 허구 고지를 함께 진열하는 형식입니다.
-          생성형 AI로 제작한 예시 이미지이며, 실제 학생 작품이 아닙니다.
         </figcaption>
       </figure>
       <div className="exs-head">
-        <div className="exs-acc">SPECIMEN WORKS · 예시 작품 자료집</div>
+        <div className="exs-acc">예시 작품 자료집</div>
         <h2>예시 작품 세 점</h2>
         <p>
-          아래 세 점은 예시 작품 자료집에 수록된 가상의 예시이며, 실제 학생 작품이 아닙니다.
           예시는 완성작의 한 가지 모습일 뿐, 같은 문제라도 다른 사물과 다른 태도로 풀 수 있습니다.
           관람 방식은 학생 작품과 같습니다. 1차에는 작품 캡션을 가리고 보고, 2차에는 작품 캡션을 펼쳐 봅니다.
         </p>
@@ -240,7 +238,7 @@ export function ExhibitSamples({ showPlate }) {
           </div>
         ))}
       </div>
-      <div className="exs-tail">여기부터는 학급의 출품작이 걸립니다.</div>
+      {tail && <div className="exs-tail">여기부터는 학급의 출품작이 걸립니다.</div>}
     </div>
   );
 }

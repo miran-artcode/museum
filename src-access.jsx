@@ -952,7 +952,7 @@ export function GateLangHelp() {
   return (
     <div className="ax-gate" translate="no">
       <div className="ax-gate-langs" role="group" aria-label="Language · 언어">
-        <span className="ax-gate-l">Language</span>
+        <span className="ax-gate-l">언어 · Language</span>
         {Object.keys(GATE_HELP).map((c) => (
           <button type="button" key={c} lang={langOf(c).bcp} aria-pressed={code === c} className={code === c ? "on" : ""}
             onClick={() => { const next = code === c ? "" : c; setCode(next); gateLang.save(next); }}>

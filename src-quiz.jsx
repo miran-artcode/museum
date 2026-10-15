@@ -1232,9 +1232,12 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
     );
   } else if (!got) {
     screen = (
-      <div className="card qz-card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
-        응시 기록을 불러오는 중… 잠시만 기다려 주세요.
-        {slow && <div className="warn-note" style={{ marginTop: 10 }}>연결이 느립니다. 인터넷 연결을 확인해 주세요. 연결되면 자동으로 이어집니다.</div>}
+      <div className="card qz-card"><div className="card-body" role="status" aria-live="polite" style={{ color: "var(--sub)", fontSize: 14 }}>
+        <span className="ld-spin" aria-hidden="true" />응시 기록을 불러오는 중입니다. 보통 몇 초 걸립니다.
+        {slow && <div className="warn-note" style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ flex: 1, minWidth: 200 }}>연결이 느립니다. 인터넷 연결을 확인해 주세요. 연결되면 자동으로 이어집니다.</span>
+          <button type="button" className="btn small ghost" onClick={() => window.location.reload()}>다시 불러오기</button>
+        </div>}
       </div></div>
     );
   } else if (lv && (lv.status === "done" || lv.finishedAt)) {
@@ -1282,7 +1285,7 @@ export function QuizTab({ me, cfgAll, sampleMode }) {
             {bank && !bankOk && <div className="warn-note">문항 은행이 준비되지 않았습니다. 선생님께 알려 주세요.</div>}
             {!canStart && <div className="warn-note" role="alert">시작 마감이 지나 새로 시작할 수 없습니다. 선생님께 알려 주세요.</div>}
             {err && <div className="warn-note" role="alert">{err}</div>}
-            <p style={{ fontSize: 13, lineHeight: 1.6 }}>누르면 전체화면으로 바뀌고 40분 타이머가 시작됩니다. 준비가 되었을 때 누르세요. 시작한 뒤에는 처음부터 다시 할 수 없습니다.</p>
+            <p style={{ fontSize: 13, lineHeight: 1.6 }}>누르면 전체화면으로 바뀌고 {Math.round((Number(cfg.durationSec) || 2400) / 60)}분 타이머가 시작됩니다. 준비가 되었을 때 누르세요. 시작한 뒤에는 처음부터 다시 할 수 없습니다.</p>
             <button type="button" className="btn qz-big" disabled={busy || !bankOk || !canStart} onClick={() => openSession(true)}>{busy ? "시작하는 중…" : "시험 시작"}</button>
           </div>
         </div>

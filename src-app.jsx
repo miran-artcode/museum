@@ -21,6 +21,7 @@ import { ThemeStyle } from "./src-theme.jsx";
 import { UxStyle, ConfirmButton, session, TeacherTabs, VIEWER_TABS, TEACHER_TAB_GROUPS } from "./src-ux.jsx";
 import { GridStyle, GridRuntime } from "./src-grid.jsx";
 import { NavStyle, NavRuntime, StudentSideNav, TeacherSideNav } from "./src-nav.jsx";
+import { PolishStyle } from "./src-polish.jsx";
 import { ExhibitSamples, EXHIBIT_SAMPLES } from "./src-exhibit-samples.jsx";
 import { useExhibitPublisher, useExhibits, exhibitOf } from "./src-exhibit.jsx";
 import { ArExpoEntry, ArDeepLink, ArStyle } from "./src-ar.jsx";
@@ -2874,7 +2875,7 @@ function SessionDot({ ratio }) {
 }
 
 
-function LessonPanel({ L, teacher, onReading }) {
+function LessonPanel({ L, teacher, onReading, readOnly }) {
   const total = L.flow.reduce((a, r) => a + r[1], 0);
   const [seen, setSeen] = useState({}); // 한 번이라도 펼쳐 본 읽기 자료 — 어디까지 읽었는지 표시
   const bodyRef = useRef(null);
@@ -2892,7 +2893,7 @@ function LessonPanel({ L, teacher, onReading }) {
       <div className="lesson-head">
         <span className="lesson-n">{L.n}차시 {teacher ? "수업 안내" : "강의 노트"}</span>
         <span className="lesson-title" role="heading" aria-level="2">{L.title}</span>
-        {teacher && <span className="lesson-min">{total}MIN</span>}
+        {teacher && <span className="lesson-min">{total}분</span>}
       </div>
       <div className="lesson-body" ref={bodyRef}>
         <LessonNotice text={L.notice} />
@@ -2965,8 +2966,8 @@ function LessonPanel({ L, teacher, onReading }) {
       </div>
       {!teacher && <AccessMemo L={L} />}
       {!teacher && <div className="lesson-guide">
-        <span>다 읽었으면 아래 카드에 답합니다.</span>
-        <button type="button" className="btn small ghost" onClick={() => { const el = document.getElementById("sec-l" + L.n); if (el) el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" }); }}>배움 확인 {L.n}으로 ↓</button>
+        <span>{readOnly ? "예시 답은 아래 카드에 있습니다." : "다 읽었으면 아래 카드에 답합니다."}</span>
+        <button type="button" className="btn small ghost" onClick={() => { const el = document.getElementById("sec-l" + L.n); if (el) el.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" }); }}>{readOnly ? "예시 답 보기 ↓" : "배움 확인 " + L.n + "으로 ↓"}</button>
       </div>}
       {!teacher && <GuardNotice />}
     </div>
@@ -3201,8 +3202,8 @@ function StageEcho({ sec, f, ws }) {
   const key = sec.id + "." + f.k;
 
   // 2차시: "캡션 두 장 비교"가 무엇인지 묻는 학생이 많아, 자료를 질문 바로 옆에 붙인다
-  if (key === "q2.concept") return <LabelCompare />;
-  if (key === "s12.labelCmp") return <LabelCompare compact />;
+  if (key === "q2.concept") return <LabelCompare defaultOpen={false} />;
+  if (key === "s12.labelCmp") return <LabelCompare compact defaultOpen={false} />;
 
   if (key === "s3o.methodWhy" && obs) return (
     <div className="obs-echo"><b>고른 관찰 방법: {obs.label}</b>
@@ -3422,8 +3423,8 @@ function CandsField({ f, fieldKey, v, setField, ws }) {
                 <td data-th="누가 어떻게 만지는지"><textarea aria-label={(i + 1) + "번째 후보: 누가 어떻게 만지는지"} rows={2} value={r.act || ""} maxLength={120} placeholder={CAND_PH[i][2]} onChange={(e) => up(i, "act", e.target.value)} /></td>
                 <td data-th="선택 / 제외">
                   <div className="seg" style={{ flexDirection: "column" }}>
-                    <button type="button" className={r.verdict === "고름" ? "on-ok" : ""} onClick={() => setVerdict(i, "고름")}>선택</button>
-                    <button type="button" className={r.verdict === "접음" ? "on-no" : ""} onClick={() => setVerdict(i, "접음")}>제외</button>
+                    <button type="button" aria-pressed={r.verdict === "고름"} className={r.verdict === "고름" ? "on-ok" : ""} onClick={() => setVerdict(i, "고름")}>선택</button>
+                    <button type="button" aria-pressed={r.verdict === "접음"} className={r.verdict === "접음" ? "on-no" : ""} onClick={() => setVerdict(i, "접음")}>제외</button>
                   </div>
                 </td>
               </tr>
@@ -3551,7 +3552,7 @@ function StmtField({ f, fieldKey, v, setField, ws }) {
           <span className="conc-chip">{String(cur || "").trim().length}자</span>
           <span className="conc-chip">저장한 문장 {saved.length}개</span>
           <button type="button" className="btn small" onClick={fix} disabled={!filled(cur)}>이 문장 저장하기</button>
-          <span className="hint" style={{ margin: 0, flex: "1 1 180px" }}>다 썼으면 「이 문장 저장하기」를 누릅니다. 고친 뒤에 다시 누릅니다.</span>
+          <span className="hint" style={{ margin: 0, flex: "1 1 180px" }}>쓰는 대로 저장됩니다. 고치기 전 문장을 따로 두려면 「이 문장 저장하기」를 누릅니다.</span>
         </div>
         {vers.length > 0 && (
           <div className="stmt-vers">
@@ -3737,6 +3738,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
   const v = ws[key];
   // 사진 처리 오류를 alert 대신 그 칸 안에 보여 준다 — 모바일에서 alert은 맥락을 가린다
   const [imgErr, setImgErr] = useState("");
+  const [imgBusy, setImgBusy] = useState(false);   // 사진을 줄여 저장하는 동안 버튼 글자로 상태를 보인다
   // 칸 이름표와 입력칸을 잇는다 (스크린리더가 칸 이름을 읽는다)
   const fid = React.useId();
   // 아직 올리는 중인 사진 수. 겹쳐 고른 사진까지 세어 3장 상한을 넘기지 않는다
@@ -3883,9 +3885,9 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
               </div>
             ))}
           </div>
-          {list.length < 3 && <input type="file" accept="image/*" multiple onChange={pick} style={{ fontSize: 12 }} />}
+          {list.length < 3 && <label className="btn small ghost up-btn">사진 고르기<input type="file" accept="image/*" multiple onChange={pick} aria-label={f.label + " 사진 고르기"} /></label>}
           <span className="hint">{list.length}/3장 · {imgHintText(preset)}</span>
-          {imgErr && <span className="hint" role="alert" style={{ color: "var(--seal)", flex: "1 1 100%" }}>{imgErr}</span>}
+          {imgErr && <div className="warn-note" role="alert" style={{ flex: "1 1 100%", margin: 0 }}>{imgErr}</div>}
         </div>
       </div>
     );
@@ -3914,10 +3916,11 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
       <div className="field span2">
         <label>{f.label}</label>
         {rows.map((r, i) => (
-          <div className="link-row" key={i}>
-            <input value={r.url || ""} placeholder="https:// 로 시작하는 주소" maxLength={500}
+          <div className="link-row" key={i} role="group" aria-label={"링크 " + (i + 1)}>
+            <span className="link-n" aria-hidden="true">{i + 1}</span>
+            <input value={r.url || ""} aria-label={"링크 " + (i + 1) + " 주소"} placeholder="https:// 로 시작하는 주소" maxLength={500} inputMode="url" autoComplete="off"
               onChange={(e) => up(i, "url", e.target.value)} />
-            <input value={r.memo || ""} placeholder="어떤 화면인지 한마디" maxLength={60}
+            <input value={r.memo || ""} aria-label={"링크 " + (i + 1) + " 설명"} placeholder="어떤 화면인지 한마디" maxLength={60}
               onChange={(e) => up(i, "memo", e.target.value)} />
           </div>
         ))}
@@ -3933,6 +3936,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
       e.target.value = "";
       if (!file) return;
       setImgErr("");
+      setImgBusy(true);
       try {
         const r = await prepareImage(file, preset);
         if (r.blurry && !window.confirm(BLUR_CONFIRM)) return;
@@ -3943,6 +3947,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
         // 바꿔 올리면 옛 문서는 아무도 가리키지 않으므로 지운다 (녹음·영상 칸과 같은 처리). 실패해도 새 사진에는 지장 없음
         if (cur && cur.ref) mediaStore.remove(OWNER, cur.ref);
       } catch (err) { setImgErr(imgErrText(err)); }
+      finally { setImgBusy(false); }
     };
     return (
       <div className="field">
@@ -3954,9 +3959,14 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
               <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, cur.ref); setField(key, ""); }}>지우기</button>
             </div>
           ) : <span className="hint">사진 한 장을 올립니다.</span>}
-          <input type="file" accept="image/*" onChange={pick} style={{ fontSize: 12 }} />
+          {/* 파일 입력은 버튼 모양의 라벨 안에 숨긴다. 줄여서 저장하는 동안은 버튼 글자로 상태를 보인다 */}
+          <label className={"btn small ghost up-btn" + (imgBusy ? " busy" : "")}>
+            <input type="file" accept="image/*" onChange={pick} disabled={imgBusy} aria-label={f.label + " 사진 고르기"} />
+            {imgBusy ? "사진을 줄여 저장하는 중…" : cur ? "다른 사진으로 바꾸기" : "사진 고르기"}
+          </label>
+          {imgBusy && <span className="hint" role="status" aria-live="polite">큰 사진은 10초쯤 걸립니다. 이 화면을 닫지 마세요.</span>}
           <span className="hint" style={{ flex: "1 1 100%" }}>{imgHintText(preset)}</span>
-          {imgErr && <span className="hint" role="alert" style={{ color: "var(--seal)", flex: "1 1 100%" }}>{imgErr}</span>}
+          {imgErr && <div className="warn-note" role="alert" style={{ flex: "1 1 100%", margin: 0 }}>{imgErr}</div>}
         </div>
       </div>
     );
@@ -3984,29 +3994,30 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
       <div className="tbl-scroll">
         {/* 프롬프트 전문 칸이 들어와 열이 일곱이 되었다. .tbl-scroll의 기본 최소 너비(640px)로는
             뒤쪽 열이 한 글자씩 접히므로 이 표만 따로 넓힌다 — 좁은 화면에서는 가로로 밀린다. */}
-        <table className="tbl" style={{ minWidth: 940 }}>
-          <thead><tr><th style={{ width: 40 }}>회차</th><th style={{ width: 92 }}>사용 도구</th><th style={{ minWidth: 240 }}>이번 회차에 넣은 프롬프트 전문</th><th style={{ width: 150 }}>프롬프트에서 고친 한 가지</th><th style={{ width: 70 }}>결과물 번호</th><th style={{ width: 150 }}>한 줄 판단</th><th style={{ width: 118 }}>결과 화면</th></tr></thead>
+        {/* 폰(640px 이하)에서는 .stack 규칙(src-polish.jsx)이 행을 카드로 펴고 data-th를 칸 이름으로 쓴다 */}
+        <table className="tbl stack rounds">
+          <thead><tr><th style={{ width: 40 }}>회차</th><th style={{ width: 92 }}>사용 도구</th><th style={{ minWidth: 240 }}>이번 회차에 넣은 프롬프트 전문</th><th style={{ width: 150 }}>프롬프트에서 고친 한 가지</th><th style={{ width: 84 }}>결과물 번호</th><th style={{ width: 150 }}>한 줄 판단</th><th style={{ width: 118 }}>결과 화면</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
               <tr key={i}>
                 <td className="rn">{i + 1}</td>
-                <td><input value={r.tool || ""} onChange={(e) => up(i, "tool", e.target.value)} /></td>
-                <td data-fk={key + "#prompt" + i}>
-                  <textarea rows={3} maxLength={1500} value={r.prompt || ""}
+                <td data-th="사용 도구"><input value={r.tool || ""} aria-label={i + 1 + "회차 사용 도구"} onChange={(e) => up(i, "tool", e.target.value)} /></td>
+                <td data-th="프롬프트 전문" data-fk={key + "#prompt" + i}>
+                  <textarea rows={3} maxLength={1500} value={r.prompt || ""} aria-label={i + 1 + "회차 프롬프트 전문"}
                     placeholder={i === 0 ? "도구에 넣은 문장을 그대로 붙여 넣습니다. 네 요소(무엇인가 / 어떤 상태인가 / 어떻게 놓였는가 / 어떤 사진인가)" : ""}
                     onChange={(e) => up(i, "prompt", e.target.value)} />
                 </td>
-                <td><input value={r.change || ""} onChange={(e) => up(i, "change", e.target.value)} /></td>
-                <td><input value={r.no || ""} onChange={(e) => up(i, "no", e.target.value)} /></td>
-                <td><input value={r.judge || ""} onChange={(e) => up(i, "judge", e.target.value)} /></td>
-                <td>
+                <td data-th="고친 한 가지"><input value={r.change || ""} aria-label={i + 1 + "회차 프롬프트에서 고친 한 가지"} onChange={(e) => up(i, "change", e.target.value)} /></td>
+                <td data-th="결과물 번호"><input value={r.no || ""} aria-label={i + 1 + "회차 결과물 번호"} onChange={(e) => up(i, "no", e.target.value)} /></td>
+                <td data-th="한 줄 판단"><input value={r.judge || ""} aria-label={i + 1 + "회차 한 줄 판단"} onChange={(e) => up(i, "judge", e.target.value)} /></td>
+                <td data-th="결과 화면">
                   {r.img ? (
                     <div className="mm-item">
                       <MediaThumb owner={OWNER} refId={r.img} alt={i + 1 + "회차 결과"} size={64} />
                       <button className="mm-del" onClick={async () => { if (!confirmDel()) return; await mediaStore.remove(OWNER, r.img); upLate(i, "img", ""); }}>지우기</button>
                     </div>
                   ) : (
-                    <input type="file" accept="image/*" style={{ fontSize: 11 }} onChange={async (e) => {
+                    <label className="btn small ghost up-btn">사진 고르기<input type="file" accept="image/*" aria-label={i + 1 + "회차 결과 화면 고르기"} onChange={async (e) => {
                       const file = e.target.files && e.target.files[0];
                       e.target.value = "";
                       if (!file) return;
@@ -4018,7 +4029,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
                         if (await mediaStore.putT(OWNER, ref, r.data)) upLate(i, "img", ref, { upload: true });
                         else setImgErr("사진 저장에 실패했습니다. 인터넷 연결을 확인하고 다시 올려 주세요.");
                       } catch (err) { setImgErr(imgErrText(err)); }
-                    }} />
+                    }} /></label>
                   )}
                 </td>
               </tr>
@@ -4026,7 +4037,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
           </tbody>
         </table>
         <span className="hint">결과 화면: {imgHintText(imgPresetOf(key))}</span>
-        {imgErr && <span className="hint" role="alert" style={{ color: "var(--seal)" }}>{imgErr}</span>}
+        {imgErr && <div className="warn-note" role="alert" style={{ marginTop: 8 }}>{imgErr}</div>}
       </div>
     );
   }
@@ -4035,7 +4046,7 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
     const up = (ik, k2, val) => setField(key, { ...m, [ik]: { ...(m[ik] || {}), [k2]: val } });
     return (
       <div className="tbl-scroll">
-        <table className="tbl">
+        <table className="tbl stack">
           <thead><tr><th style={{ width: 130 }}>점검 항목</th><th style={{ width: 130 }}>판정</th><th style={{ width: 120 }}>수정 방법</th><th>확인한 내용 / 안 맞는다면 그 근거</th></tr></thead>
           <tbody>
             {INSPECT_ITEMS.map((it) => {
@@ -4043,19 +4054,19 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
               return (
                 <tr key={it.k}>
                   <td>{it.label}<div className="hint">{it.hint}</div></td>
-                  <td>
-                    <div className="seg">
-                      <button className={row.status === "성립" ? "on-ok" : ""} onClick={() => up(it.k, "status", row.status === "성립" ? "" : "성립")}>맞음</button>
-                      <button className={row.status === "불성립" ? "on-no" : ""} onClick={() => up(it.k, "status", row.status === "불성립" ? "" : "불성립")}>안 맞음</button>
+                  <td data-th="판정">
+                    <div className="seg" role="group" aria-label={it.label + " 판정"}>
+                      <button type="button" aria-pressed={row.status === "성립"} className={row.status === "성립" ? "on-ok" : ""} onClick={() => up(it.k, "status", row.status === "성립" ? "" : "성립")}>맞음</button>
+                      <button type="button" aria-pressed={row.status === "불성립"} className={row.status === "불성립" ? "on-no" : ""} onClick={() => up(it.k, "status", row.status === "불성립" ? "" : "불성립")}>안 맞음</button>
                     </div>
                   </td>
-                  <td>
-                    <select value={row.fix || ""} onChange={(e) => up(it.k, "fix", e.target.value)}>
+                  <td data-th="수정 방법">
+                    <select value={row.fix || ""} aria-label={it.label + " 수정 방법"} onChange={(e) => up(it.k, "fix", e.target.value)}>
                       <option value="">-</option>
                       {FIX_OPTS.map((o) => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </td>
-                  <td><input value={row.note || ""} onChange={(e) => up(it.k, "note", e.target.value)} /></td>
+                  <td data-th="확인한 내용"><input value={row.note || ""} aria-label={it.label + " 확인한 내용"} placeholder="확인한 내용, 안 맞는다면 그 근거" onChange={(e) => up(it.k, "note", e.target.value)} /></td>
                 </tr>
               );
             })}
@@ -4074,31 +4085,31 @@ function FieldEditor({ sec, f, ws, setField, inq }) {
           const upV = (vk, k2, val) => upB(i, { views: { ...views, [vk]: { ...(views[vk] || {}), [k2]: val } } });
           return (
             <div key={i} style={{ marginBottom: 22 }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
-                <strong className="serif" style={{ fontSize: 14 }}>관람 작품 {i + 1}</strong>
-                <input style={{ width: 140, padding: "5px 8px", border: "1px solid var(--line)", fontFamily: "var(--sans)", fontSize: 13 }}
-                  placeholder="작품 번호" value={b.no || ""} onChange={(e) => upB(i, { no: e.target.value })} />
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+                <label htmlFor={"peer-no-" + i} className="serif" style={{ fontSize: 14, fontWeight: 700 }}>관람 작품 {i + 1}의 작품 번호</label>
+                <input id={"peer-no-" + i} style={{ width: 140, padding: "5px 8px", border: "1px solid var(--line)", fontFamily: "var(--sans)", fontSize: 13 }}
+                  placeholder="예: A-03" value={b.no || ""} onChange={(e) => upB(i, { no: e.target.value })} />
               </div>
               <div className="tbl-scroll">
-                <table className="tbl">
-                  <thead><tr><th style={{ width: 160 }}>평가 관점</th><th style={{ width: 110 }}>확인</th><th>메모</th><th>작가에게 줄 한 문장</th></tr></thead>
+                <table className="tbl stack">
+                  <thead><tr><th style={{ width: 160 }}>평가 관점</th><th style={{ width: 110 }}>확인 <span className="hint" style={{ display: "inline", fontWeight: 400 }}>● 그렇다 · ◐ 부분 · ○ 아니다</span></th><th>메모</th><th>작가에게 줄 한 문장</th></tr></thead>
                   <tbody>
                     {PEER_VIEWS.map((pv) => {
                       const row = views[pv.k] || {};
                       return (
                         <tr key={pv.k}>
                           <td>{pv.label}<div className="hint">{pv.hint}</div></td>
-                          <td>
-                            <div className="seg">
-                              {["●", "◐", "○"].map((mk) => (
-                                <button key={mk}
+                          <td data-th="확인">
+                            <div className="seg" role="group" aria-label={pv.label + " 확인"}>
+                              {[["●", "그렇다"], ["◐", "부분적으로 그렇다"], ["○", "아니다"]].map(([mk, name]) => (
+                                <button key={mk} type="button" aria-pressed={row.mark === mk} aria-label={name} title={name}
                                   className={row.mark === mk ? (mk === "●" ? "on-ok" : mk === "◐" ? "on-mid" : "on-no") : ""}
                                   onClick={() => upV(pv.k, "mark", row.mark === mk ? "" : mk)}>{mk}</button>
                               ))}
                             </div>
                           </td>
-                          <td><input value={row.memo || ""} onChange={(e) => upV(pv.k, "memo", e.target.value)} /></td>
-                          <td><input value={row.sent || ""} onChange={(e) => upV(pv.k, "sent", e.target.value)} /></td>
+                          <td data-th="메모"><input value={row.memo || ""} aria-label={pv.label + " 메모"} placeholder="짚은 부분" onChange={(e) => upV(pv.k, "memo", e.target.value)} /></td>
+                          <td data-th="한 문장"><input value={row.sent || ""} aria-label={pv.label + " 작가에게 줄 한 문장"} placeholder="작가에게 줄 한 문장" onChange={(e) => upV(pv.k, "sent", e.target.value)} /></td>
                         </tr>
                       );
                     })}
@@ -4780,11 +4791,11 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
   const [busy, setBusy] = useState(false);
 
   const msgOf = (reason) => {
-    if (reason === "wrong-pin") return "비밀번호가 맞지 않습니다. 기억나지 않으면 선생님께 초기화를 요청하세요.";
+    if (reason === "wrong-pin") return "비밀번호가 처음 정한 번호와 다릅니다. 기억나지 않으면 선생님께 말해 주세요. 선생님이 새 번호로 바꿀 수 있습니다.";
     if (reason === "wrong-code") return "관리자 코드가 맞지 않습니다.";
     if (reason === "auth/network-request-failed") return "인터넷 연결을 확인하세요.";
     if (reason === "auth/too-many-requests") return "시도가 너무 잦습니다. 잠시 뒤 다시 하세요.";
-    if (reason === "auth/operation-not-allowed") return "관리자 설정이 끝나지 않았습니다. Firebase 콘솔에서 이메일·비밀번호 로그인을 사용 설정해야 합니다.";
+    if (reason === "auth/operation-not-allowed") return mode === "teacher" ? "관리자 설정이 끝나지 않았습니다. Firebase 콘솔에서 이메일·비밀번호 로그인을 사용 설정해야 합니다." : "지금은 입장할 수 없습니다. 선생님께 알려 주세요.";
     return "입장하지 못했습니다. 잠시 뒤 다시 시도하세요.";
   };
 
@@ -4802,6 +4813,11 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
     const rec = g.data;
     let name = (nick.trim() || (rec && rec.nick) || "").slice(0, 12);
     if (!name && g.ok) { setBusy(false); await authApi.cancelEnter(); return setErr("처음 입장할 때는 별명을 함께 입력하세요. 실명은 쓰지 않습니다."); }
+    // 이미 별명이 있는 학번에 다른 별명을 쓰면 조용히 덮어쓰지 않고 알린다 (다른 학생의 명단·작품 번호에 별명이 섞이는 일을 막는다)
+    if (rec && rec.nick && nick.trim() && rec.nick !== name) {
+      setBusy(false); await authApi.cancelEnter();
+      return setErr("이 학번은 별명 「" + rec.nick + "」으로 등록되어 있습니다. 별명 칸을 비우고 다시 입장하세요. 별명을 바꾸려면 선생님께 말해 주세요.");
+    }
     if (name && (!rec || rec.nick !== name)) {
       // 명단 잠금(교사 설정 4)이 켜져 있으면 명부에 없는 학번의 쓰기를 규칙이 거부한다
       const okR = await store.setT("roster", { [id]: { nick: name } });
@@ -4845,28 +4861,28 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
         onGallery={onGallery}
         onDemo={onDemo} />
       <div className="g4-main">
-        <GateSections onEnter={() => scrollTo("g4-enter", true)} />
-        <aside className="g4-enter" id="g4-enter" tabIndex={-1}>
+        {/* 입장 패널을 장 소개보다 먼저 둔다: 키보드·스크린리더 순서가 보이는 순서(폰에서는 맨 위)와 같아진다. 데스크톱 배치는 grid-column(src-polish.jsx) */}
+        <aside className="g4-enter" id="g4-enter" tabIndex={-1} aria-labelledby="g4-enter-h">
           <div className="ticket">
-        <GateLangHelp />
+        <h2 id="g4-enter-h">기록실 입장</h2>
+        <p className="sub">{mode === "teacher" ? "관리자 코드로 교사 화면에 들어갑니다" : "학번 · 별명 · 비밀번호 4자리"}</p>
         <div className="tab-switch" role="tablist">
           <button role="tab" aria-selected={mode === "student"} className={mode === "student" ? "on" : ""} disabled={busy} onClick={() => { setMode("student"); setErr(""); }}>학생</button>
           <button role="tab" aria-selected={mode === "teacher"} className={mode === "teacher" ? "on" : ""} disabled={busy} onClick={() => { setMode("teacher"); setErr(""); }}>교사</button>
-          <button role="tab" aria-selected={mode === "guest"} className={mode === "guest" ? "on" : ""} disabled={busy} onClick={() => { setMode("guest"); setErr(""); }}>둘러보기</button>
         </div>
         {mode === "student" ? (
           <form onSubmit={(e) => { e.preventDefault(); enterStudent(); }}>
             <div className="field"><label htmlFor="g4-sid">학번 (숫자만, 예: 10203)</label>
-              <input id="g4-sid" inputMode="numeric" value={sid} onChange={(e) => setSid(e.target.value.replace(/\D/g, ""))} maxLength={6} /></div>
-            <div className="field"><label htmlFor="g4-nick">별명 (처음 입장할 때만 · 실명 금지)</label>
+              <input id="g4-sid" inputMode="numeric" autoComplete="username" value={sid} onChange={(e) => setSid(e.target.value.replace(/\D/g, ""))} maxLength={6} /></div>
+            <div className="field"><label htmlFor="g4-nick">별명 (처음 입장할 때만 씁니다 · 실명 금지)</label>
               <input id="g4-nick" value={nick} onChange={(e) => setNick(e.target.value)} maxLength={12} /></div>
-            <div className="field"><label htmlFor="g4-pin">비밀번호 숫자 4자리</label>
-              <input id="g4-pin" type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} maxLength={4} /></div>
+            <div className="field"><label htmlFor="g4-pin">비밀번호 숫자 4자리 <span className="hint">(처음이면 지금 정하는 번호입니다. 다음에도 같은 번호로 들어옵니다)</span></label>
+              <input id="g4-pin" type="password" inputMode="numeric" autoComplete="current-password" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} maxLength={4} /></div>
             {err && <div className="err" role="alert">{err}</div>}
             <button type="submit" className="btn full" disabled={busy}>{busy ? "확인 중…" : "기록실 입장"}</button>
-            <p className="gate-note">처음 입장하면 학번과 별명이 등록되고, 다음부터는 학번과 비밀번호로 이어서 작성합니다. 별명을 이미 정했다면 비워 둡니다.</p>
+            <p className="gate-note">처음 입장: 학번, 별명, 비밀번호 4자리를 정해 넣습니다. 다음부터: 학번과 그 비밀번호만 넣고 별명은 비워 둡니다.</p>
           </form>
-        ) : mode === "teacher" ? (
+        ) : (
           <form onSubmit={(e) => { e.preventDefault(); enterTeacher(); }}>
             <div className="field"><label htmlFor="g4-tpin">관리자 코드 (5자리 이상)</label>
               <div style={{ display: "flex", gap: 6 }}>
@@ -4877,17 +4893,12 @@ function Gate({ onStudent, onTeacher, onGallery, onDemo }) {
             <button type="submit" className="btn full seal" disabled={busy}>{busy ? "확인 중…" : "관리자 입장"}</button>
             <p className="gate-note">관리자 코드나 참관용 코드를 입력합니다. 「표시」를 누르면 입력한 코드를 확인할 수 있습니다.</p>
           </form>
-        ) : (
-          <div>
-            <p style={{ fontSize: 13, color: "var(--sub)", marginBottom: 14 }}>
-              공개된 학급 작품이 걸린 전시장과, 예시 작품 「오른손」의 기록지를 로그인 없이 볼 수 있습니다.
-            </p>
-            <button className="btn full" onClick={onGallery}>전시장 들어가기</button>
-            <button className="btn full ghost" style={{ marginTop: 8 }} onClick={onDemo}>예시 기록지 「오른손」</button>
-          </div>
         )}
+        {/* 언어 도움말은 폼 아래에: 한국어 사용자는 건너뛰고, 다른 언어 사용자는 안내를 읽고 바로 위 칸을 채운다 */}
+        <GateLangHelp />
           </div>
         </aside>
+        <GateSections onEnter={() => scrollTo("g4-enter", true)} />
       </div>
       <footer className="g4-foot">
         <div className="g4-foot-in">
@@ -4909,7 +4920,7 @@ function SectionCard({ sec, ws, setField, onGallery, inq }) {
   const sp = sectionProgress(sec, ws);
   const complete = sp.total > 0 && sp.done >= sp.total;
   return (
-    <div className="card" id={"sec-" + sec.id} style={{ scrollMarginTop: "var(--sv-top, 60px)" }}>
+    <div className="card" id={"sec-" + sec.id} data-kind={sec.ladder || sec.summary ? "ladder" : sec.kind || "record"} style={{ scrollMarginTop: "var(--sv-top, 60px)" }}>
       {complete && <div className="stamp">기록됨</div>}
       <div className="card-head">
         {/* 발상 단계 카드는 「단계 3」처럼 tag만 찍는다. 교사 화면·CSV는 code(B3)를 쓴다 */}
@@ -5730,9 +5741,8 @@ function StudentApp({ me, onExit, onGallery }) {
     <div>
       <div className="topbar">
         <div className="topbar-in">
-          <div className="brand" role="heading" aria-level="1">허구의 아카이브 기록실<small>학생 · {me.sid}</small></div>
+          <div className="brand" role="heading" aria-level="1">허구의 아카이브 기록실<small>학생 · {me.sid}{me.nick ? " · " + me.nick : ""}</small></div>
           <div className="top-right">
-            <span>{me.nick}</span>
             <span translate="no"
               className={"save-pill " + (saveState === "dirty" || saveState === "saving" || saveState === "queued" ? "dirty" : saveState === "err" ? "err" : "")}>
               {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "queued" ? "연결 대기(기기에 담아 둠)" : saveState === "err" ? "저장 실패, 5초 뒤 재시도" : savedAt ? "저장됨 " + fmtTime(savedAt) : "아직 저장 기록 없음"}
@@ -5746,6 +5756,10 @@ function StudentApp({ me, onExit, onGallery }) {
             <button className="btn small ghost" disabled={leaving} onClick={leave}>{leaving ? "저장하는 중…" : "나가기"}</button>
           </div>
         </div>
+      </div>
+      {/* 폰에서 상단 바가 스크롤에 숨는 동안 저장 상태만 작은 띠로 남긴다 (src-polish.jsx .save-mini) */}
+      <div className={"save-mini " + (saveState === "dirty" || saveState === "saving" || saveState === "queued" ? "dirty" : saveState === "err" ? "err" : "")} aria-hidden="true" translate="no">
+        {saveState === "saving" ? "저장 중…" : saveState === "dirty" ? "입력 중…" : saveState === "queued" ? "연결 대기" : saveState === "err" ? "저장 실패" : savedAt ? "저장됨" : ""}
       </div>
       <div className="nav-shell">
       {loaded && <StudentSideNav tocKey={tab + (assessOn ? ":assess" : quizOn ? ":quiz" : "")} onSession={switchTab}
@@ -5808,16 +5822,12 @@ function StudentApp({ me, onExit, onGallery }) {
           <span className="prog-num">올린 사진·녹음 {mediaCount(ws)}개</span>
         </div>}
         {/* 최종 평가·쪽지시험 탭은 탭 줄 맨 뒤라 폰에서는 보이지 않는다. 열려 있는 동안 이동 안내를 탭 줄 위에 둔다 */}
-        {loaded && peerStage !== "closed" && !assessOn && (
-          <div className="ok-note stage-open" role="status">
-            <span>최종 평가(제출·자기평가·동료 비교)가 열려 있습니다.</span>
-            <button className="btn small" onClick={() => goStage("assess")}>최종 평가로 이동</button>
-          </div>
-        )}
-        {loaded && quizStage !== "closed" && !quizOn && (
-          <div className="ok-note stage-open" role="status">
-            <span>쪽지시험이 열려 있습니다.</span>
-            <button className="btn small" onClick={() => goStage("quiz")}>쪽지시험으로 이동</button>
+        {/* 600px 이상에서는 탭 줄·사이드바에 같은 항목이 있어 숨긴다(src-polish.jsx .stage-nav). 폰에서만 한 줄로 */}
+        {loaded && !assessOn && !quizOn && (peerStage !== "closed" || quizStage !== "closed") && (
+          <div className="ok-note stage-open stage-nav" role="status">
+            <span>{[peerStage !== "closed" && "최종 평가", quizStage !== "closed" && "쪽지시험"].filter(Boolean).join("·")}이(가) 열려 있습니다.</span>
+            {peerStage !== "closed" && <button className="btn small ghost" onClick={() => goStage("assess")}>최종 평가로 이동</button>}
+            {quizStage !== "closed" && <button className="btn small ghost" onClick={() => goStage("quiz")}>쪽지시험으로 이동</button>}
           </div>
         )}
         {loaded && wsLocked && !assessOn && !quizOn && <WsLockNote />}
@@ -5860,18 +5870,18 @@ function StudentApp({ me, onExit, onGallery }) {
           <SurveyCard phase="pre" block={survey.pre} busy={svBusy} saveInfo={svSave}
             onChange={(b) => svChange("pre", b)} onSubmit={() => svSubmit("pre")} />
         ) : !svDone(survey.pre) && (
-          <div className="ok-note stage-open" role="status">
+          <div className="ok-note stage-open sv-note" role="status">
             <span>사전 설문(약 5분)이 {svHome} 탭에 있습니다.</span>
-            <button className="btn small" onClick={() => switchTab(svHome)}>설문으로 이동</button>
+            <button className="btn small ghost" onClick={() => switchTab(svHome)}>설문으로 이동</button>
           </div>
         ))}
         {loaded && survey && surveyOpen(svCfg, "post") && (tab === svHomePost ? (
           <SurveyCard phase="post" block={survey.post} busy={svBusy} saveInfo={svSave}
             onChange={(b) => svChange("post", b)} onSubmit={() => svSubmit("post")} />
         ) : !svDone(survey.post) && (
-          <div className="ok-note stage-open" role="status">
+          <div className="ok-note stage-open sv-note" role="status">
             <span>사후 설문이 {svHomePost} 탭에 있습니다.</span>
-            <button className="btn small" onClick={() => switchTab(svHomePost)}>설문으로 이동</button>
+            <button className="btn small ghost" onClick={() => switchTab(svHomePost)}>설문으로 이동</button>
           </div>
         ))}
         {loaded && survey && surveyOpen(svCfg, "sPre") && tab === svHome && (
@@ -5898,7 +5908,7 @@ function StudentApp({ me, onExit, onGallery }) {
             onChange={anChange} onSubmit={anSubmit} />
         )}
 
-        {loaded && assessOn && <AssessTab me={me} ws={ws} cfgAll={cfgAll} />}
+        {loaded && assessOn && <AssessTab me={me} ws={ws} cfgAll={cfgAll} onGoTab={switchTab} />}
         {loaded && quizOn && <QuizTab me={me} cfgAll={cfgAll} />}
         {loaded && !assessOn && !quizOn && !isOpen(openMap, tab) ? (
           <div className="card"><div className="card-body" style={{ color: "var(--sub)", fontSize: 13 }}>
@@ -7276,12 +7286,19 @@ function TeacherGuide() {
   const [sess, setSess] = useState(SESSIONS[0]);
   return (
     <div>
+      <div className="t-tabs" role="tablist" aria-label="차시">
+        {SESSIONS.map((s) => (
+          <button key={s} role="tab" aria-selected={sess === s} className={"btn small " + (sess === s ? "" : "ghost")} onClick={() => setSess(s)}>{s}</button>
+        ))}
+      </div>
+      {LESSONS.filter((L) => L.session === sess).map((L) => <LessonPanel key={L.n} L={L} teacher />)}
       <div className="card">
         <div className="card-body" style={{ fontSize: 13, color: "var(--sub)" }}>
           차시별 교사용 안내서입니다. 120분 수업 흐름, 성취기준, 설계 근거(교육학적 참고)와 학생에게 보이는 읽기 자료를 함께 볼 수 있습니다. 학생 화면에는 학습 목표와 읽기 자료만 보입니다.
         </div>
       </div>
-      <div className="card">
+      <div className="card guide-ref">
+        <div className="card-head"><span className="card-code">참고</span><span className="card-title">설계·연구 참고 문서</span></div>
         <div className="card-body">
           <details>
             <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>연구 설계 참고: 이론적 기반, 측정 도구, 데이터 수집 구조, 연구 윤리</summary>
@@ -7320,10 +7337,6 @@ function TeacherGuide() {
               </p>
             </div>
           </details>
-        </div>
-      </div>
-      <div className="card">
-        <div className="card-body">
           <details>
             <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>유물 발상 단계 운영: 일곱 단계와 돌아보기를 수업 시간에 어떻게 진행하는가</summary>
             <div style={{ fontSize: 13, lineHeight: 1.8, marginTop: 10 }}>
@@ -7403,10 +7416,6 @@ function TeacherGuide() {
               </p>
             </div>
           </details>
-        </div>
-      </div>
-      <div className="card">
-        <div className="card-body">
           <details>            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>「연구」 탭: 수업 기록을 논문 작성용 자료로 바꾸기</summary>
             <div style={{ fontSize: 13, lineHeight: 1.8, marginTop: 10 }}>
               <p style={{ marginBottom: 10 }}>
@@ -7439,10 +7448,6 @@ function TeacherGuide() {
               </p>
             </div>
           </details>
-        </div>
-      </div>
-      <div className="card">
-        <div className="card-body">
           <details>
             <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500 }}>참고: 학습지 항목과 「창의성」 탭 지표의 대응 표</summary>
             <p style={{ fontSize: 13, margin: "10px 0" }}>
@@ -7464,12 +7469,6 @@ function TeacherGuide() {
           </details>
         </div>
       </div>
-      <div className="t-tabs">
-        {SESSIONS.map((s) => (
-          <button key={s} className={"btn small " + (sess === s ? "" : "ghost")} onClick={() => setSess(s)}>{s}</button>
-        ))}
-      </div>
-      {LESSONS.filter((L) => L.session === sess).map((L) => <LessonPanel key={L.n} L={L} teacher />)}
     </div>
   );
 }
@@ -9289,6 +9288,7 @@ function TeacherApp({ onExit, onGallery }) {
   const [cfgAll, setCfgAll] = useState(null);   // 설정 문서 전체 — 붙여넣기 출처 묻기 토글을 읽는다
   const [sampleMode, setSampleMode] = useState(true);
   const [npin, setNpin] = useState("");
+  const [npin2, setNpin2] = useState("");   // 관리자 코드 변경의 재입력
   // 수업 편집 원고가 저장 전이면 탭 이동 한 번으로 통째로 사라진다 — 편집기가 dirty를 올려 주면 이동을 막는다
   const [edDirty, setEdDirty] = useState(false);
   // 탭 이동만이 아니라 새로고침(편집기 언마운트)·전시장·나가기도 미저장 원고를 지운다 — 같은 확인을 거친다
@@ -9507,7 +9507,7 @@ function TeacherApp({ onExit, onGallery }) {
     <div>
       <div className="topbar">
         <div className="topbar-in">
-          <div className="brand">허구의 아카이브 교사 대시보드<small>{authApi.isViewer() ? "VIEW ONLY" : "TEACHER CONSOLE"}</small></div>
+          <div className="brand" role="heading" aria-level="1">허구의 아카이브 교사 대시보드<small>{authApi.isViewer() ? "보기 전용" : "교사용"}</small></div>
           <div className="top-right">
             <button className="btn small ghost" onClick={() => { if (confirmLoseEdit()) onGallery(); }}>전시장</button>
             <button className="btn small ghost" onClick={() => { if (confirmLoseEdit()) loadAll(); }}>새로고침</button>
@@ -9516,7 +9516,7 @@ function TeacherApp({ onExit, onGallery }) {
         </div>
       </div>
       <div className="nav-shell">
-      {(!sel || viewerOnly) && <TeacherSideNav tab={tab} onSwitch={switchTab} dirty={edDirty}
+      {<TeacherSideNav tab={tab} onSwitch={(t) => { if (sel && !viewerOnly) setSel(null); switchTab(t); }} dirty={edDirty}
         groups={TEACHER_TAB_GROUPS.map((g) => ({ ...g, tabs: viewerOnly ? g.tabs.filter((t) => VIEWER_TABS.includes(t)) : g.tabs })).filter((g) => g.tabs.length)} />}
       <div className="wrap wide">
         <CaptionOnAir />
@@ -9614,8 +9614,8 @@ function TeacherApp({ onExit, onGallery }) {
                               <td className="mono">{working} / {ids.length}</td>
                               <td>
                                 <div className="seg">
-                                  <button className={open ? "on-ok" : ""} onClick={() => { if (!open) toggleSession(s); }}>열림</button>
-                                  <button className={!open ? "on-no" : ""} onClick={() => { if (open) toggleSession(s); }}>잠김</button>
+                                  <button type="button" aria-pressed={open} className={open ? "on-ok" : ""} onClick={() => { if (!open) toggleSession(s); }}>열림</button>
+                                  <button type="button" aria-pressed={!open} className={!open ? "on-no" : ""} onClick={() => { if (open) toggleSession(s); }}>잠김</button>
                                 </div>
                               </td>
                             </tr>
@@ -9652,8 +9652,8 @@ function TeacherApp({ onExit, onGallery }) {
                               <td className="mono">{done} / {ids.length}</td>
                               <td>
                                 <div className="seg">
-                                  <button className={open ? "on-ok" : ""} onClick={() => { if (!open) toggleSurvey(ph); }}>열림</button>
-                                  <button className={!open ? "on-no" : ""} onClick={() => { if (open) toggleSurvey(ph); }}>잠김</button>
+                                  <button type="button" aria-pressed={open} className={open ? "on-ok" : ""} onClick={() => { if (!open) toggleSurvey(ph); }}>열림</button>
+                                  <button type="button" aria-pressed={!open} className={!open ? "on-no" : ""} onClick={() => { if (open) toggleSurvey(ph); }}>잠김</button>
                                 </div>
                               </td>
                             </tr>
@@ -9682,8 +9682,8 @@ function TeacherApp({ onExit, onGallery }) {
                           </td>
                           <td>
                             <div className="seg">
-                              <button className={pasteAskOn(cfgAll) ? "on-ok" : ""} onClick={() => { if (!pasteAskOn(cfgAll)) togglePasteAsk(); }}>켬</button>
-                              <button className={!pasteAskOn(cfgAll) ? "on-no" : ""} onClick={() => { if (pasteAskOn(cfgAll)) togglePasteAsk(); }}>끔</button>
+                              <button type="button" aria-pressed={pasteAskOn(cfgAll)} className={pasteAskOn(cfgAll) ? "on-ok" : ""} onClick={() => { if (!pasteAskOn(cfgAll)) togglePasteAsk(); }}>켬</button>
+                              <button type="button" aria-pressed={!pasteAskOn(cfgAll)} className={!pasteAskOn(cfgAll) ? "on-no" : ""} onClick={() => { if (pasteAskOn(cfgAll)) togglePasteAsk(); }}>끔</button>
                             </div>
                           </td>
                         </tr>
@@ -9742,7 +9742,7 @@ function TeacherApp({ onExit, onGallery }) {
                         <div key={sec.id} style={{ marginBottom: 8, fontSize: 13 }}>
                           <span className="mono" style={{ color: "var(--seal)", fontSize: 11 }}>{sec.kind === "learn" ? "배움 확인" : sec.kind === "inquiry" ? "탐구 질문" : "기록"} {sec.code}</span>{" "}
                           <strong>{sec.title}</strong> <span className="hint">({sec.session})</span>{" "}
-                          <span className="mono" style={{ fontSize: 12 }}>{missing.length}명: {missing.join(", ")}</span>
+                          <span className="mono" style={{ fontSize: 12 }}>{missing.length === ids.length ? "전원 (" + ids.length + "명)" : missing.length + "명: " + missing.join(", ")}</span>
                         </div>
                       );
                     })}
@@ -9847,14 +9847,19 @@ function TeacherApp({ onExit, onGallery }) {
                                 <div className="card">
                   <div className="card-head"><span className="card-code">설정 3</span><span className="card-title">관리자 코드 변경</span></div>
                   <div className="card-body">
-                    <div className="field" style={{ maxWidth: 260 }}><label>새 관리자 코드 (5자리 이상)</label>
-                      <input type="password" value={npin} onChange={(e) => setNpin(e.target.value)} /></div>
-                    <button className="btn" onClick={async () => {
-                      if (npin.length < 5) return setMsg("관리자 코드는 5자리 이상으로 정하세요.");
-                      const ok = await authApi.changeCode(npin);
-                      if (ok) { setMsg("관리자 코드를 바꿨습니다."); setNpin(""); }
-                      else setMsg("코드를 바꾸지 못했습니다. 다시 로그인한 뒤 시도하세요.");
-                    }}>코드 변경</button>
+                    <div className="field" style={{ maxWidth: 260 }}><label htmlFor="set-npin">새 관리자 코드 (5자리 이상)</label>
+                      <input id="set-npin" type="password" autoComplete="new-password" value={npin} onChange={(e) => setNpin(e.target.value)} /></div>
+                    <div className="field" style={{ maxWidth: 260 }}><label htmlFor="set-npin2">새 코드 다시 입력</label>
+                      <input id="set-npin2" type="password" autoComplete="new-password" value={npin2} onChange={(e) => setNpin2(e.target.value)} />
+                      {npin2 && npin2 !== npin && <span className="hint" style={{ color: "var(--err)" }}>두 입력이 다릅니다.</span>}</div>
+                    {/* 오타로 바꾸면 교사가 잠기므로 두 번 입력하고 그 자리에서 한 번 더 묻는다 */}
+                    <ConfirmButton className="btn ghost" label="코드 변경" yes="바꾸기" disabled={npin.length < 5 || npin !== npin2}
+                      ask="관리자 코드를 바꿉니다. 바꾼 코드는 다시 볼 수 없습니다. 지금 바꿀까요?"
+                      onConfirm={async () => {
+                        const ok = await authApi.changeCode(npin);
+                        if (ok) { setMsg("관리자 코드를 바꿨습니다."); setNpin(""); setNpin2(""); }
+                        else setMsg("코드를 바꾸지 못했습니다. 다시 로그인한 뒤 시도하세요.");
+                      }} />
                     <p className="hint" style={{ marginTop: 10 }}>학생이 한 명도 입장하지 않은 동안에는 화면 구조를 살펴보도록 표본 학급 8명이 표시됩니다. 실제 학생이 입장하면 표본은 사라집니다.</p>
                   </div>
                 </div>
@@ -9863,8 +9868,8 @@ function TeacherApp({ onExit, onGallery }) {
                   <div className="card-body">
                     <p style={{ fontSize: 13 }}>켜면 명부에 없는 학번은 새로 입장하지 못합니다. 학급 전원이 한 번씩 입장한 뒤에 켜 두면 엉뚱한 학번의 계정과 기록이 생기는 것을 막습니다. 전학생처럼 새 학번이 필요하면 아래 학생 관리에서 먼저 추가하거나 잠금을 잠시 끕니다.</p>
                     <div className="seg" style={{ marginTop: 8 }}>
-                      <button className={rosterLockOn ? "on-ok" : ""} onClick={() => { if (!rosterLockOn) toggleRosterLock(); }}>켬</button>
-                      <button className={!rosterLockOn ? "on-no" : ""} onClick={() => { if (rosterLockOn) toggleRosterLock(); }}>끔</button>
+                      <button type="button" aria-pressed={rosterLockOn} className={rosterLockOn ? "on-ok" : ""} onClick={() => { if (!rosterLockOn) toggleRosterLock(); }}>켬</button>
+                      <button type="button" aria-pressed={!rosterLockOn} className={!rosterLockOn ? "on-no" : ""} onClick={() => { if (rosterLockOn) toggleRosterLock(); }}>끔</button>
                     </div>
                   </div>
                 </div>
@@ -10225,7 +10230,7 @@ function Gallery({ onBack, backLabel }) {
     <div>
       <div className="topbar">
         <div className="topbar-in">
-          <div className="brand">학급 가상 컬렉션 전시장<small>FICTIVE ARCHIVE · EXHIBITION</small></div>
+          <div className="brand" role="heading" aria-level="1">학급 가상 컬렉션 전시장<small>FICTIVE ARCHIVE · EXHIBITION</small></div>
           <div className="top-right">
             <button className="btn ghost" onClick={onBack}>{backLabel || "입장 화면으로"}</button>
           </div>
@@ -10248,12 +10253,18 @@ function Gallery({ onBack, backLabel }) {
             <button role="tab" aria-selected={showPlate} className={showPlate ? "on" : ""} onClick={() => setShowPlate(true)}>2차 관람 (작품 캡션 공개)</button>
           </div>
           <div className="gal-tools">
-            <input className="gal-find" inputMode="text" placeholder="작품 번호로 찾기 (예: A-01)"
-              value={numQ} onChange={(e) => setNumQ(e.target.value)} aria-label="작품 번호로 찾기" />
+            <label className="gal-find-l" htmlFor="gal-find">작품 번호</label>
+            {/* 학급 작품이 없으면 찾을 대상이 없으므로 비활성화하고 이유를 보인다 */}
+            <input id="gal-find" className="gal-find" inputMode="text" placeholder="예: A-01" disabled={!works || !works.length}
+              title={!works || !works.length ? "학급 작품이 걸리면 번호로 찾을 수 있습니다" : undefined}
+              value={numQ} onChange={(e) => setNumQ(e.target.value)} />
           </div>
         </div>
         {ex.status === "signedOut" && (
-          <div className="warn-note" style={{ maxWidth: 640, margin: "0 auto 16px" }}>학급 작품은 로그인한 뒤에 볼 수 있습니다. 아래는 자료집의 예시 작품입니다.</div>
+          <div className="warn-note" style={{ maxWidth: 640, margin: "0 auto 16px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ flex: 1, minWidth: 200 }}>학급 작품은 로그인한 뒤에 볼 수 있습니다. 아래는 자료집의 예시 작품입니다.</span>
+            <button className="btn small ghost" onClick={onBack}>{backLabel || "입장 화면으로"}</button>
+          </div>
         )}
         {ex.status === "viewer" && (
           <div className="warn-note" style={{ maxWidth: 640, margin: "0 auto 16px" }}>보기 전용 계정에서는 학급 작품이 보이지 않습니다. 아래는 자료집의 예시 작품입니다.</div>
@@ -10268,10 +10279,10 @@ function Gallery({ onBack, backLabel }) {
           /* 학급 작품이 걸리면 예시 구간은 접어 둔다. 폰에서 자기 반 작품까지 다섯 화면을 내려야 했다 */
           <details className="gal-samples">
             <summary>전시 진열 예시와 예시 작품 세 점 보기</summary>
-            <ExhibitSamples showPlate={showPlate} />
+            <ExhibitSamples showPlate={showPlate} tail />
           </details>
         ) : (
-          <ExhibitSamples showPlate={showPlate} />
+          <ExhibitSamples showPlate={showPlate} tail={false} />
         )}
         {works === null ? (
           <p style={{ textAlign: "center", color: "var(--sub)" }}>전시 작품을 불러오는 중…</p>
@@ -10498,15 +10509,15 @@ function DemoView({ onBack }) {
   const [tab, setTab] = useState(SESSIONS[0]);
   return (
     <div>
-      <div className="topbar">
+      <div className="topbar demo-bar">
         <div className="topbar-in">
-          <div className="brand">예시 기록지 「오른손」<small>SAMPLE RECORD · READ ONLY</small></div>
+          <div className="brand" role="heading" aria-level="1">예시 기록지 「오른손」<small>예시 · 읽기 전용</small></div>
           <div className="top-right">
             <button className="btn ghost" onClick={onBack}>입장 화면으로</button>
           </div>
         </div>
       </div>
-      <div className="wrap">
+      <div className="wrap demo">
         <div className="card" style={{ marginTop: 18 }}>
           <div className="card-body" style={{ fontSize: 13, color: "var(--sub)" }}>
             자료집의 예시 작품 A 「오른손」(새벽 배송 노동)으로 채워 둔 기록지입니다. 생성형 AI로 만든 가상의 사례이며 실제 학생 작품이 아닙니다. 여기서는 읽기만 할 수 있고, 자기 기록은 학생으로 입장해 작성합니다.
@@ -10521,16 +10532,16 @@ function DemoView({ onBack }) {
         </div>
         {[tab].map((sess) => (
           <div key={sess}>
-            {LESSONS.filter((L) => L.session === sess).map((L) => <LessonPanel key={L.n} L={demoLesson(L)} />)}
+            {LESSONS.filter((L) => L.session === sess).map((L) => <LessonPanel key={L.n} L={demoLesson(L)} readOnly />)}
             {SCHEMA.filter((s) => s.session === sess).map((sec) => (
-              <div className="card" key={sec.id}>
+              /* id는 강의 노트 끝의 「예시 답 보기 ↓」 버튼이 찾는다(학생 화면 SectionCard와 같은 규약) */
+              <div className="card" key={sec.id} id={"sec-" + sec.id} data-kind={sec.ladder || sec.summary ? "ladder" : sec.kind || "record"} style={{ scrollMarginTop: "var(--sv-top, 60px)" }}>
                 <div className="card-head">
                   {/* 학생 화면(SectionCard)과 같은 머리표: 발상 단계는 「단계 5」 */}
                   <span className="card-code">{sectionHead(sec)}</span>
-                  <span className="card-title">{sec.title}</span>
+                  <span className="card-title" role="heading" aria-level="3">{sec.title}</span>
                   <span className="card-sess">{sec.session}</span>
                 </div>
-                {sec.note && sec.kind !== "inquiry" && <div className="card-note">{sec.note}</div>}
                 <div className="card-body">
                   {sec.fields.map((f) => <FieldReader key={f.k} sec={sec} f={f} ws={DEMO_WS} />)}
                 </div>
@@ -10635,6 +10646,7 @@ function App() {
       <ArStyle />
       <GridStyle /><GridRuntime />
       <NavStyle /><NavRuntime />
+      <PolishStyle />
       {restoring && <div style={{ padding: "60px 16px", textAlign: "center", color: "var(--sub)", fontSize: 13 }}>기록실을 여는 중…</div>}
       {view === "gate" && !restoring && <Gate
         onStudent={(m) => { setMe(m); setView("student"); }}

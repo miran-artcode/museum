@@ -53,30 +53,22 @@ export const GATE_SECTIONS = [
   },
 ];
 
-/* 상단 헤더 — 유틸리티 스트립 + 대형 로고 + 주 내비게이션 */
+/* 상단 헤더: 대형 로고 + 주 내비게이션 (같은 목적지로 가던 유틸리티 스트립은 2026-10-15에 뺐다) */
 export function GateHeader({ onEnter, onUnits, onTeacher, onGallery, onDemo }) {
   return (
     <header className="g4-header">
-      <div className="g4-strip">
-        <nav className="g4-strip-nav">
-          <button onClick={onUnits}>수업 소개</button>
-          <button onClick={onGallery}>전시장</button>
-          <button onClick={onDemo}>예시 기록지</button>
-          <button onClick={onTeacher}>교사</button>
-          <button className="g4-strip-join" onClick={onEnter}>기록실 입장</button>
-        </nav>
-      </div>
       <div className="g4-masthead">
         <button className="g4-logo" onClick={onUnits} aria-label="허구의 아카이브 수업 소개로 이동">
           <span>FICTIVE</span>
           <span>ARCHIVE</span>
           <span className="g4-logo-kr">허구의 아카이브 · 창작 과정 기록실</span>
         </button>
-        <nav className="g4-mainnav">
-          <button onClick={onUnits}>수업</button>
-          <button onClick={onEnter}>기록실 입장</button>
+        {/* 목적지 하나에 이름 하나. 기록실 입장은 옆(폰에서는 위)의 입장 패널이 맡는다 */}
+        <nav className="g4-mainnav" aria-label="주 메뉴">
+          <button onClick={onUnits}>수업 소개</button>
           <button onClick={onGallery}>전시장</button>
           <button onClick={onDemo}>예시 기록지</button>
+          <button onClick={onTeacher}>교사</button>
         </nav>
       </div>
     </header>
@@ -107,11 +99,12 @@ export function GateSections({ onEnter }) {
               </div>
               <h3>{s.title}</h3>
               <p>{s.body}</p>
-              <button className="g4-arrow" onClick={onEnter} aria-label={s.title + " 기록실 입장으로 이동"}>입장 →</button>
             </div>
           </article>
         ))}
       </div>
+      {/* 폰·태블릿에서는 장 네 개를 다 읽은 뒤 위의 입장 패널로 돌아갈 길 (1100px 이상에서는 패널이 옆에 있어 숨긴다) */}
+      <div className="g4-units-foot"><button className="btn" onClick={onEnter}>기록실 입장</button><span>오늘 열린 차시는 입장한 뒤에 보입니다.</span></div>
     </section>
   );
 }
@@ -150,7 +143,7 @@ export const GATE_CSS = `
   display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:0 34px;align-items:start}
 @media(max-width:1100px){
   .g4-main{grid-template-columns:1fr;display:flex;flex-direction:column}
-  .g4-main .g4-enter{order:-1} /* 폰에서 도판 4장을 다 지나야 입장칸이 나오던 문제 — 입장 패널을 맨 위로 */
+  /* 입장 패널은 마크업에서도 장 소개보다 앞이라(2026-10-15) 순서를 바꾸는 규칙이 필요 없다 */
 }
 
 /* 장 구분 캡션 줄 */

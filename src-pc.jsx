@@ -152,7 +152,7 @@ export function PcPad({ f, fieldKey, v, setField, ws, owner, store, MediaThumb, 
         </div>
       ) : <span className="hint">불러올 이미지가 없습니다. PhotoCraft에서 기기의 이미지 파일을 열 수 있습니다.</span>}
       <div className="pcf-row">
-        <button type="button" className="btn" onClick={() => setOpen(true)}>{cur ? "PhotoCraft에서 열기" : "PhotoCraft 열기"}</button>
+        <button type="button" className="btn ghost" onClick={() => setOpen(true)}>{cur ? "PhotoCraft에서 열기" : "PhotoCraft 열기"}</button>
         {val && val.n ? <span className="hint">저장 {val.n}회 · 마지막 {fmtAt(val.at)}</span> : null}
       </div>
       {open ? (

@@ -90,7 +90,7 @@ function LessonStrip({ L }) {
   return (
     <div className="iaid-block">
       <div className="iaid-t">
-        <span className="iaid-acc">SOURCE</span>
+        <span className="iaid-acc">근거 자료</span>
         {L.n}차시에 본 작품·자료 {items.length}점
         <span className="iaid-sub"> (눌러서 크게 보고, 이 가운데 실제로 근거가 된 것을 답에 밝혀 씁니다{items.length > 5 ? ". 옆으로 넘기면 더 볼 수 있습니다" : ""})</span>
       </div>
@@ -197,7 +197,7 @@ function GalleryLink({ n, onGallery }) {
   return (
     <div className="iaid-block">
       <div className="iaid-t">
-        <span className="iaid-acc">EXHIBITION</span>
+        <span className="iaid-acc">전시</span>
         이 질문의 자료는 학급 전시장입니다
         <span className="iaid-sub"> ({n === 7 ? "내 작품 옆에 놓을 한 점을 전시장에서 고릅니다" : "관람에서 본 작품 두 점을 전시장에서 다시 확인합니다"})</span>
       </div>

@@ -376,16 +376,14 @@ export function InquiryField({ sec, f, ws, setField, sid, cfg, echo }) {
       <textarea id={fid} rows={f.rows || 4} value={text} maxLength={4000} placeholder={ph} onChange={(e) => onText(e.target.value)} />
       {!tr.v1 ? (
         <div className="inq-foot">
-          {text.trim().length >= MIN_V1 ? (
-            <button type="button" className="btn small" onClick={freeze}>
-              {level === "self" ? "답 저장하고 내 질문 쓰기" : "답 저장하고 추가 질문 받기"}
-            </button>
-          ) : null}
+          {/* 버튼은 늘 보이고 글자 수가 모자라면 눌리지 않는다. 갑자기 나타나던 버튼을 찾아 헤매지 않게 */}
+          <button type="button" className="btn small" disabled={text.trim().length < MIN_V1} onClick={freeze}>
+            {level === "self" ? "답 저장하고 내 질문 쓰기" : "답 저장하고 추가 질문 받기"}
+          </button>
           <span className="hint">
-            {!text.trim() ? "다 쓰면 아래에 「답 저장」 버튼이 나타납니다."
-              : text.trim().length < MIN_V1 ? MIN_V1 + "자 이상 쓰면 「답 저장」 버튼이 나타납니다."
-              : level === "self" ? "저장하면 지금 쓴 답이 처음 쓴 답으로 기록되고, 내 질문을 쓰는 칸이 나타납니다."
-              :"저장하면 지금 쓴 답이 처음 쓴 답으로 기록되고, 추가 질문을 받습니다."}
+            {text.trim().length < MIN_V1 ? MIN_V1 + "자 이상 쓰면 누를 수 있습니다. (지금 " + text.trim().length + "자)"
+              : level === "self" ? "누르면 내 질문을 쓰는 칸이 열립니다. 답은 위 칸에서 이어 고칩니다."
+              : "누르면 추가 질문이 옵니다. 답은 위 칸에서 이어 고칩니다."}
           </span>
         </div>
       ) : (
